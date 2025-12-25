@@ -236,7 +236,7 @@ class MainWindow(tk.Tk):
         # main route actions
         self.bind('<Control-x>', self.open_customize_dvs_window)
         self.bind('<Control-n>', self.open_new_route_window)
-        self.bind('<Control-l>', self.open_load_route_window)
+        self.bind('<Control-a>', self.open_load_route_window)
         self.bind('<Control-s>', self.save_route)
         self.bind('<Control-W>', self.export_notes)
         # event actions
@@ -252,7 +252,7 @@ class MainWindow(tk.Tk):
         self.bind('<Control-Z>', self.open_app_config_window)
         self.bind('<Control-R>', self.open_summary_window)
         self.bind('<Control-T>', self.open_setup_summary_window)
-        self.bind('<Control-O>', self.open_data_location)
+        self.bind('<Control-A>', self.open_data_location)
         # Battle summary export shortcuts
         self.bind('<Control-q>', self.screenshot_battle_summary)
         self.bind('<Control-w>', self.export_player_ranges)
