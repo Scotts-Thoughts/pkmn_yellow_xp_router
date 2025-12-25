@@ -130,7 +130,6 @@ class EventDetails(ttk.Frame):
         self._battle_summary_controller.load_empty()
         self.battle_summary_frame.configure_weather(current_gen_info().get_valid_weather())
         self.battle_summary_frame.configure_setup_moves(current_gen_info().get_stat_modifer_moves())
-        self.battle_summary_frame.configure_field_moves(current_gen_info().get_field_moves())
     
     def _handle_auto_switch_toggle(self, *args, **kwargs):
         config.set_auto_switch(self.auto_change_tab_checkbox.is_checked())
@@ -269,6 +268,48 @@ class EventDetails(ttk.Frame):
     
     def take_battle_summary_screenshot(self, *args, **kwargs):
         if self.tabbed_states.index(self.tabbed_states.select()) == self.battle_summary_tab_index:
-            self._battle_summary_controller.take_screenshot(
-                tk_utils.get_bounding_box(self.battle_summary_frame)
+            bbox = self.battle_summary_frame.get_content_bounding_box()
+            self._battle_summary_controller.take_screenshot(bbox)
+    
+    def take_player_ranges_screenshot(self, *args, **kwargs):
+        if self.tabbed_states.index(self.tabbed_states.select()) == self.battle_summary_tab_index:
+            self._take_scaled_screenshot(
+                self.battle_summary_frame.get_player_ranges_bounding_box,
+                suffix="_player_ranges"
             )
+    
+    def take_enemy_ranges_screenshot(self, *args, **kwargs):
+        if self.tabbed_states.index(self.tabbed_states.select()) == self.battle_summary_tab_index:
+            self._take_scaled_screenshot(
+                self.battle_summary_frame.get_enemy_ranges_bounding_box,
+                suffix="_enemy_ranges"
+            )
+    
+    def _take_scaled_screenshot(self, bbox_getter, suffix=""):
+        """Take a screenshot with UI scaled up by 1.5x for better quality."""
+        root = self.winfo_toplevel()
+        
+        # Get current scaling factor
+        current_scaling = float(root.tk.call('tk', 'scaling'))
+        
+        try:
+            # Scale up by 1.5x
+            new_scaling = current_scaling * 1.5
+            root.tk.call('tk', 'scaling', new_scaling)
+            
+            # Update UI to reflect scaling changes
+            self.update_idletasks()
+            self.battle_summary_frame.update_idletasks()
+            root.update_idletasks()
+            
+            # Small delay to ensure UI has updated
+            time.sleep(0.1)
+            
+            # Get bounding box and take screenshot
+            bbox = bbox_getter()
+            self._battle_summary_controller.take_screenshot(bbox, suffix)
+        finally:
+            # Restore original scaling
+            root.tk.call('tk', 'scaling', current_scaling)
+            self.update_idletasks()
+            root.update_idletasks()

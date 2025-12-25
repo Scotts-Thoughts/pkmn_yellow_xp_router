@@ -26,7 +26,7 @@ from gui.setup_summary_window import SetupSummaryWindow
 from route_recording.recorder import RecorderController
 from utils.constants import const
 from utils.config_manager import config
-from utils import io_utils
+from utils import io_utils, tk_utils
 from routing.route_events import EventFolder
 
 logger = logging.getLogger(__name__)
@@ -60,14 +60,19 @@ class MainWindow(tk.Tk):
         self.file_menu.add_command(label="Load Route", accelerator="Ctrl+L", command=self.open_load_route_window)
         self.file_menu.add_command(label="Save Route", accelerator="Ctrl+S", command=self.save_route)
         self.file_menu.add_command(label="Export Notes", accelerator="Ctrl+Shift+W", command=self.export_notes)
-        self.file_menu.add_command(label="Screenshot Battle Summary", accelerator="Ctrl+P", command=self.screenshot_battle_summary)
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Screenshot Event List", command=self.screenshot_event_list)
+        self.file_menu.add_command(label="Screenshot Battle Summary", accelerator="Ctrl+Q", command=self.screenshot_battle_summary)
+        self.file_menu.add_command(label="Export Player Ranges", accelerator="Ctrl+W", command=self.export_player_ranges)
+        self.file_menu.add_command(label="Export Enemy Ranges", accelerator="Ctrl+E", command=self.export_enemy_ranges)
+        self.file_menu.add_separator()
         self.file_menu.add_command(label="Config Font", accelerator="Ctrl+Shift+D", command=self.open_config_window)
         self.file_menu.add_command(label="Custom Gens", accelerator="Ctrl+Shift+E", command=self.open_custom_gens_window)
         self.file_menu.add_command(label="App Config", accelerator="Ctrl+Shift+Z", command=self.open_app_config_window)
         self.file_menu.add_command(label="Open Data Folder", accelerator="Ctrl+Shift+O", command=self.open_data_location)
 
         self.event_menu = tk.Menu(self.top_menu_bar, tearoff=0)
-        self.event_menu.add_command(label="Move Event Up", accelerator="Ctrl+E", command=self.move_group_up)
+        self.event_menu.add_command(label="Move Event Up", command=self.move_group_up)
         self.event_menu.add_command(label="Move Event Down", accelerator="Ctrl+D", command=self.move_group_down)
         self.event_menu.add_command(label="Enable/Disable", accelerator="Ctrl+C", command=self.toggle_enable_disable)
         self.event_menu.add_command(label="Toggle Highlight", accelerator="Ctrl+V", command=self.toggle_event_highlight)
@@ -75,8 +80,8 @@ class MainWindow(tk.Tk):
         self.event_menu.add_command(label="Delete Event", accelerator="Ctrl+B", command=self.delete_group)
 
         self.folder_menu = tk.Menu(self.top_menu_bar, tearoff=0)
-        self.folder_menu.add_command(label="New Folder", accelerator="Ctrl+Q", command=self.open_new_folder_window)
-        self.folder_menu.add_command(label="Rename Cur Folder", accelerator="Ctrl+W", command=self.rename_folder)
+        self.folder_menu.add_command(label="New Folder", command=self.open_new_folder_window)
+        self.folder_menu.add_command(label="Rename Cur Folder", command=self.rename_folder)
 
         self.top_menu_bar.add_cascade(label="File", menu=self.file_menu)
         self.top_menu_bar.add_cascade(label="Events", menu=self.event_menu)
@@ -236,23 +241,22 @@ class MainWindow(tk.Tk):
         self.bind('<Control-W>', self.export_notes)
         # event actions
         self.bind('<Control-d>', self.move_group_down)
-        self.bind('<Control-e>', self.move_group_up)
         self.bind('<Control-c>', self.toggle_enable_disable)
         self.bind('<Control-v>', self.toggle_event_highlight)
         self.bind('<Control-r>', self.open_transfer_event_window)
         self.bind('<Control-b>', self.delete_group)
         self.bind('<Delete>', self.delete_group)
-        # folder actions
-        self.bind('<Control-q>', self.open_new_folder_window)
-        self.bind('<Control-w>', self.rename_folder)
-        # config integrations
-        self.bind('<Control-E>', self.open_custom_gens_window)
+        # folder actions (keyboard shortcuts removed - now used for export)
+        # config integrations (Ctrl+E removed - now used for Export Enemy Ranges)
         self.bind('<Control-D>', self.open_config_window)
         self.bind('<Control-Z>', self.open_app_config_window)
         self.bind('<Control-R>', self.open_summary_window)
         self.bind('<Control-T>', self.open_setup_summary_window)
         self.bind('<Control-O>', self.open_data_location)
-        self.bind('<Control-p>', self.screenshot_battle_summary)
+        # Battle summary export shortcuts
+        self.bind('<Control-q>', self.screenshot_battle_summary)
+        self.bind('<Control-w>', self.export_player_ranges)
+        self.bind('<Control-e>', self.export_enemy_ranges)
         # detail update function
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<<TreeviewSelect>>", self._report_new_selection)
@@ -325,8 +329,29 @@ class MainWindow(tk.Tk):
     def export_notes(self, *args, **kwargs):
         self._controller.export_notes(self.route_name.get())
     
+    def screenshot_event_list(self, *args, **kwargs):
+        # Save current selection
+        current_selection = self.event_list.get_all_selected_event_ids()
+        
+        # Temporarily clear selection to remove highlight
+        self.event_list.selection_set([])
+        self.update_idletasks()
+        
+        # Take screenshot of the event list only (excluding scrollbar)
+        bbox = tk_utils.get_bounding_box(self.event_list)
+        self._controller.take_screenshot("event_list", bbox)
+        
+        # Restore selection
+        self.event_list.set_all_selected_event_ids(current_selection)
+    
     def screenshot_battle_summary(self, *args, **kwargs):
         self.event_details.take_battle_summary_screenshot()
+    
+    def export_player_ranges(self, *args, **kwargs):
+        self.event_details.take_player_ranges_screenshot()
+    
+    def export_enemy_ranges(self, *args, **kwargs):
+        self.event_details.take_enemy_ranges_screenshot()
 
     def load_custom_font(self):
         if config.get_custom_font_name() in font.families():

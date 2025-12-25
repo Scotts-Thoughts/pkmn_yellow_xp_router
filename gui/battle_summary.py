@@ -58,12 +58,6 @@ class BattleSummary(ttk.Frame):
         self.enemy_setup_moves = SetupMovesSummary(self._setup_half, callback=self._enemy_setup_move_callback, is_player=False)
         self.enemy_setup_moves.grid(row=1, column=0, sticky=tk.EW)
 
-        self.player_field_moves = SetupMovesSummary(self._setup_half, callback=self._player_field_move_callback, is_field=True)
-        self.player_field_moves.grid(row=2, column=0, sticky=tk.EW)
-
-        self.enemy_field_moves = SetupMovesSummary(self._setup_half, callback=self._enemy_field_move_callback, is_player=False, is_field=True)
-        self.enemy_field_moves.grid(row=3, column=0, sticky=tk.EW)
-
         self.config_button = custom_components.SimpleButton(self._weather_half, text="Configure/Help", command=self._launch_config_popup)
         self.config_button.grid(row=0, column=0, sticky=tk.EW, padx=10, pady=(0, 2))
 
@@ -94,16 +88,6 @@ class BattleSummary(ttk.Frame):
     def configure_setup_moves(self, possible_setup_moves):
         self.setup_moves.configure_moves(possible_setup_moves)
         self.enemy_setup_moves.configure_moves(possible_setup_moves)
-
-    def configure_field_moves(self, possible_field_moves):
-        self.player_field_moves.configure_moves(possible_field_moves)
-        self.enemy_field_moves.configure_moves(possible_field_moves)
-        if possible_field_moves:
-            self.player_field_moves.grid(row=2, column=0, sticky=tk.EW)
-            self.enemy_field_moves.grid(row=3, column=0, sticky=tk.EW)
-        else:
-            self.player_field_moves.grid_forget()
-            self.enemy_field_moves.grid_forget()
     
     def hide_contents(self):
         self.should_render = False
@@ -133,13 +117,7 @@ class BattleSummary(ttk.Frame):
 
     def _enemy_setup_move_callback(self, *args, **kwargs):
         self._controller.update_enemy_setup_moves(self.enemy_setup_moves._move_list.copy())
-        
-    def _player_field_move_callback(self, *args, **kwargs):
-        self._controller.update_player_field_moves(self.player_field_moves._move_list.copy())
 
-    def _enemy_field_move_callback(self, *args, **kwargs):
-        self._controller.update_enemy_field_moves(self.enemy_field_moves._move_list.copy())
-    
     def set_team(
         self,
         enemy_pkmn:List[universal_data_objects.EnemyPkmn],
@@ -172,9 +150,7 @@ class BattleSummary(ttk.Frame):
         self.transform_checkbox.set_checked(self._controller.is_player_transformed())
         self.weather_status.set_weather(self._controller.get_weather())
         self.setup_moves.set_move_list(self._controller.get_player_setup_moves())
-        self.player_field_moves.set_move_list(self._controller.get_player_field_moves())
         self.enemy_setup_moves.set_move_list(self._controller.get_enemy_setup_moves())
-        self.enemy_field_moves.set_move_list(self._controller.get_enemy_field_moves())
         for idx in range(6):
             player_info = self._controller.get_pkmn_info(idx, True)
             enemy_info = self._controller.get_pkmn_info(idx, False)
@@ -190,17 +166,131 @@ class BattleSummary(ttk.Frame):
                 self._mon_pairs[idx].update_rendering()
 
         self._loading = False
+    
+    def get_content_bounding_box(self):
+        """Get bounding box that includes only visible content, excluding blank space at bottom."""
+        # Ensure widgets are updated before measuring
+        self.update_idletasks()
+        
+        leftmost = self.winfo_rootx()
+        topmost = self.winfo_rooty()
+        rightmost = leftmost + self.winfo_width()
+        
+        # Start with the top bar as the initial bottom
+        bottommost = self._top_bar.winfo_rooty() + self._top_bar.winfo_height()
+        
+        # Check each mon pair to find the last visible one
+        for idx in range(5, -1, -1):  # Check from last to first
+            if self._did_draw_mon_pairs[idx]:
+                mon_pair = self._mon_pairs[idx]
+                # Get the bottom of this mon pair in root coordinates
+                mon_pair_bottom = mon_pair.winfo_rooty() + mon_pair.winfo_height()
+                bottommost = max(bottommost, mon_pair_bottom)
+                break
+        
+        return (leftmost, topmost, rightmost, bottommost)
+    
+    def get_player_ranges_bounding_box(self):
+        """Get bounding box for player damage ranges (left side only)."""
+        self.update_idletasks()
+        
+        # Find the leftmost and rightmost bounds of player columns (0-3)
+        leftmost = None
+        rightmost = None
+        topmost = None
+        bottommost = None
+        
+        # Check each visible mon pair to find the bounds
+        for idx in range(6):
+            if self._did_draw_mon_pairs[idx]:
+                mon_pair = self._mon_pairs[idx]
+                # Player side is columns 0-3 (left_mon_label_frame spans 0-3, moves are in 0-3)
+                # Get the left edge from the left_mon_label_frame
+                left_edge = mon_pair.left_mon_label_frame.winfo_rootx()
+                # Get the right edge from the divider (which separates player and enemy sides)
+                right_edge = mon_pair.divider.winfo_rootx()
+                
+                if leftmost is None or left_edge < leftmost:
+                    leftmost = left_edge
+                if rightmost is None or right_edge > rightmost:
+                    rightmost = right_edge
+                
+                # Get top from first visible mon pair
+                if topmost is None:
+                    topmost = mon_pair.winfo_rooty()
+                
+                # Update bottommost to include this mon pair
+                mon_pair_bottom = mon_pair.winfo_rooty() + mon_pair.winfo_height()
+                if bottommost is None or mon_pair_bottom > bottommost:
+                    bottommost = mon_pair_bottom
+        
+        # If no mon pairs are visible, use the frame bounds for left half
+        if leftmost is None:
+            leftmost = self.winfo_rootx()
+            rightmost = self.winfo_rootx() + self.winfo_width() // 2
+            topmost = self.winfo_rooty()
+            bottommost = self.winfo_rooty() + self.winfo_height()
+        
+        # Contract by 2 pixels on the right side
+        rightmost = rightmost - 2
+        
+        return (leftmost, topmost, rightmost, bottommost)
+    
+    def get_enemy_ranges_bounding_box(self):
+        """Get bounding box for enemy damage ranges (right side only)."""
+        self.update_idletasks()
+        
+        # Find the leftmost and rightmost bounds of enemy columns (5-8)
+        leftmost = None
+        rightmost = None
+        topmost = None
+        bottommost = None
+        
+        # Check each visible mon pair to find the bounds
+        for idx in range(6):
+            if self._did_draw_mon_pairs[idx]:
+                mon_pair = self._mon_pairs[idx]
+                # Enemy side is columns 5-8 (right_mon_label_frame spans 5-8, moves are in 5-8)
+                # Get the left edge from just after the divider (column 4)
+                left_edge = mon_pair.divider.winfo_rootx() + mon_pair.divider.winfo_width()
+                # Get the right edge from the right_mon_label_frame
+                right_edge = mon_pair.right_mon_label_frame.winfo_rootx() + mon_pair.right_mon_label_frame.winfo_width()
+                
+                if leftmost is None or left_edge < leftmost:
+                    leftmost = left_edge
+                if rightmost is None or right_edge > rightmost:
+                    rightmost = right_edge
+                
+                # Get top from first visible mon pair
+                if topmost is None:
+                    topmost = mon_pair.winfo_rooty()
+                
+                # Update bottommost to include this mon pair
+                mon_pair_bottom = mon_pair.winfo_rooty() + mon_pair.winfo_height()
+                if bottommost is None or mon_pair_bottom > bottommost:
+                    bottommost = mon_pair_bottom
+        
+        # If no mon pairs are visible, use the frame bounds for right half
+        if leftmost is None:
+            leftmost = self.winfo_rootx() + self.winfo_width() // 2
+            rightmost = self.winfo_rootx() + self.winfo_width()
+            topmost = self.winfo_rooty()
+            bottommost = self.winfo_rooty() + self.winfo_height()
+        
+        # Contract by 2 pixels on the left side
+        leftmost = leftmost + 2
+        
+        return (leftmost, topmost, rightmost, bottommost)
 
 
 class SetupMovesSummary(ttk.Frame):
-    def __init__(self, *args, callback=None, is_player=True, is_field=False, **kwargs):
+    def __init__(self, *args, callback=None, is_player=True, **kwargs):
         super().__init__(*args, **kwargs)
 
         self._callback = callback
         self._move_list = []
 
-        type_text = "  Field" if is_field else "Setup"
-        self.reset_button = custom_components.SimpleButton(self, text=f"Reset {type_text}", command=self._reset)
+        self.reset_button = custom_components.SimpleButton(self, text="Reset Setup", command=self._reset)
         self.reset_button.grid(row=0, column=0, padx=2)
 
         self.setup_label = ttk.Label(self, text="Move:")
@@ -212,8 +302,11 @@ class SetupMovesSummary(ttk.Frame):
         self.add_button = custom_components.SimpleButton(self, text="Apply Move", command=self._add_setup_move)
         self.add_button.grid(row=0, column=3, padx=2)
 
-        agent_text = "Player" if is_player else "Enemy"
-        self.extra_label = ttk.Label(self, text=f"{agent_text} {type_text}:")
+        if is_player:
+            label_text = "Player Setup:"
+        else:
+            label_text = "Enemy Setup:"
+        self.extra_label = ttk.Label(self, text=label_text)
         self.extra_label.grid(row=0, column=4, padx=2)
 
         self.move_list_label = ttk.Label(self)
@@ -233,6 +326,14 @@ class SetupMovesSummary(ttk.Frame):
     def set_move_list(self, new_moves, trigger_update=False):
         self._move_list = new_moves
         self._move_list_updated(trigger_update=trigger_update)
+    
+    def get_stage_modifiers(self):
+        result = universal_data_objects.StageModifiers()
+
+        for cur_move in self._move_list:
+            result = result.apply_stat_mod(current_gen_info().move_db().get_stat_mod(cur_move))
+        
+        return result
     
     def _move_list_updated(self, trigger_update=True):
         to_display = ", ".join(self._move_list)
@@ -517,14 +618,14 @@ class DamageSummary(ttk.Frame):
             
             else:
                 self.damage_range.configure(text=f"{move.damage_ranges.min_damage} - {move.damage_ranges.max_damage}")
-                pct_min_damage = f"{round(move.damage_ranges.min_damage / move.defending_mon_hp * 100)}%"
-                pct_max_damage = f"{round(move.damage_ranges.max_damage / move.defending_mon_hp * 100)}%"
-                self.pct_damage_range.configure(text=f"{pct_min_damage} - {pct_max_damage}")
+                pct_min_damage = round(move.damage_ranges.min_damage / move.defending_mon_hp * 100)
+                pct_max_damage = round(move.damage_ranges.max_damage / move.defending_mon_hp * 100)
+                self.pct_damage_range.configure(text=f"{pct_min_damage} - {pct_max_damage}%")
 
                 self.crit_damage_range.configure(text=f"{move.crit_damage_ranges.min_damage} - {move.crit_damage_ranges.max_damage}")
-                crit_pct_min_damage = f"{round(move.crit_damage_ranges.min_damage / move.defending_mon_hp * 100)}%"
-                crit_pct_max_damage = f"{round(move.crit_damage_ranges.max_damage / move.defending_mon_hp * 100)}%"
-                self.crit_pct_damage_range.configure(text=f"{crit_pct_min_damage} - {crit_pct_max_damage}")
+                crit_pct_min_damage = round(move.crit_damage_ranges.min_damage / move.defending_mon_hp * 100)
+                crit_pct_max_damage = round(move.crit_damage_ranges.max_damage / move.defending_mon_hp * 100)
+                self.crit_pct_damage_range.configure(text=f"{crit_pct_min_damage} - {crit_pct_max_damage}%")
 
             
             max_num_messages = 3

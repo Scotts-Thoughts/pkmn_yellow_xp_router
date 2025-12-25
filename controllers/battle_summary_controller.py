@@ -65,12 +65,10 @@ class BattleSummaryController:
         # actual state used to calculate battle stats
         self._original_player_mon_list:List[EnemyPkmn] = []
         self._player_setup_move_list:List[str] = []
-        self._player_field_move_list:List[str] = []
         self._is_player_transformed:bool = False
         self._transformed_mon_list:List[EnemyPkmn] = []
         self._original_enemy_mon_list:List[EnemyPkmn] = []
         self._enemy_setup_move_list:List[str] = []
-        self._enemy_field_move_list:List[str] = []
 
         self._mimic_options:List[str] = []
         self._player_mimic_selection:str = ""
@@ -181,14 +179,6 @@ class BattleSummaryController:
         self._player_setup_move_list = new_setup_moves
         self._full_refresh()
 
-    def update_enemy_field_moves(self, new_field_moves):
-        self._enemy_field_move_list = new_field_moves
-        self._full_refresh()
-
-    def update_player_field_moves(self, new_field_moves):
-        self._player_field_move_list = new_field_moves
-        self._full_refresh()
-    
     def update_player_transform(self, is_transformed):
         self._is_player_transformed = is_transformed
         self._full_refresh()
@@ -262,9 +252,9 @@ class BattleSummaryController:
     def _full_refresh(self, is_load=False):
         # Once the "true" state of the current battle has been updated, recalculate all the derived properties
         self._player_stage_modifier = self._calc_stage_modifier(self._player_setup_move_list)
-        self._player_field_status = self._calc_field_status(True)
+        self._player_field_status = self._calc_field_status(self._player_setup_move_list)
         self._enemy_stage_modifier = self._calc_stage_modifier(self._enemy_setup_move_list)
-        self._enemy_field_status = self._calc_field_status(False)
+        self._enemy_field_status = self._calc_field_status(self._enemy_setup_move_list)
         self._player_pkmn_matchup_data = []
         self._enemy_pkmn_matchup_data = []
         self._player_move_data = []
@@ -278,10 +268,10 @@ class BattleSummaryController:
                 player_stats = player_mon.cur_stats
             else:
                 player_mon = self._original_player_mon_list[mon_idx]
-                player_stats = player_mon.get_battle_stats(self._player_stage_modifier, mon_field=self._player_field_status)
+                player_stats = player_mon.get_battle_stats(self._player_stage_modifier)
 
             enemy_mon = self._original_enemy_mon_list[mon_idx]
-            enemy_stats = enemy_mon.get_battle_stats(self._enemy_stage_modifier, mon_field=self._enemy_field_status)
+            enemy_stats = enemy_mon.get_battle_stats(self._enemy_stage_modifier)
 
             self._player_pkmn_matchup_data.append(
                 PkmnRenderInfo(player_mon.name, player_mon.level, player_stats.speed, enemy_mon.name, enemy_mon.level, enemy_stats.speed, enemy_mon.cur_stats.hp)
@@ -510,13 +500,11 @@ class BattleSummaryController:
         self._mimic_selection = trainer_def.mimic_selection
         self._is_player_transformed = trainer_def.transformed
         self._player_setup_move_list = trainer_def.setup_moves.copy()
-        self._player_field_move_list = trainer_def.player_field_moves.copy()
         self._player_stage_modifier = self._calc_stage_modifier(self._player_setup_move_list)
-        self._player_field_status = self._calc_field_status(True)
+        self._player_field_status = self._calc_field_status(self._player_setup_move_list)
         self._enemy_setup_move_list = trainer_def.enemy_setup_moves.copy()
-        self._enemy_field_move_list = trainer_def.enemy_field_moves.copy()
         self._enemy_stage_modifier = self._calc_stage_modifier(self._enemy_setup_move_list)
-        self._enemy_field_status = self._calc_field_status(False)
+        self._enemy_stage_modifier = self._calc_field_status(self._enemy_setup_move_list)
         self._cached_definition_order = [x.mon_order - 1 for x in event_group.event_definition.get_pokemon_list(definition_order=True)]
         if not trainer_def.custom_move_data:
             self._custom_move_data = []
@@ -569,9 +557,7 @@ class BattleSummaryController:
         self._mimic_selection = ""
         self._is_player_transformed = False
         self._player_setup_move_list = []
-        self._player_field_move_list = []
         self._enemy_setup_move_list = []
-        self._enemy_field_move_list = []
         self._custom_move_data = []
         self._cached_definition_order = list(range(len(enemy_mons)))
         for _ in range(len(enemy_mons)):
@@ -609,9 +595,7 @@ class BattleSummaryController:
         self._mimic_selection = ""
         self._is_player_transformed = False
         self._player_setup_move_list = []
-        self._player_field_move_list = []
         self._enemy_setup_move_list = []
-        self._enemy_field_move_list = []
         self._custom_move_data = []
         self._original_player_mon_list = []
         self._transformed_mon_list = []
@@ -645,9 +629,7 @@ class BattleSummaryController:
             self._trainer_name,
             second_trainer_name=self._second_trainer_name,
             setup_moves=self._player_setup_move_list,
-            player_field_moves=self._player_field_move_list,
             enemy_setup_moves=self._enemy_setup_move_list,
-            enemy_field_moves=self._enemy_field_move_list,
             mimic_selection=self._mimic_selection,
             custom_move_data=final_custom_move_data,
             weather=self._weather,
@@ -685,12 +667,6 @@ class BattleSummaryController:
     def get_enemy_setup_moves(self) -> List[str]:
         return self._enemy_setup_move_list
 
-    def get_player_field_moves(self) -> List[str]:
-        return self._player_field_move_list
-
-    def get_enemy_field_moves(self) -> List[str]:
-        return self._enemy_field_move_list
-    
     def is_double_battle(self) -> bool:
         return self._double_battle_flag
 
@@ -788,16 +764,12 @@ class BattleSummaryController:
         
         return result
 
-    def _calc_field_status(self, is_player:bool) -> FieldStatus:
+    @staticmethod
+    def _calc_field_status(move_list) -> FieldStatus:
         result = FieldStatus()
 
-        if is_player:
-            move_list = self._player_field_move_list + self._player_setup_move_list
-        else:
-            move_list = self._enemy_field_move_list + self._enemy_setup_move_list
-
-        for cur_move_name in move_list:
-            result = result.apply_move(cur_move_name)
+        for cur_move in move_list:
+            result = result.apply_move(current_gen_info().move_db().get_move(cur_move))
         
         return result
     
@@ -814,13 +786,17 @@ class BattleSummaryController:
         
         return prev_event.event_definition.rare_candy.amount
     
-    def take_screenshot(self, bbox):
+    def take_screenshot(self, bbox, suffix=""):
         if not self._trainer_name:
             self._main_controller.send_message(f"No active battle to screenshot")
             return
         
+        image_name = self._trainer_name.replace(" ", "_")
+        if suffix:
+            image_name = f"{image_name}{suffix}"
+        
         self._main_controller.take_screenshot(
-            self._trainer_name.replace(" ", "_"),
+            image_name,
             bbox
         )
         
