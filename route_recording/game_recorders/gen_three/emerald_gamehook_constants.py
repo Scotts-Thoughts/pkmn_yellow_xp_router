@@ -80,10 +80,14 @@ class Gen3GameHookConstants:
         self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.soundEffect1"
         self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.soundEffect2"
         # expect this value to be in soundEffect1
-        self.SAVE_SOUND_EFFECT_VALUE = 143641472
+        # The value for Vanilla Emerald is 143641472
+        # The value for STP-2026 is 143651700
+        self.SAVE_SOUND_EFFECT_VALUE = 143651700 
         # corresponds to 0x0890dcc8 in little endian bytes, or 143711432
         # expect this value to be in soundEffect2
-        self.HEAL_SOUND_EFFECT_VALUE = 143710852
+        # The value for Vanilla Emerald is 143710852
+        # The value for STP-2026 is 143721092
+        self.HEAL_SOUND_EFFECT_VALUE = 143721092 
 
         self.ALL_KEYS_ITEM_TYPE = [f"player.bag.items.{i}.item" for i in range(0, 30)]
         self.ALL_KEYS_ITEM_QUANTITY = [f"player.bag.items.{i}.quantity" for i in range(0, 30)]
@@ -162,10 +166,14 @@ class Gen3GameHookConstants:
         self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.soundEffect1"
         self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.soundEffect2"
         # expect this value to be in soundEffect1
-        self.SAVE_SOUND_EFFECT_VALUE = 141254636
+        # The value for Vanilla Emerald is 141254636
+        # The value for STP-2026 is 141256612
+        self.SAVE_SOUND_EFFECT_VALUE = 141256612
         # corresponds to 0x0890dcc8 in little endian bytes, or 143711432
         # expect this value to be in soundEffect2
-        self.HEAL_SOUND_EFFECT_VALUE = 141281788
+        # The value for Vanilla Emerald is 141281788
+        # The value for STP-2026 is 141283764 
+        self.HEAL_SOUND_EFFECT_VALUE = 141283764 
 
         self.ALL_KEYS_ITEM_TYPE = [f"player.bag.items.{i}.item" for i in range(0, 42)]
         self.ALL_KEYS_ITEM_QUANTITY = [f"player.bag.items.{i}.quantity" for i in range(0, 42)]
