@@ -77,19 +77,49 @@ class RouteSummaryWindow(tk.Toplevel):
         self._move_frames:List[List[ttk.Frame]] = [[], [], [], []]
 
         summary_list:List[SummaryInfo] = []
+        elite_four_seen = set()  # Track which Elite Four members we've already included
+        # Trainers to exclude from Run Summary for Crystal routes
+        crystal_excluded_trainers = {
+            "Leader Brock",
+            "Leader Misty",
+            "Leader Lt.Surge",
+            "Leader Erika",
+            "Leader Sabrina",
+            "Leader Blaine",
+            "Leader Janine"
+        }
         cur_event = self._controller.get_next_event()
         while cur_event is not None:
             if (
                 cur_event.event_definition.trainer_def is not None and
                 cur_event.event_definition.enabled
             ):
-                if (
-                    cur_event.event_definition.is_highlighted() or
-                    current_gen_info().is_major_fight(cur_event.event_definition.trainer_def.trainer_name)
-                ):
+                trainer_name = cur_event.event_definition.trainer_def.trainer_name
+                is_elite_four = trainer_name.startswith("Elite Four ")
+                
+                # Skip highlighted trainers
+                if cur_event.event_definition.is_highlighted():
+                    cur_event = self._controller.get_next_event(cur_event.group_id)
+                    continue
+                
+                # For Crystal routes, exclude specific Kanto gym leaders
+                if (current_gen_info().version_name() == const.CRYSTAL_VERSION and 
+                    trainer_name in crystal_excluded_trainers):
+                    cur_event = self._controller.get_next_event(cur_event.group_id)
+                    continue
+                
+                # For Elite Four members, only include the first instance
+                if is_elite_four:
+                    if trainer_name in elite_four_seen:
+                        cur_event = self._controller.get_next_event(cur_event.group_id)
+                        continue
+                    elite_four_seen.add(trainer_name)
+                
+                # Include major fights (including first instance of Elite Four)
+                if current_gen_info().is_major_fight(trainer_name):
                     summary_list.append(
                         SummaryInfo(
-                            cur_event.event_definition.trainer_def.trainer_name,
+                            trainer_name,
                             cur_event.init_state.solo_pkmn.cur_level,
                             cur_event.init_state.solo_pkmn.held_item,
                             cur_event.init_state.solo_pkmn.move_list,
