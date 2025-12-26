@@ -370,6 +370,11 @@ class Machine:
             item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_ITEM_TYPE[i]).value
             result[item_type] = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_ITEM_QUANTITY[i]).value
         
+        # load the medicine pocket
+        for i in range(len(gh_gen_four_const.ALL_KEYS_MEDICINE_TYPE)):
+            item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_MEDICINE_TYPE[i]).value
+            result[item_type] = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_MEDICINE_QUANTITY[i]).value
+        
         # load the ball pocket
         for i in range(len(gh_gen_four_const.ALL_KEYS_BALL_TYPE)):
             item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_BALL_TYPE[i]).value
@@ -404,6 +409,7 @@ class Machine:
         ):
         new_cache = self._get_item_cache()
         old_cache = self._cached_items
+        logger.info(f"_item_cache_update: old_cache = {old_cache}, new_cache = {new_cache}")
         self._cached_items = new_cache
 
         if not generate_events:
@@ -431,6 +437,8 @@ class Machine:
                 gained_items[new_item] = new_count - cur_count
             elif cur_count > new_count:
                 lost_items[new_item] = cur_count - new_count
+        
+        logger.info(f"_item_cache_update: gained_items = {gained_items}, lost_items = {lost_items}")
 
         if len(gained_items) > 0 and sale_expected:
             logger.error(f"Gained the following items when expecting to be losing items to selling... {gained_items}")

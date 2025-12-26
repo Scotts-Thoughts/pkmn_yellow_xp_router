@@ -579,51 +579,52 @@ class BattleState(WatchForResetState):
         return self.state_type
 
 
-# class InventoryChangeState(WatchForResetState):
-#     BASE_DELAY = 2
-#     def __init__(self, machine: Machine):
-#         super().__init__(StateType.INVENTORY_CHANGE, machine)
-#         self._seconds_delay = self.BASE_DELAY
-#         self._money_gained = False
-#         self._money_lost = False
-#         self._held_item_changed = False
-#         self.external_held_item_flag = False
+class InventoryChangeState(WatchForResetState):
+    BASE_DELAY = 2
+    def __init__(self, machine: Machine):
+        super().__init__(StateType.INVENTORY_CHANGE, machine)
+        self._seconds_delay = self.BASE_DELAY
+        self._money_gained = False
+        self._money_lost = False
+        self._held_item_changed = False
+        self.external_held_item_flag = False
     
-#     def _on_enter(self, prev_state: State):
-#         self._seconds_delay = self.BASE_DELAY
-#         self._money_gained = True if self.machine._money_cache_update() else False
-#         self._money_lost = False
+    def _on_enter(self, prev_state: State):
+        self._seconds_delay = self.BASE_DELAY
+        self._money_gained = True if self.machine._money_cache_update() else False
+        self._money_lost = False
 
-#         # Set it to True if we are getting flagged for it externally. Otherwise set it to False
-#         self._held_item_changed = self.external_held_item_flag
-#         self.external_held_item_flag = False
+        # Set it to True if we are getting flagged for it externally. Otherwise set it to False
+        self._held_item_changed = self.external_held_item_flag
+        self.external_held_item_flag = False
     
-#     def _on_exit(self, next_state: State):
-#         if next_state.state_type != StateType.RESETTING:
-#             self.machine._item_cache_update(
-#                 sale_expected=self._money_gained,
-#                 purchase_expected=self._money_lost,
-#                 held_item_changed=self._held_item_changed
-#             )
+    def _on_exit(self, next_state: State):
+        if next_state.state_type != StateType.RESETTING:
+            logger.info(f"InventoryChangeState._on_exit: old_cache = {self.machine._cached_items}")
+            self.machine._item_cache_update(
+                sale_expected=self._money_gained,
+                purchase_expected=self._money_lost,
+                held_item_changed=self._held_item_changed
+            )
     
-#     @auto_reset
-#     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-#         if new_prop.path == gh_gen_four_const.KEY_PLAYER_MONEY:
-#             if new_prop.value > prev_prop.value:
-#                 self._money_gained = True
-#             else:
-#                 self._money_lost = True
-#         elif new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
-#             self._seconds_delay = self.BASE_DELAY
-#         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM:
-#             self._held_item_changed = True
-#         elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
-#             if self._seconds_delay <= 0:
-#                 return StateType.OVERWORLD
-#             else:
-#                 self._seconds_delay -= 1
+    @auto_reset
+    def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
+        if new_prop.path == gh_gen_four_const.KEY_PLAYER_MONEY:
+            if new_prop.value > prev_prop.value:
+                self._money_gained = True
+            else:
+                self._money_lost = True
+        elif new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
+            self._seconds_delay = self.BASE_DELAY
+        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM:
+            self._held_item_changed = True
+        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+            if self._seconds_delay <= 0:
+                return StateType.OVERWORLD
+            else:
+                self._seconds_delay -= 1
 
-#         return self.state_type
+        return self.state_type
 
 
 # class UseRareCandyState(WatchForResetState):
@@ -786,8 +787,8 @@ class OverworldState(WatchForResetState):
         self._validation_delay = 5
     
     def _on_exit(self, next_state: State):
-        # if isinstance(next_state, InventoryChangeState):
-        #     next_state.external_held_item_flag = self._propagate_held_item_flag
+        if isinstance(next_state, InventoryChangeState):
+            next_state.external_held_item_flag = self._propagate_held_item_flag
         
         self._propagate_held_item_flag = False
     

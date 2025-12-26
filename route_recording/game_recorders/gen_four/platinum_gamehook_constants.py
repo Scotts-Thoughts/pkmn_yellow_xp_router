@@ -98,6 +98,8 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_ALL_ITEM_FIELDS = set([])
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_ITEM_TYPE)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_ITEM_QUANTITY)
+        self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_MEDICINE_TYPE)
+        self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_MEDICINE_QUANTITY)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BALL_TYPE)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BALL_QUANTITY)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BERRY_TYPE)
