@@ -665,95 +665,95 @@ class UseRareCandyState(WatchForResetState):
         return self.state_type
 
 
-# class UseTMState(WatchForResetState):
-#     BASE_DELAY = 2
-#     def __init__(self, machine: Machine):
-#         super().__init__(StateType.TM, machine)
+class UseTMState(WatchForResetState):
+    BASE_DELAY = 2
+    def __init__(self, machine: Machine):
+        super().__init__(StateType.TM, machine)
 
-#     def _on_enter(self, prev_state: State):
-#         self._seconds_delay = self.BASE_DELAY
+    def _on_enter(self, prev_state: State):
+        self._seconds_delay = self.BASE_DELAY
     
-#     def _on_exit(self, next_state: State):
-#         if next_state.state_type != StateType.RESETTING:
-#             if not self.machine._item_cache_update(tm_flag=True):
-#                 self.machine._move_cache_update(levelup_source=True)
+    def _on_exit(self, next_state: State):
+        if next_state.state_type != StateType.RESETTING:
+            if not self.machine._item_cache_update(tm_flag=True):
+                self.machine._move_cache_update(levelup_source=True)
     
-#     @auto_reset
-#     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-#         if new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
-#             self._seconds_delay = self.BASE_DELAY
-#         elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
-#             if self._seconds_delay <= 0:
-#                 return StateType.OVERWORLD
-#             else:
-#                 self._seconds_delay -= 1
+    @auto_reset
+    def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
+        if new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
+            self._seconds_delay = self.BASE_DELAY
+        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+            if self._seconds_delay <= 0:
+                return StateType.OVERWORLD
+            else:
+                self._seconds_delay -= 1
 
-#         return self.state_type
+        return self.state_type
 
 
-# class MoveDeleteState(WatchForResetState):
-#     BASE_DELAY = 2
-#     def __init__(self, machine: Machine):
-#         super().__init__(StateType.MOVE_DELETE, machine)
-#         self._cur_delay = self.BASE_DELAY
+class MoveDeleteState(WatchForResetState):
+    BASE_DELAY = 2
+    def __init__(self, machine: Machine):
+        super().__init__(StateType.MOVE_DELETE, machine)
+        self._cur_delay = self.BASE_DELAY
 
-#     def _on_enter(self, prev_state: State):
-#         self._cur_delay = self.BASE_DELAY
+    def _on_enter(self, prev_state: State):
+        self._cur_delay = self.BASE_DELAY
     
-#     def _on_exit(self, next_state: State):
-#         if next_state.state_type != StateType.RESETTING:
-#             self.machine._move_cache_update(tutor_expected=True)
+    def _on_exit(self, next_state: State):
+        if next_state.state_type != StateType.RESETTING:
+            self.machine._move_cache_update(tutor_expected=True)
     
-#     @auto_reset
-#     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-#         if new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
-#             if self._cur_delay <= 0:
-#                 return StateType.OVERWORLD
-#             else:
-#                 self._cur_delay -= 1
-#         elif new_prop.path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
-#             self._cur_delay = self.BASE_DELAY
+    @auto_reset
+    def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
+        if new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+            if self._cur_delay <= 0:
+                return StateType.OVERWORLD
+            else:
+                self._cur_delay -= 1
+        elif new_prop.path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
+            self._cur_delay = self.BASE_DELAY
 
-#         return self.state_type
+        return self.state_type
 
 
-# class UseVitaminState(WatchForResetState):
-#     BASE_DELAY = 2
-#     ERROR_DELAY = 5
-#     def __init__(self, machine: Machine):
-#         super().__init__(StateType.VITAMIN, machine)
-#         self._item_removal_detected = False
-#         self._cur_delay = self.BASE_DELAY
-#         self._error_delay = self.ERROR_DELAY
+class UseVitaminState(WatchForResetState):
+    BASE_DELAY = 2
+    ERROR_DELAY = 5
+    def __init__(self, machine: Machine):
+        super().__init__(StateType.VITAMIN, machine)
+        self._item_removal_detected = False
+        self._cur_delay = self.BASE_DELAY
+        self._error_delay = self.ERROR_DELAY
 
-#     def _on_enter(self, prev_state: State):
-#         self._item_removal_detected = False
-#         self._cur_delay = self.BASE_DELAY
-#         self._error_delay = self.ERROR_DELAY
+    def _on_enter(self, prev_state: State):
+        self._item_removal_detected = False
+        self._cur_delay = self.BASE_DELAY
+        self._error_delay = self.ERROR_DELAY
     
-#     def _on_exit(self, next_state: State):
-#         if next_state.state_type != StateType.RESETTING:
-#             if self._error_delay <= 0:
-#                 logger.error(f"Vitamin state hit error timeout. Will attempt to see if any vitamins were used anyways")
-#             self.machine._item_cache_update(vitamin_flag=True)
+    def _on_exit(self, next_state: State):
+        if next_state.state_type != StateType.RESETTING:
+            if self._error_delay <= 0:
+                logger.error(f"Vitamin state hit error timeout. Will attempt to see if any vitamins were used anyways")
+            self.machine._item_cache_update(vitamin_flag=True)
     
-#     @auto_reset
-#     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-#         if new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_TYPE:
-#             self._item_removal_detected = True
-#         elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
-#             if self._item_removal_detected:
-#                 if self._cur_delay <= 0:
-#                     return StateType.OVERWORLD
-#                 else:
-#                     self._cur_delay -= 1
+    @auto_reset
+    def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
+        if new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_TYPE:
+            self._item_removal_detected = True
+        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+            if self._item_removal_detected:
+                if self._cur_delay <= 0:
+                    return StateType.OVERWORLD
+                else:
+                    self._cur_delay -= 1
             
-#             if self._error_delay > 0:
-#                 self._error_delay -= 1
-#             else:
-#                 return StateType.OVERWORLD
+            if self._error_delay > 0:
+                self._error_delay -= 1
+            else:
+                return StateType.OVERWORLD
 
-#         return self.state_type
+        return self.state_type
 
 # Overworld state
 class OverworldState(WatchForResetState):

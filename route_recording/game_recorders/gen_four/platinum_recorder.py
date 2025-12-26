@@ -31,9 +31,9 @@ class PlatinumRecorder(route_recording.recorder.RecorderGameHookClient):
         self._machine.register(platinum_states.BattleState(self._machine))
         self._machine.register(platinum_states.InventoryChangeState(self._machine))
         self._machine.register(platinum_states.UseRareCandyState(self._machine))
-        # self._machine.register(platinum_states.UseTMState(self._machine))
-        # self._machine.register(platinum_states.MoveDeleteState(self._machine))
-        # self._machine.register(platinum_states.UseVitaminState(self._machine))
+        self._machine.register(platinum_states.UseTMState(self._machine))
+        self._machine.register(platinum_states.MoveDeleteState(self._machine))
+        self._machine.register(platinum_states.UseVitaminState(self._machine))
         self._machine.register(platinum_states.OverworldState(self._machine))
     
     def on_mapper_loaded(self):
