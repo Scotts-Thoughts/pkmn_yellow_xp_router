@@ -135,6 +135,8 @@ class Gen4GameHookConstants:
             # self.KEY_DOUBLE_BATTLE_FLAG,
             self.KEY_BATTLE_OUTCOME,
             self.KEY_BATTLE_TRAINER_A_NUMBER,
+            self.KEY_BATTLE_TRAINER_B_NUMBER,
+            self.KEY_BATTLE_ALLY_NUMBER,
             self.KEY_BATTLE_PLAYER_MON_HP,
             self.KEY_BATTLE_PLAYER_MON_PARTY_POS,
             self.KEY_BATTLE_ALLY_MON_HP,
@@ -150,9 +152,6 @@ class Gen4GameHookConstants:
             self.KEY_AUDIO_SOUND_EFFECT_1,
             self.KEY_AUDIO_SOUND_EFFECT_2,
         ]
-        if is_hgss:
-            # self.ALL_KEYS_TO_REGISTER.append(self.KEY_TWO_OPPONENTS_BATTLE_FLAG)
-            self.ALL_KEYS_TO_REGISTER.append(self.KEY_BATTLE_TRAINER_B_NUMBER)
 
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_MOVES)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_STAT_EXP)

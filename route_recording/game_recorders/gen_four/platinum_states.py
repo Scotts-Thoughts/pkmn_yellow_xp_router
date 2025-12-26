@@ -333,7 +333,9 @@ class BattleState(WatchForResetState):
             self._enemy_pos_lookup = self._get_enemy_pos_lookup()
             if self._is_double_battle:
                 ally_mon_pos = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
-                self._exp_split = [set([0, ally_mon_pos]) for _ in range(num_enemy_pokemon)]
+                # For double battles, ensure we have enough slots for all possible enemy positions
+                # Each trainer can have up to 3 Pokemon, so we need at least 6 slots
+                self._exp_split = [set([0, ally_mon_pos]) for _ in range(6)]
                 self._enemy_mon_order = [0, 1]
             else:
                 self._exp_split = [set([0]) for _ in range(num_enemy_pokemon)]
@@ -349,13 +351,21 @@ class BattleState(WatchForResetState):
                         const.ENEMY_KEY: {}
                     })
 
+            # Create exp_split list, ensuring it has enough elements for double battles
+            initial_exp_split = [len(x) for x in self._exp_split]
+            if self._is_double_battle:
+                # For double battles, ensure at least 6 elements (3 per trainer max)
+                # This prevents IndexError when get_pokemon_list() uses default mon_order
+                while len(initial_exp_split) < 6:
+                    initial_exp_split.append(1)  # Default to 1 (no exp split) for padding
+            
             self.machine._queue_new_event(
                 EventDefinition(
                     trainer_def=TrainerEventDefinition(
                         self._trainer_name,
                         second_trainer_name=self._second_trainer_name,
                         custom_move_data=return_custom_move_data,
-                        exp_split=[len(x) for x in self._exp_split]
+                        exp_split=initial_exp_split
                     )
                 )
             )
@@ -370,6 +380,18 @@ class BattleState(WatchForResetState):
                     final_exp_split = None
                 
                 final_mon_order = [self._enemy_mon_order.index(x) + 1 for x in sorted(self._enemy_mon_order)]
+                
+                # Ensure exp_split has enough elements to cover all mon_order indices
+                # mon_order values are 1-based, so max_index = max(mon_order) - 1
+                # For double battles, ensure we have at least 6 slots (3 per trainer)
+                if final_exp_split is not None and final_mon_order:
+                    max_needed_index = max(final_mon_order) - 1
+                    if self._is_double_battle:
+                        # For double battles, ensure at least 6 slots
+                        max_needed_index = max(max_needed_index, 5)
+                    # Pad exp_split if needed
+                    while len(final_exp_split) <= max_needed_index:
+                        final_exp_split.append(1)  # Default to 1 (no exp split) for any missing slots
 
                 return_custom_move_data = None
                 if gen_four_const.RETURN_MOVE_NAME in self.machine._cached_moves:
