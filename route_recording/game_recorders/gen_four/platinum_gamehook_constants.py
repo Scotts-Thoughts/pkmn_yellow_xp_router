@@ -77,7 +77,7 @@ class Gen4GameHookConstants:
         self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.heal_sound"
         # expect this value to be in audio.save_sound
         self.SAVE_SOUND_EFFECT_VALUE = 36342100
-        self.HEAL_SOUND_EFFECT_VALUE = 36335794
+        self.HEAL_SOUND_EFFECT_VALUE = 36336016
 
         self.ALL_KEYS_ITEM_TYPE         = [f"bag.items.{i}.item" for i in range(0, 40)]
         self.ALL_KEYS_ITEM_QUANTITY     = [f"bag.items.{i}.quantity" for i in range(0, 40)]

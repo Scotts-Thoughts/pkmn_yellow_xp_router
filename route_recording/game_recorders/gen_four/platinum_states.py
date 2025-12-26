@@ -393,14 +393,31 @@ class BattleState(WatchForResetState):
                         notes=gh_gen_four_const.ROAR_FLAG
                     )
                 )
+            # Only trigger blackout if we actually lost the battle
+            # Don't trigger blackout if we're successfully transitioning to Overworld (we won)
+            # Evolution means we won, so don't blackout in that case
             if self._loss_detected:
-                if self.is_trainer_battle == 'Trainer':
-                    self.machine._queue_new_event(
-                        EventDefinition(trainer_def=TrainerEventDefinition(self._trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
-                    )
-                    for trainer_mon_event in self._defeated_trainer_mons:
-                        self.machine._queue_new_event(trainer_mon_event)
-                self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
+                meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
+                battle_outcome = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_OUTCOME).value
+                # Don't trigger blackout if:
+                # 1. We're transitioning to Overworld AND META_STATE indicates we left battle (we won)
+                # 2. Battle outcome indicates we won
+                should_blackout = True
+                if next_state.state_type == StateType.OVERWORLD and meta_state != 'Battle':
+                    # Successfully left battle, so we won - don't trigger blackout
+                    should_blackout = False
+                elif battle_outcome == 'Win':
+                    # Battle outcome indicates we won - don't trigger blackout
+                    should_blackout = False
+                
+                if should_blackout:
+                    if self.is_trainer_battle == 'Trainer':
+                        self.machine._queue_new_event(
+                            EventDefinition(trainer_def=TrainerEventDefinition(self._trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
+                        )
+                        for trainer_mon_event in self._defeated_trainer_mons:
+                            self.machine._queue_new_event(trainer_mon_event)
+                    self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
 
             self._delayed_move_updater.trigger()
             self._delayed_item_updater.trigger()
@@ -458,7 +475,9 @@ class BattleState(WatchForResetState):
                 logger.error(f"Solo mon gained experience, but we didn't properly cache which enemy mon was defeated... This is normal if the a different pokemon has been pulled into player's slot 1")
             
             # Check if battle ended AFTER processing EXP changes
-            if self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value == 'From Battle':
+            # If META_STATE is not 'Battle', we've left battle
+            meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
+            if meta_state != 'Battle':
                 return StateType.OVERWORLD
 
         # elif new_prop.path == gh_gen_four_const.KEY_BATTLE_FLAG:
@@ -567,11 +586,31 @@ class BattleState(WatchForResetState):
                 # or if the enemy trainer switches pokemon (and doesn't only send out new mons on previous death)
                 if real_new_value not in self._enemy_mon_order:
                     self._enemy_mon_order.append(real_new_value)
+        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_SPECIES:
+            # Species changed - could be an evolution! Update team cache to detect it
+            # This handles the case where evolution occurs during battle end transition
+            self.machine.update_team_cache()
+            # Only transition if META_STATE indicates we've left battle
+            # Don't transition immediately on species change - wait for META_STATE to change
+            meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
+            if meta_state != 'Battle':
+                # If we have a cached Pokemon, don't transition yet - wait for EXP change
+                if not self._cached_first_mon_species and not self._cached_second_mon_species:
+                    return StateType.OVERWORLD
+        elif new_prop.path == gh_gen_four_const.META_STATE:
+            # META_STATE changed - check if battle ended
+            # If META_STATE is not 'Battle', we've left battle (could be 'From Battle' or anything else)
+            if new_prop.value != 'Battle':
+                # If we have a cached Pokemon, don't transition yet - wait for EXP change
+                if not self._cached_first_mon_species and not self._cached_second_mon_species:
+                    return StateType.OVERWORLD
         
         # Check if battle ended (only if not already checked after EXP change)
         # BUT: Don't transition if we have a cached Pokemon waiting for EXP change
         if new_prop.path != gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
-            if self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value == 'From Battle':
+            meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
+            # If META_STATE is not 'Battle', we've left battle (could be 'From Battle', 'Overworld', or anything else)
+            if meta_state != 'Battle':
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
                 if not self._cached_first_mon_species and not self._cached_second_mon_species:
                     return StateType.OVERWORLD
@@ -759,14 +798,18 @@ class UseVitaminState(WatchForResetState):
 # Overworld state
 class OverworldState(WatchForResetState):
     BASE_DELAY = 2
-    SAVE_TIMEOUT_SECONDS = 2
+    SAVE_DELAY = 2
+    HEAL_DELAY = 3
     def __init__(self, machine: Machine):
         super().__init__(StateType.OVERWORLD, machine)
         self._waiting_for_registration = False
         self._register_delay = self.BASE_DELAY
         self._propagate_held_item_flag = False
         self._validation_delay = 5
-        self._last_save_time = None
+        self._save_detected = False
+        self._save_delay = self.SAVE_DELAY
+        self._heal_detected = False
+        self._heal_delay = self.HEAL_DELAY
     
     def _on_enter(self, prev_state: State):
         self.machine._money_cache_update()
@@ -788,6 +831,10 @@ class OverworldState(WatchForResetState):
             self._wrong_mon_in_slot_1 = False
         
         self._validation_delay = 5
+        self._save_detected = False
+        self._save_delay = self.SAVE_DELAY
+        self._heal_detected = False
+        self._heal_delay = self.HEAL_DELAY
     
     def _on_exit(self, next_state: State):
         if isinstance(next_state, InventoryChangeState):
@@ -910,15 +957,16 @@ class OverworldState(WatchForResetState):
             # then this won't change. Theoretically, there's another field, soundEffect1Played that we could hook into, to allow us to detect
             # when the actual changes occur. However, this is gets left on by default, and flickers between off/on so quickly that it sometimes gets
             # missed by gamehook. In practice, this approximation should cover all known edge cases
-            if new_prop.value == gh_gen_four_const.SAVE_SOUND_EFFECT_VALUE:
-                current_time = self.machine._gamehook_client.get(gh_gen_four_const.KEY_GAMETIME_SECONDS).value
-                if self._last_save_time is None or current_time >= self._last_save_time + self.SAVE_TIMEOUT_SECONDS:
-                    self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value)))
-                    self._last_save_time = current_time
+            # Set flag when save sound effect is detected, delay will be handled on gametime ticks
+            if new_prop.value == gh_gen_four_const.SAVE_SOUND_EFFECT_VALUE and prev_prop.value != gh_gen_four_const.SAVE_SOUND_EFFECT_VALUE:
+                self._save_detected = True
+                self._save_delay = self.SAVE_DELAY
         elif new_prop.path == gh_gen_four_const.KEY_AUDIO_SOUND_EFFECT_2:
             # NOTE: same limitations as above
-            if new_prop.value == gh_gen_four_const.HEAL_SOUND_EFFECT_VALUE:
-                self.machine._queue_new_event(EventDefinition(heal=HealEventDefinition(location=self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value)))
+            # Set flag when heal sound effect is detected, delay will be handled on gametime ticks
+            if new_prop.value == gh_gen_four_const.HEAL_SOUND_EFFECT_VALUE and prev_prop.value != gh_gen_four_const.HEAL_SOUND_EFFECT_VALUE:
+                self._heal_detected = True
+                self._heal_delay = self.HEAL_DELAY
         elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
             if self._waiting_for_registration:
                 if self._register_delay <= 0:
@@ -933,6 +981,24 @@ class OverworldState(WatchForResetState):
                         self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value)
                     )
                 self._wrong_mon_delay -= 1
+            
+            # Handle save delay using gametime ticks (independent check, can run with other conditions)
+            if self._save_detected:
+                if self._save_delay <= 0:
+                    self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value)))
+                    self._save_detected = False
+                    self._save_delay = self.SAVE_DELAY
+                else:
+                    self._save_delay -= 1
+            
+            # Handle heal delay using gametime ticks (independent check, can run with other conditions)
+            if self._heal_detected:
+                if self._heal_delay <= 0:
+                    self.machine._queue_new_event(EventDefinition(heal=HealEventDefinition(location=self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value)))
+                    self._heal_detected = False
+                    self._heal_delay = self.HEAL_DELAY
+                else:
+                    self._heal_delay -= 1
 
             
             if self._validation_delay > 0:
