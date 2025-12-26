@@ -61,7 +61,8 @@ class Gen4GameHookConstants:
         self.KEY_BATTLE_ALLY_MON_HP          = "battle.player.active_pokemon_2.stats.hp"
 
         self.KEY_BATTLE_TRAINER_A_NUMBER       = "battle.opponent.id"
-        self.KEY_BATTLE_TRAINER_B_NUMBER       = "battle.opponent_2.id" # TODO: STP - Create this property in the mapper
+        self.KEY_BATTLE_TRAINER_B_NUMBER       = "battle.opponent_2.id"
+        self.KEY_BATTLE_ALLY_NUMBER            = "battle.ally.id"
         self.KEY_BATTLE_FIRST_ENEMY_SPECIES    = "battle.opponent.active_pokemon.species"
         self.KEY_BATTLE_FIRST_ENEMY_LEVEL      = "battle.opponent.active_pokemon.level"
         self.KEY_BATTLE_FIRST_ENEMY_HP         = "battle.opponent.active_pokemon.stats.hp"
