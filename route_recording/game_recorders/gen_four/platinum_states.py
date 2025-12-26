@@ -591,8 +591,9 @@ class InventoryChangeState(WatchForResetState):
     
     def _on_enter(self, prev_state: State):
         self._seconds_delay = self.BASE_DELAY
-        self._money_gained = True if self.machine._money_cache_update() else False
-        self._money_lost = False
+        money_change = self.machine._money_cache_update()
+        self._money_gained = money_change is True
+        self._money_lost = money_change is False
 
         # Set it to True if we are getting flagged for it externally. Otherwise set it to False
         self._held_item_changed = self.external_held_item_flag
@@ -758,12 +759,14 @@ class UseVitaminState(WatchForResetState):
 # Overworld state
 class OverworldState(WatchForResetState):
     BASE_DELAY = 2
+    SAVE_TIMEOUT_SECONDS = 2
     def __init__(self, machine: Machine):
         super().__init__(StateType.OVERWORLD, machine)
         self._waiting_for_registration = False
         self._register_delay = self.BASE_DELAY
         self._propagate_held_item_flag = False
         self._validation_delay = 5
+        self._last_save_time = None
     
     def _on_enter(self, prev_state: State):
         self.machine._money_cache_update()
@@ -908,7 +911,10 @@ class OverworldState(WatchForResetState):
             # when the actual changes occur. However, this is gets left on by default, and flickers between off/on so quickly that it sometimes gets
             # missed by gamehook. In practice, this approximation should cover all known edge cases
             if new_prop.value == gh_gen_four_const.SAVE_SOUND_EFFECT_VALUE:
-                self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value)))
+                current_time = self.machine._gamehook_client.get(gh_gen_four_const.KEY_GAMETIME_SECONDS).value
+                if self._last_save_time is None or current_time >= self._last_save_time + self.SAVE_TIMEOUT_SECONDS:
+                    self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value)))
+                    self._last_save_time = current_time
         elif new_prop.path == gh_gen_four_const.KEY_AUDIO_SOUND_EFFECT_2:
             # NOTE: same limitations as above
             if new_prop.value == gh_gen_four_const.HEAL_SOUND_EFFECT_VALUE:

@@ -73,12 +73,11 @@ class Gen4GameHookConstants:
 
         self.ALL_KEYS_ENEMY_TEAM_SPECIES = [f"battle.opponent.team.{i}.species" for i in range(0, 6)]
 
-        self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.soundEffect1" # TODO: STP - Need to map this property
-        self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.soundEffect2" # TODO: STP - Need to map this property
-        # expect this value to be in soundEffect1
-        self.SAVE_SOUND_EFFECT_VALUE = 143651700 # TODO: STP - Need to map this value 
-        # expect this value to be in soundEffect2
-        self.HEAL_SOUND_EFFECT_VALUE = 143721092 # TODO: STP - Need to map this value
+        self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.save_sound"
+        self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.heal_sound"
+        # expect this value to be in audio.save_sound
+        self.SAVE_SOUND_EFFECT_VALUE = 36342100
+        self.HEAL_SOUND_EFFECT_VALUE = 36335794
 
         self.ALL_KEYS_ITEM_TYPE         = [f"bag.items.{i}.item" for i in range(0, 40)]
         self.ALL_KEYS_ITEM_QUANTITY     = [f"bag.items.{i}.quantity" for i in range(0, 40)]
