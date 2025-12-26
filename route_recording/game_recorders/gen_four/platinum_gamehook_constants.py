@@ -52,8 +52,6 @@ class Gen4GameHookConstants:
         self.KEY_GAMETIME_SECONDS            = "game_time.seconds"
         self.KEY_GAMETIME_FRAMES             = "game_time.seconds"                        # Frames doesn't exist in Platinum, this may cause issues
         self.KEY_TRAINER_BATTLE_FLAG         = "battle.mode"                              # Set to 'Trainer' when battling a trainer, set to 'null' when not battling
-        # self.KEY_DOUBLE_BATTLE_FLAG          = "battle.type.double"                       # TODO: STP - I need to figure out an equivalent property
-        # self.KEY_TWO_OPPONENTS_BATTLE_FLAG   = "battle.type.two_opponents"                # TODO: STP - I need to figure out an equivalent property
         self.KEY_BATTLE_OUTCOME              = "battle.outcome"
         self.KEY_BATTLE_PLAYER_MON_PARTY_POS = "battle.player.party_position"
         self.KEY_BATTLE_PLAYER_MON_HP        = "battle.player.active_pokemon.stats.hp"
@@ -76,7 +74,6 @@ class Gen4GameHookConstants:
 
         self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.save_sound"
         self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.heal_sound"
-        # expect this value to be in audio.save_sound
         self.SAVE_SOUND_EFFECT_VALUE = 36342100
         self.HEAL_SOUND_EFFECT_VALUE = 36335730
 
@@ -88,7 +85,6 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_BALL_QUANTITY     = [f"bag.balls.{i}.quantity" for i in range(0, 16)]
         self.ALL_KEYS_BERRY_TYPE        = [f"bag.berries.{i}.item" for i in range(0, 63)]
         self.ALL_KEYS_BERRY_QUANTITY    = [f"bag.berries.{i}.quantity" for i in range(0, 63)]
-        # self.ALL_KEYS_KEY_ITEMS         = [f"bag.keyItems.{i}.item" for i in range(0, 30)] # Haven't mappe key items in platinum yet
 
         self.ALL_KEYS_TMHM_TYPE     = [f"bag.tmhm.{i}.item" for i in range(0, 99)]
         self.ALL_KEYS_TMHM_QUANTITY = [f"bag.tmhm.{i}.quantity" for i in range(0, 99)]
@@ -104,7 +100,6 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BALL_QUANTITY)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BERRY_TYPE)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BERRY_QUANTITY)
-        # self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_KEY_ITEMS)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_TMHM_TYPE)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_TMHM_QUANTITY)
         self.ALL_KEYS_PLAYER_MOVES = [
@@ -132,7 +127,6 @@ class Gen4GameHookConstants:
             self.KEY_PLAYER_MON_HELD_ITEM,
             self.KEY_GAMETIME_SECONDS,
             self.KEY_TRAINER_BATTLE_FLAG,
-            # self.KEY_DOUBLE_BATTLE_FLAG,
             self.KEY_BATTLE_OUTCOME,
             self.KEY_BATTLE_TRAINER_A_NUMBER,
             self.KEY_BATTLE_TRAINER_B_NUMBER,
@@ -157,10 +151,6 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_STAT_EXP)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_ALL_ITEM_FIELDS)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_TEAM_SPECIES)
-
-        # for debugging
-        # self.ALL_KEYS_TO_REGISTER.extend([self.KEY_DMA_A, self.KEY_DMA_B, self.KEY_DMA_C])
-
 
 class GameHookConstantConverter:
     def __init__(self):
