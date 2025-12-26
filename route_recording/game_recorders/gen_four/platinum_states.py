@@ -627,42 +627,42 @@ class InventoryChangeState(WatchForResetState):
         return self.state_type
 
 
-# class UseRareCandyState(WatchForResetState):
-#     BASE_DELAY = 2
-#     def __init__(self, machine: Machine):
-#         super().__init__(StateType.RARE_CANDY, machine)
-#         self._move_learned = False
-#         self._item_removal_detected = False
-#         self._cur_delay = self.BASE_DELAY
+class UseRareCandyState(WatchForResetState):
+    BASE_DELAY = 2
+    def __init__(self, machine: Machine):
+        super().__init__(StateType.RARE_CANDY, machine)
+        self._move_learned = False
+        self._item_removal_detected = False
+        self._cur_delay = self.BASE_DELAY
 
-#     def _on_enter(self, prev_state: State):
-#         self._move_learned = False
-#         self._item_removal_detected = False
-#         self._cur_delay = self.BASE_DELAY
+    def _on_enter(self, prev_state: State):
+        self._move_learned = False
+        self._item_removal_detected = False
+        self._cur_delay = self.BASE_DELAY
     
-#     def _on_exit(self, next_state: State):
-#         if next_state.state_type != StateType.RESETTING:
-#             if self.machine._item_cache_update(candy_flag=True):
-#                 self.machine._solo_mon_levelup(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_LEVEL).value)
-#             if self._move_learned:
-#                 self.machine.update_team_cache()
-#                 self.machine._move_cache_update(levelup_source=True)
+    def _on_exit(self, next_state: State):
+        if next_state.state_type != StateType.RESETTING:
+            if self.machine._item_cache_update(candy_flag=True):
+                self.machine._solo_mon_levelup(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_LEVEL).value)
+            if self._move_learned:
+                self.machine.update_team_cache()
+                self.machine._move_cache_update(levelup_source=True)
     
-#     @auto_reset
-#     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-#         if new_prop.path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
-#             self._move_learned = True
-#         elif new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_QUANTITY:
-#             self._cur_delay = self.BASE_DELAY
-#         elif new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_TYPE:
-#             self._cur_delay = self.BASE_DELAY
-#         elif new_prop.path in gh_gen_four_const.KEY_GAMETIME_SECONDS:
-#             if self._cur_delay <= 0:
-#                 return StateType.OVERWORLD
-#             else:
-#                 self._cur_delay -= 1
+    @auto_reset
+    def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
+        if new_prop.path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
+            self._move_learned = True
+        elif new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_QUANTITY:
+            self._cur_delay = self.BASE_DELAY
+        elif new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_TYPE:
+            self._cur_delay = self.BASE_DELAY
+        elif new_prop.path in gh_gen_four_const.KEY_GAMETIME_SECONDS:
+            if self._cur_delay <= 0:
+                return StateType.OVERWORLD
+            else:
+                self._cur_delay -= 1
 
-#         return self.state_type
+        return self.state_type
 
 
 # class UseTMState(WatchForResetState):
