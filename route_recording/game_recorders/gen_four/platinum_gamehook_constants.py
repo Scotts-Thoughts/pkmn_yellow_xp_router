@@ -71,6 +71,7 @@ class Gen4GameHookConstants:
         self.KEY_BATTLE_SECOND_ENEMY_PARTY_POS = "battle.opponent_2.party_position"
 
         self.ALL_KEYS_ENEMY_TEAM_SPECIES = [f"battle.opponent.team.{i}.species" for i in range(0, 6)]
+        self.ALL_KEYS_ENEMY_2_TEAM_SPECIES = [f"battle.opponent_2.team.{i}.species" for i in range(0, 6)]
 
         self.KEY_SAVE_COUNT           = "meta.saves"
         self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.save_sound"

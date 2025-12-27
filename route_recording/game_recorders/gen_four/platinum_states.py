@@ -125,7 +125,7 @@ class UninitializedState(WatchForResetState):
 
         return self.state_type
 
-# Reset 
+
 class ResettingState(State):
     def __init__(self, machine: Machine):
         super().__init__(StateType.RESETTING, machine)
@@ -160,7 +160,7 @@ class ResettingState(State):
 
         return self.state_type
 
-# Battle state
+
 class BattleState(WatchForResetState):
     BASE_DELAY = 3
 
@@ -264,7 +264,10 @@ class BattleState(WatchForResetState):
         self._battle_started = False
         self._battle_finished = False
         self._is_double_battle = False
+        self._multi_battle = False
         # self._is_tutorial_battle = False
+        self._ally_id = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_NUMBER).value
+        logger.info(f"ally id: {self._ally_id}")
         self._initial_money = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MONEY).value
         self._init_held_item = None
         
@@ -277,6 +280,10 @@ class BattleState(WatchForResetState):
         for cur_key in gh_gen_four_const.ALL_KEYS_ENEMY_TEAM_SPECIES:
             if self.machine._gamehook_client.get(cur_key).value:
                 result += 1
+        if self.trainer_2 > 0:
+            for cur_key in gh_gen_four_const.ALL_KEYS_ENEMY_2_TEAM_SPECIES:
+                if self.machine._gamehook_client.get(cur_key).value:
+                    result += 1
         return result
 
     def _get_enemy_pos_lookup(self):
@@ -313,6 +320,8 @@ class BattleState(WatchForResetState):
             self._is_double_battle = False
         else:
             self._is_double_battle = True
+            if self._ally_id is not 0:
+                self._multi_battle = True
         # self._is_tutorial_battle = self.machine._gamehook_client.get(gh_gen_four_const.KEY_TUTORIAL_BATTLE_FLAG).value
         self.is_trainer_battle = battle_mode
         self._delayed_levelup.configure_level(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_LEVEL).value)
@@ -331,11 +340,9 @@ class BattleState(WatchForResetState):
 
             num_enemy_pokemon = self._get_num_enemy_trainer_pokemon()
             self._enemy_pos_lookup = self._get_enemy_pos_lookup()
-            if self._is_double_battle:
+            if self._is_double_battle and not self._multi_battle:
                 ally_mon_pos = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
-                # For double battles, ensure we have enough slots for all possible enemy positions
-                # Each trainer can have up to 3 Pokemon, so we need at least 6 slots
-                self._exp_split = [set([0, ally_mon_pos]) for _ in range(6)]
+                self._exp_split = [set([0, ally_mon_pos]) for _ in range(num_enemy_pokemon)]
                 self._enemy_mon_order = [0, 1]
             else:
                 self._exp_split = [set([0]) for _ in range(num_enemy_pokemon)]
@@ -351,21 +358,14 @@ class BattleState(WatchForResetState):
                         const.ENEMY_KEY: {}
                     })
 
-            # Create exp_split list, ensuring it has enough elements for double battles
-            initial_exp_split = [len(x) for x in self._exp_split]
-            if self._is_double_battle:
-                # For double battles, ensure at least 6 elements (3 per trainer max)
-                # This prevents IndexError when get_pokemon_list() uses default mon_order
-                while len(initial_exp_split) < 6:
-                    initial_exp_split.append(1)  # Default to 1 (no exp split) for padding
-            
+            logger.info(f"exp split: {[len(x) for x in self._exp_split]}")
             self.machine._queue_new_event(
                 EventDefinition(
                     trainer_def=TrainerEventDefinition(
                         self._trainer_name,
                         second_trainer_name=self._second_trainer_name,
                         custom_move_data=return_custom_move_data,
-                        exp_split=initial_exp_split
+                        exp_split=[len(x) for x in self._exp_split]
                     )
                 )
             )
@@ -380,18 +380,8 @@ class BattleState(WatchForResetState):
                     final_exp_split = None
                 
                 final_mon_order = [self._enemy_mon_order.index(x) + 1 for x in sorted(self._enemy_mon_order)]
-                
-                # Ensure exp_split has enough elements to cover all mon_order indices
-                # mon_order values are 1-based, so max_index = max(mon_order) - 1
-                # For double battles, ensure we have at least 6 slots (3 per trainer)
-                if final_exp_split is not None and final_mon_order:
-                    max_needed_index = max(final_mon_order) - 1
-                    if self._is_double_battle:
-                        # For double battles, ensure at least 6 slots
-                        max_needed_index = max(max_needed_index, 5)
-                    # Pad exp_split if needed
-                    while len(final_exp_split) <= max_needed_index:
-                        final_exp_split.append(1)  # Default to 1 (no exp split) for any missing slots
+                if self._multi_battle:
+                    final_mon_order = [] # ! ignores mon order for multi battles (hacky solution, incomplete)
 
                 return_custom_move_data = None
                 if gen_four_const.RETURN_MOVE_NAME in self.machine._cached_moves:
@@ -531,7 +521,7 @@ class BattleState(WatchForResetState):
                     second_enemy_mon_pos = self._get_second_enemy_mon_pos()
                     if player_mon_pos in self._exp_split[second_enemy_mon_pos]:
                         self._exp_split[second_enemy_mon_pos].remove(player_mon_pos)
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP:
+        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP and not self._multi_battle:
             if self._is_double_battle and new_prop.value <= 0:
                 # for each of these we want to remove the ally from exp split if the enemy mon is still alive
                 # additionally, we also want to remove from the exp split if the enemy is cached, as this means they died on the same turn (e.g. earthquake)
