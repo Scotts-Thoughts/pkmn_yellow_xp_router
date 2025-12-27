@@ -38,9 +38,9 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_DEFENSE = [f"player.team.{i}.ivs.special_defense" for i in range(0, 6)]
 
         self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.moves.0.move"
-        self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.moves.0.move"
-        self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.moves.0.move"
-        self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.moves.0.move"
+        self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.moves.1.move"
+        self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.moves.2.move"
+        self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.moves.3.move"
 
         self.KEY_PLAYER_MON_STAT_EXP_HP              = "player.team.0.evs.hp"
         self.KEY_PLAYER_MON_STAT_EXP_ATTACK          = "player.team.0.evs.attack"
@@ -50,8 +50,8 @@ class Gen4GameHookConstants:
         self.KEY_PLAYER_MON_STAT_EXP_SPECIAL_DEFENSE = "player.team.0.evs.special_defense"
 
         self.KEY_GAMETIME_SECONDS            = "game_time.seconds"
-        self.KEY_GAMETIME_FRAMES             = "game_time.seconds"                        # Frames doesn't exist in Platinum, this may cause issues
-        self.KEY_TRAINER_BATTLE_FLAG         = "battle.mode"                              # Set to 'Trainer' when battling a trainer, set to 'null' when not battling
+        self.KEY_GAMETIME_FRAMES             = "game_time.seconds" # Frames doesn't exist in Platinum, this may cause issues
+        self.KEY_TRAINER_BATTLE_FLAG         = "battle.mode"       # Set to 'Trainer' when battling a trainer, set to 'null' when not battling
         self.KEY_BATTLE_OUTCOME              = "battle.outcome"
         self.KEY_BATTLE_PLAYER_MON_PARTY_POS = "battle.player.party_position"
         self.KEY_BATTLE_PLAYER_MON_HP        = "battle.player.active_pokemon.stats.hp"
