@@ -30,7 +30,7 @@ class Gen4GameHookConstants:
 
         self.ALL_KEYS_PLAYER_TEAM_SPECIES            = [f"player.team.{i}.species" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_LEVEL              = [f"player.team.{i}.level" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_IV_ATTACK          = [f"player.team.{i}.ivs.hp" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_IV_HP              = [f"player.team.{i}.ivs.hp" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_ATTACK          = [f"player.team.{i}.ivs.attack" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_DEFENSE         = [f"player.team.{i}.ivs.defense" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_SPEED           = [f"player.team.{i}.ivs.speed" for i in range(0, 6)]
@@ -41,6 +41,8 @@ class Gen4GameHookConstants:
         self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.moves.1.move"
         self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.moves.2.move"
         self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.moves.3.move"
+        
+        self.KEY_PLAYER_MON_STAT_CUR_HP = "battle.player.active_pokemon.stats.hp"
 
         self.KEY_PLAYER_MON_STAT_EXP_HP              = "player.team.0.evs.hp"
         self.KEY_PLAYER_MON_STAT_EXP_ATTACK          = "player.team.0.evs.attack"
@@ -53,6 +55,7 @@ class Gen4GameHookConstants:
         self.KEY_GAMETIME_FRAMES             = "game_time.seconds" # Frames doesn't exist in Platinum, this may cause issues
         self.KEY_TRAINER_BATTLE_FLAG         = "battle.mode"       # Set to 'Trainer' when battling a trainer, set to 'null' when not battling
         self.KEY_BATTLE_OUTCOME              = "battle.outcome"
+        self.KEY_BATTLE_FLAGS                = "battle.other.outcome_flags"
         self.KEY_BATTLE_PLAYER_MON_PARTY_POS = "battle.player.party_position"
         self.KEY_BATTLE_PLAYER_MON_HP        = "battle.player.active_pokemon.stats.hp"
         self.KEY_BATTLE_ALLY_MON_PARTY_POS   = "battle.player.party_position_2"
@@ -130,6 +133,7 @@ class Gen4GameHookConstants:
             self.KEY_GAMETIME_SECONDS,
             self.KEY_TRAINER_BATTLE_FLAG,
             self.KEY_BATTLE_OUTCOME,
+            self.KEY_BATTLE_FLAGS,
             self.KEY_BATTLE_TRAINER_A_NUMBER,
             self.KEY_BATTLE_TRAINER_B_NUMBER,
             self.KEY_BATTLE_ALLY_NUMBER,

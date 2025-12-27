@@ -410,17 +410,14 @@ class BattleState(WatchForResetState):
             # Evolution means we won, so don't blackout in that case
             if self._loss_detected:
                 meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
-                battle_outcome = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_OUTCOME).value
+                battle_outcome = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FLAGS).value
+                solo_mon_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_CUR_HP).value
                 # Don't trigger blackout if:
                 # 1. We're transitioning to Overworld AND META_STATE indicates we left battle (we won)
                 # 2. Battle outcome indicates we won
-                should_blackout = True
-                if next_state.state_type == StateType.OVERWORLD and meta_state != 'Battle':
-                    # Successfully left battle, so we won - don't trigger blackout
-                    should_blackout = False
-                elif battle_outcome == 'Win':
-                    # Battle outcome indicates we won - don't trigger blackout
-                    should_blackout = False
+                should_blackout = False
+                if solo_mon_hp == 0:
+                    should_blackout = True
                 
                 if should_blackout:
                     if self.is_trainer_battle == 'Trainer':
@@ -512,7 +509,9 @@ class BattleState(WatchForResetState):
             player_mon_pos = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value
             if player_mon_pos == 0 and new_prop.value <= 0:
                 if self._battle_started:
+                    logger.info(f"Player mon HP dropped to 0 or below")
                     self._loss_detected = True
+                    logger.info(f"Loss detected: {self._loss_detected}")
             elif new_prop.value <= 0:
                 enemy_mon_pos = self._get_first_enemy_mon_pos()
                 if player_mon_pos in self._exp_split[enemy_mon_pos]:
