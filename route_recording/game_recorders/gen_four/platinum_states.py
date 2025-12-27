@@ -832,6 +832,7 @@ class OverworldState(WatchForResetState):
         self._save_delay = self.SAVE_DELAY
         self._heal_detected = False
         self._heal_delay = self.HEAL_DELAY
+        self._previous_save_count = None
     
     def _on_enter(self, prev_state: State):
         self.machine._money_cache_update()
@@ -857,6 +858,12 @@ class OverworldState(WatchForResetState):
         self._save_delay = self.SAVE_DELAY
         self._heal_detected = False
         self._heal_delay = self.HEAL_DELAY
+        # Initialize previous save count from current value if available
+        save_count_prop = self.machine._gamehook_client.get(gh_gen_four_const.KEY_SAVE_COUNT)
+        if save_count_prop is not None and save_count_prop.value is not None:
+            self._previous_save_count = save_count_prop.value
+        else:
+            self._previous_save_count = None
     
     def _on_exit(self, next_state: State):
         if isinstance(next_state, InventoryChangeState):
@@ -974,15 +981,26 @@ class OverworldState(WatchForResetState):
         # elif new_prop.path in gh_gen_four_const.ALL_KEYS_STAT_EXP:
         #     if not self._waiting_for_registration and not self._wrong_mon_in_slot_1:
         #         return StateType.VITAMIN
-        elif new_prop.path == gh_gen_four_const.KEY_AUDIO_SOUND_EFFECT_1:
-            # NOTE: this points to the currently loaded sound effect. If a single sound effect gets played multiple times in a row
-            # then this won't change. Theoretically, there's another field, soundEffect1Played that we could hook into, to allow us to detect
-            # when the actual changes occur. However, this is gets left on by default, and flickers between off/on so quickly that it sometimes gets
-            # missed by gamehook. In practice, this approximation should cover all known edge cases
-            # Set flag when save sound effect is detected, delay will be handled on gametime ticks
-            if new_prop.value == gh_gen_four_const.SAVE_SOUND_EFFECT_VALUE and prev_prop.value != gh_gen_four_const.SAVE_SOUND_EFFECT_VALUE:
+        elif new_prop.path == gh_gen_four_const.KEY_SAVE_COUNT:
+            # Track save count increments. Only add save event if:
+            # 1. The value increments by exactly 1 (new_value == prev_value + 1)
+            # 2. If prev_value is 0, only allow if new_value is 1 (first save)
+            #    If prev_value > 0, allow any increment of 1 (prevents jumps from 0 to >1 on reset)
+            # 3. We're in overworld (already handled by being in OverworldState)
+            if (
+                prev_prop.value is not None and
+                new_prop.value is not None and
+                new_prop.value == prev_prop.value + 1 and
+                (prev_prop.value != 0 or new_prop.value == 1)
+            ):
                 self._save_detected = True
                 self._save_delay = self.SAVE_DELAY
+            # Update previous save count for next check
+            self._previous_save_count = new_prop.value
+        elif new_prop.path == gh_gen_four_const.KEY_AUDIO_SOUND_EFFECT_1:
+            # NOTE: Legacy save detection via sound effect - kept for reference but no longer used
+            # This is replaced by KEY_SAVE_COUNT tracking above
+            pass
         elif new_prop.path == gh_gen_four_const.KEY_AUDIO_SOUND_EFFECT_2:
             # NOTE: same limitations as above
             # Set flag when heal sound effect is detected, delay will be handled on gametime ticks

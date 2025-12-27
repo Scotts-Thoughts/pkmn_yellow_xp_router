@@ -72,10 +72,11 @@ class Gen4GameHookConstants:
 
         self.ALL_KEYS_ENEMY_TEAM_SPECIES = [f"battle.opponent.team.{i}.species" for i in range(0, 6)]
 
+        self.KEY_SAVE_COUNT           = "meta.saves"
         self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.save_sound"
         self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.heal_sound"
-        self.SAVE_SOUND_EFFECT_VALUE = 36342100
-        self.HEAL_SOUND_EFFECT_VALUE = 36335730
+        self.SAVE_SOUND_EFFECT_VALUE  = 36342100
+        self.HEAL_SOUND_EFFECT_VALUE  = 36335730
 
         self.ALL_KEYS_ITEM_TYPE         = [f"bag.items.{i}.item" for i in range(0, 40)]
         self.ALL_KEYS_ITEM_QUANTITY     = [f"bag.items.{i}.quantity" for i in range(0, 40)]
@@ -145,6 +146,7 @@ class Gen4GameHookConstants:
             self.KEY_BATTLE_SECOND_ENEMY_PARTY_POS,
             self.KEY_AUDIO_SOUND_EFFECT_1,
             self.KEY_AUDIO_SOUND_EFFECT_2,
+            self.KEY_SAVE_COUNT,
         ]
 
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_MOVES)
