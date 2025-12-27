@@ -109,7 +109,7 @@
                 "Evaluate Attack",
                 "Damage Priority"
             ],
-            "money": 450
+            "money": 648
         },
         {
             "rom_id": 2,
@@ -154,7 +154,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 125
+            "money": 180
         },
         {
             "rom_id": 3,
@@ -199,7 +199,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 125
+            "money": 180
         },
         {
             "rom_id": 4,
@@ -331,7 +331,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 8
+            "money": 32
         },
         {
             "rom_id": 5,
@@ -440,7 +440,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 6,
@@ -488,7 +488,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 170
+            "money": 680
         },
         {
             "rom_id": 7,
@@ -622,7 +622,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 112
+            "money": 448
         },
         {
             "rom_id": 8,
@@ -668,7 +668,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 16
+            "money": 64
         },
         {
             "rom_id": 9,
@@ -715,7 +715,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 84
+            "money": 336
         },
         {
             "rom_id": 10,
@@ -792,7 +792,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 11,
@@ -901,7 +901,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 540
+            "money": 2160
         },
         {
             "rom_id": 12,
@@ -1194,7 +1194,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 92
+            "money": 368
         },
         {
             "rom_id": 15,
@@ -1303,7 +1303,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 376
+            "money": 1504
         },
         {
             "rom_id": 16,
@@ -1381,7 +1381,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 17,
@@ -1429,7 +1429,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 18,
@@ -1558,7 +1558,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 40
+            "money": 160
         },
         {
             "rom_id": 19,
@@ -1667,7 +1667,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 20,
@@ -1743,7 +1743,7 @@
                 "Basic",
                 "Evaluate Attack"
             ],
-            "money": 390
+            "money": 1560
         },
         {
             "rom_id": 21,
@@ -1850,7 +1850,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 450
+            "money": 1800
         },
         {
             "rom_id": 22,
@@ -1898,7 +1898,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 68
+            "money": 272
         },
         {
             "rom_id": 23,
@@ -1946,7 +1946,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 24,
@@ -1994,7 +1994,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 85
+            "money": 340
         },
         {
             "rom_id": 25,
@@ -2102,7 +2102,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 64
+            "money": 256
         },
         {
             "rom_id": 26,
@@ -2151,7 +2151,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 36
+            "money": 144
         },
         {
             "rom_id": 27,
@@ -2197,7 +2197,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 32
+            "money": 128
         },
         {
             "rom_id": 28,
@@ -2308,7 +2308,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 495
+            "money": 1980
         },
         {
             "rom_id": 29,
@@ -2382,7 +2382,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 56
+            "money": 224
         },
         {
             "rom_id": 30,
@@ -2465,7 +2465,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 570
+            "money": 2280
         },
         {
             "rom_id": 31,
@@ -2610,7 +2610,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 690
+            "money": 2760
         },
         {
             "rom_id": 32,
@@ -2725,7 +2725,7 @@
                 "Expert",
                 "Weather"
             ],
-            "money": 1020
+            "money": 4080
         },
         {
             "rom_id": 33,
@@ -2839,7 +2839,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1050
+            "money": 4200
         },
         {
             "rom_id": 34,
@@ -2921,7 +2921,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 930
+            "money": 3720
         },
         {
             "rom_id": 35,
@@ -3066,7 +3066,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1230
+            "money": 4920
         },
         {
             "rom_id": 36,
@@ -3146,7 +3146,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 540
+            "money": 2160
         },
         {
             "rom_id": 37,
@@ -3226,7 +3226,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 900
+            "money": 3600
         },
         {
             "rom_id": 38,
@@ -3275,7 +3275,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 540
+            "money": 2160
         },
         {
             "rom_id": 39,
@@ -3384,7 +3384,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 40,
@@ -3432,7 +3432,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 240
+            "money": 480
         },
         {
             "rom_id": 41,
@@ -3479,7 +3479,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 252
+            "money": 1008
         },
         {
             "rom_id": 42,
@@ -3528,7 +3528,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 208
+            "money": 832
         },
         {
             "rom_id": 43,
@@ -3630,7 +3630,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 36
+            "money": 144
         },
         {
             "rom_id": 44,
@@ -3677,7 +3677,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 288
+            "money": 1152
         },
         {
             "rom_id": 45,
@@ -3724,7 +3724,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 272
+            "money": 1088
         },
         {
             "rom_id": 46,
@@ -3834,7 +3834,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 240
+            "money": 960
         },
         {
             "rom_id": 47,
@@ -3908,7 +3908,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 16
+            "money": 64
         },
         {
             "rom_id": 48,
@@ -3986,7 +3986,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 156
+            "money": 624
         },
         {
             "rom_id": 49,
@@ -4061,7 +4061,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 32
+            "money": 128
         },
         {
             "rom_id": 50,
@@ -4108,7 +4108,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 72
+            "money": 288
         },
         {
             "rom_id": 51,
@@ -4210,7 +4210,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 36
+            "money": 144
         },
         {
             "rom_id": 52,
@@ -4312,7 +4312,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 36
+            "money": 144
         },
         {
             "rom_id": 53,
@@ -4358,7 +4358,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 72
+            "money": 288
         },
         {
             "rom_id": 54,
@@ -4436,7 +4436,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 84
+            "money": 336
         },
         {
             "rom_id": 55,
@@ -4482,7 +4482,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 72
+            "money": 288
         },
         {
             "rom_id": 56,
@@ -4529,7 +4529,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 40
+            "money": 160
         },
         {
             "rom_id": 57,
@@ -4576,7 +4576,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 58,
@@ -4623,7 +4623,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 352
+            "money": 1408
         },
         {
             "rom_id": 59,
@@ -4732,7 +4732,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 312
+            "money": 1248
         },
         {
             "rom_id": 60,
@@ -4808,7 +4808,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 64
+            "money": 256
         },
         {
             "rom_id": 61,
@@ -4887,7 +4887,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 88
+            "money": 352
         },
         {
             "rom_id": 62,
@@ -5025,7 +5025,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 32
+            "money": 128
         },
         {
             "rom_id": 63,
@@ -5150,7 +5150,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 48
+            "money": 192
         },
         {
             "rom_id": 65,
@@ -5257,7 +5257,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 48
+            "money": 192
         },
         {
             "rom_id": 66,
@@ -5306,7 +5306,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 56
+            "money": 224
         },
         {
             "rom_id": 67,
@@ -5407,7 +5407,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 48
+            "money": 192
         },
         {
             "rom_id": 68,
@@ -5481,7 +5481,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 48
+            "money": 192
         },
         {
             "rom_id": 69,
@@ -5528,7 +5528,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 52
+            "money": 208
         },
         {
             "rom_id": 70,
@@ -5606,7 +5606,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 71,
@@ -5716,7 +5716,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 60
+            "money": 240
         },
         {
             "rom_id": 72,
@@ -5793,7 +5793,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 112
+            "money": 448
         },
         {
             "rom_id": 73,
@@ -5964,7 +5964,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 120
+            "money": 480
         },
         {
             "rom_id": 74,
@@ -6074,7 +6074,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 56
+            "money": 224
         },
         {
             "rom_id": 75,
@@ -6154,7 +6154,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 60
+            "money": 240
         },
         {
             "rom_id": 76,
@@ -6201,7 +6201,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 64
+            "money": 256
         },
         {
             "rom_id": 77,
@@ -6248,7 +6248,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 60
+            "money": 240
         },
         {
             "rom_id": 78,
@@ -6295,7 +6295,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 60
+            "money": 240
         },
         {
             "rom_id": 79,
@@ -6373,7 +6373,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 80,
@@ -6452,7 +6452,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 140
+            "money": 560
         },
         {
             "rom_id": 81,
@@ -6530,7 +6530,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 128
+            "money": 512
         },
         {
             "rom_id": 82,
@@ -6639,7 +6639,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 83,
@@ -6686,7 +6686,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 84,
@@ -6735,7 +6735,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 85,
@@ -6813,7 +6813,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 76
+            "money": 304
         },
         {
             "rom_id": 86,
@@ -6922,7 +6922,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 72
+            "money": 288
         },
         {
             "rom_id": 87,
@@ -6970,7 +6970,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 264
+            "money": 1056
         },
         {
             "rom_id": 88,
@@ -7142,7 +7142,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 89,
@@ -7221,7 +7221,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 240
+            "money": 960
         },
         {
             "rom_id": 90,
@@ -7330,7 +7330,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 91,
@@ -7408,7 +7408,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 88
+            "money": 352
         },
         {
             "rom_id": 92,
@@ -7455,7 +7455,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 88
+            "money": 352
         },
         {
             "rom_id": 93,
@@ -7533,7 +7533,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 94,
@@ -7611,7 +7611,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 84
+            "money": 336
         },
         {
             "rom_id": 95,
@@ -7720,7 +7720,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 76
+            "money": 304
         },
         {
             "rom_id": 96,
@@ -7922,7 +7922,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 76
+            "money": 304
         },
         {
             "rom_id": 97,
@@ -7969,7 +7969,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 92
+            "money": 368
         },
         {
             "rom_id": 98,
@@ -8043,7 +8043,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 99,
@@ -8090,7 +8090,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 92
+            "money": 368
         },
         {
             "rom_id": 100,
@@ -8169,7 +8169,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 256
+            "money": 1024
         },
         {
             "rom_id": 101,
@@ -8358,7 +8358,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 480
+            "money": 1920
         },
         {
             "rom_id": 103,
@@ -8469,7 +8469,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 465
+            "money": 1860
         },
         {
             "rom_id": 104,
@@ -8518,7 +8518,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 525
+            "money": 2100
         },
         {
             "rom_id": 105,
@@ -8629,7 +8629,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 150
+            "money": 600
         },
         {
             "rom_id": 106,
@@ -8740,7 +8740,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 150
+            "money": 600
         },
         {
             "rom_id": 107,
@@ -8851,7 +8851,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 150
+            "money": 600
         },
         {
             "rom_id": 108,
@@ -8931,7 +8931,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 405
+            "money": 1620
         },
         {
             "rom_id": 109,
@@ -9042,7 +9042,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 110,
@@ -9153,7 +9153,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 525
+            "money": 2100
         },
         {
             "rom_id": 111,
@@ -9202,7 +9202,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 570
+            "money": 2280
         },
         {
             "rom_id": 112,
@@ -9282,7 +9282,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 555
+            "money": 2220
         },
         {
             "rom_id": 113,
@@ -9362,7 +9362,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 465
+            "money": 1860
         },
         {
             "rom_id": 114,
@@ -9473,7 +9473,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 540
+            "money": 2160
         },
         {
             "rom_id": 115,
@@ -9584,7 +9584,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 480
+            "money": 1920
         },
         {
             "rom_id": 116,
@@ -9664,7 +9664,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 375
+            "money": 1500
         },
         {
             "rom_id": 117,
@@ -9744,7 +9744,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 555
+            "money": 2220
         },
         {
             "rom_id": 118,
@@ -9824,7 +9824,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 420
+            "money": 1680
         },
         {
             "rom_id": 119,
@@ -9873,7 +9873,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 570
+            "money": 2280
         },
         {
             "rom_id": 120,
@@ -9953,7 +9953,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 121,
@@ -10064,7 +10064,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 122,
@@ -10167,7 +10167,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 120
+            "money": 480
         },
         {
             "rom_id": 123,
@@ -10214,7 +10214,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 124,
@@ -10323,7 +10323,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 125,
@@ -10401,7 +10401,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 126,
@@ -10448,7 +10448,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 216
+            "money": 864
         },
         {
             "rom_id": 127,
@@ -10580,7 +10580,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 128,
@@ -10720,7 +10720,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 296
+            "money": 1184
         },
         {
             "rom_id": 129,
@@ -10799,7 +10799,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 272
+            "money": 1088
         },
         {
             "rom_id": 130,
@@ -10847,7 +10847,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 320
+            "money": 1280
         },
         {
             "rom_id": 131,
@@ -10926,7 +10926,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 132,
@@ -10974,7 +10974,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 320
+            "money": 1280
         },
         {
             "rom_id": 133,
@@ -11053,7 +11053,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 624
+            "money": 2496
         },
         {
             "rom_id": 134,
@@ -11163,7 +11163,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 136
+            "money": 544
         },
         {
             "rom_id": 135,
@@ -11273,7 +11273,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 136,
@@ -11383,7 +11383,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 137,
@@ -11461,7 +11461,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 138,
@@ -11510,7 +11510,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 60
+            "money": 240
         },
         {
             "rom_id": 139,
@@ -11557,7 +11557,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 140,
@@ -11635,7 +11635,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 148
+            "money": 592
         },
         {
             "rom_id": 141,
@@ -11684,7 +11684,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 60
+            "money": 240
         },
         {
             "rom_id": 142,
@@ -11793,7 +11793,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 128
+            "money": 512
         },
         {
             "rom_id": 143,
@@ -11903,7 +11903,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 216
+            "money": 864
         },
         {
             "rom_id": 144,
@@ -12013,7 +12013,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 145,
@@ -12061,7 +12061,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 240
+            "money": 960
         },
         {
             "rom_id": 146,
@@ -12140,7 +12140,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 216
+            "money": 864
         },
         {
             "rom_id": 147,
@@ -12189,7 +12189,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 68
+            "money": 272
         },
         {
             "rom_id": 148,
@@ -12238,7 +12238,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 184
+            "money": 736
         },
         {
             "rom_id": 149,
@@ -12318,7 +12318,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 150,
@@ -12429,7 +12429,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 151,
@@ -12507,7 +12507,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 56
+            "money": 224
         },
         {
             "rom_id": 152,
@@ -12554,7 +12554,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 153,
@@ -12632,7 +12632,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 154,
@@ -12804,7 +12804,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 104
+            "money": 416
         },
         {
             "rom_id": 155,
@@ -12914,7 +12914,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 320
+            "money": 1280
         },
         {
             "rom_id": 156,
@@ -12962,7 +12962,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 162
+            "money": 648
         },
         {
             "rom_id": 157,
@@ -13010,7 +13010,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 162
+            "money": 648
         },
         {
             "rom_id": 158,
@@ -13089,7 +13089,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 204
+            "money": 816
         },
         {
             "rom_id": 159,
@@ -13199,7 +13199,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 150
+            "money": 600
         },
         {
             "rom_id": 160,
@@ -13248,7 +13248,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1140
+            "money": 4560
         },
         {
             "rom_id": 161,
@@ -13297,7 +13297,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1140
+            "money": 4560
         },
         {
             "rom_id": 162,
@@ -13346,7 +13346,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1140
+            "money": 4560
         },
         {
             "rom_id": 163,
@@ -13395,7 +13395,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1140
+            "money": 4560
         },
         {
             "rom_id": 164,
@@ -13444,7 +13444,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1140
+            "money": 4560
         },
         {
             "rom_id": 165,
@@ -13491,7 +13491,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 112
+            "money": 448
         },
         {
             "rom_id": 166,
@@ -13538,7 +13538,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 116
+            "money": 464
         },
         {
             "rom_id": 167,
@@ -13585,7 +13585,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 168,
@@ -13694,7 +13694,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 100
+            "money": 400
         },
         {
             "rom_id": 169,
@@ -13772,7 +13772,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 108
+            "money": 432
         },
         {
             "rom_id": 170,
@@ -13881,7 +13881,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 96
+            "money": 384
         },
         {
             "rom_id": 171,
@@ -13990,7 +13990,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 172,
@@ -14100,7 +14100,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 512
+            "money": 2048
         },
         {
             "rom_id": 173,
@@ -14241,7 +14241,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 688
+            "money": 2752
         },
         {
             "rom_id": 174,
@@ -14350,7 +14350,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 175,
@@ -14398,7 +14398,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 300
+            "money": 1200
         },
         {
             "rom_id": 176,
@@ -14446,7 +14446,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 300
+            "money": 1200
         },
         {
             "rom_id": 177,
@@ -14494,7 +14494,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 300
+            "money": 1200
         },
         {
             "rom_id": 178,
@@ -14572,7 +14572,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 75
+            "money": 300
         },
         {
             "rom_id": 179,
@@ -14713,7 +14713,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 180,
@@ -14760,7 +14760,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 181,
@@ -14807,7 +14807,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 256
+            "money": 1024
         },
         {
             "rom_id": 182,
@@ -14854,7 +14854,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 256
+            "money": 1024
         },
         {
             "rom_id": 183,
@@ -14964,7 +14964,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 184,
@@ -15043,7 +15043,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 68
+            "money": 272
         },
         {
             "rom_id": 185,
@@ -16558,7 +16558,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 202,
@@ -16606,7 +16606,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 416
+            "money": 1664
         },
         {
             "rom_id": 203,
@@ -16685,7 +16685,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 204,
@@ -16764,7 +16764,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 205,
@@ -16875,7 +16875,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 390
+            "money": 1560
         },
         {
             "rom_id": 206,
@@ -17017,7 +17017,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 330
+            "money": 1320
         },
         {
             "rom_id": 207,
@@ -17064,7 +17064,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 208,
@@ -17111,7 +17111,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 209,
@@ -17189,7 +17189,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 588
+            "money": 2352
         },
         {
             "rom_id": 210,
@@ -17298,7 +17298,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 532
+            "money": 2128
         },
         {
             "rom_id": 211,
@@ -17376,7 +17376,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 212,
@@ -17423,7 +17423,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 213,
@@ -17501,7 +17501,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 214,
@@ -17610,7 +17610,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 215,
@@ -17658,7 +17658,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 84
+            "money": 336
         },
         {
             "rom_id": 216,
@@ -17907,7 +17907,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 218,
@@ -18835,7 +18835,7 @@
                 "Basic",
                 "Evaluate Attack"
             ],
-            "money": 376
+            "money": 1504
         },
         {
             "rom_id": 231,
@@ -18884,7 +18884,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 2050
+            "money": 8200
         },
         {
             "rom_id": 232,
@@ -18993,7 +18993,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 252
+            "money": 1008
         },
         {
             "rom_id": 233,
@@ -19072,7 +19072,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 132
+            "money": 264
         },
         {
             "rom_id": 234,
@@ -19182,7 +19182,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 235,
@@ -19261,7 +19261,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 236,
@@ -19372,7 +19372,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 645
+            "money": 2580
         },
         {
             "rom_id": 237,
@@ -19483,7 +19483,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 645
+            "money": 2580
         },
         {
             "rom_id": 238,
@@ -19592,7 +19592,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 272
+            "money": 1088
         },
         {
             "rom_id": 239,
@@ -19670,7 +19670,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 320
+            "money": 1280
         },
         {
             "rom_id": 240,
@@ -19717,7 +19717,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 241,
@@ -19857,7 +19857,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 288
+            "money": 1152
         },
         {
             "rom_id": 242,
@@ -19966,7 +19966,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 296
+            "money": 1184
         },
         {
             "rom_id": 243,
@@ -20013,7 +20013,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 244,
@@ -20859,7 +20859,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 249,
@@ -20933,7 +20933,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 12
+            "money": 48
         },
         {
             "rom_id": 250,
@@ -21074,7 +21074,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 251,
@@ -21153,7 +21153,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 150
+            "money": 600
         },
         {
             "rom_id": 252,
@@ -21231,7 +21231,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 253,
@@ -21408,7 +21408,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1560
+            "money": 6240
         },
         {
             "rom_id": 254,
@@ -21554,7 +21554,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1620
+            "money": 6480
         },
         {
             "rom_id": 255,
@@ -21731,7 +21731,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1590
+            "money": 6360
         },
         {
             "rom_id": 256,
@@ -21878,7 +21878,7 @@
                 "Expert",
                 "Weather"
             ],
-            "money": 1680
+            "money": 6720
         },
         {
             "rom_id": 257,
@@ -22055,7 +22055,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1500
+            "money": 6000
         },
         {
             "rom_id": 258,
@@ -22170,7 +22170,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1650
+            "money": 6600
         },
         {
             "rom_id": 259,
@@ -22286,7 +22286,7 @@
                 "Expert",
                 "Weather"
             ],
-            "money": 1770
+            "money": 7080
         },
         {
             "rom_id": 260,
@@ -22495,7 +22495,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 4200
+            "money": 8400
         },
         {
             "rom_id": 261,
@@ -22704,7 +22704,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 2400
+            "money": 7200
         },
         {
             "rom_id": 262,
@@ -22955,7 +22955,7 @@
                 "Evaluate Attack",
                 "Damage Priority"
             ],
-            "money": 550
+            "money": 792
         },
         {
             "rom_id": 264,
@@ -23159,7 +23159,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1000
+            "money": 1440
         },
         {
             "rom_id": 265,
@@ -23204,7 +23204,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 125
+            "money": 180
         },
         {
             "rom_id": 266,
@@ -23315,7 +23315,7 @@
                 "Evaluate Attack",
                 "Damage Priority"
             ],
-            "money": 450
+            "money": 648
         },
         {
             "rom_id": 267,
@@ -23457,7 +23457,7 @@
                 "Evaluate Attack",
                 "Damage Priority"
             ],
-            "money": 550
+            "money": 792
         },
         {
             "rom_id": 268,
@@ -23661,7 +23661,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1000
+            "money": 1440
         },
         {
             "rom_id": 269,
@@ -23772,7 +23772,7 @@
                 "Evaluate Attack",
                 "Damage Priority"
             ],
-            "money": 450
+            "money": 648
         },
         {
             "rom_id": 270,
@@ -23914,7 +23914,7 @@
                 "Evaluate Attack",
                 "Damage Priority"
             ],
-            "money": 550
+            "money": 792
         },
         {
             "rom_id": 271,
@@ -24087,7 +24087,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 800
+            "money": 1152
         },
         {
             "rom_id": 272,
@@ -24291,7 +24291,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1000
+            "money": 1440
         },
         {
             "rom_id": 273,
@@ -24400,7 +24400,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 64
+            "money": 256
         },
         {
             "rom_id": 274,
@@ -24511,7 +24511,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 124
+            "money": 496
         },
         {
             "rom_id": 275,
@@ -24653,7 +24653,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 128
+            "money": 512
         },
         {
             "rom_id": 276,
@@ -24731,7 +24731,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 277,
@@ -24840,7 +24840,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 278,
@@ -24981,7 +24981,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 246
+            "money": 984
         },
         {
             "rom_id": 279,
@@ -25028,7 +25028,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 136
+            "money": 544
         },
         {
             "rom_id": 280,
@@ -25075,7 +25075,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 281,
@@ -25122,7 +25122,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 282,
@@ -25231,7 +25231,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 128
+            "money": 512
         },
         {
             "rom_id": 283,
@@ -25309,7 +25309,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 96
+            "money": 384
         },
         {
             "rom_id": 284,
@@ -25449,7 +25449,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 285,
@@ -25653,7 +25653,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1250
+            "money": 1800
         },
         {
             "rom_id": 286,
@@ -25857,7 +25857,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1250
+            "money": 1800
         },
         {
             "rom_id": 287,
@@ -26061,7 +26061,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1250
+            "money": 1800
         },
         {
             "rom_id": 288,
@@ -26234,7 +26234,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 850
+            "money": 1224
         },
         {
             "rom_id": 289,
@@ -26407,7 +26407,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 850
+            "money": 1224
         },
         {
             "rom_id": 290,
@@ -26513,7 +26513,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 300
+            "money": 1200
         },
         {
             "rom_id": 291,
@@ -26560,7 +26560,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 184
+            "money": 736
         },
         {
             "rom_id": 292,
@@ -26607,7 +26607,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 293,
@@ -26716,7 +26716,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 294,
@@ -26825,7 +26825,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 295,
@@ -26872,7 +26872,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 296,
@@ -26950,7 +26950,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 297,
@@ -26997,7 +26997,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 298,
@@ -27075,7 +27075,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 184
+            "money": 736
         },
         {
             "rom_id": 299,
@@ -27153,7 +27153,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 352
+            "money": 1408
         },
         {
             "rom_id": 300,
@@ -27231,7 +27231,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 352
+            "money": 1408
         },
         {
             "rom_id": 301,
@@ -27340,7 +27340,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 328
+            "money": 1312
         },
         {
             "rom_id": 302,
@@ -27387,7 +27387,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 303,
@@ -27434,7 +27434,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 352
+            "money": 1408
         },
         {
             "rom_id": 304,
@@ -27576,7 +27576,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 305,
@@ -27718,7 +27718,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 306,
@@ -27860,7 +27860,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 307,
@@ -28002,7 +28002,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 308,
@@ -28051,7 +28051,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 309,
@@ -28191,7 +28191,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 310,
@@ -28238,7 +28238,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 311,
@@ -28316,7 +28316,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 312,
@@ -28425,7 +28425,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 313,
@@ -28472,7 +28472,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 314,
@@ -28550,7 +28550,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 315,
@@ -28659,7 +28659,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 316,
@@ -28770,7 +28770,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 312
+            "money": 1248
         },
         {
             "rom_id": 317,
@@ -28819,7 +28819,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 344
+            "money": 1376
         },
         {
             "rom_id": 318,
@@ -28897,7 +28897,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 319,
@@ -28973,7 +28973,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 48
+            "money": 192
         },
         {
             "rom_id": 320,
@@ -29051,7 +29051,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 321,
@@ -29160,7 +29160,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 304
+            "money": 1216
         },
         {
             "rom_id": 322,
@@ -29269,7 +29269,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 296
+            "money": 1184
         },
         {
             "rom_id": 323,
@@ -29316,7 +29316,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 264
+            "money": 1056
         },
         {
             "rom_id": 324,
@@ -29425,7 +29425,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 304
+            "money": 1216
         },
         {
             "rom_id": 325,
@@ -29534,7 +29534,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 288
+            "money": 1152
         },
         {
             "rom_id": 326,
@@ -29612,7 +29612,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 376
+            "money": 1504
         },
         {
             "rom_id": 327,
@@ -29722,7 +29722,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 215
+            "money": 860
         },
         {
             "rom_id": 328,
@@ -29801,7 +29801,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 215
+            "money": 860
         },
         {
             "rom_id": 329,
@@ -29850,7 +29850,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 225
+            "money": 900
         },
         {
             "rom_id": 330,
@@ -29930,7 +29930,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 331,
@@ -30037,7 +30037,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 175
+            "money": 700
         },
         {
             "rom_id": 332,
@@ -30115,7 +30115,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 333,
@@ -30193,7 +30193,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 334,
@@ -30302,7 +30302,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 335,
@@ -30380,7 +30380,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 336,
@@ -30427,7 +30427,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 196
+            "money": 784
         },
         {
             "rom_id": 337,
@@ -30538,7 +30538,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 2100
+            "money": 8400
         },
         {
             "rom_id": 338,
@@ -30587,7 +30587,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1000
+            "money": 4000
         },
         {
             "rom_id": 339,
@@ -30697,7 +30697,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 252
+            "money": 1008
         },
         {
             "rom_id": 340,
@@ -30744,7 +30744,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 341,
@@ -30791,7 +30791,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 342,
@@ -30838,7 +30838,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 343,
@@ -30885,7 +30885,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 344,
@@ -30932,7 +30932,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 345,
@@ -30979,7 +30979,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 346,
@@ -31088,7 +31088,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 658
+            "money": 2632
         },
         {
             "rom_id": 347,
@@ -31135,7 +31135,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 348,
@@ -31182,7 +31182,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 688
+            "money": 2752
         },
         {
             "rom_id": 349,
@@ -31384,7 +31384,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 512
+            "money": 2048
         },
         {
             "rom_id": 350,
@@ -31493,7 +31493,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 608
+            "money": 2432
         },
         {
             "rom_id": 351,
@@ -31540,7 +31540,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 672
+            "money": 2688
         },
         {
             "rom_id": 352,
@@ -31711,7 +31711,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 496
+            "money": 1984
         },
         {
             "rom_id": 353,
@@ -31869,7 +31869,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 355,
@@ -31979,7 +31979,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 356,
@@ -32090,7 +32090,7 @@
                 "Expert",
                 "Weather"
             ],
-            "money": 184
+            "money": 736
         },
         {
             "rom_id": 357,
@@ -32169,7 +32169,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 358,
@@ -32279,7 +32279,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 264
+            "money": 1056
         },
         {
             "rom_id": 359,
@@ -32327,7 +32327,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 360,
@@ -32374,7 +32374,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 361,
@@ -32485,7 +32485,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 690
+            "money": 2760
         },
         {
             "rom_id": 362,
@@ -32566,7 +32566,7 @@
                 "Expert",
                 "Weather"
             ],
-            "money": 705
+            "money": 2820
         },
         {
             "rom_id": 363,
@@ -32615,7 +32615,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 420
+            "money": 1680
         },
         {
             "rom_id": 364,
@@ -32694,7 +32694,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 528
+            "money": 1056
         },
         {
             "rom_id": 365,
@@ -32804,7 +32804,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 480
+            "money": 960
         },
         {
             "rom_id": 366,
@@ -32852,7 +32852,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 564
+            "money": 1128
         },
         {
             "rom_id": 367,
@@ -32962,7 +32962,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 468
+            "money": 936
         },
         {
             "rom_id": 368,
@@ -33041,7 +33041,7 @@
                 "Basic",
                 "Evaluate Attack"
             ],
-            "money": 540
+            "money": 2160
         },
         {
             "rom_id": 369,
@@ -33120,7 +33120,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 552
+            "money": 2208
         },
         {
             "rom_id": 370,
@@ -33260,7 +33260,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 371,
@@ -33338,7 +33338,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 372,
@@ -33447,7 +33447,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 64
+            "money": 256
         },
         {
             "rom_id": 373,
@@ -33494,7 +33494,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 374,
@@ -33572,7 +33572,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 375,
@@ -33681,7 +33681,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 64
+            "money": 256
         },
         {
             "rom_id": 376,
@@ -33790,7 +33790,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 64
+            "money": 256
         },
         {
             "rom_id": 377,
@@ -33868,7 +33868,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 378,
@@ -33946,7 +33946,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 379,
@@ -34055,7 +34055,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 380,
@@ -34102,7 +34102,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 381,
@@ -34180,7 +34180,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 382,
@@ -34260,7 +34260,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 372
+            "money": 1488
         },
         {
             "rom_id": 383,
@@ -34364,7 +34364,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 64
+            "money": 256
         },
         {
             "rom_id": 384,
@@ -34412,7 +34412,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 88
+            "money": 352
         },
         {
             "rom_id": 385,
@@ -34490,7 +34490,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 128
+            "money": 512
         },
         {
             "rom_id": 386,
@@ -34538,7 +34538,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 136
+            "money": 544
         },
         {
             "rom_id": 387,
@@ -34615,7 +34615,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 388,
@@ -34693,7 +34693,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 128
+            "money": 512
         },
         {
             "rom_id": 389,
@@ -34772,7 +34772,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 390,
@@ -34818,7 +34818,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 72
+            "money": 288
         },
         {
             "rom_id": 391,
@@ -34865,7 +34865,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 392,
@@ -34944,7 +34944,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 393,
@@ -35081,7 +35081,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 108
+            "money": 216
         },
         {
             "rom_id": 394,
@@ -35192,7 +35192,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 395,
@@ -35298,7 +35298,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 128
+            "money": 512
         },
         {
             "rom_id": 396,
@@ -35407,7 +35407,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 344
+            "money": 1376
         },
         {
             "rom_id": 397,
@@ -35455,7 +35455,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 100
+            "money": 400
         },
         {
             "rom_id": 398,
@@ -35533,7 +35533,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 252
+            "money": 1008
         },
         {
             "rom_id": 399,
@@ -35642,7 +35642,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 288
+            "money": 1152
         },
         {
             "rom_id": 400,
@@ -35723,7 +35723,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 76
+            "money": 304
         },
         {
             "rom_id": 401,
@@ -35772,7 +35772,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1100
+            "money": 4400
         },
         {
             "rom_id": 402,
@@ -35819,7 +35819,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 84
+            "money": 336
         },
         {
             "rom_id": 403,
@@ -35930,7 +35930,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 80
+            "money": 320
         },
         {
             "rom_id": 404,
@@ -36088,7 +36088,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 232
+            "money": 928
         },
         {
             "rom_id": 406,
@@ -36136,7 +36136,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 480
+            "money": 1920
         },
         {
             "rom_id": 407,
@@ -36216,7 +36216,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 435
+            "money": 1740
         },
         {
             "rom_id": 408,
@@ -36296,7 +36296,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 435
+            "money": 1740
         },
         {
             "rom_id": 409,
@@ -36373,7 +36373,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 208
+            "money": 832
         },
         {
             "rom_id": 410,
@@ -36420,7 +36420,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 411,
@@ -36469,7 +36469,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 288
+            "money": 1152
         },
         {
             "rom_id": 412,
@@ -36580,7 +36580,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 272
+            "money": 1088
         },
         {
             "rom_id": 413,
@@ -36689,7 +36689,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 272
+            "money": 1088
         },
         {
             "rom_id": 414,
@@ -36736,7 +36736,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 320
+            "money": 1280
         },
         {
             "rom_id": 415,
@@ -36847,7 +36847,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 416,
@@ -36925,7 +36925,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 296
+            "money": 1184
         },
         {
             "rom_id": 417,
@@ -37005,7 +37005,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 390
+            "money": 1560
         },
         {
             "rom_id": 418,
@@ -37260,7 +37260,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 420,
@@ -37307,7 +37307,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 421,
@@ -37385,7 +37385,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 328
+            "money": 1312
         },
         {
             "rom_id": 422,
@@ -37465,7 +37465,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 328
+            "money": 1312
         },
         {
             "rom_id": 423,
@@ -37574,7 +37574,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 576
+            "money": 2304
         },
         {
             "rom_id": 424,
@@ -37620,7 +37620,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 640
+            "money": 2560
         },
         {
             "rom_id": 425,
@@ -37698,7 +37698,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 312
+            "money": 1248
         },
         {
             "rom_id": 426,
@@ -37776,7 +37776,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 312
+            "money": 1248
         },
         {
             "rom_id": 427,
@@ -37856,7 +37856,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 516
+            "money": 2064
         },
         {
             "rom_id": 428,
@@ -37936,7 +37936,7 @@
                 "Expert",
                 "Baton Pass"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 429,
@@ -38012,7 +38012,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 430,
@@ -38091,7 +38091,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 85
+            "money": 340
         },
         {
             "rom_id": 431,
@@ -38170,7 +38170,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 155
+            "money": 620
         },
         {
             "rom_id": 432,
@@ -38249,7 +38249,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 150
+            "money": 600
         },
         {
             "rom_id": 433,
@@ -38390,7 +38390,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 170
+            "money": 680
         },
         {
             "rom_id": 434,
@@ -38469,7 +38469,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 150
+            "money": 600
         },
         {
             "rom_id": 435,
@@ -38548,7 +38548,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 190
+            "money": 760
         },
         {
             "rom_id": 436,
@@ -38595,7 +38595,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 496
+            "money": 1984
         },
         {
             "rom_id": 437,
@@ -38642,7 +38642,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 688
+            "money": 2752
         },
         {
             "rom_id": 438,
@@ -38720,7 +38720,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 480
+            "money": 1920
         },
         {
             "rom_id": 439,
@@ -38860,7 +38860,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 464
+            "money": 1856
         },
         {
             "rom_id": 440,
@@ -38938,7 +38938,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 288
+            "money": 1152
         },
         {
             "rom_id": 441,
@@ -39016,7 +39016,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 328
+            "money": 1312
         },
         {
             "rom_id": 442,
@@ -39064,7 +39064,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 84
+            "money": 336
         },
         {
             "rom_id": 443,
@@ -39112,7 +39112,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 84
+            "money": 336
         },
         {
             "rom_id": 444,
@@ -39223,7 +39223,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 570
+            "money": 2280
         },
         {
             "rom_id": 445,
@@ -39334,7 +39334,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 705
+            "money": 2820
         },
         {
             "rom_id": 446,
@@ -39412,7 +39412,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 447,
@@ -39490,7 +39490,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 256
+            "money": 1024
         },
         {
             "rom_id": 448,
@@ -39599,7 +39599,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 449,
@@ -39646,7 +39646,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 450,
@@ -39755,7 +39755,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 320
+            "money": 1280
         },
         {
             "rom_id": 451,
@@ -39834,7 +39834,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 280
+            "money": 1120
         },
         {
             "rom_id": 452,
@@ -39913,7 +39913,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 296
+            "money": 1184
         },
         {
             "rom_id": 453,
@@ -40022,7 +40022,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 454,
@@ -40162,7 +40162,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 272
+            "money": 1088
         },
         {
             "rom_id": 455,
@@ -40302,7 +40302,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 456,
@@ -40413,7 +40413,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 510
+            "money": 2040
         },
         {
             "rom_id": 457,
@@ -40524,7 +40524,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 570
+            "money": 2280
         },
         {
             "rom_id": 458,
@@ -40604,7 +40604,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 555
+            "money": 2220
         },
         {
             "rom_id": 459,
@@ -40684,7 +40684,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 600
+            "money": 2400
         },
         {
             "rom_id": 460,
@@ -40824,7 +40824,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 112
+            "money": 448
         },
         {
             "rom_id": 461,
@@ -40959,7 +40959,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 72
+            "money": 288
         },
         {
             "rom_id": 462,
@@ -41006,7 +41006,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 320
+            "money": 1280
         },
         {
             "rom_id": 463,
@@ -41084,7 +41084,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 464,
@@ -41165,7 +41165,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 124
+            "money": 496
         },
         {
             "rom_id": 465,
@@ -41246,7 +41246,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 466,
@@ -41293,7 +41293,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 136
+            "money": 544
         },
         {
             "rom_id": 467,
@@ -41340,7 +41340,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 468,
@@ -41419,7 +41419,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 264
+            "money": 704
         },
         {
             "rom_id": 469,
@@ -41464,7 +41464,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 288
+            "money": 768
         },
         {
             "rom_id": 470,
@@ -41574,7 +41574,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 240
+            "money": 640
         },
         {
             "rom_id": 471,
@@ -41684,7 +41684,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 324
+            "money": 864
         },
         {
             "rom_id": 472,
@@ -41732,7 +41732,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 360
+            "money": 960
         },
         {
             "rom_id": 473,
@@ -41811,7 +41811,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 264
+            "money": 528
         },
         {
             "rom_id": 474,
@@ -41856,7 +41856,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 288
+            "money": 576
         },
         {
             "rom_id": 475,
@@ -41966,7 +41966,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 240
+            "money": 480
         },
         {
             "rom_id": 476,
@@ -42076,7 +42076,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 324
+            "money": 648
         },
         {
             "rom_id": 477,
@@ -42124,7 +42124,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 360
+            "money": 720
         },
         {
             "rom_id": 478,
@@ -42235,7 +42235,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 640
+            "money": 2560
         },
         {
             "rom_id": 479,
@@ -42346,7 +42346,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 540
+            "money": 2160
         },
         {
             "rom_id": 480,
@@ -42393,7 +42393,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 232
+            "money": 928
         },
         {
             "rom_id": 481,
@@ -42440,7 +42440,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 232
+            "money": 928
         },
         {
             "rom_id": 482,
@@ -42549,7 +42549,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 483,
@@ -42627,7 +42627,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 216
+            "money": 864
         },
         {
             "rom_id": 484,
@@ -42736,7 +42736,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 485,
@@ -42847,7 +42847,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 760
+            "money": 3040
         },
         {
             "rom_id": 486,
@@ -42925,7 +42925,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 120
+            "money": 960
         },
         {
             "rom_id": 487,
@@ -43129,7 +43129,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 300
+            "money": 2400
         },
         {
             "rom_id": 488,
@@ -43240,7 +43240,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 220
+            "money": 1760
         },
         {
             "rom_id": 489,
@@ -43447,7 +43447,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1500
+            "money": 2160
         },
         {
             "rom_id": 490,
@@ -43654,7 +43654,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1500
+            "money": 2160
         },
         {
             "rom_id": 491,
@@ -43861,7 +43861,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1500
+            "money": 2160
         },
         {
             "rom_id": 492,
@@ -43969,7 +43969,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1040
+            "money": 4160
         },
         {
             "rom_id": 493,
@@ -44017,7 +44017,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 264
+            "money": 1056
         },
         {
             "rom_id": 494,
@@ -44189,7 +44189,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 495,
@@ -44435,7 +44435,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 810
+            "money": 3240
         },
         {
             "rom_id": 499,
@@ -44562,7 +44562,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 555
+            "money": 2220
         },
         {
             "rom_id": 501,
@@ -44673,7 +44673,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 525
+            "money": 2100
         },
         {
             "rom_id": 502,
@@ -44751,7 +44751,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 280
+            "money": 1120
         },
         {
             "rom_id": 503,
@@ -44863,7 +44863,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 260
+            "money": 1040
         },
         {
             "rom_id": 504,
@@ -44973,7 +44973,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 185
+            "money": 740
         },
         {
             "rom_id": 505,
@@ -45114,7 +45114,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 270
+            "money": 1080
         },
         {
             "rom_id": 506,
@@ -45255,7 +45255,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 175
+            "money": 700
         },
         {
             "rom_id": 507,
@@ -45335,7 +45335,7 @@
                 "Expert",
                 "Status"
             ],
-            "money": 280
+            "money": 1120
         },
         {
             "rom_id": 508,
@@ -45414,7 +45414,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 190
+            "money": 760
         },
         {
             "rom_id": 509,
@@ -45492,7 +45492,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 416
+            "money": 1664
         },
         {
             "rom_id": 510,
@@ -45539,7 +45539,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 216
+            "money": 864
         },
         {
             "rom_id": 511,
@@ -45586,7 +45586,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 148
+            "money": 592
         },
         {
             "rom_id": 512,
@@ -45726,7 +45726,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 513,
@@ -45804,7 +45804,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 514,
@@ -45851,7 +45851,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 515,
@@ -45929,7 +45929,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 448
+            "money": 1792
         },
         {
             "rom_id": 516,
@@ -46007,7 +46007,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 312
+            "money": 1248
         },
         {
             "rom_id": 517,
@@ -46116,7 +46116,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 424
+            "money": 1696
         },
         {
             "rom_id": 518,
@@ -46225,7 +46225,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 240
+            "money": 960
         },
         {
             "rom_id": 519,
@@ -46334,7 +46334,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 128
+            "money": 512
         },
         {
             "rom_id": 520,
@@ -46443,7 +46443,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 220
+            "money": 880
         },
         {
             "rom_id": 521,
@@ -46552,7 +46552,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 522,
@@ -46599,7 +46599,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 244
+            "money": 976
         },
         {
             "rom_id": 523,
@@ -46709,7 +46709,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 440
+            "money": 1760
         },
         {
             "rom_id": 524,
@@ -46819,7 +46819,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 272
+            "money": 1088
         },
         {
             "rom_id": 525,
@@ -46961,7 +46961,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 526,
@@ -47103,7 +47103,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 136
+            "money": 544
         },
         {
             "rom_id": 527,
@@ -47243,7 +47243,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 408
+            "money": 1632
         },
         {
             "rom_id": 528,
@@ -47324,7 +47324,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 216
+            "money": 864
         },
         {
             "rom_id": 529,
@@ -47403,7 +47403,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 530,
@@ -47544,7 +47544,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 928
+            "money": 3712
         },
         {
             "rom_id": 531,
@@ -47622,7 +47622,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 304
+            "money": 1216
         },
         {
             "rom_id": 532,
@@ -47762,7 +47762,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 136
+            "money": 544
         },
         {
             "rom_id": 533,
@@ -47837,7 +47837,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 40
+            "money": 160
         },
         {
             "rom_id": 534,
@@ -47884,7 +47884,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 266
+            "money": 1064
         },
         {
             "rom_id": 535,
@@ -47931,7 +47931,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 256
+            "money": 1024
         },
         {
             "rom_id": 536,
@@ -48042,7 +48042,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 120
+            "money": 480
         },
         {
             "rom_id": 537,
@@ -48121,7 +48121,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 272
+            "money": 1088
         },
         {
             "rom_id": 538,
@@ -48169,7 +48169,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 468
+            "money": 936
         },
         {
             "rom_id": 539,
@@ -48217,7 +48217,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 228
+            "money": 456
         },
         {
             "rom_id": 540,
@@ -48264,7 +48264,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 720
+            "money": 2880
         },
         {
             "rom_id": 541,
@@ -48311,7 +48311,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 704
+            "money": 2816
         },
         {
             "rom_id": 542,
@@ -48390,7 +48390,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 543,
@@ -48469,7 +48469,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 544,
@@ -48548,7 +48548,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 545,
@@ -48630,7 +48630,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 705
+            "money": 2820
         },
         {
             "rom_id": 546,
@@ -48711,7 +48711,7 @@
                 "Expert",
                 "Baton Pass"
             ],
-            "money": 215
+            "money": 860
         },
         {
             "rom_id": 547,
@@ -48821,7 +48821,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 360
+            "money": 1440
         },
         {
             "rom_id": 548,
@@ -48869,7 +48869,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 282
+            "money": 1128
         },
         {
             "rom_id": 549,
@@ -48949,7 +48949,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 2820
+            "money": 11280
         },
         {
             "rom_id": 550,
@@ -49059,7 +49059,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 264
+            "money": 1056
         },
         {
             "rom_id": 551,
@@ -49138,7 +49138,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 352
+            "money": 1408
         },
         {
             "rom_id": 552,
@@ -49216,7 +49216,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 553,
@@ -49294,7 +49294,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1376
+            "money": 5504
         },
         {
             "rom_id": 554,
@@ -49343,7 +49343,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 2250
+            "money": 9000
         },
         {
             "rom_id": 555,
@@ -49421,7 +49421,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 312
+            "money": 1248
         },
         {
             "rom_id": 556,
@@ -49499,7 +49499,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 312
+            "money": 1248
         },
         {
             "rom_id": 557,
@@ -49578,7 +49578,7 @@
                 "Basic",
                 "Weather"
             ],
-            "money": 1376
+            "money": 5504
         },
         {
             "rom_id": 558,
@@ -49681,7 +49681,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 559,
@@ -49759,7 +49759,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1472
+            "money": 5888
         },
         {
             "rom_id": 560,
@@ -49808,7 +49808,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 561,
@@ -49857,7 +49857,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 562,
@@ -49904,7 +49904,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 563,
@@ -49951,7 +49951,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 564,
@@ -50031,7 +50031,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 516
+            "money": 2064
         },
         {
             "rom_id": 565,
@@ -50078,7 +50078,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 296
+            "money": 1184
         },
         {
             "rom_id": 566,
@@ -50126,7 +50126,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 567,
@@ -50205,7 +50205,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 195
+            "money": 780
         },
         {
             "rom_id": 568,
@@ -50253,7 +50253,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 210
+            "money": 840
         },
         {
             "rom_id": 569,
@@ -50329,7 +50329,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 328
+            "money": 1312
         },
         {
             "rom_id": 570,
@@ -50407,7 +50407,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 656
+            "money": 2624
         },
         {
             "rom_id": 571,
@@ -50485,7 +50485,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 656
+            "money": 2624
         },
         {
             "rom_id": 572,
@@ -50532,7 +50532,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 188
+            "money": 752
         },
         {
             "rom_id": 573,
@@ -50610,7 +50610,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 574,
@@ -50657,7 +50657,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 575,
@@ -50766,7 +50766,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 148
+            "money": 592
         },
         {
             "rom_id": 576,
@@ -50813,7 +50813,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 577,
@@ -50860,7 +50860,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 188
+            "money": 752
         },
         {
             "rom_id": 578,
@@ -50907,7 +50907,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 184
+            "money": 736
         },
         {
             "rom_id": 579,
@@ -50985,7 +50985,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 580,
@@ -51034,7 +51034,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 581,
@@ -51081,7 +51081,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 582,
@@ -51128,7 +51128,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 180
+            "money": 720
         },
         {
             "rom_id": 583,
@@ -51206,7 +51206,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 344
+            "money": 1376
         },
         {
             "rom_id": 584,
@@ -51253,7 +51253,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 585,
@@ -51331,7 +51331,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 586,
@@ -51409,7 +51409,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 587,
@@ -51456,7 +51456,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 588,
@@ -51565,7 +51565,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 589,
@@ -51705,7 +51705,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 304
+            "money": 1216
         },
         {
             "rom_id": 590,
@@ -51752,7 +51752,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 336
+            "money": 1344
         },
         {
             "rom_id": 591,
@@ -51830,7 +51830,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 320
+            "money": 1280
         },
         {
             "rom_id": 592,
@@ -51877,7 +51877,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 593,
@@ -51924,7 +51924,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 594,
@@ -52002,7 +52002,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 595,
@@ -52080,7 +52080,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 596,
@@ -52189,7 +52189,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 296
+            "money": 1184
         },
         {
             "rom_id": 597,
@@ -52329,7 +52329,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 288
+            "money": 1152
         },
         {
             "rom_id": 598,
@@ -52407,7 +52407,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 328
+            "money": 1312
         },
         {
             "rom_id": 599,
@@ -52456,7 +52456,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 172
+            "money": 688
         },
         {
             "rom_id": 600,
@@ -52503,7 +52503,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 601,
@@ -52661,7 +52661,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 424
+            "money": 1696
         },
         {
             "rom_id": 603,
@@ -52801,7 +52801,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 212
+            "money": 848
         },
         {
             "rom_id": 604,
@@ -52912,7 +52912,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 750
+            "money": 3000
         },
         {
             "rom_id": 605,
@@ -53053,7 +53053,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 318
+            "money": 1272
         },
         {
             "rom_id": 606,
@@ -53132,7 +53132,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 416
+            "money": 1664
         },
         {
             "rom_id": 607,
@@ -53243,7 +53243,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 840
+            "money": 3360
         },
         {
             "rom_id": 608,
@@ -53352,7 +53352,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 504
+            "money": 2016
         },
         {
             "rom_id": 609,
@@ -53432,7 +53432,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 885
+            "money": 3540
         },
         {
             "rom_id": 610,
@@ -53572,7 +53572,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 752
+            "money": 3008
         },
         {
             "rom_id": 611,
@@ -53619,7 +53619,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 848
+            "money": 3392
         },
         {
             "rom_id": 612,
@@ -53728,7 +53728,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 432
+            "money": 1728
         },
         {
             "rom_id": 613,
@@ -53807,7 +53807,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 124
+            "money": 496
         },
         {
             "rom_id": 614,
@@ -53886,7 +53886,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 615,
@@ -53965,7 +53965,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 216
+            "money": 864
         },
         {
             "rom_id": 616,
@@ -54043,7 +54043,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 132
+            "money": 528
         },
         {
             "rom_id": 617,
@@ -54121,7 +54121,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 618,
@@ -54199,7 +54199,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 232
+            "money": 928
         },
         {
             "rom_id": 619,
@@ -54277,7 +54277,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 256
+            "money": 1024
         },
         {
             "rom_id": 620,
@@ -54355,7 +54355,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 296
+            "money": 1184
         },
         {
             "rom_id": 621,
@@ -54464,7 +54464,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 464
+            "money": 1856
         },
         {
             "rom_id": 622,
@@ -54542,7 +54542,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 160
+            "money": 640
         },
         {
             "rom_id": 623,
@@ -54620,7 +54620,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 184
+            "money": 736
         },
         {
             "rom_id": 624,
@@ -54698,7 +54698,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 625,
@@ -54776,7 +54776,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 168
+            "money": 672
         },
         {
             "rom_id": 626,
@@ -54854,7 +54854,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 627,
@@ -54932,7 +54932,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 628,
@@ -55010,7 +55010,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 629,
@@ -55088,7 +55088,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 630,
@@ -55166,7 +55166,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 220
+            "money": 880
         },
         {
             "rom_id": 631,
@@ -55244,7 +55244,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 196
+            "money": 784
         },
         {
             "rom_id": 632,
@@ -55322,7 +55322,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 220
+            "money": 880
         },
         {
             "rom_id": 633,
@@ -55431,7 +55431,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 232
+            "money": 928
         },
         {
             "rom_id": 634,
@@ -55509,7 +55509,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 188
+            "money": 752
         },
         {
             "rom_id": 635,
@@ -55587,7 +55587,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 196
+            "money": 784
         },
         {
             "rom_id": 636,
@@ -55665,7 +55665,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 216
+            "money": 864
         },
         {
             "rom_id": 637,
@@ -55745,7 +55745,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 516
+            "money": 2064
         },
         {
             "rom_id": 638,
@@ -55825,7 +55825,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 588
+            "money": 2352
         },
         {
             "rom_id": 639,
@@ -55905,7 +55905,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 660
+            "money": 2640
         },
         {
             "rom_id": 640,
@@ -56012,7 +56012,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 641,
@@ -56119,7 +56119,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 230
+            "money": 920
         },
         {
             "rom_id": 642,
@@ -56256,7 +56256,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 255
+            "money": 1020
         },
         {
             "rom_id": 643,
@@ -56332,7 +56332,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 644,
@@ -56410,7 +56410,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 424
+            "money": 1696
         },
         {
             "rom_id": 645,
@@ -56488,7 +56488,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 440
+            "money": 1760
         },
         {
             "rom_id": 646,
@@ -56566,7 +56566,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 352
+            "money": 1408
         },
         {
             "rom_id": 647,
@@ -56644,7 +56644,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 408
+            "money": 1632
         },
         {
             "rom_id": 648,
@@ -56722,7 +56722,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 440
+            "money": 1760
         },
         {
             "rom_id": 649,
@@ -56832,7 +56832,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 205
+            "money": 820
         },
         {
             "rom_id": 650,
@@ -56942,7 +56942,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 240
+            "money": 960
         },
         {
             "rom_id": 651,
@@ -57052,7 +57052,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 260
+            "money": 1040
         },
         {
             "rom_id": 652,
@@ -57130,7 +57130,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1600
+            "money": 6400
         },
         {
             "rom_id": 653,
@@ -57208,7 +57208,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1664
+            "money": 6656
         },
         {
             "rom_id": 654,
@@ -57286,7 +57286,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1792
+            "money": 7168
         },
         {
             "rom_id": 655,
@@ -57427,7 +57427,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 256
+            "money": 1024
         },
         {
             "rom_id": 656,
@@ -57568,7 +57568,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 368
+            "money": 1472
         },
         {
             "rom_id": 657,
@@ -57709,7 +57709,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 432
+            "money": 1728
         },
         {
             "rom_id": 658,
@@ -57789,7 +57789,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 164
+            "money": 656
         },
         {
             "rom_id": 659,
@@ -57900,7 +57900,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 660,
@@ -58011,7 +58011,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 208
+            "money": 832
         },
         {
             "rom_id": 661,
@@ -58120,7 +58120,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 344
+            "money": 1376
         },
         {
             "rom_id": 662,
@@ -58260,7 +58260,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 312
+            "money": 1248
         },
         {
             "rom_id": 663,
@@ -58400,7 +58400,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 408
+            "money": 1632
         },
         {
             "rom_id": 664,
@@ -58532,7 +58532,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 665,
@@ -58693,7 +58693,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 666,
@@ -58883,7 +58883,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 144
+            "money": 576
         },
         {
             "rom_id": 667,
@@ -59812,7 +59812,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1800
+            "money": 7200
         },
         {
             "rom_id": 673,
@@ -59861,7 +59861,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 2100
+            "money": 8400
         },
         {
             "rom_id": 674,
@@ -59910,7 +59910,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 2900
+            "money": 11600
         },
         {
             "rom_id": 675,
@@ -60037,7 +60037,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 344
+            "money": 1376
         },
         {
             "rom_id": 677,
@@ -60084,7 +60084,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 384
+            "money": 1536
         },
         {
             "rom_id": 678,
@@ -60131,7 +60131,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 679,
@@ -60209,7 +60209,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 680,
@@ -60287,7 +60287,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 681,
@@ -60367,7 +60367,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 780
+            "money": 3120
         },
         {
             "rom_id": 682,
@@ -60447,7 +60447,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 780
+            "money": 3120
         },
         {
             "rom_id": 683,
@@ -60527,7 +60527,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 795
+            "money": 3180
         },
         {
             "rom_id": 684,
@@ -60607,7 +60607,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 3000
+            "money": 12000
         },
         {
             "rom_id": 685,
@@ -60655,7 +60655,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 400
+            "money": 1600
         },
         {
             "rom_id": 686,
@@ -60733,7 +60733,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 400
+            "money": 1600
         },
         {
             "rom_id": 687,
@@ -60811,7 +60811,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 400
+            "money": 1600
         },
         {
             "rom_id": 688,
@@ -60855,7 +60855,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 424
+            "money": 1696
         },
         {
             "rom_id": 689,
@@ -60903,7 +60903,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 636
+            "money": 1272
         },
         {
             "rom_id": 690,
@@ -60951,7 +60951,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 636
+            "money": 1272
         },
         {
             "rom_id": 691,
@@ -60999,7 +60999,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 636
+            "money": 1272
         },
         {
             "rom_id": 692,
@@ -61047,7 +61047,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 600
+            "money": 1600
         },
         {
             "rom_id": 693,
@@ -61095,7 +61095,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 600
+            "money": 1600
         },
         {
             "rom_id": 694,
@@ -61143,7 +61143,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 600
+            "money": 1600
         },
         {
             "rom_id": 695,
@@ -61221,7 +61221,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 192
+            "money": 768
         },
         {
             "rom_id": 696,
@@ -61268,7 +61268,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 200
+            "money": 800
         },
         {
             "rom_id": 697,
@@ -61368,7 +61368,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 240
+            "money": 960
         },
         {
             "rom_id": 698,
@@ -61473,7 +61473,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 184
+            "money": 736
         },
         {
             "rom_id": 699,
@@ -61582,7 +61582,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 176
+            "money": 704
         },
         {
             "rom_id": 700,
@@ -61726,7 +61726,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 2070
+            "money": 8280
         },
         {
             "rom_id": 701,
@@ -62843,7 +62843,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 330
+            "money": 2640
         },
         {
             "rom_id": 707,
@@ -63291,7 +63291,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1680
+            "money": 6720
         },
         {
             "rom_id": 713,
@@ -63499,7 +63499,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1560
+            "money": 6240
         },
         {
             "rom_id": 714,
@@ -63708,7 +63708,7 @@
                 "Expert",
                 "Status"
             ],
-            "money": 1740
+            "money": 6960
         },
         {
             "rom_id": 715,
@@ -63916,7 +63916,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1710
+            "money": 6840
         },
         {
             "rom_id": 716,
@@ -64125,7 +64125,7 @@
                 "Expert",
                 "Weather"
             ],
-            "money": 1800
+            "money": 7200
         },
         {
             "rom_id": 717,
@@ -64333,7 +64333,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1860
+            "money": 7440
         },
         {
             "rom_id": 718,
@@ -64540,7 +64540,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 1800
+            "money": 7200
         },
         {
             "rom_id": 719,
@@ -64748,7 +64748,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1800
+            "money": 7200
         },
         {
             "rom_id": 720,
@@ -64956,7 +64956,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1710
+            "money": 6840
         },
         {
             "rom_id": 721,
@@ -65164,7 +65164,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1800
+            "money": 7200
         },
         {
             "rom_id": 722,
@@ -65372,7 +65372,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1680
+            "money": 6720
         },
         {
             "rom_id": 723,
@@ -65581,7 +65581,7 @@
                 "Expert",
                 "Weather"
             ],
-            "money": 1650
+            "money": 6600
         },
         {
             "rom_id": 724,
@@ -65789,7 +65789,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1650
+            "money": 6600
         },
         {
             "rom_id": 725,
@@ -65998,7 +65998,7 @@
                 "Expert",
                 "Status"
             ],
-            "money": 1590
+            "money": 6360
         },
         {
             "rom_id": 726,
@@ -66206,7 +66206,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1860
+            "money": 7440
         },
         {
             "rom_id": 727,
@@ -66415,7 +66415,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 2880
+            "money": 8640
         },
         {
             "rom_id": 728,
@@ -66462,7 +66462,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 224
+            "money": 896
         },
         {
             "rom_id": 729,
@@ -66540,7 +66540,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 704
+            "money": 2816
         },
         {
             "rom_id": 730,
@@ -66620,7 +66620,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1500
+            "money": 6000
         },
         {
             "rom_id": 731,
@@ -66730,7 +66730,7 @@
                 "Basic",
                 "Damage Priority"
             ],
-            "money": 152
+            "money": 608
         },
         {
             "rom_id": 732,
@@ -66810,7 +66810,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 84
+            "money": 336
         },
         {
             "rom_id": 733,
@@ -67038,7 +67038,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1800
+            "money": 7200
         },
         {
             "rom_id": 735,
@@ -67152,7 +67152,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1400
+            "money": 2016
         },
         {
             "rom_id": 736,
@@ -67266,7 +67266,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1400
+            "money": 2016
         },
         {
             "rom_id": 737,
@@ -67380,7 +67380,7 @@
                 "Evaluate Attack",
                 "Expert"
             ],
-            "money": 1400
+            "money": 2016
         }
     ]
 }
