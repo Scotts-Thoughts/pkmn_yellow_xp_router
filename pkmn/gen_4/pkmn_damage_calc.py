@@ -321,14 +321,14 @@ def calculate_gen_four_damage(
     # when a crit occurs, always ignore negative modifiers for the attacking pokemon, and always ignore positive modifiers for the defensive pokemon
     if is_crit:
         if move.category == const.CATEGORY_PHYSICAL:
-            if attacking_stage_modifiers.attack_stage < 0:
-                attacking_stage_modifiers = universal_data_objects.StageModifiers()
-            if defending_stage_modifiers.defense_stage > 0:
-                defending_stage_modifiers = universal_data_objects.StageModifiers()
-        else:
             if attacking_stage_modifiers.special_attack_stage < 0:
                 attacking_stage_modifiers = universal_data_objects.StageModifiers()
             if defending_stage_modifiers.special_defense_stage > 0:
+                defending_stage_modifiers = universal_data_objects.StageModifiers()
+        else:
+            if attacking_stage_modifiers.attack_stage < 0:
+                attacking_stage_modifiers = universal_data_objects.StageModifiers()
+            if defending_stage_modifiers.defense_stage > 0:
                 defending_stage_modifiers = universal_data_objects.StageModifiers()
 
     if attacking_battle_stats is None:

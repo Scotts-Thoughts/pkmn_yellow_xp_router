@@ -157,14 +157,6 @@ class BattleSummaryController:
                 lookup_key = const.ENEMY_KEY
 
             move_name = move_data[pkmn_idx][move_idx].name
-            # Ensure custom_move_data entry exists and is properly initialized
-            if (pkmn_idx >= len(self._custom_move_data) or 
-                self._custom_move_data[pkmn_idx] is None):
-                self._custom_move_data.extend([None] * (pkmn_idx + 1 - len(self._custom_move_data)))
-                self._custom_move_data[pkmn_idx] = {const.PLAYER_KEY: {}, const.ENEMY_KEY: {}}
-            elif lookup_key not in self._custom_move_data[pkmn_idx]:
-                self._custom_move_data[pkmn_idx][lookup_key] = {}
-            
             self._custom_move_data[pkmn_idx][lookup_key][move_name] = new_value
 
             move_data[pkmn_idx][move_idx] = self._recalculate_single_move(pkmn_idx, is_player_mon, move_name)
@@ -417,13 +409,7 @@ class BattleSummaryController:
         if move_display_name is None:
             move_display_name = move.name
 
-        # Safety check: ensure custom_move_data entry exists and is not None
-        if (mon_idx >= len(self._custom_move_data) or 
-            self._custom_move_data[mon_idx] is None or 
-            custom_lookup_key not in self._custom_move_data[mon_idx]):
-            custom_data_selection = None
-        else:
-            custom_data_selection = self._custom_move_data[mon_idx][custom_lookup_key].get(move_name)
+        custom_data_selection = self._custom_move_data[mon_idx][custom_lookup_key].get(move_name)
         custom_data_options = current_gen_info().get_move_custom_data(move.name)
         if custom_data_options is None and const.FLAVOR_MULTI_HIT in move.attack_flavor:
             custom_data_options = const.MULTI_HIT_CUSTOM_DATA
@@ -525,12 +511,7 @@ class BattleSummaryController:
             for _ in range(len(event_group.event_definition.get_pokemon_list())):
                 self._custom_move_data.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
         else:
-            self._custom_move_data = []
-            for x in event_group.event_definition.get_pokemon_list():
-                if x.custom_move_data is None:
-                    self._custom_move_data.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
-                else:
-                    self._custom_move_data.append(copy.deepcopy(x.custom_move_data))
+            self._custom_move_data = [copy.deepcopy(x.custom_move_data) for x in event_group.event_definition.get_pokemon_list()]
 
         self._original_player_mon_list = []
         self._transformed_mon_list = []
