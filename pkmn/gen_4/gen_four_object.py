@@ -134,16 +134,8 @@ class GenFour(CurrentGen):
         if version_name is None:
             version_name = self._version_name
 
-        if version_name == const.DIAMOND_VERSION:
-            return PlatinumRecorder(recorder_controller, ["Pokemon Diamond"])
-        elif version_name == const.PEARL_VERSION:
-            return PlatinumRecorder(recorder_controller, ["Pokemon Pearl"])
-        elif version_name == const.PLATINUM_VERSION:
+        if version_name == const.PLATINUM_VERSION:
             return PlatinumRecorder(recorder_controller, ["Pokemon Platinum"])
-        elif version_name == const.HEART_GOLD_VERSION:
-            return PlatinumRecorder(recorder_controller, ["Pokemon HeartGold"], is_hgss=True)
-        elif version_name == const.SOUL_SILVER_VERSION:
-            return PlatinumRecorder(recorder_controller, ["Pokemon SoulSilver"], is_hgss=True)
         
         raise NotImplementedError()
 

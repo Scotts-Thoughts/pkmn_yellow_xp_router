@@ -6,7 +6,7 @@ from utils.io_utils import sanitize_string
 logger = logging.getLogger(__name__)
 
 
-class Gen5GameHookConstants:
+class Gen4GameHookConstants:
     # NOTE: every key defined here is tied to a sepcific version of a GameHook mapper
     # if the keys in the mapper ever change such that they don't match anymore, the whole recorder will start to fail
     def __init__(self):
@@ -30,7 +30,7 @@ class Gen5GameHookConstants:
 
         self.ALL_KEYS_PLAYER_TEAM_SPECIES            = [f"player.team.{i}.species" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_LEVEL              = [f"player.team.{i}.level" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_IV_HP              = [f"player.team.{i}.ivs.hp" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_IV_ATTACK          = [f"player.team.{i}.ivs.hp" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_ATTACK          = [f"player.team.{i}.ivs.attack" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_DEFENSE         = [f"player.team.{i}.ivs.defense" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_SPEED           = [f"player.team.{i}.ivs.speed" for i in range(0, 6)]
@@ -38,11 +38,9 @@ class Gen5GameHookConstants:
         self.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_DEFENSE = [f"player.team.{i}.ivs.special_defense" for i in range(0, 6)]
 
         self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.moves.0.move"
-        self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.moves.1.move"
-        self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.moves.2.move"
-        self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.moves.3.move"
-        
-        self.KEY_PLAYER_MON_STAT_CUR_HP = "battle.player.active_pokemon.stats.hp"
+        self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.moves.0.move"
+        self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.moves.0.move"
+        self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.moves.0.move"
 
         self.KEY_PLAYER_MON_STAT_EXP_HP              = "player.team.0.evs.hp"
         self.KEY_PLAYER_MON_STAT_EXP_ATTACK          = "player.team.0.evs.attack"
@@ -52,18 +50,18 @@ class Gen5GameHookConstants:
         self.KEY_PLAYER_MON_STAT_EXP_SPECIAL_DEFENSE = "player.team.0.evs.special_defense"
 
         self.KEY_GAMETIME_SECONDS            = "game_time.seconds"
-        self.KEY_GAMETIME_FRAMES             = "game_time.seconds" # Frames doesn't exist in Platinum, this may cause issues
-        self.KEY_TRAINER_BATTLE_FLAG         = "battle.mode"       # Set to 'Trainer' when battling a trainer, set to 'null' when not battling
+        self.KEY_GAMETIME_FRAMES             = "game_time.seconds"                        # Frames doesn't exist in Platinum, this may cause issues
+        self.KEY_TRAINER_BATTLE_FLAG         = "battle.mode"                              # Set to 'Trainer' when battling a trainer, set to 'null' when not battling
+        # self.KEY_DOUBLE_BATTLE_FLAG          = "battle.type.double"                       # TODO: STP - I need to figure out an equivalent property
+        # self.KEY_TWO_OPPONENTS_BATTLE_FLAG   = "battle.type.two_opponents"                # TODO: STP - I need to figure out an equivalent property
         self.KEY_BATTLE_OUTCOME              = "battle.outcome"
-        self.KEY_BATTLE_FLAGS                = "battle.other.outcome_flags"
         self.KEY_BATTLE_PLAYER_MON_PARTY_POS = "battle.player.party_position"
         self.KEY_BATTLE_PLAYER_MON_HP        = "battle.player.active_pokemon.stats.hp"
         self.KEY_BATTLE_ALLY_MON_PARTY_POS   = "battle.player.party_position_2"
         self.KEY_BATTLE_ALLY_MON_HP          = "battle.player.active_pokemon_2.stats.hp"
 
         self.KEY_BATTLE_TRAINER_A_NUMBER       = "battle.opponent.id"
-        self.KEY_BATTLE_TRAINER_B_NUMBER       = "battle.opponent_2.id"
-        self.KEY_BATTLE_ALLY_NUMBER            = "battle.ally.id"
+        self.KEY_BATTLE_TRAINER_B_NUMBER       = "battle.opponent_2.id" # TODO: STP - Create this property in the mapper
         self.KEY_BATTLE_FIRST_ENEMY_SPECIES    = "battle.opponent.active_pokemon.species"
         self.KEY_BATTLE_FIRST_ENEMY_LEVEL      = "battle.opponent.active_pokemon.level"
         self.KEY_BATTLE_FIRST_ENEMY_HP         = "battle.opponent.active_pokemon.stats.hp"
@@ -74,13 +72,13 @@ class Gen5GameHookConstants:
         self.KEY_BATTLE_SECOND_ENEMY_PARTY_POS = "battle.opponent_2.party_position"
 
         self.ALL_KEYS_ENEMY_TEAM_SPECIES = [f"battle.opponent.team.{i}.species" for i in range(0, 6)]
-        self.ALL_KEYS_ENEMY_2_TEAM_SPECIES = [f"battle.opponent_2.team.{i}.species" for i in range(0, 6)]
 
-        self.KEY_SAVE_COUNT           = "meta.saves"
-        self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.save_sound"
-        self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.heal_sound"
-        self.SAVE_SOUND_EFFECT_VALUE  = 36342100
-        self.HEAL_SOUND_EFFECT_VALUE  = 36335692
+        self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.soundEffect1" # TODO: STP - Need to map this property
+        self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.soundEffect2" # TODO: STP - Need to map this property
+        # expect this value to be in soundEffect1
+        self.SAVE_SOUND_EFFECT_VALUE = 143651700 # TODO: STP - Need to map this value 
+        # expect this value to be in soundEffect2
+        self.HEAL_SOUND_EFFECT_VALUE = 143721092 # TODO: STP - Need to map this value
 
         self.ALL_KEYS_ITEM_TYPE         = [f"bag.items.{i}.item" for i in range(0, 40)]
         self.ALL_KEYS_ITEM_QUANTITY     = [f"bag.items.{i}.quantity" for i in range(0, 40)]
@@ -90,6 +88,7 @@ class Gen5GameHookConstants:
         self.ALL_KEYS_BALL_QUANTITY     = [f"bag.balls.{i}.quantity" for i in range(0, 16)]
         self.ALL_KEYS_BERRY_TYPE        = [f"bag.berries.{i}.item" for i in range(0, 63)]
         self.ALL_KEYS_BERRY_QUANTITY    = [f"bag.berries.{i}.quantity" for i in range(0, 63)]
+        # self.ALL_KEYS_KEY_ITEMS         = [f"bag.keyItems.{i}.item" for i in range(0, 30)] # Haven't mappe key items in platinum yet
 
         self.ALL_KEYS_TMHM_TYPE     = [f"bag.tmhm.{i}.item" for i in range(0, 99)]
         self.ALL_KEYS_TMHM_QUANTITY = [f"bag.tmhm.{i}.quantity" for i in range(0, 99)]
@@ -99,12 +98,11 @@ class Gen5GameHookConstants:
         self.ALL_KEYS_ALL_ITEM_FIELDS = set([])
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_ITEM_TYPE)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_ITEM_QUANTITY)
-        self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_MEDICINE_TYPE)
-        self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_MEDICINE_QUANTITY)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BALL_TYPE)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BALL_QUANTITY)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BERRY_TYPE)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_BERRY_QUANTITY)
+        # self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_KEY_ITEMS)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_TMHM_TYPE)
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_TMHM_QUANTITY)
         self.ALL_KEYS_PLAYER_MOVES = [
@@ -132,11 +130,9 @@ class Gen5GameHookConstants:
             self.KEY_PLAYER_MON_HELD_ITEM,
             self.KEY_GAMETIME_SECONDS,
             self.KEY_TRAINER_BATTLE_FLAG,
+            # self.KEY_DOUBLE_BATTLE_FLAG,
             self.KEY_BATTLE_OUTCOME,
-            self.KEY_BATTLE_FLAGS,
             self.KEY_BATTLE_TRAINER_A_NUMBER,
-            self.KEY_BATTLE_TRAINER_B_NUMBER,
-            self.KEY_BATTLE_ALLY_NUMBER,
             self.KEY_BATTLE_PLAYER_MON_HP,
             self.KEY_BATTLE_PLAYER_MON_PARTY_POS,
             self.KEY_BATTLE_ALLY_MON_HP,
@@ -151,13 +147,19 @@ class Gen5GameHookConstants:
             self.KEY_BATTLE_SECOND_ENEMY_PARTY_POS,
             self.KEY_AUDIO_SOUND_EFFECT_1,
             self.KEY_AUDIO_SOUND_EFFECT_2,
-            self.KEY_SAVE_COUNT,
         ]
+        if is_hgss:
+            # self.ALL_KEYS_TO_REGISTER.append(self.KEY_TWO_OPPONENTS_BATTLE_FLAG)
+            self.ALL_KEYS_TO_REGISTER.append(self.KEY_BATTLE_TRAINER_B_NUMBER)
 
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_MOVES)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_STAT_EXP)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_ALL_ITEM_FIELDS)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_TEAM_SPECIES)
+
+        # for debugging
+        # self.ALL_KEYS_TO_REGISTER.extend([self.KEY_DMA_A, self.KEY_DMA_B, self.KEY_DMA_C])
+
 
 class GameHookConstantConverter:
     def __init__(self):
@@ -356,4 +358,4 @@ class GameHookConstantConverter:
         return area_name
 
 
-gh_gen_five_const = Gen5GameHookConstants()
+gh_gen_four_const = Gen4GameHookConstants()
