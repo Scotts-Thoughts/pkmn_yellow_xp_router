@@ -411,14 +411,7 @@ class BattleState(WatchForResetState):
             if self._loss_detected:
                 meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
                 solo_mon_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_CUR_HP).value
-                # Don't trigger blackout if:
-                # 1. We're transitioning to Overworld AND META_STATE indicates we left battle (we won)
-                # 2. Battle outcome indicates we won
-                should_blackout = False
                 if solo_mon_hp == 0:
-                    should_blackout = True
-                
-                if should_blackout:
                     if self.is_trainer_battle == 'Trainer':
                         self.machine._queue_new_event(
                             EventDefinition(trainer_def=TrainerEventDefinition(self._trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)

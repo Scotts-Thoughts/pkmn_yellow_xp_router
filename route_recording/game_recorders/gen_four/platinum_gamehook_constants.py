@@ -43,8 +43,7 @@ class Gen4GameHookConstants:
         self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.moves.2.move"
         self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.moves.3.move"
         
-        self.KEY_PLAYER_MON_STAT_CUR_HP  = "battle.player.active_pokemon.stats.hp"
-        self.KEY_PLAYER_BATTLE_TEAM_0_HP = "battle.player.team.0.stats.hp"
+        self.KEY_PLAYER_MON_STAT_CUR_HP = "battle.player.active_pokemon.stats.hp"
 
         self.KEY_PLAYER_MON_STAT_EXP_HP              = "player.team.0.evs.hp"
         self.KEY_PLAYER_MON_STAT_EXP_ATTACK          = "player.team.0.evs.attack"

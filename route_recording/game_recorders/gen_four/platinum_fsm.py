@@ -443,15 +443,6 @@ class Machine:
         if len(gained_items) > 0 and sale_expected:
             logger.error(f"Gained the following items when expecting to be losing items to selling... {gained_items}")
 
-        # Check if there's a qualifying ball purchase (10+ Poke/Great/Ultra Balls) that would grant a free Premier Ball
-        free_premier_ball_eligible = False
-        if purchase_expected and not held_item_changed:
-            for cur_gained_item, cur_gain_num in gained_items.items():
-                app_item_name = self.gh_converter.item_name_convert(cur_gained_item)
-                if cur_gain_num >= 10 and app_item_name in ["Poke Ball", "Great Ball", "Ultra Ball"]:
-                    free_premier_ball_eligible = True
-                    break
-
         if not held_item_changed:
             for cur_gained_item, cur_gain_num in gained_items.items():
                 app_item_name = self.gh_converter.item_name_convert(cur_gained_item)
@@ -460,27 +451,11 @@ class Machine:
                     logger.error(f"#" * 50)
                     logger.error(f"Ignoring attempt to gain the above item, due to excessive number. Assuming this is happening due to DMA issues")
                     continue
-                
-                # Skip creating purchase event for Premier Ball if it's eligible as a free ball
-                if app_item_name == "Premier Ball" and free_premier_ball_eligible and purchase_expected:
-                    logger.info(f"Skipping purchase event for Premier Ball (will be added as free acquire)")
-                    continue
-                
                 self._queue_new_event(
                     EventDefinition(
                         item_event_def=InventoryEventDefinition(app_item_name, cur_gain_num, True, purchase_expected)
                     )
                 )
-                # If purchasing Pokeballs, Greatballs, or Ultraballs in quantities of 10 or greater,
-                # add a free Premier Ball as an acquire event (not a purchase)
-                if purchase_expected and cur_gain_num >= 10:
-                    if app_item_name in ["Poke Ball", "Great Ball", "Ultra Ball"]:
-                        logger.info(f"Adding free Premier Ball for purchasing {cur_gain_num} {app_item_name}")
-                        self._queue_new_event(
-                            EventDefinition(
-                                item_event_def=InventoryEventDefinition("Premier Ball", 1, True, False)
-                            )
-                        )
                 
         if len(lost_items) > 0:
             if purchase_expected:
