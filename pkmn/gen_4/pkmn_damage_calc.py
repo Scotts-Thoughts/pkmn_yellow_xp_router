@@ -79,7 +79,7 @@ def get_move_accuracy(
     if defending_pkmn.ability == gen_four_const.SAND_VEIL_ABILITY and weather == const.WEATHER_SANDSTORM:
         result = math.floor(result * 3277 / 4096)
 
-    if defending_pkmn.ability == gen_four_const.SNOW_CLOAK_ABILITY and weather == const.WEATHER_HAIL:
+    if defending_pkmn.ability == gen_four_const.SNOW_CLOAK_ABILITY and weather == const.WEATHER_SANDSTORM:
         result = math.floor(result * 3277 / 4096)
 
     return result
@@ -190,7 +190,7 @@ def calculate_gen_four_damage(
         attacking_ability == gen_four_const.TECHNICIAN_ABILITY and
         base_power <= 60
     ):
-        base_power = math.floor(base_power * 1.5)
+        base_power = math.floor(60 * 1.5)
 
     if attacking_ability == gen_four_const.NORMALIZE_ABILITY:
         move_type = const.TYPE_NORMAL
@@ -483,15 +483,15 @@ def calculate_gen_four_damage(
         is_weather_active and
         weather == const.WEATHER_SUN
     ):
-        defending_battle_stats.attack = math.floor(defending_battle_stats.attack * 1.5)
-        defending_battle_stats.special_defense = math.floor(defending_battle_stats.special_defense * 1.5)
+        defending_battle_stats.special_attack = math.floor(defending_battle_stats.special_attack * 1.5)
+        defending_battle_stats.special_defense = math.floor(defending_battle_stats.special_attack * 1.5)
     elif (
         attacking_ability == gen_four_const.FLOWER_GIFT_ABILITY and
         is_weather_active and
         weather == const.WEATHER_SUN
     ):
-        attacking_battle_stats.attack = math.floor(attacking_battle_stats.sattack * 1.5)
-        attacking_battle_stats.special_defense = math.floor(attacking_battle_stats.special_defense * 1.5)
+        attacking_battle_stats.special_attack = math.floor(attacking_battle_stats.special_attack * 1.5)
+        attacking_battle_stats.special_defense = math.floor(attacking_battle_stats.special_attack * 1.5)
     elif (
         attacking_ability == gen_four_const.SOLAR_POWER_ABILITY and
         is_weather_active and
