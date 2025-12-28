@@ -5,8 +5,9 @@ import sys
 
 class Constants:
     def __init__(self):
+        self.DEVELOPMENT_MODE = True
         self.APP_VERSION = "v4.0a"
-        self.APP_RELEASE_DATE = "2025-Dec-27"
+        self.APP_RELEASE_DATE = "2025-Dec-28"
 
         self.DEBUG_MODE = False
         self.DEBUG_RECORDING_MODE = False
