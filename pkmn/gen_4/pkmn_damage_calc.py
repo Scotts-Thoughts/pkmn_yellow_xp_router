@@ -186,12 +186,6 @@ def calculate_gen_four_damage(
         elif weather == const.WEATHER_SANDSTORM:
             move_type = const.TYPE_ROCK
 
-    if (
-        attacking_ability == gen_four_const.TECHNICIAN_ABILITY and
-        base_power <= 60
-    ):
-        base_power = math.floor(base_power * 1.5)
-
     if attacking_ability == gen_four_const.NORMALIZE_ABILITY:
         move_type = const.TYPE_NORMAL
     
@@ -418,6 +412,12 @@ def calculate_gen_four_damage(
             base_power = 100
         else:
             base_power = 120
+
+    if (
+        attacking_ability == gen_four_const.TECHNICIAN_ABILITY and
+        base_power <= 60
+    ):
+        base_power = math.floor(base_power * 1.5)
 
     # NOTE: for now, just ignoring the "edge case" of: what if the mon for mon-specific unique items has klutz?
     # it never occurs in normal gameplay, and would require a hack. so, wtv
