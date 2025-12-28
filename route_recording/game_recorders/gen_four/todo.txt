@@ -1,0 +1,7 @@
+GEN4 ROUTER TODO
+- Collect replay file from 'Platinum-2026 v0.3.0'
+- Work out a robust way to track blackouts
+
+- Finish patching HeartGold
+- Collect replay file from HeartGold
+- Test HeartGold
