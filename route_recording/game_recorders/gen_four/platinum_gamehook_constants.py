@@ -22,6 +22,7 @@ class Gen4GameHookConstants:
         self.KEY_OVERWORLD_MAP         = "overworld.map_name"
         self.KEY_PLAYER_PLAYERID       = "player.player_id"
         self.KEY_PLAYER_MONEY          = "bag.money"
+        self.KEY_PLAYER_COINS          = "bag.coins"
         self.KEY_PLAYER_MON_EXPPOINTS  = "player.team.0.exp"
         self.KEY_PLAYER_MON_LEVEL      = "player.team.0.level"
         self.KEY_PLAYER_MON_SPECIES    = "player.team.0.species"
@@ -80,7 +81,8 @@ class Gen4GameHookConstants:
         self.KEY_AUDIO_SOUND_EFFECT_1 = "audio.save_sound"
         self.KEY_AUDIO_SOUND_EFFECT_2 = "audio.heal_sound"
         self.SAVE_SOUND_EFFECT_VALUE  = 36342100
-        self.HEAL_SOUND_EFFECT_VALUE  = 36335692
+        self.PLATINUM_HEAL_SOUND_EFFECT_VALUE  = 36335692 #36336700 in heartgold
+        self.HEARTGOLD_HEAL_SOUND_EFFECT_VALUE  = 36336700 #36336700 in heartgold
 
         self.ALL_KEYS_ITEM_TYPE         = [f"bag.items.{i}.item" for i in range(0, 40)]
         self.ALL_KEYS_ITEM_QUANTITY     = [f"bag.items.{i}.quantity" for i in range(0, 40)]
@@ -126,6 +128,7 @@ class Gen4GameHookConstants:
             self.KEY_OVERWORLD_MAP,
             self.KEY_PLAYER_PLAYERID,
             self.KEY_PLAYER_MONEY,
+            self.KEY_PLAYER_COINS,
             self.KEY_PLAYER_MON_EXPPOINTS,
             self.KEY_PLAYER_MON_LEVEL,
             self.KEY_PLAYER_MON_SPECIES,

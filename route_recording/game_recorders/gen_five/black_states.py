@@ -1,11 +1,11 @@
 from __future__ import annotations
 import logging
 
-from route_recording.game_recorders.gen_four.platinum_fsm import Machine, State, StateType
+from route_recording.game_recorders.gen_five.black_fsm import Machine, State, StateType
 from route_recording.gamehook_client import GameHookProperty
 from routing.route_events import BlackoutEventDefinition, EventDefinition, HealEventDefinition, HoldItemEventDefinition, SaveEventDefinition, TrainerEventDefinition, WildPkmnEventDefinition
-from route_recording.game_recorders.gen_four.platinum_gamehook_constants import gh_gen_four_const
-from pkmn.gen_4.gen_four_constants import gen_four_const
+from route_recording.game_recorders.gen_five.black_gamehook_constants import gh_gen_five_const
+from pkmn.gen_4.gen_five_constants import gen_five_const
 from utils.constants import const
 
 logger = logging.getLogger(__name__)
@@ -48,9 +48,9 @@ class DelayedUpdate:
 class WatchForResetState(State):
     def watch_for_reset(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
         if self.machine._player_id is not None:
-            if new_prop.path == gh_gen_four_const.KEY_PLAYER_PLAYERID and new_prop.value == 0:
+            if new_prop.path == gh_gen_five_const.KEY_PLAYER_PLAYERID and new_prop.value == 0:
                 return StateType.RESETTING
-            elif new_prop.value == 0 and self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_PLAYERID).value == 0:
+            elif new_prop.value == 0 and self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value == 0:
                 return StateType.RESETTING
         return None
 
@@ -80,8 +80,8 @@ class WatchState(State):
         pass
 
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-        if new_prop.path != gh_gen_four_const.KEY_GAMETIME_SECONDS:
-            frame_val = self.machine._gamehook_client.get(gh_gen_four_const.KEY_GAMETIME_FRAMES).value
+        if new_prop.path != gh_gen_five_const.KEY_GAMETIME_SECONDS:
+            frame_val = self.machine._gamehook_client.get(gh_gen_five_const.KEY_GAMETIME_FRAMES).value
             logger.info(f"On Frame {frame_val:02} Changing {new_prop.path} from {prev_prop.value} to {new_prop.value}({type(new_prop.value)})")
 
         return self.state_type
@@ -98,7 +98,7 @@ class UninitializedState(WatchForResetState):
         self._seconds_delay = 2
     
     def _on_exit(self, next_state: State):
-        self.machine._player_id = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_PLAYERID).value
+        self.machine._player_id = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value
         # Shouldn't really happen ever, but if the player connects to an active game, but then resets the emulator
         # it's possible that we exit (due to transitioning to a reset state) while the player id is 0
         # If this happens, just ignore the update, let the ResettingState handle setting the player id
@@ -109,15 +109,15 @@ class UninitializedState(WatchForResetState):
     
     @auto_reset
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-        if new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        if new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if self._seconds_delay <= 0:
                 if (
-                    self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value is 'Battle'
+                    self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value is 'Battle'
                 ):
                     return StateType.BATTLE
                 else:
                     return StateType.OVERWORLD
-            elif not self._is_waiting and self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_PLAYERID).value != 0:
+            elif not self._is_waiting and self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value != 0:
                 self._is_waiting = True
 
             if self._is_waiting:
@@ -135,10 +135,10 @@ class ResettingState(State):
     def _on_enter(self, prev_state: State):
         self._is_waiting = False
         self._seconds_delay = 2
-        self.machine._queue_new_event(EventDefinition(notes=gh_gen_four_const.RESET_FLAG))
+        self.machine._queue_new_event(EventDefinition(notes=gh_gen_five_const.RESET_FLAG))
     
     def _on_exit(self, next_state: State):
-        new_player_id = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_PLAYERID).value
+        new_player_id = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value
         if self.machine._player_id is None:
             self.machine._player_id = new_player_id
         elif self.machine._player_id != new_player_id:
@@ -147,10 +147,10 @@ class ResettingState(State):
         self.machine.update_all_cached_info()
 
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-        if new_prop.path == gh_gen_four_const.KEY_PLAYER_PLAYERID:
+        if new_prop.path == gh_gen_five_const.KEY_PLAYER_PLAYERID:
             if prev_prop.value == 0 and new_prop.value != 0:
                 self._is_waiting = True
-        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        elif new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if not self._is_waiting:
                 self._is_waiting = True
             elif self._seconds_delay <= 0:
@@ -166,7 +166,7 @@ class BattleState(WatchForResetState):
 
     class DelayedBattleMovesUpdate(DelayedUpdate):
         def _update_helper(self):
-            if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
+            if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
                 self.machine.update_team_cache()
                 self.machine._move_cache_update(levelup_source=True)
 
@@ -179,16 +179,16 @@ class BattleState(WatchForResetState):
             self._init_held_item = held_item
 
         def _update_helper(self):
-            if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
-                if self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM).value is None:
+            if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
+                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value is None:
                     self.machine._queue_new_event(EventDefinition(hold_item=HoldItemEventDefinition(None, True)))
-                elif self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM).value != self._init_held_item:
+                elif self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value != self._init_held_item:
                     do_consume = self._init_held_item is not None
-                    self._init_held_item = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM).value
+                    self._init_held_item = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value
                     self.machine._queue_new_event(
                         EventDefinition(
                             hold_item=HoldItemEventDefinition(
-                                self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM).value,
+                                self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value,
                                 do_consume
                             )
                         )
@@ -199,8 +199,8 @@ class BattleState(WatchForResetState):
             self.original_level = original_level
 
         def _update_helper(self):
-            if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
-                new_level = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_LEVEL).value
+            if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
+                new_level = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_LEVEL).value
                 if new_level > self.original_level:
                     self.machine._solo_mon_levelup(new_level)
                     self.original_level = new_level
@@ -266,9 +266,9 @@ class BattleState(WatchForResetState):
         self._is_double_battle = False
         self._multi_battle = False
         # self._is_tutorial_battle = False
-        self._ally_id = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_NUMBER).value
+        self._ally_id = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_NUMBER).value
         logger.info(f"ally id: {self._ally_id}")
-        self._initial_money = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MONEY).value
+        self._initial_money = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MONEY).value
         self._init_held_item = None
         
         self._delayed_initialization.begin_waiting()
@@ -277,11 +277,11 @@ class BattleState(WatchForResetState):
         # Ideally, this should be pulled from a single property. However that mapped property doesn't work currently
         # so, for now, just iterate over enemy pokemon team species, and figure out how many non-empty team members are loaded
         result = 0
-        for cur_key in gh_gen_four_const.ALL_KEYS_ENEMY_TEAM_SPECIES:
+        for cur_key in gh_gen_five_const.ALL_KEYS_ENEMY_TEAM_SPECIES:
             if self.machine._gamehook_client.get(cur_key).value:
                 result += 1
         if self.trainer_2 > 0:
-            for cur_key in gh_gen_four_const.ALL_KEYS_ENEMY_2_TEAM_SPECIES:
+            for cur_key in gh_gen_five_const.ALL_KEYS_ENEMY_2_TEAM_SPECIES:
                 if self.machine._gamehook_client.get(cur_key).value:
                     result += 1
         return result
@@ -298,7 +298,7 @@ class BattleState(WatchForResetState):
         result = {}
         next_pos_idx = 0
         for cur_key_idx in real_order:
-            if self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_ENEMY_TEAM_SPECIES[cur_key_idx]).value:
+            if self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_ENEMY_TEAM_SPECIES[cur_key_idx]).value:
                 result[cur_key_idx] = next_pos_idx
                 next_pos_idx += 1
 
@@ -306,42 +306,42 @@ class BattleState(WatchForResetState):
 
     def _battle_ready(self):
         # to be called after battle is actually initialized
-        battle_mode = self.machine._gamehook_client.get(gh_gen_four_const.KEY_TRAINER_BATTLE_FLAG).value
+        battle_mode = self.machine._gamehook_client.get(gh_gen_five_const.KEY_TRAINER_BATTLE_FLAG).value
         if battle_mode is None or battle_mode == 'null':
             self._delayed_initialization.reset()
             return
 
-        self.trainer_1 = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_TRAINER_A_NUMBER).value
-        self.trainer_2 = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_TRAINER_B_NUMBER).value
+        self.trainer_1 = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_TRAINER_A_NUMBER).value
+        self.trainer_2 = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_TRAINER_B_NUMBER).value
 
         self._battle_started = True
-        self._init_held_item = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM).value
+        self._init_held_item = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value
         if not self.trainer_2:
             self._is_double_battle = False
         else:
             self._is_double_battle = True
             if self._ally_id is not 0:
                 self._multi_battle = True
-        # self._is_tutorial_battle = self.machine._gamehook_client.get(gh_gen_four_const.KEY_TUTORIAL_BATTLE_FLAG).value
+        # self._is_tutorial_battle = self.machine._gamehook_client.get(gh_gen_five_const.KEY_TUTORIAL_BATTLE_FLAG).value
         self.is_trainer_battle = battle_mode
-        self._delayed_levelup.configure_level(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_LEVEL).value)
+        self._delayed_levelup.configure_level(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_LEVEL).value)
 
         # if self._is_tutorial_battle:
         #     logger.info(f"tutorial fight found")
         if self.is_trainer_battle == 'Trainer':
             logger.info(f"trainer battle found")
-            self._trainer_name = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_TRAINER_A_NUMBER).value
+            self._trainer_name = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_TRAINER_A_NUMBER).value
             if self.machine.is_hgss:
                 self._second_trainer_name = ""
             else:
-                self._second_trainer_name = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_TRAINER_B_NUMBER).value
+                self._second_trainer_name = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_TRAINER_B_NUMBER).value
                 if self._second_trainer_name is None:
                     self._second_trainer_name = ""
 
             num_enemy_pokemon = self._get_num_enemy_trainer_pokemon()
             self._enemy_pos_lookup = self._get_enemy_pos_lookup()
             if self._is_double_battle and not self._multi_battle:
-                ally_mon_pos = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
+                ally_mon_pos = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
                 self._exp_split = [set([0, ally_mon_pos]) for _ in range(num_enemy_pokemon)]
                 self._enemy_mon_order = [0, 1]
             else:
@@ -351,7 +351,7 @@ class BattleState(WatchForResetState):
             return_custom_move_data = None
             if gen_four_const.RETURN_MOVE_NAME in self.machine._cached_moves:
                 return_custom_move_data = []
-                cur_friendship = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value
+                cur_friendship = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP).value
                 for _ in range(6):
                     return_custom_move_data.append({
                         const.PLAYER_KEY: {gen_four_const.RETURN_MOVE_NAME: str(int(cur_friendship / 2.5))},
@@ -380,7 +380,7 @@ class BattleState(WatchForResetState):
                     final_exp_split = None
                 
                 final_mon_order = [self._enemy_mon_order.index(x) + 1 for x in sorted(self._enemy_mon_order)]
-                if self._multi_battle or self._double_battle:
+                if self._multi_battle:
                     final_mon_order = [] # ! ignores mon order for multi battles (hacky solution, incomplete)
 
                 return_custom_move_data = None
@@ -400,21 +400,29 @@ class BattleState(WatchForResetState):
                             exp_split=final_exp_split,
                             mon_order=final_mon_order,
                             custom_move_data=return_custom_move_data,
-                            pay_day_amount=self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MONEY).value - self._initial_money,
+                            pay_day_amount=self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MONEY).value - self._initial_money,
                         ),
-                        notes=gh_gen_four_const.ROAR_FLAG
+                        notes=gh_gen_five_const.ROAR_FLAG
                     )
                 )
             # Only trigger blackout if we actually lost the battle
             # Don't trigger blackout if we're successfully transitioning to Overworld (we won)
             # Evolution means we won, so don't blackout in that case
             if self._loss_detected:
-                meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
-                solo_mon_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_CUR_HP).value
+                meta_state = self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value
+                battle_outcome = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FLAGS).value
+                solo_mon_hp = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_CUR_HP).value
+                # Don't trigger blackout if:
+                # 1. We're transitioning to Overworld AND META_STATE indicates we left battle (we won)
+                # 2. Battle outcome indicates we won
+                should_blackout = False
                 if solo_mon_hp == 0:
+                    should_blackout = True
+                
+                if should_blackout:
                     if self.is_trainer_battle == 'Trainer':
                         self.machine._queue_new_event(
-                            EventDefinition(trainer_def=TrainerEventDefinition(self._trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
+                            EventDefinition(trainer_def=TrainerEventDefinition(self._trainer_name), notes=gh_gen_five_const.TRAINER_LOSS_FLAG)
                         )
                         for trainer_mon_event in self._defeated_trainer_mons:
                             self.machine._queue_new_event(trainer_mon_event)
@@ -427,12 +435,12 @@ class BattleState(WatchForResetState):
     
     def _get_first_enemy_mon_pos(self, value=None):
         if value is None:
-            value = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_PARTY_POS).value
+            value = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PARTY_POS).value
         return self._enemy_pos_lookup[value]
 
     def _get_second_enemy_mon_pos(self, value=None):
         if value is None:
-            value = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS).value
+            value = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS).value
         return self._enemy_pos_lookup[value]
 
     @auto_reset
@@ -441,7 +449,7 @@ class BattleState(WatchForResetState):
         # if self._is_tutorial_battle:
         #     return self.state_type
 
-        if new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
+        if new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_EXPPOINTS:
             logger.info(f"EXP changed in battle. Cached species: '{self._cached_first_mon_species}', level: {self._cached_first_mon_level}, is_trainer: {self.is_trainer_battle}")
             if self._cached_first_mon_species:
                 if self.is_trainer_battle == 'Trainer':
@@ -477,28 +485,28 @@ class BattleState(WatchForResetState):
             
             # Check if battle ended AFTER processing EXP changes
             # If META_STATE is not 'Battle', we've left battle
-            meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
+            meta_state = self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value
             if meta_state != 'Battle':
                 return StateType.OVERWORLD
 
-        # elif new_prop.path == gh_gen_four_const.KEY_BATTLE_FLAG:
+        # elif new_prop.path == gh_gen_five_const.KEY_BATTLE_FLAG:
         #     if new_prop.value and not self._battle_started:
         #         self._delayed_initialization.trigger()
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP:
+        elif new_prop.path == gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP:
             if new_prop.value <= 0 and not self._cached_first_mon_species:  # HP dropped to 0 or below, and not already cached
-                species_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_SPECIES).value
-                level_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_LEVEL).value
+                species_raw = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_SPECIES).value
+                level_raw = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_LEVEL).value
                 self._cached_first_mon_species = self.machine.gh_converter.pkmn_name_convert(species_raw)
                 self._cached_first_mon_level = level_raw
                 logger.info(f"Cached wild Pokemon: {self._cached_first_mon_species} level {self._cached_first_mon_level} (raw: {species_raw}, {level_raw})")
-                self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP:
+                self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP).value)
+        elif new_prop.path == gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP:
             if new_prop.value <= 0 and not self._cached_second_mon_species:  # HP dropped to 0 or below, and not already cached
-                self._cached_second_mon_species = self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_SPECIES).value)
-                self._cached_second_mon_level = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_LEVEL).value
-                self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_PLAYER_MON_HP:
-            player_mon_pos = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value
+                self._cached_second_mon_species = self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_SPECIES).value)
+                self._cached_second_mon_level = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_LEVEL).value
+                self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP).value)
+        elif new_prop.path == gh_gen_five_const.KEY_BATTLE_PLAYER_MON_HP:
+            player_mon_pos = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value
             if player_mon_pos == 0 and new_prop.value <= 0:
                 if self._battle_started:
                     logger.info(f"Player mon HP dropped to 0 or below")
@@ -512,17 +520,17 @@ class BattleState(WatchForResetState):
                     second_enemy_mon_pos = self._get_second_enemy_mon_pos()
                     if player_mon_pos in self._exp_split[second_enemy_mon_pos]:
                         self._exp_split[second_enemy_mon_pos].remove(player_mon_pos)
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP and not self._multi_battle:
+        elif new_prop.path == gh_gen_five_const.KEY_BATTLE_ALLY_MON_HP and not self._multi_battle:
             if self._is_double_battle and new_prop.value <= 0:
                 # for each of these we want to remove the ally from exp split if the enemy mon is still alive
                 # additionally, we also want to remove from the exp split if the enemy is cached, as this means they died on the same turn (e.g. earthquake)
                 # if the enemy has no HP *AND* is not cached for exp distribution, then they have died and enemy trainer has no further mons
                 #   In that case, leave the ally in the exp split, as they did participate already
-                ally_mon_pos = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
+                ally_mon_pos = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
                 enemy_mon_pos = self._get_first_enemy_mon_pos()
                 if (
                     ally_mon_pos in self._exp_split[enemy_mon_pos] and (
-                        self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0 or
+                        self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0 or
                         self._cached_first_mon_species
                     )
                 ):
@@ -532,75 +540,75 @@ class BattleState(WatchForResetState):
                 second_enemy_mon_pos = self._get_second_enemy_mon_pos()
                 if (
                     ally_mon_pos in self._exp_split[second_enemy_mon_pos] and (
-                        self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0 or
+                        self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0 or
                         self._cached_second_mon_species
                     )
                 ):
                     self._exp_split[second_enemy_mon_pos].remove(ally_mon_pos)
 
-        elif new_prop.path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
+        elif new_prop.path in gh_gen_five_const.ALL_KEYS_PLAYER_MOVES:
             self._delayed_move_updater.begin_waiting()
-        elif new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
+        elif new_prop.path in gh_gen_five_const.ALL_KEYS_ALL_ITEM_FIELDS:
             self._delayed_item_updater.begin_waiting()
-        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM:
+        elif new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM:
             self._delayed_held_item_updater.begin_waiting()
-        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_LEVEL:
+        elif new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_LEVEL:
             self._delayed_levelup.begin_waiting()
-        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        elif new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             self._delayed_move_updater.tick()
             self._delayed_item_updater.tick()
             self._delayed_held_item_updater.tick()
             self._delayed_levelup.tick()
             self._delayed_initialization.tick()
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS:
+        elif new_prop.path == gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS:
             if new_prop.value >= 0 and new_prop.value < 6:
-                if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0:
+                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0:
                     self._exp_split[self._get_first_enemy_mon_pos()].add(new_prop.value)
                 if self._is_double_battle:
-                    if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0:
+                    if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0:
                         self._exp_split[self._get_second_enemy_mon_pos()].add(new_prop.value)
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS:
+        elif new_prop.path == gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS:
             if self._is_double_battle and new_prop.value >= 0 and new_prop.value < 6:
-                if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0:
+                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0:
                     self._exp_split[self._get_first_enemy_mon_pos()].add(new_prop.value)
-                if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0:
+                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0:
                     self._exp_split[self._get_second_enemy_mon_pos()].add(new_prop.value)
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_PARTY_POS:
+        elif new_prop.path == gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PARTY_POS:
             real_new_value = self._get_first_enemy_mon_pos(value=new_prop.value)
             if real_new_value >= 0 and real_new_value < len(self._exp_split):
-                if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_HP).value > 0:
-                    self._exp_split[real_new_value] = set([self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
-                if self._is_double_battle and self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
-                    self._exp_split[real_new_value].add(self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value)
+                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_HP).value > 0:
+                    self._exp_split[real_new_value] = set([self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
+                if self._is_double_battle and self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
+                    self._exp_split[real_new_value].add(self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value)
 
                 # NOTE: this logic won't perfectly reflect things if the player uses roar/whirlwind
                 # or if the enemy trainer switches pokemon (and doesn't only send out new mons on previous death)
                 if real_new_value not in self._enemy_mon_order:
                     self._enemy_mon_order.append(real_new_value)
-        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS:
+        elif new_prop.path == gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS:
             real_new_value = self._get_second_enemy_mon_pos(value=new_prop.value)
             if self._is_double_battle and real_new_value >= 0 and real_new_value < len(self._exp_split):
-                if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_HP).value > 0:
-                    self._exp_split[real_new_value] = set([self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
-                if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
-                    self._exp_split[real_new_value].add(self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value)
+                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_HP).value > 0:
+                    self._exp_split[real_new_value] = set([self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
+                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
+                    self._exp_split[real_new_value].add(self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value)
 
                 # NOTE: this logic won't perfectly reflect things if the player uses roar/whirlwind
                 # or if the enemy trainer switches pokemon (and doesn't only send out new mons on previous death)
                 if real_new_value not in self._enemy_mon_order:
                     self._enemy_mon_order.append(real_new_value)
-        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_SPECIES:
+        elif new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_SPECIES:
             # Species changed - could be an evolution! Update team cache to detect it
             # This handles the case where evolution occurs during battle end transition
             self.machine.update_team_cache()
             # Only transition if META_STATE indicates we've left battle
             # Don't transition immediately on species change - wait for META_STATE to change
-            meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
+            meta_state = self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value
             if meta_state != 'Battle':
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
                 if not self._cached_first_mon_species and not self._cached_second_mon_species:
                     return StateType.OVERWORLD
-        elif new_prop.path == gh_gen_four_const.META_STATE:
+        elif new_prop.path == gh_gen_five_const.META_STATE:
             # META_STATE changed - check if battle ended
             # If META_STATE is not 'Battle', we've left battle (could be 'From Battle' or anything else)
             if new_prop.value != 'Battle':
@@ -610,8 +618,8 @@ class BattleState(WatchForResetState):
         
         # Check if battle ended (only if not already checked after EXP change)
         # BUT: Don't transition if we have a cached Pokemon waiting for EXP change
-        if new_prop.path != gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
-            meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
+        if new_prop.path != gh_gen_five_const.KEY_PLAYER_MON_EXPPOINTS:
+            meta_state = self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value
             # If META_STATE is not 'Battle', we've left battle (could be 'From Battle', 'Overworld', or anything else)
             if meta_state != 'Battle':
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
@@ -652,16 +660,16 @@ class InventoryChangeState(WatchForResetState):
     
     @auto_reset
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-        if new_prop.path == gh_gen_four_const.KEY_PLAYER_MONEY:
+        if new_prop.path == gh_gen_five_const.KEY_PLAYER_MONEY:
             if new_prop.value > prev_prop.value:
                 self._money_gained = True
             else:
                 self._money_lost = True
-        elif new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
+        elif new_prop.path in gh_gen_five_const.ALL_KEYS_ALL_ITEM_FIELDS:
             self._seconds_delay = self.BASE_DELAY
-        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM:
+        elif new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM:
             self._held_item_changed = True
-        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        elif new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if self._seconds_delay <= 0:
                 return StateType.OVERWORLD
             else:
@@ -686,20 +694,20 @@ class UseRareCandyState(WatchForResetState):
     def _on_exit(self, next_state: State):
         if next_state.state_type != StateType.RESETTING:
             if self.machine._item_cache_update(candy_flag=True):
-                self.machine._solo_mon_levelup(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_LEVEL).value)
+                self.machine._solo_mon_levelup(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_LEVEL).value)
             if self._move_learned:
                 self.machine.update_team_cache()
                 self.machine._move_cache_update(levelup_source=True)
     
     @auto_reset
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-        if new_prop.path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
+        if new_prop.path in gh_gen_five_const.ALL_KEYS_PLAYER_MOVES:
             self._move_learned = True
-        elif new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_QUANTITY:
+        elif new_prop.path in gh_gen_five_const.ALL_KEYS_ITEM_QUANTITY:
             self._cur_delay = self.BASE_DELAY
-        elif new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_TYPE:
+        elif new_prop.path in gh_gen_five_const.ALL_KEYS_ITEM_TYPE:
             self._cur_delay = self.BASE_DELAY
-        elif new_prop.path in gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        elif new_prop.path in gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if self._cur_delay <= 0:
                 return StateType.OVERWORLD
             else:
@@ -723,9 +731,9 @@ class UseTMState(WatchForResetState):
     
     @auto_reset
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-        if new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
+        if new_prop.path in gh_gen_five_const.ALL_KEYS_ALL_ITEM_FIELDS:
             self._seconds_delay = self.BASE_DELAY
-        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        elif new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if self._seconds_delay <= 0:
                 return StateType.OVERWORLD
             else:
@@ -749,12 +757,12 @@ class MoveDeleteState(WatchForResetState):
     
     @auto_reset
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-        if new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        if new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if self._cur_delay <= 0:
                 return StateType.OVERWORLD
             else:
                 self._cur_delay -= 1
-        elif new_prop.path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
+        elif new_prop.path in gh_gen_five_const.ALL_KEYS_PLAYER_MOVES:
             self._cur_delay = self.BASE_DELAY
 
         return self.state_type
@@ -782,9 +790,9 @@ class UseVitaminState(WatchForResetState):
     
     @auto_reset
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
-        if new_prop.path in gh_gen_four_const.ALL_KEYS_ITEM_TYPE:
+        if new_prop.path in gh_gen_five_const.ALL_KEYS_ITEM_TYPE:
             self._item_removal_detected = True
-        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        elif new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if self._item_removal_detected:
                 if self._cur_delay <= 0:
                     return StateType.OVERWORLD
@@ -824,10 +832,10 @@ class OverworldState(WatchForResetState):
         self._new_file_delay = self.BASE_DELAY
 
         self._wrong_mon_delay = self.BASE_DELAY
-        if self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value == None:
+        if self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_SPECIES).value == None:
             self._waiting_for_solo_mon_in_slot_1 = True
             self._wrong_mon_in_slot_1 = False
-        elif self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value != self.machine._solo_mon_key.species:
+        elif self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_SPECIES).value != self.machine._solo_mon_key.species:
             self._waiting_for_solo_mon_in_slot_1 = False
             self._wrong_mon_in_slot_1 = True
         else:
@@ -840,7 +848,7 @@ class OverworldState(WatchForResetState):
         self._heal_detected = False
         self._heal_delay = self.HEAL_DELAY
         # Initialize previous save count from current value if available
-        save_count_prop = self.machine._gamehook_client.get(gh_gen_four_const.KEY_SAVE_COUNT)
+        save_count_prop = self.machine._gamehook_client.get(gh_gen_five_const.KEY_SAVE_COUNT)
         if save_count_prop is not None and save_count_prop.value is not None:
             self._previous_save_count = save_count_prop.value
         else:
@@ -857,32 +865,32 @@ class OverworldState(WatchForResetState):
         logger.info("Attempting validation!")
         valid = True
         cur_state = self.machine._controller._controller.get_final_state()
-        live_xp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS).value
+        live_xp = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_EXPPOINTS).value
         if live_xp != cur_state.solo_pkmn.cur_xp:
             logger.error(f"VALIDATION FAILED for xp: {cur_state.solo_pkmn.cur_xp} vs {live_xp}")
             valid = False
         cur_total_evs = cur_state.solo_pkmn.unrealized_stat_xp.add(cur_state.solo_pkmn.realized_stat_xp)
-        hp_ev = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_EXP_HP).value
+        hp_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_HP).value
         if hp_ev != cur_total_evs.hp:
             logger.error(f"VALIDATION FAILED for HP EV: {cur_total_evs.hp} vs {hp_ev}")
             valid = False
-        attack_ev = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_EXP_ATTACK).value
+        attack_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_ATTACK).value
         if attack_ev != cur_total_evs.attack:
             logger.error(f"VALIDATION FAILED for attack EV: {cur_total_evs.attack} vs {attack_ev}")
             valid = False
-        defense_ev = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_EXP_DEFENSE).value
+        defense_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_DEFENSE).value
         if defense_ev != cur_total_evs.defense:
             logger.error(f"VALIDATION FAILED for defense EV: {cur_total_evs.defense} vs {defense_ev}")
             valid = False
-        special_attack_ev = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_EXP_SPECIAL_ATTACK).value
+        special_attack_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPECIAL_ATTACK).value
         if special_attack_ev != cur_total_evs.special_attack:
             logger.error(f"VALIDATION FAILED for special attack EV: {cur_total_evs.special_attack} vs {special_attack_ev}")
             valid = False
-        special_defense_ev = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_EXP_SPECIAL_DEFENSE).value
+        special_defense_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPECIAL_DEFENSE).value
         if special_defense_ev != cur_total_evs.special_defense:
             logger.error(f"VALIDATION FAILED for special defense EV: {cur_total_evs.special_attack} vs {special_defense_ev}")
             valid = False
-        speed_ev = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_EXP_SPEED).value
+        speed_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPEED).value
         if speed_ev != cur_total_evs.speed:
             logger.error(f"VALIDATION FAILED for speed EV: {cur_total_evs.speed} vs {speed_ev}")
             valid = False
@@ -896,7 +904,7 @@ class OverworldState(WatchForResetState):
         # intentionally ignore all updates while waiting for a new file
         if self._waiting_for_new_file or self._waiting_for_solo_mon_in_slot_1:
             check_for_battle = False
-            if new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+            if new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
                 if self._wrong_mon_delay <= 0:
                     self._waiting_for_solo_mon_in_slot_1 = False
                     self._wrong_mon_in_slot_1 = False
@@ -911,32 +919,32 @@ class OverworldState(WatchForResetState):
             
             if (
                 check_for_battle and
-                self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value == 'Battle' and
-                self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_OUTCOME).value is None
+                self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value == 'Battle' and
+                self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_OUTCOME).value is None
             ):
                 logger.info(f"tranitioning into battle pre-emptively")
                 return StateType.BATTLE
             return self.state_type
 
-        elif new_prop.path == gh_gen_four_const.KEY_OVERWORLD_MAP:
+        elif new_prop.path == gh_gen_five_const.KEY_OVERWORLD_MAP:
             self.machine._controller.entered_new_area(
-                f"{self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value}"
+                f"{self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value}"
             )
-        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_PLAYERID:
-            if prev_prop.value and self.machine._player_id != self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_PLAYERID).value:
+        elif new_prop.path == gh_gen_five_const.KEY_PLAYER_PLAYERID:
+            if prev_prop.value and self.machine._player_id != self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value:
                 self._waiting_for_new_file = True
-        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM:
+        elif new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM:
             self._propagate_held_item_flag = True
             if False:
                 self.machine._queue_new_event(
                     EventDefinition(
                         hold_item=HoldItemEventDefinition(self.machine.gh_converter.item_name_convert(new_prop.value)),
-                        notes=gh_gen_four_const.HELD_CHECK_FLAG
+                        notes=gh_gen_five_const.HELD_CHECK_FLAG
                     )
                 )
-        elif new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
+        elif new_prop.path in gh_gen_five_const.ALL_KEYS_ALL_ITEM_FIELDS:
             return StateType.INVENTORY_CHANGE
-        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_SPECIES:
+        elif new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_SPECIES:
             if not prev_prop.value:
                 self._waiting_for_registration = True
             elif self.machine._solo_mon_key.species == self.machine.gh_converter.pkmn_name_convert(prev_prop.value):
@@ -944,13 +952,13 @@ class OverworldState(WatchForResetState):
             elif self.machine._solo_mon_key.species == self.machine.gh_converter.pkmn_name_convert(new_prop.value):
                 self._wrong_mon_delay = self.BASE_DELAY
                 self._waiting_for_solo_mon_in_slot_1 = True
-        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_LEVEL:
+        elif new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_LEVEL:
             if not self._waiting_for_registration and not self._wrong_mon_in_slot_1:
                 return StateType.RARE_CANDY
-        elif new_prop.path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
+        elif new_prop.path in gh_gen_five_const.ALL_KEYS_PLAYER_MOVES:
             if not self._waiting_for_registration and not self._wrong_mon_in_slot_1:
                 all_cur_moves = []
-                for move_path in gh_gen_four_const.ALL_KEYS_PLAYER_MOVES:
+                for move_path in gh_gen_five_const.ALL_KEYS_PLAYER_MOVES:
                     if move_path == prev_prop.path:
                         all_cur_moves.append(prev_prop.value)
                     else:
@@ -959,10 +967,10 @@ class OverworldState(WatchForResetState):
                     return StateType.MOVE_DELETE
                 else:
                     return StateType.TM
-        # elif new_prop.path in gh_gen_four_const.ALL_KEYS_STAT_EXP:
+        # elif new_prop.path in gh_gen_five_const.ALL_KEYS_STAT_EXP:
         #     if not self._waiting_for_registration and not self._wrong_mon_in_slot_1:
         #         return StateType.VITAMIN
-        elif new_prop.path == gh_gen_four_const.KEY_SAVE_COUNT:
+        elif new_prop.path == gh_gen_five_const.KEY_SAVE_COUNT:
             # Track save count increments. Only add save event if:
             # 1. The value increments by exactly 1 (new_value == prev_value + 1)
             # 2. If prev_value is 0, only allow if new_value is 1 (first save)
@@ -978,20 +986,17 @@ class OverworldState(WatchForResetState):
                 self._save_delay = self.SAVE_DELAY
             # Update previous save count for next check
             self._previous_save_count = new_prop.value
-        elif new_prop.path == gh_gen_four_const.KEY_AUDIO_SOUND_EFFECT_1:
+        elif new_prop.path == gh_gen_five_const.KEY_AUDIO_SOUND_EFFECT_1:
             # NOTE: Legacy save detection via sound effect - kept for reference but no longer used
             # This is replaced by KEY_SAVE_COUNT tracking above
             pass
-        elif new_prop.path == gh_gen_four_const.KEY_AUDIO_SOUND_EFFECT_2:
+        elif new_prop.path == gh_gen_five_const.KEY_AUDIO_SOUND_EFFECT_2:
             # NOTE: same limitations as above
             # Set flag when heal sound effect is detected, delay will be handled on gametime ticks
-            if new_prop.value == gh_gen_four_const.PLATINUM_HEAL_SOUND_EFFECT_VALUE and prev_prop.value != gh_gen_four_const.PLATINUM_HEAL_SOUND_EFFECT_VALUE and not self.machine.is_frlg:
+            if new_prop.value == gh_gen_five_const.HEAL_SOUND_EFFECT_VALUE and prev_prop.value != gh_gen_five_const.HEAL_SOUND_EFFECT_VALUE:
                 self._heal_detected = True
                 self._heal_delay = self.HEAL_DELAY
-            if new_prop.value == gh_gen_four_const.HEARTGOLD_HEAL_SOUND_EFFECT_VALUE and prev_prop.value != gh_gen_four_const.HEARTGOLD_HEAL_SOUND_EFFECT_VALUE:
-                self._heal_detected = True
-                self._heal_delay = self.HEAL_DELAY
-        elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
+        elif new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if self._waiting_for_registration:
                 if self._register_delay <= 0:
                     self._waiting_for_registration = False
@@ -1002,14 +1007,14 @@ class OverworldState(WatchForResetState):
                     self.machine.update_team_cache(regenerate_move_cache=True)
                     self._wrong_mon_in_slot_1 = (
                         self.machine._solo_mon_key.species != 
-                        self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value)
+                        self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_SPECIES).value)
                     )
                 self._wrong_mon_delay -= 1
             
             # Handle save delay using gametime ticks (independent check, can run with other conditions)
             if self._save_detected:
                 if self._save_delay <= 0:
-                    self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value)))
+                    self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value)))
                     self._save_detected = False
                     self._save_delay = self.SAVE_DELAY
                 else:
@@ -1018,7 +1023,7 @@ class OverworldState(WatchForResetState):
             # Handle heal delay using gametime ticks (independent check, can run with other conditions)
             if self._heal_detected:
                 if self._heal_delay <= 0:
-                    self.machine._queue_new_event(EventDefinition(heal=HealEventDefinition(location=self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value)))
+                    self.machine._queue_new_event(EventDefinition(heal=HealEventDefinition(location=self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value)))
                     self._heal_detected = False
                     self._heal_delay = self.HEAL_DELAY
                 else:
@@ -1032,8 +1037,8 @@ class OverworldState(WatchForResetState):
                 self._validation_delay -= 1
 
             if (
-                self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value == 'Battle' and
-                self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_OUTCOME).value is None
+                self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value == 'Battle' and
+                self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_OUTCOME).value is None
             ):
                 return StateType.BATTLE
 

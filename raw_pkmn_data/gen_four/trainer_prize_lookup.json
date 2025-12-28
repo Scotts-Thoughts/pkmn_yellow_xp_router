@@ -135,9 +135,9 @@
     "Elite Four Karen": 120,
     "Champion Lance": 200,
     "Gym Leader":	120,
-    "Rival_1_3":	16,
-    "Rival_4_7":	36,
-    "Rival":	36,
+    "Rival_1":	16,
+    "Rival_2_10": 64,
+    "Rival":	64,
     "Pokemon Trainer":	100
 }
 
