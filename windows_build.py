@@ -2,9 +2,6 @@
 import os
 import sys
 import subprocess
-import zipfile
-from datetime import datetime
-from utils.constants import const
 
 
 def get_all_json_folders(root_path, ignore_dirs):
@@ -29,17 +26,6 @@ def get_all_json_folders(root_path, ignore_dirs):
 
 
 if __name__ == "__main__":
-    root_path = os.path.dirname(os.path.abspath(__file__))
-    
-    # Determine exe and zip names based on development mode
-    if const.DEVELOPMENT_MODE:
-        timestamp = datetime.now().strftime("%Y%m%d%H%M")
-        exe_name = f"pkmn_xp_router_{timestamp}"
-        zip_name = f"pkmn_xp_router_{timestamp}.zip"
-    else:
-        exe_name = "pkmn_xp_router"
-        zip_name = f"pkmn_xp_router_{const.APP_VERSION}.zip"
-    
     cmd = [
         sys.executable,
         "-m",
@@ -50,11 +36,13 @@ if __name__ == "__main__":
         "--hidden-import=PIL",
         "--hidden-import=appdirs",
         "--hidden-import=signalrcore",
-        "--name", exe_name,
+        "--name", "pkmn_xp_router",
         "--add-data", "assets\*.tcl;assets",
         "--add-data", "assets\\theme\\*.tcl;assets\\theme",
         "--add-data", "assets\\theme\\dark\\*;assets\\theme\\dark",
     ]
+
+    root_path = os.path.dirname(os.path.abspath(__file__))
     ignore_dirs = [
         os.path.join(root_path, x) for x in [
             ".git",
@@ -76,17 +64,4 @@ if __name__ == "__main__":
 
     print(f"cmd: {' '.join(cmd)}")
     subprocess.call(cmd)
-    
-    # Create zip file containing the exe
-    dist_dir = os.path.join(root_path, "dist")
-    exe_path = os.path.join(dist_dir, f"{exe_name}.exe")
-    zip_path = os.path.join(dist_dir, zip_name)
-    
-    if os.path.exists(exe_path):
-        print(f"Creating zip file: {zip_path}")
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            zipf.write(exe_path, f"{exe_name}.exe")
-        print(f"Zip file created successfully: {zip_path}")
-    else:
-        print(f"Warning: Exe file not found at {exe_path}. Skipping zip creation.")
 
