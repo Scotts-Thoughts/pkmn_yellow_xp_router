@@ -712,15 +712,19 @@ class EventItem:
             if None is not self.event_definition.trainer_def:
                 if self.defeating_trainer:
                     defeated_trainer_name = self.event_definition.trainer_def.trainer_name
+                    # Pass second trainer name for multi-battles
+                    second_trainer_name = self.event_definition.trainer_def.second_trainer_name if self.event_definition.trainer_def.second_trainer_name else None
                 else:
                     defeated_trainer_name = None
+                    second_trainer_name = None
                 render_trainer_name = self.event_definition.trainer_def.trainer_name
             else:
                 defeated_trainer_name = None
+                second_trainer_name = None
                 render_trainer_name = "TrainerPkmn" if self.event_definition.wild_pkmn_info.trainer_pkmn else "WildPkmn"
 
             self.name = f"{render_trainer_name}: {self.to_defeat_mon.name}"
-            self.final_state, self.error_message = cur_state.defeat_pkmn(self.to_defeat_mon, trainer_name=defeated_trainer_name, exp_split=self.exp_split_num, pay_day_amount=self.pay_day_amount)
+            self.final_state, self.error_message = cur_state.defeat_pkmn(self.to_defeat_mon, trainer_name=defeated_trainer_name, exp_split=self.exp_split_num, pay_day_amount=self.pay_day_amount, second_trainer_name=second_trainer_name)
         elif None is not self.event_definition.rare_candy:
             # note: deliberatley ignoring amount here, that's handled at the group level
             # just apply one rare candy at the item level

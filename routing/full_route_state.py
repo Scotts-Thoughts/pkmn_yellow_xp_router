@@ -11,7 +11,7 @@ from pkmn.gen_factory import current_gen_info
 logger = logging.getLogger(__name__)
 
 
-def _defeat_trainer(inventory:Inventory, solo_pkmn:SoloPokemon, trainer_obj:pkmn.universal_data_objects.Trainer, pay_day_amount):
+def _defeat_trainer(inventory:Inventory, solo_pkmn:SoloPokemon, trainer_obj:pkmn.universal_data_objects.Trainer, pay_day_amount, second_trainer_obj:pkmn.universal_data_objects.Trainer=None):
     if trainer_obj is None:
         return inventory
 
@@ -20,6 +20,13 @@ def _defeat_trainer(inventory:Inventory, solo_pkmn:SoloPokemon, trainer_obj:pkmn
     reward_money = trainer_obj.money
     if solo_pkmn.held_item == const.AMULET_COIN_ITEM_NAME:
         reward_money *= 2
+
+    # Add second trainer's money in multi-battles
+    if second_trainer_obj is not None:
+        second_trainer_money = second_trainer_obj.money
+        if solo_pkmn.held_item == const.AMULET_COIN_ITEM_NAME:
+            second_trainer_money *= 2
+        reward_money += second_trainer_money
 
     result.cur_money += reward_money + pay_day_amount
 
@@ -278,12 +285,15 @@ class RouteState:
             inv
         ), error_message
 
-    def defeat_pkmn(self, enemy_pkmn:pkmn.universal_data_objects.EnemyPkmn, trainer_name=None, exp_split=1, pay_day_amount=0):
+    def defeat_pkmn(self, enemy_pkmn:pkmn.universal_data_objects.EnemyPkmn, trainer_name=None, exp_split=1, pay_day_amount=0, second_trainer_name=None):
         new_badges = self.badges.award_badge(trainer_name)
+        second_trainer_obj = None
+        if second_trainer_name:
+            second_trainer_obj = pkmn.gen_factory.current_gen_info().trainer_db().get_trainer(second_trainer_name)
         return RouteState(
             _defeat_pkmn(self.solo_pkmn, enemy_pkmn, new_badges, exp_split),
             new_badges,
-            _defeat_trainer(self.inventory, self.solo_pkmn, pkmn.gen_factory.current_gen_info().trainer_db().get_trainer(trainer_name), pay_day_amount)
+            _defeat_trainer(self.inventory, self.solo_pkmn, pkmn.gen_factory.current_gen_info().trainer_db().get_trainer(trainer_name), pay_day_amount, second_trainer_obj)
         ), ""
     
     def add_item(self, item_name, amount, is_purchase):

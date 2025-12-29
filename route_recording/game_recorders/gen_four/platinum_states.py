@@ -382,9 +382,16 @@ class BattleState(WatchForResetState):
     
     def _on_exit(self, next_state: State):
         if next_state.state_type != StateType.RESETTING:
-            # If we're watching for a blackout and transitioning to OVERWORLD, pass blackout data to machine
-            if next_state.state_type == StateType.OVERWORLD and self._watching_for_map_change:
-                logger.info(f"Passing blackout detection to OVERWORLD state")
+            # If solo HP hit 0 and we're transitioning to OVERWORLD, pass blackout data to machine
+            # OverworldState will check team HP when map changes to confirm blackout
+            if next_state.state_type == StateType.OVERWORLD and self._solo_hp_zero:
+                logger.info(f"[BLACKOUT DEBUG] Passing blackout detection to OVERWORLD state")
+                logger.info(f"[BLACKOUT DEBUG] Solo HP hit 0: {self._solo_hp_zero}, Team HP hit 0: {self._team_hp_zero}, Watching for map change: {self._watching_for_map_change}")
+                logger.info(f"[BLACKOUT DEBUG] Trainer name: {self._trainer_name}")
+                logger.info(f"[BLACKOUT DEBUG] Initial map: {self._initial_map}")
+                logger.info(f"[BLACKOUT DEBUG] Cached first mon: {self._cached_first_mon_species} level {self._cached_first_mon_level}")
+                logger.info(f"[BLACKOUT DEBUG] Cached second mon: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
+                logger.info(f"[BLACKOUT DEBUG] Defeated trainer mons count: {len(self._defeated_trainer_mons)}")
                 self.machine._potential_blackout_flag = True
                 self.machine._blackout_cached_first_mon_species = self._cached_first_mon_species
                 self.machine._blackout_cached_first_mon_level = self._cached_first_mon_level
@@ -775,6 +782,11 @@ class InventoryChangeState(WatchForResetState):
     
     def _on_exit(self, next_state: State):
         if next_state.state_type != StateType.RESETTING:
+            # If transitioning to RARE_CANDY state, skip item cache update here
+            # UseRareCandyState._on_exit will handle it with candy_flag=True
+            if next_state.state_type == StateType.RARE_CANDY:
+                return
+            
             logger.info(f"InventoryChangeState._on_exit: old_cache = {self.machine._cached_items}")
             self.machine._item_cache_update(
                 sale_expected=self._money_gained,
@@ -795,6 +807,10 @@ class InventoryChangeState(WatchForResetState):
             self._seconds_delay = self.BASE_DELAY
         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM:
             self._held_item_changed = True
+        elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_LEVEL:
+            # Check if level increased - this indicates rare candy usage
+            if prev_prop.value is not None and new_prop.value is not None and new_prop.value > prev_prop.value:
+                return StateType.RARE_CANDY
         elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
             if self._seconds_delay <= 0:
                 return StateType.OVERWORLD
@@ -980,6 +996,11 @@ class OverworldState(WatchForResetState):
         else:
             self._previous_save_count = None
         
+        # Log blackout flag status when entering OVERWORLD
+        if self.machine._potential_blackout_flag:
+            current_map = self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
+            logger.info(f"[BLACKOUT DEBUG] Entered OVERWORLD with blackout flag set. Current map: {current_map}, Initial map: {self.machine._blackout_initial_map}")
+        
         # Check for potential blackout if flag is set (in case map changed before we transitioned)
         if self.machine._potential_blackout_flag and self.machine._blackout_initial_map is not None:
             current_map = self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
@@ -993,9 +1014,11 @@ class OverworldState(WatchForResetState):
                         break
                 
                 if all_team_hp_zero:
-                    logger.info(f"Entered OVERWORLD with blackout flag set, map already changed and team HP is 0 - blackout confirmed")
+                    logger.info(f"[BLACKOUT DEBUG] Entered OVERWORLD with blackout flag set, map already changed and team HP is 0 - blackout confirmed")
+                    logger.info(f"[BLACKOUT DEBUG] Current map: {current_map}, Initial map: {self.machine._blackout_initial_map}")
                     # Handle blackout
                     if self.machine._blackout_trainer_name:
+                        logger.info(f"[BLACKOUT DEBUG] Queueing TRAINER_LOSS_FLAG event for trainer: {self.machine._blackout_trainer_name}")
                         self.machine._queue_new_event(
                             EventDefinition(trainer_def=TrainerEventDefinition(self.machine._blackout_trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
                         )
@@ -1121,18 +1144,26 @@ class OverworldState(WatchForResetState):
             
             # Check for potential blackout if flag is set
             if self.machine._potential_blackout_flag:
+                logger.info(f"[BLACKOUT DEBUG] Map changed, checking for blackout. Old map: {prev_prop.value}, New map: {new_prop.value}")
+                logger.info(f"[BLACKOUT DEBUG] Initial map was: {self.machine._blackout_initial_map}")
+                logger.info(f"[BLACKOUT DEBUG] Trainer name: {self.machine._blackout_trainer_name}")
+                
                 # Verify that team HP is actually 0 before confirming blackout
                 all_team_hp_zero = True
+                team_hp_values = []
                 for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
                     hp_value = self.machine._gamehook_client.get(hp_key).value
+                    team_hp_values.append(hp_value)
                     if hp_value is not None and hp_value > 0:
                         all_team_hp_zero = False
-                        break
+                
+                logger.info(f"[BLACKOUT DEBUG] Team HP values: {team_hp_values}, all_zero: {all_team_hp_zero}")
                 
                 if all_team_hp_zero:
-                    logger.info(f"Map changed and team HP is 0 - blackout confirmed")
+                    logger.info(f"[BLACKOUT DEBUG] Map changed and team HP is 0 - blackout confirmed")
                     # Handle blackout: remove trainer event, add defeated Pokemon, add blackout event
                     if self.machine._blackout_trainer_name:
+                        logger.info(f"[BLACKOUT DEBUG] Queueing TRAINER_LOSS_FLAG event for trainer: {self.machine._blackout_trainer_name}")
                         self.machine._queue_new_event(
                             EventDefinition(trainer_def=TrainerEventDefinition(self.machine._blackout_trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
                         )

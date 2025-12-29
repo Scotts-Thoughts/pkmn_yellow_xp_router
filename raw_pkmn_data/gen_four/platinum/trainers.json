@@ -806,7 +806,7 @@
                 "Basic",
                 "Expert"
             ],
-            "money": 176
+            "money": 352
         },
         {
             "rom_id": 16,
@@ -3664,7 +3664,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1472
+            "money": 2944
         },
         {
             "rom_id": 56,
@@ -4220,7 +4220,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 368
+            "money": 736
         },
         {
             "rom_id": 66,
@@ -5069,7 +5069,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 4320
+            "money": 8640
         },
         {
             "rom_id": 76,
@@ -7684,7 +7684,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 100
+            "money": 200
         },
         {
             "rom_id": 113,
@@ -10702,7 +10702,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 100
+            "money": 200
         },
         {
             "rom_id": 156,
@@ -11446,7 +11446,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 100
+            "money": 200
         },
         {
             "rom_id": 166,
@@ -12759,7 +12759,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 320
+            "money": 640
         },
         {
             "rom_id": 183,
@@ -14474,7 +14474,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 320
+            "money": 640
         },
         {
             "rom_id": 208,
@@ -15240,7 +15240,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 320
+            "money": 640
         },
         {
             "rom_id": 224,
@@ -16459,7 +16459,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 6000
+            "money": 12000
         },
         {
             "rom_id": 237,
@@ -16537,7 +16537,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 6000
+            "money": 12000
         },
         {
             "rom_id": 238,
@@ -21077,7 +21077,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1344
+            "money": 2688
         },
         {
             "rom_id": 291,
@@ -21355,7 +21355,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 352
+            "money": 704
         },
         {
             "rom_id": 295,
@@ -39074,7 +39074,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1288
+            "money": 2576
         },
         {
             "rom_id": 534,
@@ -39152,7 +39152,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 1472
+            "money": 2944
         },
         {
             "rom_id": 535,
@@ -52189,7 +52189,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 704
+            "money": 1408
         },
         {
             "rom_id": 688,
@@ -52267,7 +52267,7 @@
             "ai_flags": [
                 "Basic"
             ],
-            "money": 960
+            "money": 1920
         },
         {
             "rom_id": 689,

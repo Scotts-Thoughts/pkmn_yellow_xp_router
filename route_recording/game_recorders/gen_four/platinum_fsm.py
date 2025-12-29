@@ -635,6 +635,7 @@ class Machine:
                         continue
                     elif None is not cur_event.trainer_def:
                         trainer_id = int(cur_event.trainer_def.trainer_name)
+                        logger.info(f"[BLACKOUT DEBUG] Processing trainer event with ID: {trainer_id}, notes: {cur_event.notes}")
                         trainer = current_gen_info().trainer_db().get_trainer_by_id(trainer_id)
                         if trainer is None:
                             msg = f"Failed to find trainer from GameHook: ({type(trainer_id)}) {trainer_id}"
@@ -643,7 +644,10 @@ class Machine:
                                 EventDefinition(notes=const.RECORDING_ERROR_FRAGMENT + msg)
                             )
                             continue
+                        trainer_name_before = cur_event.trainer_def.trainer_name
                         cur_event.trainer_def.trainer_name = trainer.name
+                        logger.info(f"[BLACKOUT DEBUG] Converted trainer ID {trainer_id} ({trainer_name_before}) to name: {trainer.name}")
+                        second_trainer = None
                         if cur_event.trainer_def.second_trainer_name:
                             second_trainer_id = int(cur_event.trainer_def.second_trainer_name)
                             second_trainer = current_gen_info().trainer_db().get_trainer_by_id(second_trainer_id)
@@ -656,27 +660,44 @@ class Machine:
                                 continue
                             cur_event.trainer_def.second_trainer_name = second_trainer.name
                         if cur_event.notes == gh_gen_four_const.TRAINER_LOSS_FLAG:
-                            logger.info(f"Handling trainer loss: {cur_event.trainer_def.trainer_name}")
-                            self._controller.lost_trainer_battle(cur_event.trainer_def.trainer_name)
+                            # Trainer name has already been converted above
+                            trainer_name = cur_event.trainer_def.trainer_name
+                            logger.info(f"[BLACKOUT DEBUG] Processing TRAINER_LOSS_FLAG event for trainer: {trainer_name}")
+                            self._controller.lost_trainer_battle(trainer_name)
                             continue
                         elif cur_event.notes == gh_gen_four_const.ROAR_FLAG:
+                            logger.info(f"[BLACKOUT DEBUG] Processing ROAR_FLAG event for trainer: {cur_event.trainer_def.trainer_name}")
                             logger.info(f"Updating full trainer event: {cur_event}")
                             logger.info(f"Updating split exp for trainer {cur_event.trainer_def.trainer_name} to {cur_event.trainer_def.exp_split}")
 
                             test_obj = self._controller._controller.get_previous_event()
+                            logger.info(f"[BLACKOUT DEBUG] ROAR_FLAG: Starting search from last event: {test_obj}")
+                            search_count = 0
                             while not self._controller.is_trainer_event(test_obj, cur_event.trainer_def.trainer_name):
                                 if test_obj is None:
+                                    logger.info(f"[BLACKOUT DEBUG] ROAR_FLAG: Reached None while searching (searched {search_count} events)")
                                     break
                                 test_obj = self._controller._controller.get_previous_event(test_obj.group_id)
+                                search_count += 1
+                                if search_count > 20:  # Safety limit
+                                    logger.error(f"[BLACKOUT DEBUG] ROAR_FLAG: Search limit reached")
+                                    break
                             
                             if test_obj is None:
-                                logger.error(f"Failed to find trainer fight to update for exp split behavior")
+                                logger.error(f"[BLACKOUT DEBUG] ROAR_FLAG: Failed to find trainer fight to update for exp split behavior")
+                                logger.error(f"[BLACKOUT DEBUG] ROAR_FLAG: Searched {search_count} events for trainer: {cur_event.trainer_def.trainer_name}")
                             else:
                                 cur_event.notes = ""
                                 expected_money = trainer.money
                                 logger.info(f"held item: {test_obj.final_state.solo_pkmn.held_item}")
                                 if test_obj.final_state.solo_pkmn.held_item == const.AMULET_COIN_ITEM_NAME:
                                     expected_money *= 2
+                                # Account for second trainer's money in multi-battles
+                                if second_trainer is not None:
+                                    second_trainer_money = second_trainer.money
+                                    if test_obj.final_state.solo_pkmn.held_item == const.AMULET_COIN_ITEM_NAME:
+                                        second_trainer_money *= 2
+                                    expected_money += second_trainer_money
                                 cur_event.trainer_def.pay_day_amount = max(0, cur_event.trainer_def.pay_day_amount - expected_money)
                                 self._controller._controller.update_existing_event(test_obj.group_id, cur_event)
                             
