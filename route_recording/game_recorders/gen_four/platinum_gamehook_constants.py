@@ -28,6 +28,9 @@ class Gen4GameHookConstants:
         self.KEY_PLAYER_MON_HELD_ITEM  = "player.team.0.held_item"
         self.KEY_PLAYER_MON_FRIENDSHIP = "player.team.0.friendship"
 
+        self.ALL_KEYS_BATTLE_SOLO_HP = "battle.player.team.0.stats.hp"
+        self.ALL_KEYS_BATTLE_TEAM_HP = [f"battle.player.team.{i}.stats.hp" for i in range(0, 6)]
+
         self.ALL_KEYS_PLAYER_TEAM_SPECIES            = [f"player.team.{i}.species" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_LEVEL              = [f"player.team.{i}.level" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_HP              = [f"player.team.{i}.ivs.hp" for i in range(0, 6)]
