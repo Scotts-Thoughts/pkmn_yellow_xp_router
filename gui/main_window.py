@@ -246,6 +246,9 @@ class MainWindow(tk.Tk):
         self.bind('<Control-r>', self.open_transfer_event_window)
         self.bind('<Control-b>', self.delete_group)
         self.bind('<Delete>', self.delete_group)
+        # navigation
+        self.bind('<Home>', self.scroll_to_top)
+        self.bind('<End>', self.scroll_to_bottom)
         # folder actions (keyboard shortcuts removed - now used for export)
         # config integrations (Ctrl+E removed - now used for Export Enemy Ranges)
         self.bind('<Control-D>', self.open_config_window)
@@ -550,6 +553,14 @@ class MainWindow(tk.Tk):
             [x for x in self._controller.get_all_folder_names() if x not in invalid_folders],
             all_event_ids
         )
+
+    def scroll_to_top(self, event=None):
+        """Scroll to the top of the event list."""
+        self.event_list.scroll_to_top()
+    
+    def scroll_to_bottom(self, event=None):
+        """Scroll to the bottom of the event list."""
+        self.event_list.scroll_to_bottom()
 
     def rename_folder(self, *args, **kwargs):
         all_event_ids = self.event_list.get_all_selected_event_ids()

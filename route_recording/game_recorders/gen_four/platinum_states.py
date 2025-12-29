@@ -636,14 +636,21 @@ class InventoryChangeState(WatchForResetState):
         self._seconds_delay = self.BASE_DELAY
         self._money_gained = False
         self._money_lost = False
+        self._money_change_amount = None
         self._held_item_changed = False
         self.external_held_item_flag = False
     
     def _on_enter(self, prev_state: State):
         self._seconds_delay = self.BASE_DELAY
         money_change = self.machine._money_cache_update()
-        self._money_gained = money_change is True
-        self._money_lost = money_change is False
+        if money_change is not None:
+            self._money_change_amount = money_change
+            self._money_gained = money_change > 0
+            self._money_lost = money_change < 0
+        else:
+            self._money_change_amount = None
+            self._money_gained = False
+            self._money_lost = False
 
         # Set it to True if we are getting flagged for it externally. Otherwise set it to False
         self._held_item_changed = self.external_held_item_flag
@@ -655,16 +662,18 @@ class InventoryChangeState(WatchForResetState):
             self.machine._item_cache_update(
                 sale_expected=self._money_gained,
                 purchase_expected=self._money_lost,
+                money_change_amount=self._money_change_amount,
                 held_item_changed=self._held_item_changed
             )
     
     @auto_reset
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
         if new_prop.path == gh_gen_four_const.KEY_PLAYER_MONEY:
-            if new_prop.value > prev_prop.value:
-                self._money_gained = True
-            else:
-                self._money_lost = True
+            money_change = new_prop.value - prev_prop.value
+            if money_change != 0:
+                self._money_change_amount = money_change
+                self._money_gained = money_change > 0
+                self._money_lost = money_change < 0
         elif new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
             self._seconds_delay = self.BASE_DELAY
         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM:

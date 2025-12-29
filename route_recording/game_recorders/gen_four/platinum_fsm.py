@@ -289,9 +289,9 @@ class Machine:
         if new_cache == self._cached_money:
             return None
         
-        result = new_cache > self._cached_money
+        money_change = new_cache - self._cached_money
         self._cached_money = new_cache
-        return result
+        return money_change
     
     def _move_cache_update(self, generate_events=True, tm_name=None, hm_expected=False, tutor_expected=False, levelup_source=False):
         new_cache = []
@@ -402,6 +402,7 @@ class Machine:
             generate_events=True,
             purchase_expected=False,
             sale_expected=False,
+            money_change_amount=None,
             vitamin_flag=False,
             candy_flag=False,
             tm_flag=False,
@@ -489,6 +490,42 @@ class Machine:
             if held_item_changed:
                 logger.error(f"Lost multiple items when trying to change the held item... {lost_items}")
 
+        # If sale_expected is True, validate that the money change matches the expected sell price
+        # This prevents incorrectly recording use/drop as sales when money is tracked incorrectly
+        actual_is_sale = sale_expected
+        if sale_expected and money_change_amount is not None and len(lost_items) > 0:
+            expected_money_from_sale = 0
+            for cur_lost_item, cur_lost_num in lost_items.items():
+                app_item_name = self.gh_converter.item_name_convert(cur_lost_item)
+                # Skip validation for vitamins, rare candy, and TMs as they're handled separately
+                if vitamin_flag and self.gh_converter.is_game_vitamin(cur_lost_item):
+                    continue
+                if candy_flag and self.gh_converter.is_game_rare_candy(cur_lost_item):
+                    continue
+                if tm_flag and self.gh_converter.is_game_tm(cur_lost_item):
+                    continue
+                if held_item_changed:
+                    continue
+                
+                # Get item from database to check sell price
+                item = current_gen_info().item_db().get_item(app_item_name)
+                if item is None:
+                    # Try to find TM/HM if it's a TM/HM
+                    for test_tm_hm_name in current_gen_info().item_db().get_filtered_names(item_type=const.ITEM_TYPE_TM):
+                        if test_tm_hm_name.startswith(app_item_name):
+                            item = current_gen_info().item_db().get_item(test_tm_hm_name)
+                            break
+                
+                if item is not None:
+                    expected_money_from_sale += item.sell_price * cur_lost_num
+                else:
+                    logger.warning(f"Could not find item {app_item_name} in database for sale validation")
+            
+            # Only treat as sale if money change matches expected sell price
+            if expected_money_from_sale > 0 and money_change_amount != expected_money_from_sale:
+                logger.warning(f"Money change ({money_change_amount}) does not match expected sell price ({expected_money_from_sale}) for lost items. Treating as use/drop instead of sale.")
+                actual_is_sale = False
+
         for cur_lost_item, cur_lost_num in lost_items.items():
             app_item_name = self.gh_converter.item_name_convert(cur_lost_item)
             logger.info(f"trying to lose item: {app_item_name}, converted from {cur_lost_item}")
@@ -527,7 +564,7 @@ class Machine:
             else:
                 self._queue_new_event(
                     EventDefinition(
-                        item_event_def=InventoryEventDefinition(app_item_name, cur_lost_num, False, sale_expected)
+                        item_event_def=InventoryEventDefinition(app_item_name, cur_lost_num, False, actual_is_sale)
                     )
                 )
 
