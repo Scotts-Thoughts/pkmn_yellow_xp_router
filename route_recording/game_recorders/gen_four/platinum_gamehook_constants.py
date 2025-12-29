@@ -161,6 +161,9 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_STAT_EXP)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_ALL_ITEM_FIELDS)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_TEAM_SPECIES)
+        self.ALL_KEYS_TO_REGISTER.append(self.ALL_KEYS_BATTLE_SOLO_HP)
+        self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_BATTLE_TEAM_HP)
+        self.ALL_KEYS_TO_REGISTER.append(self.META_STATE)
 
 class GameHookConstantConverter:
     def __init__(self):

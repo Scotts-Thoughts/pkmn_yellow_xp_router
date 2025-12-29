@@ -240,6 +240,10 @@ class BattleState(WatchForResetState):
         # self._is_tutorial_battle = False
         self._initial_money = 0
         self._init_held_item = None
+        self._solo_hp_zero = False
+        self._team_hp_zero = False
+        self._watching_for_map_change = False
+        self._initial_map = None
     
     def _on_enter(self, prev_state: State):
         self._defeated_trainer_mons = []
@@ -270,6 +274,10 @@ class BattleState(WatchForResetState):
         logger.info(f"ally id: {self._ally_id}")
         self._initial_money = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MONEY).value
         self._init_held_item = None
+        self._solo_hp_zero = False
+        self._team_hp_zero = False
+        self._watching_for_map_change = False
+        self._initial_map = self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
         
         self._delayed_initialization.begin_waiting()
     
@@ -405,28 +413,11 @@ class BattleState(WatchForResetState):
                         notes=gh_gen_four_const.ROAR_FLAG
                     )
                 )
-            # Only trigger blackout if we actually lost the battle
-            # Don't trigger blackout if we're successfully transitioning to Overworld (we won)
-            # Evolution means we won, so don't blackout in that case
-            if self._loss_detected:
-                meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
-                battle_outcome = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FLAGS).value
-                solo_mon_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_STAT_CUR_HP).value
-                # Don't trigger blackout if:
-                # 1. We're transitioning to Overworld AND META_STATE indicates we left battle (we won)
-                # 2. Battle outcome indicates we won
-                should_blackout = False
-                if solo_mon_hp == 0:
-                    should_blackout = True
-                
-                if should_blackout:
-                    if self.is_trainer_battle == 'Trainer':
-                        self.machine._queue_new_event(
-                            EventDefinition(trainer_def=TrainerEventDefinition(self._trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
-                        )
-                        for trainer_mon_event in self._defeated_trainer_mons:
-                            self.machine._queue_new_event(trainer_mon_event)
-                    self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
+            # Blackout is now handled in transition() method when map change is detected
+            # Old blackout logic removed - blackout is only triggered when we detect:
+            # 1. Solo HP hits 0
+            # 2. Team HP hits 0  
+            # 3. Map change occurs
 
             self._delayed_move_updater.trigger()
             self._delayed_item_updater.trigger()
@@ -443,15 +434,84 @@ class BattleState(WatchForResetState):
             value = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS).value
         return self._enemy_pos_lookup[value]
 
+    def _check_all_team_hp_zero(self):
+        """Check if all team HP values are 0 or below"""
+        for hp_key in gh_gen_four_const.ALL_KEYS_BATTLE_TEAM_HP:
+            hp_value = self.machine._gamehook_client.get(hp_key).value
+            if hp_value is not None and hp_value > 0:
+                return False
+        return True
+    
+    def _handle_blackout(self):
+        """Handle blackout logic: remove trainer event, add defeated Pokemon, add blackout event"""
+        logger.info("Handling blackout")
+        if self.is_trainer_battle == 'Trainer':
+            self.machine._queue_new_event(
+                EventDefinition(trainer_def=TrainerEventDefinition(self._trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
+            )
+            # Add any cached Pokemon that haven't been processed yet (in case blackout happened before EXP was processed)
+            # Check both cache slots - multiple Pokemon can be cached sequentially
+            if self._cached_first_mon_species or self._cached_first_mon_level:
+                self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                    self._cached_first_mon_species,
+                    self._cached_first_mon_level,
+                    trainer_pkmn=True
+                )))
+                logger.info(f"Adding cached Pokemon to defeated list during blackout: {self._cached_first_mon_species} level {self._cached_first_mon_level}")
+            if self._cached_second_mon_species or self._cached_second_mon_level:
+                self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                    self._cached_second_mon_species,
+                    self._cached_second_mon_level,
+                    trainer_pkmn=True
+                )))
+                logger.info(f"Adding cached Pokemon to defeated list during blackout: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
+            
+            # Add all defeated trainer Pokemon
+            for trainer_mon_event in self._defeated_trainer_mons:
+                self.machine._queue_new_event(trainer_mon_event)
+        self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
+
     @auto_reset
     def transition(self, new_prop: GameHookProperty, prev_prop: GameHookProperty) -> StateType:
         # don't actually track anything during the tutorial battle
         # if self._is_tutorial_battle:
         #     return self.state_type
 
+        # Track solo HP hitting 0 - start blackout detection
+        if new_prop.path == gh_gen_four_const.ALL_KEYS_BATTLE_SOLO_HP:
+            if new_prop.value is not None and new_prop.value <= 0 and not self._solo_hp_zero:
+                logger.info(f"Solo HP hit 0, starting blackout detection")
+                self._solo_hp_zero = True
+                # Check if team HP is already 0 (in case it happened before solo HP hit 0)
+                if not self._team_hp_zero and self._check_all_team_hp_zero():
+                    logger.info(f"All team HP already 0, watching for map change")
+                    self._team_hp_zero = True
+                    self._watching_for_map_change = True
+        
+        # Track team HP hitting 0 - start watching for map change
+        # Check whenever any team HP property changes
+        if new_prop.path in gh_gen_four_const.ALL_KEYS_BATTLE_TEAM_HP:
+            if self._solo_hp_zero and not self._team_hp_zero:
+                if self._check_all_team_hp_zero():
+                    logger.info(f"All team HP hit 0, watching for map change")
+                    self._team_hp_zero = True
+                    self._watching_for_map_change = True
+        
+        # Watch for map change when team HP is zero
+        if new_prop.path == gh_gen_four_const.KEY_OVERWORLD_MAP:
+            if self._watching_for_map_change:
+                if new_prop.value != self._initial_map:
+                    logger.info(f"Map changed from {self._initial_map} to {new_prop.value}, blackout confirmed")
+                    self._handle_blackout()
+                    # Reset flags and transition to overworld
+                    self._solo_hp_zero = False
+                    self._team_hp_zero = False
+                    self._watching_for_map_change = False
+                    return StateType.OVERWORLD
+
         if new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
             logger.info(f"EXP changed in battle. Cached species: '{self._cached_first_mon_species}', level: {self._cached_first_mon_level}, is_trainer: {self.is_trainer_battle}")
-            if self._cached_first_mon_species:
+            if self._cached_first_mon_species or self._cached_first_mon_level:
                 if self.is_trainer_battle == 'Trainer':
                     self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
                         self._cached_first_mon_species,
@@ -466,7 +526,7 @@ class BattleState(WatchForResetState):
                     )))
                 self._cached_first_mon_species = ""
                 self._cached_first_mon_level = 0
-            elif self._cached_second_mon_species:
+            elif self._cached_second_mon_species or self._cached_second_mon_level:
                 if self.is_trainer_battle == 'Trainer':
                     self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
                         self._cached_second_mon_species,
@@ -485,15 +545,29 @@ class BattleState(WatchForResetState):
             
             # Check if battle ended AFTER processing EXP changes
             # If META_STATE is not 'Battle', we've left battle
+            # BUT: Don't transition if we're tracking a blackout
             meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
             if meta_state != 'Battle':
+                # If we're tracking a blackout, stay in battle state
+                if self._solo_hp_zero:
+                    return self.state_type
                 return StateType.OVERWORLD
 
         # elif new_prop.path == gh_gen_four_const.KEY_BATTLE_FLAG:
         #     if new_prop.value and not self._battle_started:
         #         self._delayed_initialization.trigger()
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP:
-            if new_prop.value <= 0 and not self._cached_first_mon_species:  # HP dropped to 0 or below, and not already cached
+            if new_prop.value == 0:
+                # Always cache when HP hits 0 (like Emerald) - allows caching multiple Pokemon
+                # If there's already a cached Pokemon, add it to defeated list before overwriting (for trainer battles)
+                if (self._cached_first_mon_species or self._cached_first_mon_level) and self.is_trainer_battle == 'Trainer':
+                    self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                        self._cached_first_mon_species,
+                        self._cached_first_mon_level,
+                        trainer_pkmn=True
+                    )))
+                    logger.info(f"Adding previously cached Pokemon to defeated list before overwriting: {self._cached_first_mon_species} level {self._cached_first_mon_level}")
+                
                 species_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_SPECIES).value
                 level_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_LEVEL).value
                 self._cached_first_mon_species = self.machine.gh_converter.pkmn_name_convert(species_raw)
@@ -501,7 +575,17 @@ class BattleState(WatchForResetState):
                 logger.info(f"Cached wild Pokemon: {self._cached_first_mon_species} level {self._cached_first_mon_level} (raw: {species_raw}, {level_raw})")
                 self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP:
-            if new_prop.value <= 0 and not self._cached_second_mon_species:  # HP dropped to 0 or below, and not already cached
+            if new_prop.value == 0:
+                # Always cache when HP hits 0 (like Emerald) - allows caching multiple Pokemon
+                # If there's already a cached Pokemon, add it to defeated list before overwriting (for trainer battles)
+                if (self._cached_second_mon_species or self._cached_second_mon_level) and self.is_trainer_battle == 'Trainer':
+                    self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                        self._cached_second_mon_species,
+                        self._cached_second_mon_level,
+                        trainer_pkmn=True
+                    )))
+                    logger.info(f"Adding previously cached Pokemon to defeated list before overwriting: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
+                
                 self._cached_second_mon_species = self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_SPECIES).value)
                 self._cached_second_mon_level = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_LEVEL).value
                 self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
@@ -585,6 +669,27 @@ class BattleState(WatchForResetState):
                 # or if the enemy trainer switches pokemon (and doesn't only send out new mons on previous death)
                 if real_new_value not in self._enemy_mon_order:
                     self._enemy_mon_order.append(real_new_value)
+                
+                # When party position changes, check if HP is already 0 and cache it
+                # This handles cases where a new Pokemon is sent out and immediately faints
+                # If there's already a cached Pokemon, add it to defeated list before overwriting (for trainer battles)
+                current_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP).value
+                if current_hp is not None and current_hp == 0:
+                    if (self._cached_first_mon_species or self._cached_first_mon_level) and self.is_trainer_battle == 'Trainer':
+                        self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                            self._cached_first_mon_species,
+                            self._cached_first_mon_level,
+                            trainer_pkmn=True
+                        )))
+                        logger.info(f"Adding previously cached Pokemon to defeated list before overwriting (party pos change): {self._cached_first_mon_species} level {self._cached_first_mon_level}")
+                    
+                    species_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_SPECIES).value
+                    level_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_LEVEL).value
+                    if species_raw:
+                        self._cached_first_mon_species = self.machine.gh_converter.pkmn_name_convert(species_raw)
+                        self._cached_first_mon_level = level_raw
+                        logger.info(f"Cached wild Pokemon (from party pos change): {self._cached_first_mon_species} level {self._cached_first_mon_level}")
+                        self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS:
             real_new_value = self._get_second_enemy_mon_pos(value=new_prop.value)
             if self._is_double_battle and real_new_value >= 0 and real_new_value < len(self._exp_split):
@@ -603,25 +708,39 @@ class BattleState(WatchForResetState):
             self.machine.update_team_cache()
             # Only transition if META_STATE indicates we've left battle
             # Don't transition immediately on species change - wait for META_STATE to change
+            # BUT: Don't transition if we're tracking a blackout
             meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
             if meta_state != 'Battle':
+                # If we're tracking a blackout, stay in battle state
+                if self._solo_hp_zero:
+                    return self.state_type
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
                 if not self._cached_first_mon_species and not self._cached_second_mon_species:
                     return StateType.OVERWORLD
         elif new_prop.path == gh_gen_four_const.META_STATE:
             # META_STATE changed - check if battle ended
             # If META_STATE is not 'Battle', we've left battle (could be 'From Battle' or anything else)
+            # BUT: Don't transition if we're tracking a blackout (solo HP hit 0)
             if new_prop.value != 'Battle':
+                # If we're tracking a blackout, stay in battle state
+                if self._solo_hp_zero:
+                    logger.info(f"META_STATE changed to '{new_prop.value}' but staying in battle state for blackout tracking")
+                    return self.state_type
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
                 if not self._cached_first_mon_species and not self._cached_second_mon_species:
                     return StateType.OVERWORLD
         
         # Check if battle ended (only if not already checked after EXP change)
         # BUT: Don't transition if we have a cached Pokemon waiting for EXP change
+        # AND: Don't transition if we're tracking a blackout
         if new_prop.path != gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
             meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
             # If META_STATE is not 'Battle', we've left battle (could be 'From Battle', 'Overworld', or anything else)
+            # BUT: Don't transition if we're tracking a blackout (solo HP hit 0)
             if meta_state != 'Battle':
+                # If we're tracking a blackout, stay in battle state
+                if self._solo_hp_zero:
+                    return self.state_type
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
                 if not self._cached_first_mon_species and not self._cached_second_mon_species:
                     return StateType.OVERWORLD
