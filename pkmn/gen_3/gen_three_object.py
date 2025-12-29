@@ -214,8 +214,38 @@ class GenThree(CurrentGen):
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
     
-    def get_move_custom_data(self, move_name) -> List[str]:
-        return gen_three_const.CUSTOM_MOVE_DATA.get(move_name)
+    def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
+        base_options = gen_three_const.CUSTOM_MOVE_DATA.get(move_name)
+        
+        # Add ability boost options if applicable
+        if attacking_pkmn is not None and move is not None:
+            ability = attacking_pkmn.ability
+            move_type = move.move_type
+            
+            # Check if the Pokemon has one of the relevant abilities and the move type matches
+            ability_boost_name = None
+            if ability == gen_three_const.OVERGROW_ABILITY and move_type == const.TYPE_GRASS:
+                ability_boost_name = "Overgrow Boost"
+            elif ability == gen_three_const.BLAZE_ABILITY and move_type == const.TYPE_FIRE:
+                ability_boost_name = "Blaze Boost"
+            elif ability == gen_three_const.TORRENT_ABILITY and move_type == const.TYPE_WATER:
+                ability_boost_name = "Torrent Boost"
+            elif ability == gen_three_const.SWARM_ABILITY and move_type == const.TYPE_BUG:
+                ability_boost_name = "Swarm Boost"
+            
+            if ability_boost_name:
+                if base_options is None:
+                    return [gen_three_const.ABILITY_BOOST_NO_BOOST, ability_boost_name]
+                else:
+                    # For each base option, create variants with "No Boost" and ability boost
+                    # Default to "No Boost" by putting it first
+                    combined_options = []
+                    for base_option in base_options:
+                        combined_options.append(base_option + " " + gen_three_const.ABILITY_BOOST_NO_BOOST)
+                        combined_options.append(base_option + " " + ability_boost_name)
+                    return combined_options
+        
+        return base_options
     
     def get_hidden_power(self, dvs: universal_data_objects.StatBlock) -> Tuple[str, int]:
         return get_hidden_power_type(dvs), get_hidden_power_base_power(dvs)

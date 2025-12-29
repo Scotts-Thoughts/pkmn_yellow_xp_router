@@ -336,14 +336,26 @@ def calculate_gen_three_damage(
         defending_battle_stats.defense = math.floor(defending_battle_stats.defense * 1.5)
     if attacking_pkmn.ability == gen_three_const.GUTS_ABILITY and False:
         attacking_battle_stats.attack = math.floor(attacking_battle_stats.attack * 1.5)
-    if attacking_pkmn.ability == gen_three_const.OVERGROW_ABILITY and move_type == const.TYPE_GRASS and False:
-        base_power = math.floor(base_power * 1.5)
-    if attacking_pkmn.ability == gen_three_const.BLAZE_ABILITY and move_type == const.TYPE_FIRE and False:
-        base_power = math.floor(base_power * 1.5)
-    if attacking_pkmn.ability == gen_three_const.TORRENT_ABILITY and move_type == const.TYPE_WATER and False:
-        base_power = math.floor(base_power * 1.5)
-    if attacking_pkmn.ability == gen_three_const.SWARM_ABILITY and move_type == const.TYPE_BUG and False:
-        base_power = math.floor(base_power * 1.5)
+    
+    # Handle ability boosts (Overgrow, Blaze, Torrent, Swarm) via custom_move_data
+    # Check for ability boost strings: "Blaze Boost", "Overgrow Boost", "Torrent Boost", "Swarm Boost"
+    has_ability_boost = (
+        custom_move_data and (
+            "Blaze Boost" in custom_move_data or
+            "Overgrow Boost" in custom_move_data or
+            "Torrent Boost" in custom_move_data or
+            "Swarm Boost" in custom_move_data
+        )
+    )
+    if has_ability_boost:
+        if attacking_pkmn.ability == gen_three_const.OVERGROW_ABILITY and move_type == const.TYPE_GRASS:
+            base_power = math.floor(base_power * 1.5)
+        elif attacking_pkmn.ability == gen_three_const.BLAZE_ABILITY and move_type == const.TYPE_FIRE:
+            base_power = math.floor(base_power * 1.5)
+        elif attacking_pkmn.ability == gen_three_const.TORRENT_ABILITY and move_type == const.TYPE_WATER:
+            base_power = math.floor(base_power * 1.5)
+        elif attacking_pkmn.ability == gen_three_const.SWARM_ABILITY and move_type == const.TYPE_BUG:
+            base_power = math.floor(base_power * 1.5)
     
     if move_type in special_types:
         attacking_stat = attacking_battle_stats.special_attack

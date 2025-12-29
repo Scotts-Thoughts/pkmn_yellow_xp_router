@@ -501,13 +501,30 @@ class BattleState(WatchForResetState):
         if new_prop.path == gh_gen_four_const.KEY_OVERWORLD_MAP:
             if self._watching_for_map_change:
                 if new_prop.value != self._initial_map:
-                    logger.info(f"Map changed from {self._initial_map} to {new_prop.value}, blackout confirmed")
-                    self._handle_blackout()
-                    # Reset flags and transition to overworld
-                    self._solo_hp_zero = False
-                    self._team_hp_zero = False
-                    self._watching_for_map_change = False
-                    return StateType.OVERWORLD
+                    # Verify that team HP is actually 0 before confirming blackout
+                    # Check ALL_KEYS_PLAYER_TEAM_HP (overworld team HP, not battle team HP)
+                    all_team_hp_zero = True
+                    for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
+                        hp_value = self.machine._gamehook_client.get(hp_key).value
+                        if hp_value is not None and hp_value > 0:
+                            all_team_hp_zero = False
+                            break
+                    
+                    if all_team_hp_zero:
+                        logger.info(f"Map changed from {self._initial_map} to {new_prop.value}, blackout confirmed (team HP is 0)")
+                        self._handle_blackout()
+                        # Reset flags and transition to overworld
+                        self._solo_hp_zero = False
+                        self._team_hp_zero = False
+                        self._watching_for_map_change = False
+                        return StateType.OVERWORLD
+                    else:
+                        logger.info(f"Map changed from {self._initial_map} to {new_prop.value}, but team HP is not 0 - not a blackout, transitioning normally")
+                        # Reset flags and transition to overworld normally (not a blackout)
+                        self._solo_hp_zero = False
+                        self._team_hp_zero = False
+                        self._watching_for_map_change = False
+                        return StateType.OVERWORLD
 
         if new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
             logger.info(f"EXP changed in battle. Cached species: '{self._cached_first_mon_species}', level: {self._cached_first_mon_level}, is_trainer: {self.is_trainer_battle}")

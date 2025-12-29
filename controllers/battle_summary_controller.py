@@ -410,7 +410,7 @@ class BattleSummaryController:
             move_display_name = move.name
 
         custom_data_selection = self._custom_move_data[mon_idx][custom_lookup_key].get(move_name)
-        custom_data_options = current_gen_info().get_move_custom_data(move.name)
+        custom_data_options = current_gen_info().get_move_custom_data(move.name, attacking_pkmn=attacking_mon, move=move)
         if custom_data_options is None and const.FLAVOR_MULTI_HIT in move.attack_flavor:
             custom_data_options = const.MULTI_HIT_CUSTOM_DATA
         
@@ -418,6 +418,9 @@ class BattleSummaryController:
             custom_data_selection = None
         elif custom_data_selection not in custom_data_options:
             custom_data_selection = custom_data_options[0]
+
+        # Ensure custom_move_data is always a string (empty string if None)
+        custom_move_data_str = custom_data_selection if custom_data_selection is not None else ""
 
         normal_ranges = current_gen_info().calculate_damage(
             attacking_mon,
@@ -427,7 +430,7 @@ class BattleSummaryController:
             defending_stage_modifiers=defending_stage_modifiers,
             attacking_field=attacking_field_status,
             defending_field=defending_field_status,
-            custom_move_data=custom_data_selection,
+            custom_move_data=custom_move_data_str,
             weather=self._weather,
             is_double_battle=self._double_battle_flag,
             attacking_battle_stats=attacking_mon_stats,
@@ -441,7 +444,7 @@ class BattleSummaryController:
             defending_stage_modifiers=defending_stage_modifiers,
             attacking_field=attacking_field_status,
             defending_field=defending_field_status,
-            custom_move_data=custom_data_selection,
+            custom_move_data=custom_move_data_str,
             is_crit=True,
             weather=self._weather,
             is_double_battle=self._double_battle_flag,

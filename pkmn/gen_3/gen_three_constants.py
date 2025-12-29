@@ -85,6 +85,8 @@ class GenThreeConstants:
         self.SWITCH_BONUS = "Switch Bonus"
         self.MINIMIZE_BONUS = "Minimize Bonus"
         self.STATUS_BONUS = "Status Bonus"
+        self.ABILITY_BOOST_NO_BOOST = "No Boost"
+        self.ABILITY_BOOST_BOOST_PREFIX = "Boost"  # Will be combined with ability name
         self.PARALYSIS_BONUS = "Paralysis Bonus"
         self.DAMAGED_BONUS = "Damaged Bonus"
 

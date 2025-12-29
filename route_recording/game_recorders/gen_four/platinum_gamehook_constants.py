@@ -33,6 +33,7 @@ class Gen4GameHookConstants:
 
         self.ALL_KEYS_PLAYER_TEAM_SPECIES            = [f"player.team.{i}.species" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_LEVEL              = [f"player.team.{i}.level" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_HP                 = [f"player.team.{i}.stats.hp" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_HP              = [f"player.team.{i}.ivs.hp" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_ATTACK          = [f"player.team.{i}.ivs.attack" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_DEFENSE         = [f"player.team.{i}.ivs.defense" for i in range(0, 6)]

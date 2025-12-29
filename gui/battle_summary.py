@@ -511,6 +511,8 @@ class DamageSummary(ttk.Frame):
 
         self.move_name_label = ttk.Label(self.header, style="BattleMovePrimary.TLabel")
         self.custom_data_dropdown = custom_components.SimpleOptionMenu(self.header, [""], callback=self._custom_data_callback, width=14)
+        # Also bind to <<ComboboxSelected>> event as a backup to ensure callback fires
+        self.custom_data_dropdown.bind("<<ComboboxSelected>>", self._custom_data_callback)
 
         self.range_frame = ttk.Frame(self, style="Contrast.TFrame")
         self.range_frame.grid(row=self.row_idx, column=0, sticky=tk.NSEW, padx=self.padx, pady=self.pady)
