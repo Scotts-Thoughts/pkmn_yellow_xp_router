@@ -382,6 +382,18 @@ class BattleState(WatchForResetState):
     
     def _on_exit(self, next_state: State):
         if next_state.state_type != StateType.RESETTING:
+            # If we're watching for a blackout and transitioning to OVERWORLD, pass blackout data to machine
+            if next_state.state_type == StateType.OVERWORLD and self._watching_for_map_change:
+                logger.info(f"Passing blackout detection to OVERWORLD state")
+                self.machine._potential_blackout_flag = True
+                self.machine._blackout_cached_first_mon_species = self._cached_first_mon_species
+                self.machine._blackout_cached_first_mon_level = self._cached_first_mon_level
+                self.machine._blackout_cached_second_mon_species = self._cached_second_mon_species
+                self.machine._blackout_cached_second_mon_level = self._cached_second_mon_level
+                self.machine._blackout_defeated_trainer_mons = self._defeated_trainer_mons.copy()
+                self.machine._blackout_trainer_name = self._trainer_name
+                self.machine._blackout_initial_map = self._initial_map
+            
             if self.is_trainer_battle == 'Trainer':
                 final_exp_split = [len(x) for x in self._exp_split]
                 if not any([True for x in final_exp_split if x > 1]):
@@ -413,11 +425,7 @@ class BattleState(WatchForResetState):
                         notes=gh_gen_four_const.ROAR_FLAG
                     )
                 )
-            # Blackout is now handled in transition() method when map change is detected
-            # Old blackout logic removed - blackout is only triggered when we detect:
-            # 1. Solo HP hits 0
-            # 2. Team HP hits 0  
-            # 3. Map change occurs
+            # Blackout is now handled in OVERWORLD state when map change is detected
 
             self._delayed_move_updater.trigger()
             self._delayed_item_updater.trigger()
@@ -497,34 +505,8 @@ class BattleState(WatchForResetState):
                     self._team_hp_zero = True
                     self._watching_for_map_change = True
         
-        # Watch for map change when team HP is zero
-        if new_prop.path == gh_gen_four_const.KEY_OVERWORLD_MAP:
-            if self._watching_for_map_change:
-                if new_prop.value != self._initial_map:
-                    # Verify that team HP is actually 0 before confirming blackout
-                    # Check ALL_KEYS_PLAYER_TEAM_HP (overworld team HP, not battle team HP)
-                    all_team_hp_zero = True
-                    for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
-                        hp_value = self.machine._gamehook_client.get(hp_key).value
-                        if hp_value is not None and hp_value > 0:
-                            all_team_hp_zero = False
-                            break
-                    
-                    if all_team_hp_zero:
-                        logger.info(f"Map changed from {self._initial_map} to {new_prop.value}, blackout confirmed (team HP is 0)")
-                        self._handle_blackout()
-                        # Reset flags and transition to overworld
-                        self._solo_hp_zero = False
-                        self._team_hp_zero = False
-                        self._watching_for_map_change = False
-                        return StateType.OVERWORLD
-                    else:
-                        logger.info(f"Map changed from {self._initial_map} to {new_prop.value}, but team HP is not 0 - not a blackout, transitioning normally")
-                        # Reset flags and transition to overworld normally (not a blackout)
-                        self._solo_hp_zero = False
-                        self._team_hp_zero = False
-                        self._watching_for_map_change = False
-                        return StateType.OVERWORLD
+        # Map change handling moved to OverworldState - transition to OVERWORLD when watching for blackout
+        # This allows OverworldState to handle map changes and check team HP
 
         if new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
             logger.info(f"EXP changed in battle. Cached species: '{self._cached_first_mon_species}', level: {self._cached_first_mon_level}, is_trainer: {self.is_trainer_battle}")
@@ -725,39 +707,38 @@ class BattleState(WatchForResetState):
             self.machine.update_team_cache()
             # Only transition if META_STATE indicates we've left battle
             # Don't transition immediately on species change - wait for META_STATE to change
-            # BUT: Don't transition if we're tracking a blackout
+            # If we're watching for blackout, transition to OVERWORLD so it can handle map change detection
             meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
             if meta_state != 'Battle':
-                # If we're tracking a blackout, stay in battle state
-                if self._solo_hp_zero:
-                    return self.state_type
+                # If we're watching for blackout, transition to OVERWORLD (it will handle map change)
+                if self._watching_for_map_change:
+                    return StateType.OVERWORLD
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
                 if not self._cached_first_mon_species and not self._cached_second_mon_species:
                     return StateType.OVERWORLD
         elif new_prop.path == gh_gen_four_const.META_STATE:
             # META_STATE changed - check if battle ended
             # If META_STATE is not 'Battle', we've left battle (could be 'From Battle' or anything else)
-            # BUT: Don't transition if we're tracking a blackout (solo HP hit 0)
+            # If we're watching for blackout, transition to OVERWORLD so it can handle map change detection
             if new_prop.value != 'Battle':
-                # If we're tracking a blackout, stay in battle state
-                if self._solo_hp_zero:
-                    logger.info(f"META_STATE changed to '{new_prop.value}' but staying in battle state for blackout tracking")
-                    return self.state_type
+                # If we're watching for blackout, transition to OVERWORLD (it will handle map change)
+                if self._watching_for_map_change:
+                    logger.info(f"META_STATE changed to '{new_prop.value}', transitioning to OVERWORLD for blackout detection")
+                    return StateType.OVERWORLD
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
                 if not self._cached_first_mon_species and not self._cached_second_mon_species:
                     return StateType.OVERWORLD
         
         # Check if battle ended (only if not already checked after EXP change)
         # BUT: Don't transition if we have a cached Pokemon waiting for EXP change
-        # AND: Don't transition if we're tracking a blackout
+        # If we're watching for blackout, transition to OVERWORLD so it can handle map change detection
         if new_prop.path != gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
             meta_state = self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value
             # If META_STATE is not 'Battle', we've left battle (could be 'From Battle', 'Overworld', or anything else)
-            # BUT: Don't transition if we're tracking a blackout (solo HP hit 0)
             if meta_state != 'Battle':
-                # If we're tracking a blackout, stay in battle state
-                if self._solo_hp_zero:
-                    return self.state_type
+                # If we're watching for blackout, transition to OVERWORLD (it will handle map change)
+                if self._watching_for_map_change:
+                    return StateType.OVERWORLD
                 # If we have a cached Pokemon, don't transition yet - wait for EXP change
                 if not self._cached_first_mon_species and not self._cached_second_mon_species:
                     return StateType.OVERWORLD
@@ -998,6 +979,68 @@ class OverworldState(WatchForResetState):
             self._previous_save_count = save_count_prop.value
         else:
             self._previous_save_count = None
+        
+        # Check for potential blackout if flag is set (in case map changed before we transitioned)
+        if self.machine._potential_blackout_flag and self.machine._blackout_initial_map is not None:
+            current_map = self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
+            if current_map != self.machine._blackout_initial_map:
+                # Map has already changed, check team HP
+                all_team_hp_zero = True
+                for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
+                    hp_value = self.machine._gamehook_client.get(hp_key).value
+                    if hp_value is not None and hp_value > 0:
+                        all_team_hp_zero = False
+                        break
+                
+                if all_team_hp_zero:
+                    logger.info(f"Entered OVERWORLD with blackout flag set, map already changed and team HP is 0 - blackout confirmed")
+                    # Handle blackout
+                    if self.machine._blackout_trainer_name:
+                        self.machine._queue_new_event(
+                            EventDefinition(trainer_def=TrainerEventDefinition(self.machine._blackout_trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
+                        )
+                    
+                    # Add any cached Pokemon that haven't been processed yet
+                    if self.machine._blackout_cached_first_mon_species or self.machine._blackout_cached_first_mon_level:
+                        self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                            self.machine._blackout_cached_first_mon_species,
+                            self.machine._blackout_cached_first_mon_level,
+                            trainer_pkmn=True
+                        )))
+                    if self.machine._blackout_cached_second_mon_species or self.machine._blackout_cached_second_mon_level:
+                        self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                            self.machine._blackout_cached_second_mon_species,
+                            self.machine._blackout_cached_second_mon_level,
+                            trainer_pkmn=True
+                        )))
+                    
+                    # Add all defeated trainer Pokemon
+                    for trainer_mon_event in self.machine._blackout_defeated_trainer_mons:
+                        self.machine._queue_new_event(trainer_mon_event)
+                    
+                    # Add blackout event
+                    self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
+                    
+                    # Clear blackout flags
+                    self.machine._potential_blackout_flag = False
+                    self.machine._blackout_cached_first_mon_species = ""
+                    self.machine._blackout_cached_first_mon_level = 0
+                    self.machine._blackout_cached_second_mon_species = ""
+                    self.machine._blackout_cached_second_mon_level = 0
+                    self.machine._blackout_defeated_trainer_mons = []
+                    self.machine._blackout_trainer_name = ""
+                    self.machine._blackout_initial_map = None
+                else:
+                    logger.info(f"Entered OVERWORLD with blackout flag set, but team HP is not 0 - not a blackout, clearing flag")
+                    # Clear blackout flags since it's not actually a blackout
+                    self.machine._potential_blackout_flag = False
+                    self.machine._blackout_cached_first_mon_species = ""
+                    self.machine._blackout_cached_first_mon_level = 0
+                    self.machine._blackout_cached_second_mon_species = ""
+                    self.machine._blackout_cached_second_mon_level = 0
+                    self.machine._blackout_defeated_trainer_mons = []
+                    self.machine._blackout_trainer_name = ""
+                    self.machine._blackout_initial_map = None
     
     def _on_exit(self, next_state: State):
         if isinstance(next_state, InventoryChangeState):
@@ -1075,6 +1118,66 @@ class OverworldState(WatchForResetState):
             self.machine._controller.entered_new_area(
                 f"{self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value}"
             )
+            
+            # Check for potential blackout if flag is set
+            if self.machine._potential_blackout_flag:
+                # Verify that team HP is actually 0 before confirming blackout
+                all_team_hp_zero = True
+                for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
+                    hp_value = self.machine._gamehook_client.get(hp_key).value
+                    if hp_value is not None and hp_value > 0:
+                        all_team_hp_zero = False
+                        break
+                
+                if all_team_hp_zero:
+                    logger.info(f"Map changed and team HP is 0 - blackout confirmed")
+                    # Handle blackout: remove trainer event, add defeated Pokemon, add blackout event
+                    if self.machine._blackout_trainer_name:
+                        self.machine._queue_new_event(
+                            EventDefinition(trainer_def=TrainerEventDefinition(self.machine._blackout_trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
+                        )
+                    
+                    # Add any cached Pokemon that haven't been processed yet
+                    if self.machine._blackout_cached_first_mon_species or self.machine._blackout_cached_first_mon_level:
+                        self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                            self.machine._blackout_cached_first_mon_species,
+                            self.machine._blackout_cached_first_mon_level,
+                            trainer_pkmn=True
+                        )))
+                    if self.machine._blackout_cached_second_mon_species or self.machine._blackout_cached_second_mon_level:
+                        self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                            self.machine._blackout_cached_second_mon_species,
+                            self.machine._blackout_cached_second_mon_level,
+                            trainer_pkmn=True
+                        )))
+                    
+                    # Add all defeated trainer Pokemon
+                    for trainer_mon_event in self.machine._blackout_defeated_trainer_mons:
+                        self.machine._queue_new_event(trainer_mon_event)
+                    
+                    # Add blackout event
+                    self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
+                    
+                    # Clear blackout flags
+                    self.machine._potential_blackout_flag = False
+                    self.machine._blackout_cached_first_mon_species = ""
+                    self.machine._blackout_cached_first_mon_level = 0
+                    self.machine._blackout_cached_second_mon_species = ""
+                    self.machine._blackout_cached_second_mon_level = 0
+                    self.machine._blackout_defeated_trainer_mons = []
+                    self.machine._blackout_trainer_name = ""
+                    self.machine._blackout_initial_map = None
+                else:
+                    logger.info(f"Map changed but team HP is not 0 - not a blackout, clearing flag")
+                    # Clear blackout flags since it's not actually a blackout
+                    self.machine._potential_blackout_flag = False
+                    self.machine._blackout_cached_first_mon_species = ""
+                    self.machine._blackout_cached_first_mon_level = 0
+                    self.machine._blackout_cached_second_mon_species = ""
+                    self.machine._blackout_cached_second_mon_level = 0
+                    self.machine._blackout_defeated_trainer_mons = []
+                    self.machine._blackout_trainer_name = ""
+                    self.machine._blackout_initial_map = None
         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_PLAYERID:
             if prev_prop.value and self.machine._player_id != self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_PLAYERID).value:
                 self._waiting_for_new_file = True

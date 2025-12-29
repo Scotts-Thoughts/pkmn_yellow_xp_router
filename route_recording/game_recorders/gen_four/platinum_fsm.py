@@ -97,6 +97,16 @@ class Machine:
         self._cached_moves = [None, None, None, None]
         self._cached_money = 0
 
+        # Blackout detection flags and cached Pokemon (passed from BattleState to OverworldState)
+        self._potential_blackout_flag = False
+        self._blackout_cached_first_mon_species = ""
+        self._blackout_cached_first_mon_level = 0
+        self._blackout_cached_second_mon_species = ""
+        self._blackout_cached_second_mon_level = 0
+        self._blackout_defeated_trainer_mons = []
+        self._blackout_trainer_name = ""
+        self._blackout_initial_map = None
+
         self._cur_state:State = None
         self._registered_states:Dict[StateType, State] = {}
         self._events_to_generate:List[EventDefinition] = []
