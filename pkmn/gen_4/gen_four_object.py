@@ -83,6 +83,7 @@ class GenFour(CurrentGen):
             self._badge_rewards:Dict[str, str] = fight_info[const.BADGE_REWARDS_KEY]
             self._major_fights:List[str] = fight_info[const.MAJOR_FIGHTS_KEY]
             self._fight_rewards:Dict[str, str] = fight_info[const.FIGHT_REWARDS_KEY]
+            self._branched_mandatory_fights:List[str] = fight_info.get(const.BRANCHED_MANDATORY_FIGHTS_KEY, [])
 
             timing_info = fight_info.get(const.TRAINER_TIMING_INFO_KEY, {})
             self._trainer_timing_info = universal_data_objects.TrainerTimingStats(
@@ -211,6 +212,12 @@ class GenFour(CurrentGen):
     
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
+    
+    def is_branched_mandatory_fight(self, trainer_name) -> bool:
+        return trainer_name in self._branched_mandatory_fights
+    
+    def has_branched_mandatory_fights(self) -> bool:
+        return len(self._branched_mandatory_fights) > 0
     
     def get_gym_leader_names(self) -> List[str]:
         # HeartGold/SoulSilver use trainers 8-15 (Johto gym leaders)

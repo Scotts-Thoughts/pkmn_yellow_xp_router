@@ -89,13 +89,20 @@ class MainWindow(tk.Tk):
         self.file_menu.add_command(label="App Config", accelerator="Ctrl+Shift+Z", command=self.open_app_config_window)
         self.file_menu.add_command(label="Open Data Folder", accelerator="Ctrl+Shift+O", command=self.open_data_location)
 
-        self.event_menu = tk.Menu(self.top_menu_bar, tearoff=0)
+        self.event_menu = tk.Menu(self.top_menu_bar, tearoff=0, postcommand=self._update_event_menu_state)
         self.event_menu.add_command(label="Move Event Up", accelerator="Ctrl+E", command=self.move_group_up)
         self.event_menu.add_command(label="Move Event Down", accelerator="Ctrl+D", command=self.move_group_down)
         self.event_menu.add_command(label="Enable/Disable", accelerator="Ctrl+C", command=self.toggle_enable_disable)
         self.event_menu.add_command(label="Toggle Highlight", accelerator="Ctrl+V", command=self.toggle_event_highlight)
         self.event_menu.add_command(label="Transfer Event", accelerator="Ctrl+R", command=self.open_transfer_event_window)
         self.event_menu.add_command(label="Delete Event", accelerator="Ctrl+B", command=self.delete_group)
+        self.event_menu.add_separator()
+        self.highlight_branched_mandatory_var = tk.BooleanVar(value=config.get_highlight_branched_mandatory())
+        self.event_menu.add_checkbutton(
+            label="Highlight Branched Mandatory Battles",
+            variable=self.highlight_branched_mandatory_var,
+            command=self._toggle_highlight_branched_mandatory
+        )
 
         self.folder_menu = tk.Menu(self.top_menu_bar, tearoff=0)
         self.folder_menu.add_command(label="New Folder", command=self.open_new_folder_window)
@@ -632,10 +639,13 @@ class MainWindow(tk.Tk):
         # Refresh battle summary if it exists
         if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
             self.event_details._battle_summary_controller._on_refresh()
-        
-        # Return "break" to prevent default behavior when called from keyboard
-        if event is not None:
-            return "break"
+    
+    def _toggle_highlight_branched_mandatory(self):
+        """Toggle the Highlight Branched Mandatory Battles setting."""
+        config.set_highlight_branched_mandatory(self.highlight_branched_mandatory_var.get())
+        # Refresh the event list to update highlighting
+        if hasattr(self, 'event_list'):
+            self.event_list.refresh()
     
     def _toggle_test_moves(self, event=None):
         """Toggle the Test Moves setting."""
@@ -671,6 +681,26 @@ class MainWindow(tk.Tk):
         self.show_move_highlights_var.set(config.get_show_move_highlights())
         self.player_highlight_strategy_var.set(config.get_player_highlight_strategy())
         self.enemy_highlight_strategy_var.set(config.get_enemy_highlight_strategy())
+    
+    def _update_event_menu_state(self):
+        """Update Event menu state (called when menu opens)."""
+        # Update the checkbox state
+        self.highlight_branched_mandatory_var.set(config.get_highlight_branched_mandatory())
+        
+        # Enable or disable the menu item based on whether the current generation has branched mandatory fights
+        try:
+            from pkmn.gen_factory import current_gen_info
+            has_branched_fights = current_gen_info().has_branched_mandatory_fights()
+            # Get the index of the checkbutton (it's the last item after the separator)
+            menu_index = self.event_menu.index("end")
+            if has_branched_fights:
+                self.event_menu.entryconfig(menu_index, state="normal")
+            else:
+                self.event_menu.entryconfig(menu_index, state="disabled")
+        except Exception:
+            # If there's any issue (no route loaded, etc.), disable the option
+            menu_index = self.event_menu.index("end")
+            self.event_menu.entryconfig(menu_index, state="disabled")
     
     def _update_player_highlight_strategy(self):
         """Update Player Highlight Strategy setting from menu selection."""

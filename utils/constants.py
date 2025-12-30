@@ -39,6 +39,7 @@ class Constants:
 
         # bunch of keys just for file management crap
         self.MAJOR_FIGHTS_KEY = "major_fights"
+        self.BRANCHED_MANDATORY_FIGHTS_KEY = "branched_mandatory_fights"
         self.BADGE_REWARDS_KEY = "badge_rewards"
         self.FIGHT_REWARDS_KEY = "fight_rewards"
         self.TYPE_CHART_KEY = "type_chart"
@@ -280,6 +281,7 @@ class Constants:
 
         self.EVENT_TAG_IMPORTANT = "important"
         self.EVENT_TAG_ERRORS = "errors"
+        self.EVENT_TAG_BRANCHED_MANDATORY = "branched_mandatory"
 
         self.MOVE_KEY = "move"
         self.MOVE_DEST_KEY = "destination_slot"
@@ -313,6 +315,7 @@ class Constants:
         self.DAMAGE_SEARCH_DEPTH = "damage_search_depth"
         self.FORCE_FULL_SEARCH = "force_full_search"
         self.SHOW_MOVE_HIGHLIGHTS = "show_move_highlights"
+        self.HIGHLIGHT_BRANCHED_MANDATORY = "highlight_branched_mandatory"
         self.TEST_MOVES_ENABLED = "test_moves_enabled"
 
         self.CUSTOM_FONT_NAME_KEY = "custom_font_name"

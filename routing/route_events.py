@@ -8,6 +8,7 @@ from utils.constants import const
 from pkmn.gen_factory import current_gen_info
 from pkmn import universal_utils
 from pkmn.pkmn_db import sanitize_string
+from utils.config_manager import config
 
 logger = logging.getLogger(__name__)
 
@@ -1082,6 +1083,12 @@ class EventGroup:
 
         if self.is_major_fight():
             return [const.EVENT_TAG_IMPORTANT]
+        
+        # Check if this is a branched mandatory fight and highlighting is enabled
+        if (config.get_highlight_branched_mandatory() and 
+            self.event_definition.trainer_def is not None and
+            current_gen_info().is_branched_mandatory_fight(self.event_definition.trainer_def.trainer_name)):
+            return [const.EVENT_TAG_BRANCHED_MANDATORY]
         
         return []
     

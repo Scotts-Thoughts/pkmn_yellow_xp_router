@@ -108,6 +108,12 @@ class CurrentGen:
     def is_major_fight(self, trainer_name) -> str:
         raise NotImplementedError()
     
+    def is_branched_mandatory_fight(self, trainer_name) -> bool:
+        raise NotImplementedError()
+    
+    def has_branched_mandatory_fights(self) -> bool:
+        raise NotImplementedError()
+    
     def get_gym_leader_names(self) -> List[str]:
         raise NotImplementedError()
     

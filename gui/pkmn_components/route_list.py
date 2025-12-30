@@ -38,6 +38,7 @@ class RouteList(custom_components.CustomGridview):
         self.tag_configure(const.EVENT_TAG_ERRORS, background="#61520f")
         self.tag_configure(const.EVENT_TAG_IMPORTANT, background="#1f1f1f")
         self.tag_configure(const.HIGHLIGHT_LABEL, background="#156152")
+        self.tag_configure(const.EVENT_TAG_BRANCHED_MANDATORY, background="#5a5142")  # Brown color
 
         self.bind("<<TreeviewOpen>>", self._treeview_opened_callback)
         self.bind("<<TreeviewClose>>", self._treeview_closed_callback)

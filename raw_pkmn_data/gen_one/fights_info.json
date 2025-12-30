@@ -79,5 +79,17 @@
         "outro_time": 1.195,
         "ko_time": 1.84,
         "send_out_time": 0.75
-    }
+    },
+    "branched_mandatory_fights": [
+        "Lass 2",
+        "BugCatcher 5",
+        "Hiker 2",
+        "Hiker 3",
+        "Hiker 4",
+        "JrTrainerM 2 Duplicate",
+        "Gambler 7",
+        "Lass 16",
+        "CooltrainerF 1",
+        "Beauty 3"
+    ]
 }

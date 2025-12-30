@@ -31,6 +31,7 @@ class Config:
     DEFAULT_LANDING_PAGE_SORT = "most_recent"
     DEFAULT_LANDING_PAGE_GAME_FILTER = "All Games"
     DEFAULT_SHOW_MOVE_HIGHLIGHTS = True
+    DEFAULT_HIGHLIGHT_BRANCHED_MANDATORY = False
     DEFAULT_TEST_MOVES_ENABLED = False
 
     def __init__(self):
@@ -87,6 +88,7 @@ class Config:
         self._landing_page_sort = raw.get(const.LANDING_PAGE_SORT_KEY, self.DEFAULT_LANDING_PAGE_SORT)
         self._landing_page_game_filter = raw.get(const.LANDING_PAGE_GAME_FILTER_KEY, self.DEFAULT_LANDING_PAGE_GAME_FILTER)
         self._show_move_highlights = raw.get(const.SHOW_MOVE_HIGHLIGHTS, self.DEFAULT_SHOW_MOVE_HIGHLIGHTS)
+        self._highlight_branched_mandatory = raw.get(const.HIGHLIGHT_BRANCHED_MANDATORY, self.DEFAULT_HIGHLIGHT_BRANCHED_MANDATORY)
         self._test_moves_enabled = raw.get(const.TEST_MOVES_ENABLED, self.DEFAULT_TEST_MOVES_ENABLED)
     
     def _save(self):
@@ -123,6 +125,7 @@ class Config:
                 const.LANDING_PAGE_SORT_KEY: self._landing_page_sort,
                 const.LANDING_PAGE_GAME_FILTER_KEY: self._landing_page_game_filter,
                 const.SHOW_MOVE_HIGHLIGHTS: self._show_move_highlights,
+                const.HIGHLIGHT_BRANCHED_MANDATORY: self._highlight_branched_mandatory,
                 const.TEST_MOVES_ENABLED: self._test_moves_enabled,
             }, f, indent=4)
     
@@ -358,6 +361,13 @@ class Config:
     
     def get_test_moves_enabled(self):
         return self._test_moves_enabled
+    
+    def set_highlight_branched_mandatory(self, highlight):
+        self._highlight_branched_mandatory = highlight
+        self._save()
+    
+    def get_highlight_branched_mandatory(self):
+        return self._highlight_branched_mandatory
     
     def reset_all_colors(self):
         self._success_color = self.DEFAULT_SUCCESS
