@@ -1,9 +1,12 @@
 from __future__ import annotations
 import os
 import logging
+import sys
 from typing import List, Tuple
 import tkinter
-from PIL import ImageGrab
+from PIL import ImageGrab, Image
+if sys.platform == 'win32':
+    import ctypes
 
 from utils.io_utils import sanitize_string
 from utils.constants import const
@@ -538,7 +541,91 @@ class MainController:
                 f"{self.get_current_route_name()}_{image_name}",
                 ext=".png",
             )
-            ImageGrab.grab(bbox=bbox).save(out_path)
+            
+            # Handle multi-monitor setups on Windows
+            # ImageGrab.grab(bbox=bbox) doesn't work correctly when the window is on a 
+            # secondary monitor, especially when maximized - it produces black images.
+            # Solution: Use Windows API to capture the entire virtual screen, then crop.
+            left, top, right, bottom = bbox
+            
+            if sys.platform == 'win32':
+                # Use Windows API to capture the entire virtual screen (all monitors)
+                try:
+                    # Get virtual screen dimensions
+                    user32 = ctypes.windll.user32
+                    virtual_width = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+                    virtual_height = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+                    virtual_left = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+                    virtual_top = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+                    
+                    # Capture the entire virtual screen
+                    full_screenshot = ImageGrab.grab(bbox=(
+                        virtual_left, 
+                        virtual_top, 
+                        virtual_left + virtual_width, 
+                        virtual_top + virtual_height
+                    ))
+                    
+                    # Adjust bbox coordinates relative to virtual screen origin
+                    adjusted_left = left - virtual_left
+                    adjusted_top = top - virtual_top
+                    adjusted_right = right - virtual_left
+                    adjusted_bottom = bottom - virtual_top
+                    
+                    # Crop to the desired region
+                    cropped_image = full_screenshot.crop((
+                        adjusted_left, 
+                        adjusted_top, 
+                        adjusted_right, 
+                        adjusted_bottom
+                    ))
+                    
+                    # Verify the cropped image is not entirely black (common failure mode)
+                    # Check a sample of pixels
+                    try:
+                        pixels = list(cropped_image.getdata())
+                        if len(pixels) > 0:
+                            sample_size = min(100, len(pixels))
+                            sample = pixels[:sample_size]
+                            all_black = all(
+                                pixel == (0, 0, 0) if isinstance(pixel, tuple) and len(pixel) >= 3 
+                                else pixel == 0 
+                                for pixel in sample
+                            )
+                            
+                            if all_black:
+                                # Got a black image, try alternative method
+                                logger.warning("Screenshot produced black image, trying alternative method")
+                                raise ValueError("Black image detected")
+                    except Exception:
+                        pass  # If pixel check fails, proceed anyway
+                    
+                    cropped_image.save(out_path)
+                except Exception as e:
+                    # Fallback: Try using bbox directly (might work in some cases)
+                    logger.warning(f"Virtual screen capture failed ({e}), trying direct bbox method")
+                    try:
+                        fallback_image = ImageGrab.grab(bbox=bbox)
+                        # Check if fallback also produces black image
+                        pixels = list(fallback_image.getdata())
+                        if len(pixels) > 0:
+                            sample_size = min(100, len(pixels))
+                            sample = pixels[:sample_size]
+                            all_black = all(
+                                pixel == (0, 0, 0) if isinstance(pixel, tuple) and len(pixel) >= 3 
+                                else pixel == 0 
+                                for pixel in sample
+                            )
+                            if all_black:
+                                raise ValueError("Direct bbox method also produced black image")
+                        fallback_image.save(out_path)
+                    except Exception as fallback_error:
+                        logger.error(f"All screenshot methods failed: {fallback_error}")
+                        raise ValueError(f"Could not capture screenshot on secondary monitor. Original error: {e}, Fallback error: {fallback_error}")
+            else:
+                # For non-Windows platforms, use standard bbox method
+                ImageGrab.grab(bbox=bbox).save(out_path)
+            
             self.send_message(f"Saved screenshot to: {out_path}")
         except Exception as e:
             self.trigger_exception(f"Couldn't save screenshot due to exception! {type(e)}: {e}")
