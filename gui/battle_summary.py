@@ -631,6 +631,10 @@ class DamageSummary(ttk.Frame):
         self.custom_data_dropdown = custom_components.SimpleOptionMenu(self.header, [""], callback=self._custom_data_callback, width=14)
         # Also bind to <<ComboboxSelected>> event as a backup to ensure callback fires
         self.custom_data_dropdown.bind("<<ComboboxSelected>>", self._custom_data_callback)
+        
+        # Setup move dropdown (for moves that modify stats)
+        self.setup_move_dropdown = custom_components.SimpleOptionMenu(self.header, ["0"], callback=self._setup_move_callback, width=8)
+        self.setup_move_dropdown.bind("<<ComboboxSelected>>", self._setup_move_callback)
 
         self.range_frame = ttk.Frame(self, style="Contrast.TFrame")
         self.range_frame.grid(row=self.row_idx, column=0, sticky=tk.NSEW, padx=self.padx, pady=self.pady)
@@ -674,6 +678,12 @@ class DamageSummary(ttk.Frame):
             self._controller.update_mimic_selection(self.custom_data_dropdown.get())
         else:
             self._controller.update_custom_move_data(self._mon_idx, self._move_idx, self._is_player_mon, self.custom_data_dropdown.get())
+    
+    def _setup_move_callback(self, *args, **kwargs):
+        if self._is_loading:
+            return
+        count = int(self.setup_move_dropdown.get())
+        self._controller.update_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon, count)
 
     def _on_move_name_click(self, event):
         """Handle click on move name to cycle highlight state"""
@@ -769,14 +779,53 @@ class DamageSummary(ttk.Frame):
             custom_data_options = move.mimic_options
             custom_data_selection = move.mimic_data
 
+        # Check if this is a setup move (stat modifier move)
+        is_setup_move = False
+        max_setup_count = 0
+        if move is not None and self._move_name:
+            stat_mods = current_gen_info().move_db().get_stat_mod(self._move_name)
+            if stat_mods:
+                is_setup_move = True
+                # Determine max count based on stat stage changes
+                # Find the maximum absolute value of stat changes
+                max_stage_change = 0
+                for stat_mod in stat_mods:
+                    max_stage_change = max(max_stage_change, abs(stat_mod[1]))
+                
+                # +2 stages: max 3 uses (to reach +6)
+                # +1 stages: max 6 uses (to reach +6)
+                if max_stage_change >= 2:
+                    max_setup_count = 3
+                elif max_stage_change == 1:
+                    max_setup_count = 6
+        
+        # Get current setup usage count
+        current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
+        
+        # Layout header components
         if custom_data_options:
             self.move_name_label.grid_forget()
             self.move_name_label.grid(row=0, column=0)
-            self.custom_data_dropdown.grid(row=0, column=1)
+            col = 1
+            self.custom_data_dropdown.grid(row=0, column=col)
             self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
+            col += 1
+            if is_setup_move:
+                setup_options = [str(i) for i in range(max_setup_count + 1)]
+                self.setup_move_dropdown.grid(row=0, column=col)
+                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+            else:
+                self.setup_move_dropdown.grid_forget()
         else:
             self.move_name_label.grid_forget()
-            self.move_name_label.grid(row=0, column=0, columnspan=2)
+            if is_setup_move:
+                self.move_name_label.grid(row=0, column=0)
+                setup_options = [str(i) for i in range(max_setup_count + 1)]
+                self.setup_move_dropdown.grid(row=0, column=1)
+                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+            else:
+                self.move_name_label.grid(row=0, column=0, columnspan=2)
+                self.setup_move_dropdown.grid_forget()
             self.custom_data_dropdown.grid_forget()
 
 

@@ -143,6 +143,7 @@ class Constants:
         self.MIMIC_SELECTION = "mimic_selection"
         self.CUSTOM_MOVE_DATA = "custom_move_data"
         self.MOVE_HIGHLIGHTS = "move_highlights"
+        self.MOVE_SETUP_USAGE = "move_setup_usage"
         self.EXP_SPLIT = "exp_split"
         self.WEATHER = "weather"
         self.PAY_DAY_AMOUNT = "pay_day_amount"

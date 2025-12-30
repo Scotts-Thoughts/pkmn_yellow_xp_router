@@ -212,6 +212,7 @@ class TrainerEventDefinition:
             mon_order=None,
             transformed=False,
             move_highlights=None,
+            move_setup_usage=None,
         ):
         self.trainer_name = trainer_name
         self.second_trainer_name = second_trainer_name
@@ -244,8 +245,33 @@ class TrainerEventDefinition:
         if move_highlights is None:
             move_highlights = []
         self.move_highlights:List[Dict[str, Dict[str, int]]] = move_highlights
+        if move_setup_usage is None:
+            move_setup_usage = []
+        self.move_setup_usage:List[Dict[str, Dict[int, int]]] = move_setup_usage
 
     def serialize(self):
+        # Check if move_setup_usage has any actual data (non-zero counts)
+        move_setup_usage_to_save = None
+        if self.move_setup_usage and len(self.move_setup_usage) > 0:
+            has_data = False
+            for pkmn_data in self.move_setup_usage:
+                if not isinstance(pkmn_data, dict):
+                    continue
+                for key in [const.PLAYER_KEY, const.ENEMY_KEY]:
+                    if key in pkmn_data and pkmn_data[key] and isinstance(pkmn_data[key], dict):
+                        for move_idx, count in pkmn_data[key].items():
+                            if count > 0:
+                                has_data = True
+                                break
+                        if has_data:
+                            break
+                    if has_data:
+                        break
+                if has_data:
+                    break
+            if has_data:
+                move_setup_usage_to_save = self.move_setup_usage
+        
         return {
             const.TRAINER_NAME: self.trainer_name,
             const.SECOND_TRAINER_NAME: self.second_trainer_name,
@@ -262,6 +288,7 @@ class TrainerEventDefinition:
             const.MON_ORDER: self.mon_order,
             const.TRANSFORMED: self.transformed,
             const.MOVE_HIGHLIGHTS: self.move_highlights if self.move_highlights else None,
+            const.MOVE_SETUP_USAGE: move_setup_usage_to_save,
         }
     
     @staticmethod
@@ -295,6 +322,7 @@ class TrainerEventDefinition:
             second_trainer_name=raw_val.get(const.SECOND_TRAINER_NAME, ""),
             transformed=raw_val.get(const.TRANSFORMED, False),
             move_highlights=raw_val.get(const.MOVE_HIGHLIGHTS),
+            move_setup_usage=raw_val.get(const.MOVE_SETUP_USAGE),
         )
     
     def __str__(self):
