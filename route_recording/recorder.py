@@ -159,20 +159,31 @@ class RecorderController:
     def lost_trainer_battle(self, trainer_name):
         # If we initiate a trainer battle, lose to that trainer, and _don't_ reset
         # Need to remove the event representing that trainer fight
+        logger.info(f"[BLACKOUT DEBUG] lost_trainer_battle called for trainer: {trainer_name}")
         last_obj = test_obj = self._controller.get_previous_event()
+        logger.info(f"[BLACKOUT DEBUG] Last event: {test_obj}")
+        search_count = 0
         while not self.is_trainer_event(test_obj, trainer_name):
             if test_obj is None:
+                logger.info(f"[BLACKOUT DEBUG] Reached None while searching for trainer {trainer_name} (searched {search_count} events)")
                 break
             test_obj = self._controller.get_previous_event(test_obj.group_id)
+            search_count += 1
+            if search_count > 20:  # Safety limit
+                logger.error(f"[BLACKOUT DEBUG] Search limit reached while looking for trainer {trainer_name}")
+                break
         
         if test_obj is None:
             msg = f"{const.RECORDING_ERROR_FRAGMENT} Could not find trainer event {trainer_name} to remove after losing to them"
-            logger.error(msg)
+            logger.error(f"[BLACKOUT DEBUG] {msg}")
+            logger.error(f"[BLACKOUT DEBUG] Searched {search_count} events, last_obj was: {last_obj}")
             self._controller.new_event(routing.route_events.EventDefinition(notes=msg), dest_folder_name=self._active_folder_name)
         else:
             if test_obj != last_obj:
                 logger.error(f"{const.RECORDING_ERROR_FRAGMENT} When removing trainer event {trainer_name}, it was not the last event... odd")
+                logger.info(f"[BLACKOUT DEBUG] Found trainer event at position {search_count} from last event")
 
+            logger.info(f"[BLACKOUT DEBUG] Deleting trainer event with group_id: {test_obj.group_id}")
             self._controller.delete_events([test_obj.group_id])
 
     @skip_if_inactive

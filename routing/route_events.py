@@ -211,6 +211,8 @@ class TrainerEventDefinition:
             pay_day_amount=0,
             mon_order=None,
             transformed=False,
+            move_highlights=None,
+            move_setup_usage=None,
         ):
         self.trainer_name = trainer_name
         self.second_trainer_name = second_trainer_name
@@ -240,8 +242,36 @@ class TrainerEventDefinition:
             mon_order = []
         self.mon_order = mon_order
         self.transformed = transformed
+        if move_highlights is None:
+            move_highlights = []
+        self.move_highlights:List[Dict[str, Dict[str, int]]] = move_highlights
+        if move_setup_usage is None:
+            move_setup_usage = []
+        self.move_setup_usage:List[Dict[str, Dict[int, int]]] = move_setup_usage
 
     def serialize(self):
+        # Check if move_setup_usage has any actual data (non-zero counts)
+        move_setup_usage_to_save = None
+        if self.move_setup_usage and len(self.move_setup_usage) > 0:
+            has_data = False
+            for pkmn_data in self.move_setup_usage:
+                if not isinstance(pkmn_data, dict):
+                    continue
+                for key in [const.PLAYER_KEY, const.ENEMY_KEY]:
+                    if key in pkmn_data and pkmn_data[key] and isinstance(pkmn_data[key], dict):
+                        for move_idx, count in pkmn_data[key].items():
+                            if count > 0:
+                                has_data = True
+                                break
+                        if has_data:
+                            break
+                    if has_data:
+                        break
+                if has_data:
+                    break
+            if has_data:
+                move_setup_usage_to_save = self.move_setup_usage
+        
         return {
             const.TRAINER_NAME: self.trainer_name,
             const.SECOND_TRAINER_NAME: self.second_trainer_name,
@@ -257,6 +287,8 @@ class TrainerEventDefinition:
             const.PAY_DAY_AMOUNT: self.pay_day_amount,
             const.MON_ORDER: self.mon_order,
             const.TRANSFORMED: self.transformed,
+            const.MOVE_HIGHLIGHTS: self.move_highlights if self.move_highlights else None,
+            const.MOVE_SETUP_USAGE: move_setup_usage_to_save,
         }
     
     @staticmethod
@@ -289,6 +321,8 @@ class TrainerEventDefinition:
             mon_order=raw_val.get(const.MON_ORDER),
             second_trainer_name=raw_val.get(const.SECOND_TRAINER_NAME, ""),
             transformed=raw_val.get(const.TRANSFORMED, False),
+            move_highlights=raw_val.get(const.MOVE_HIGHLIGHTS),
+            move_setup_usage=raw_val.get(const.MOVE_SETUP_USAGE),
         )
     
     def __str__(self):
@@ -712,15 +746,19 @@ class EventItem:
             if None is not self.event_definition.trainer_def:
                 if self.defeating_trainer:
                     defeated_trainer_name = self.event_definition.trainer_def.trainer_name
+                    # Pass second trainer name for multi-battles
+                    second_trainer_name = self.event_definition.trainer_def.second_trainer_name if self.event_definition.trainer_def.second_trainer_name else None
                 else:
                     defeated_trainer_name = None
+                    second_trainer_name = None
                 render_trainer_name = self.event_definition.trainer_def.trainer_name
             else:
                 defeated_trainer_name = None
+                second_trainer_name = None
                 render_trainer_name = "TrainerPkmn" if self.event_definition.wild_pkmn_info.trainer_pkmn else "WildPkmn"
 
             self.name = f"{render_trainer_name}: {self.to_defeat_mon.name}"
-            self.final_state, self.error_message = cur_state.defeat_pkmn(self.to_defeat_mon, trainer_name=defeated_trainer_name, exp_split=self.exp_split_num, pay_day_amount=self.pay_day_amount)
+            self.final_state, self.error_message = cur_state.defeat_pkmn(self.to_defeat_mon, trainer_name=defeated_trainer_name, exp_split=self.exp_split_num, pay_day_amount=self.pay_day_amount, second_trainer_name=second_trainer_name)
         elif None is not self.event_definition.rare_candy:
             # note: deliberatley ignoring amount here, that's handled at the group level
             # just apply one rare candy at the item level

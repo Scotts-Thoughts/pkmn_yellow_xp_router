@@ -73,6 +73,14 @@ class StatExpViewer(ttk.Frame):
     def set_state(self, state:full_route_state.RouteState):
         self._config_for_gen()
         self._state = state
+        
+        if state is None:
+            # Clear all values when state is None
+            empty_values = [0] * len(self._stat_labels)
+            self._net_gain_column.set_values(empty_values)
+            self._realized_stat_xp_column.set_values(empty_values)
+            self._total_stat_xp_column.set_values(empty_values)
+            return
 
         self._net_gain_column.set_values(
             self._vals_from_stat_block(

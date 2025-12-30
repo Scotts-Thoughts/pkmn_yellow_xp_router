@@ -207,7 +207,7 @@ class GenOne(CurrentGen):
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
     
-    def get_move_custom_data(self, move_name) -> List[str]:
+    def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         # Gen one moves that require custom data are already handled by the rendering engine
         # Mimc, and all multi-hit moves
         # so, no other moves will need custom data

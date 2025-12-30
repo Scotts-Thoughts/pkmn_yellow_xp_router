@@ -72,7 +72,7 @@ class EventDetails(ttk.Frame):
         self.event_details_frame.columnconfigure(2, weight=1, uniform="group")
 
         self.footer_frame = ttk.Frame(self)
-        self.footer_frame.grid(row=1, column=0, padx=5, pady=5, sticky=tk.EW)
+        self.footer_frame.grid(row=1, column=0, padx=5, pady=(2, 2), sticky=tk.EW)
 
         # create this slightly out of order because we need the reference
         self.event_editor_lookup = route_event_components.EventEditorFactory(self.event_details_frame)
@@ -82,7 +82,7 @@ class EventDetails(ttk.Frame):
             route_event_components.EditorParams(const.TASK_NOTES_ONLY, None, None),
             save_callback=self.update_existing_event,
             delayed_save_callback=self.update_existing_event_after_delay,
-            notes_visibility_callback=self._tab_changed_callback,
+            notes_visibility_callback=self._update_notes_visibility_in_battle_summary,
         )
         self.trainer_notes.grid(row=0, column=0, sticky=tk.EW)
 
@@ -93,10 +93,73 @@ class EventDetails(ttk.Frame):
         self.bind(self._controller.register_record_mode_change(self), self._handle_selection)
         self.bind(self._controller.register_route_change(self), self._handle_route_change)
         self.bind(self._controller.register_version_change(self), self._handle_version_change)
-        self.bind(self._battle_summary_controller.register_nonload_change(self), self.update_existing_event)
+        self.bind(self._battle_summary_controller.register_nonload_change(self), self.update_existing_event_after_delay)
+        # Bind to battle summary refresh to update notes visibility when matchups change
+        self.bind(self._battle_summary_controller.register_refresh(self), self._on_battle_summary_refresh)
         self._controller.register_pre_save_hook(self.force_and_clear_event_update)
 
+        # Bind keyboard shortcuts for pre-fight rare candies
+        self.bind('<F3>', self._increment_prefight_candies)
+        self.bind('<F4>', self._decrement_prefight_candies)
+
         self._tab_changed_callback()
+    
+    def _should_show_notes_in_battle_summary(self):
+        """Determine if notes should be shown in battle summary based on visibility mode and number of visible matchups."""
+        if not self.battle_summary_frame.should_render:
+            return False
+        
+        mode = config.get_notes_visibility_mode()
+        
+        if mode == "never":
+            return False
+        elif mode == "always":
+            return True
+        elif mode == "when_space_allows":
+            # Count visible Pokemon matchups
+            visible_matchups = sum(self.battle_summary_frame._did_draw_mon_pairs)
+            # If there are 3 or fewer matchups, there's room for notes
+            # If there are 4 or more matchups, hide notes to make room for damage ranges
+            return visible_matchups <= 3
+        else:
+            # Default to when_space_allows behavior
+            visible_matchups = sum(self.battle_summary_frame._did_draw_mon_pairs)
+            return visible_matchups <= 3
+    
+    def _on_battle_summary_refresh(self, *args, **kwargs):
+        """Called when battle summary refreshes - update notes visibility."""
+        self.after_idle(self._update_notes_visibility_in_battle_summary)
+    
+    def _update_notes_visibility_in_battle_summary(self):
+        """Update notes visibility based on current battle summary state."""
+        if not self.tabbed_states.select():
+            return
+        
+        selected_tab_index = self.tabbed_states.index(self.tabbed_states.select())
+        if selected_tab_index == self.battle_summary_tab_index:
+            mode = config.get_notes_visibility_mode()
+            should_show = self._should_show_notes_in_battle_summary()
+            
+            if should_show:
+                # Always use minimal space for footer - let it use natural size, positioned at bottom
+                # Battle summary takes remaining space, footer sits at bottom with minimal padding
+                self.rowconfigure(0, weight=1)
+                self.rowconfigure(1, weight=0)  # Footer doesn't expand, uses natural size
+                self.footer_frame.grid(row=1, column=0, padx=5, pady=(2, 2), sticky=tk.EW)  # Only expand horizontally
+                self.footer_frame.rowconfigure(0, weight=0)  # Notes editor uses natural size
+                
+                # If mode is "always", enable scrollbar on battle summary (only if needed)
+                if mode == "always":
+                    # Use after_idle to ensure layout is updated before checking scrollbar need
+                    self.after_idle(self.battle_summary_frame.enable_scrollbar)
+                else:
+                    self.battle_summary_frame.disable_scrollbar()
+            else:
+                # Hide footer and let row 0 take all space
+                self.rowconfigure(0, weight=1)
+                self.rowconfigure(1, weight=0)
+                self.footer_frame.grid_forget()
+                self.battle_summary_frame.disable_scrollbar()
     
     def _tab_changed_callback(self, *args, **kwargs):
         if not self.tabbed_states.select():
@@ -108,13 +171,19 @@ class EventDetails(ttk.Frame):
         selected_tab_index = self.tabbed_states.index(self.tabbed_states.select())
         if selected_tab_index == self.battle_summary_tab_index:
             self.configure(width=self.battle_summary_width)
-            self.battle_summary_frame.after(300, self.battle_summary_frame.show_contents)
-            if not config.are_notes_visible_in_battle_summary():
-                self.footer_frame.grid_forget()
+            def show_and_update():
+                self.battle_summary_frame.show_contents()
+                self.after(350, self._update_notes_visibility_in_battle_summary)
+            self.battle_summary_frame.after(300, show_and_update)
+            # Initial visibility check (will be updated after battle summary renders)
+            self._update_notes_visibility_in_battle_summary()
         else:
             self.battle_summary_frame.hide_contents()
             self.configure(width=self.state_summary_width)
-            self.footer_frame.grid(row=1, column=0, padx=5, pady=5, sticky=tk.EW)
+            # On pre-state tab, always show footer and configure rows properly
+            self.rowconfigure(0, weight=1)
+            self.rowconfigure(1, weight=0)
+            self.footer_frame.grid(row=1, column=0, padx=5, pady=(2, 2), sticky=tk.EW)
     
     def change_tabs(self, *args, **kwargs):
         if not self.tabbed_states.select():
@@ -284,6 +353,28 @@ class EventDetails(ttk.Frame):
                 self.battle_summary_frame.get_enemy_ranges_bounding_box,
                 suffix="_enemy_ranges"
             )
+    
+    def _increment_prefight_candies(self, event=None):
+        """Handle F3 key to increment pre-fight rare candies."""
+        try:
+            if self.tabbed_states.index(self.tabbed_states.select()) == self.battle_summary_tab_index:
+                if self.battle_summary_frame.should_render:
+                    self.battle_summary_frame.candy_summary._increment_candy(event)
+        except (tk.TclError, ValueError):
+            # Tab might not be selected or widget might not exist
+            pass
+        return "break"
+    
+    def _decrement_prefight_candies(self, event=None):
+        """Handle F4 key to decrement pre-fight rare candies."""
+        try:
+            if self.tabbed_states.index(self.tabbed_states.select()) == self.battle_summary_tab_index:
+                if self.battle_summary_frame.should_render:
+                    self.battle_summary_frame.candy_summary._decrement_candy(event)
+        except (tk.TclError, ValueError):
+            # Tab might not be selected or widget might not exist
+            pass
+        return "break"
     
     def _take_scaled_screenshot(self, bbox_getter, suffix=""):
         """Take a screenshot with UI scaled up by 1.5x for better quality."""

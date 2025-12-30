@@ -146,6 +146,8 @@ class GenFourConstants:
         self.LOW_HEALTH_BONUS = "Low Health Bonus"
         self.SECOND_BONUS = "Move Second Bonus"
         self.SLEEPING_BONUS = "Sleeping Bonus"
+        self.ABILITY_BOOST_NO_BOOST = "No Boost"
+        self.ABILITY_BOOST_BOOST_PREFIX = "Boost"  # Will be combined with ability name
 
         self.PLAIN_TERRAIN = "Plain"
         self.SAND_TERRAIN = "Sand"

@@ -25,7 +25,10 @@ class Config:
     DEFAULT_DAMAGE_SEARCH_DEPTH = 20
     DEFAULT_DEBUG_MODE = False
     DEFAULT_AUTO_SWITCH = True
-    DEFAULT_NOTES_VISIBILITY = False
+    DEFAULT_NOTES_VISIBILITY = "when_space_allows"  # Options: "when_space_allows", "always", "never"
+    DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE = False
+    DEFAULT_LANDING_PAGE_SEARCH_FILTER = ""
+    DEFAULT_SHOW_MOVE_HIGHLIGHTS = True
 
     def __init__(self):
         self.reload()
@@ -38,6 +41,7 @@ class Config:
             raw = {}
         
         self._window_geometry = raw.get(const.CONFIG_WINDOW_GEOMETRY, "")
+        self._window_state = raw.get(const.CONFIG_WINDOW_STATE, "normal")
         self._user_data_dir = raw.get(const.USER_LOCATION_DATA_KEY, io_utils.get_default_user_data_dir())
         const.config_user_data_dir(self._user_data_dir)
         self._images_dir = raw.get(
@@ -66,7 +70,18 @@ class Config:
         self._custom_font_name = raw.get(const.CUSTOM_FONT_NAME_KEY, self.DEFAULT_FONT_NAME)
         self._debug_mode = raw.get(const.DEBUG_MODE_KEY, self.DEFAULT_DEBUG_MODE)
         self._auto_switch = raw.get(const.AUTO_SWITCH_KEY, self.DEFAULT_AUTO_SWITCH)
-        self._notes_visibility = raw.get(const.NOTES_VISIBILITY_KEY, self.DEFAULT_NOTES_VISIBILITY)
+        # Handle migration from boolean to string enum
+        notes_visibility_raw = raw.get(const.NOTES_VISIBILITY_KEY, self.DEFAULT_NOTES_VISIBILITY)
+        if isinstance(notes_visibility_raw, bool):
+            # Migrate old boolean values: True -> "always", False -> "when_space_allows"
+            self._notes_visibility = "always" if notes_visibility_raw else "when_space_allows"
+        elif notes_visibility_raw in ["when_space_allows", "always", "never"]:
+            self._notes_visibility = notes_visibility_raw
+        else:
+            self._notes_visibility = self.DEFAULT_NOTES_VISIBILITY
+        self._auto_load_most_recent_route = raw.get(const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY, self.DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE)
+        self._landing_page_search_filter = raw.get(const.LANDING_PAGE_SEARCH_FILTER_KEY, self.DEFAULT_LANDING_PAGE_SEARCH_FILTER)
+        self._show_move_highlights = raw.get(const.SHOW_MOVE_HIGHLIGHTS, self.DEFAULT_SHOW_MOVE_HIGHLIGHTS)
     
     def _save(self):
         if not os.path.exists(const.GLOBAL_CONFIG_DIR):
@@ -75,6 +90,7 @@ class Config:
         with open(const.GLOBAL_CONFIG_FILE, 'w') as f:
             json.dump({
                 const.CONFIG_WINDOW_GEOMETRY: self._window_geometry,
+                const.CONFIG_WINDOW_STATE: self._window_state,
                 const.USER_LOCATION_DATA_KEY: self._user_data_dir,
                 const.SUCCESS_COLOR_KEY: self._success_color,
                 const.WARNING_COLOR_KEY: self._warning_color,
@@ -96,6 +112,9 @@ class Config:
                 const.DEBUG_MODE_KEY: self._debug_mode,
                 const.AUTO_SWITCH_KEY: self._auto_switch,
                 const.NOTES_VISIBILITY_KEY: self._notes_visibility,
+                const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY: self._auto_load_most_recent_route,
+                const.LANDING_PAGE_SEARCH_FILTER_KEY: self._landing_page_search_filter,
+                const.SHOW_MOVE_HIGHLIGHTS: self._show_move_highlights,
             }, f, indent=4)
     
     def set_window_geometry(self, new_geometry):
@@ -105,6 +124,14 @@ class Config:
 
     def get_window_geometry(self):
         return self._window_geometry
+    
+    def set_window_state(self, new_state):
+        if new_state != self._window_state:
+            self._window_state = new_state
+            self._save()
+
+    def get_window_state(self):
+        return self._window_state
     
     def get_user_data_dir(self):
         return self._user_data_dir
@@ -187,8 +214,11 @@ class Config:
         self._save()
 
     def set_notes_visibility_in_battle_summary(self, are_notes_visible):
-        self._notes_visibility = are_notes_visible
-        self._save()
+        """Legacy method for backward compatibility. Converts boolean to mode."""
+        if isinstance(are_notes_visible, bool):
+            self.set_notes_visibility_mode("always" if are_notes_visible else "when_space_allows")
+        else:
+            self.set_notes_visibility_mode(are_notes_visible)
 
     def set_images_dir(self, images_dir):
         self._images_dir = images_dir
@@ -261,7 +291,41 @@ class Config:
         return self._auto_switch
     
     def are_notes_visible_in_battle_summary(self):
+        """Returns True if notes should be shown (for backward compatibility)."""
+        return self._notes_visibility in ["when_space_allows", "always"]
+    
+    def get_notes_visibility_mode(self):
+        """Returns the notes visibility mode: 'when_space_allows', 'always', or 'never'."""
         return self._notes_visibility
+    
+    def set_notes_visibility_mode(self, mode):
+        """Set notes visibility mode. Must be 'when_space_allows', 'always', or 'never'."""
+        if mode not in ["when_space_allows", "always", "never"]:
+            mode = self.DEFAULT_NOTES_VISIBILITY
+        self._notes_visibility = mode
+        self._save()
+    
+    def set_auto_load_most_recent_route(self, do_auto_load):
+        self._auto_load_most_recent_route = do_auto_load
+        self._save()
+    
+    def get_auto_load_most_recent_route(self):
+        return self._auto_load_most_recent_route
+    
+    def set_landing_page_search_filter(self, search_filter):
+        if search_filter != self._landing_page_search_filter:
+            self._landing_page_search_filter = search_filter
+            self._save()
+    
+    def get_landing_page_search_filter(self):
+        return self._landing_page_search_filter
+    
+    def set_show_move_highlights(self, show):
+        self._show_move_highlights = show
+        self._save()
+    
+    def get_show_move_highlights(self):
+        return self._show_move_highlights
     
     def reset_all_colors(self):
         self._success_color = self.DEFAULT_SUCCESS

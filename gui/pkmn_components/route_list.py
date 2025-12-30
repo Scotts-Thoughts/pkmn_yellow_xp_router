@@ -100,6 +100,33 @@ class RouteList(custom_components.CustomGridview):
             # ...maybe. I'm not totally sure. But everything seems fine, so ignore these errors for now
             pass
     
+    def _get_all_items_recursive(self, parent=""):
+        """Recursively get all items in the treeview."""
+        items = []
+        children = self.get_children(parent)
+        for child in children:
+            items.append(child)
+            items.extend(self._get_all_items_recursive(child))
+        return items
+    
+    def scroll_to_top(self):
+        """Scroll to the top of the event list."""
+        try:
+            all_items = self._get_all_items_recursive()
+            if all_items:
+                self.see(all_items[0])
+        except Exception as e:
+            pass
+    
+    def scroll_to_bottom(self):
+        """Scroll to the bottom of the event list."""
+        try:
+            all_items = self._get_all_items_recursive()
+            if all_items:
+                self.see(all_items[-1])
+        except Exception as e:
+            pass
+    
     def get_all_selected_event_ids(self, allow_event_items=True):
         temp = set(self.selection())
         result = []

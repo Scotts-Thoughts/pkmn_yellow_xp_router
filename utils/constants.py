@@ -5,7 +5,8 @@ import sys
 
 class Constants:
     def __init__(self):
-        self.APP_VERSION = "v3.1k"
+        self.DEVELOPMENT_MODE = True
+        self.APP_VERSION = "v4.0a"
         self.APP_RELEASE_DATE = "2025-Dec-20"
 
         self.DEBUG_MODE = False
@@ -141,6 +142,8 @@ class Constants:
         self.ENEMY_FIELD_MOVES_KEY = "enemy_field_moves"
         self.MIMIC_SELECTION = "mimic_selection"
         self.CUSTOM_MOVE_DATA = "custom_move_data"
+        self.MOVE_HIGHLIGHTS = "move_highlights"
+        self.MOVE_SETUP_USAGE = "move_setup_usage"
         self.EXP_SPLIT = "exp_split"
         self.WEATHER = "weather"
         self.PAY_DAY_AMOUNT = "pay_day_amount"
@@ -308,11 +311,14 @@ class Constants:
         self.IGNORE_ACCURACY_IN_DAMAGE_CALCS = "ignore_accuracy_in_damage_calcs"
         self.DAMAGE_SEARCH_DEPTH = "damage_search_depth"
         self.FORCE_FULL_SEARCH = "force_full_search"
+        self.SHOW_MOVE_HIGHLIGHTS = "show_move_highlights"
 
         self.CUSTOM_FONT_NAME_KEY = "custom_font_name"
         self.DEBUG_MODE_KEY = "debug_mode"
         self.AUTO_SWITCH_KEY = "auto_switch"
         self.NOTES_VISIBILITY_KEY = "notes_visibility"
+        self.AUTO_LOAD_MOST_RECENT_ROUTE_KEY = "auto_load_most_recent_route"
+        self.LANDING_PAGE_SEARCH_FILTER_KEY = "landing_page_search_filter"
 
         # not configurable, just for important events in route list
         self.IMPORTANT_COLOR = "#b3b6b7"
@@ -324,6 +330,7 @@ class Constants:
 
         self.CONFIG_ROUTE_ONE_PATH = "route_one_path"
         self.CONFIG_WINDOW_GEOMETRY = "tkinter_window_geometry"
+        self.CONFIG_WINDOW_STATE = "tkinter_window_state"
 
         self.STATE_SUMMARY_LABEL = "State Summary"
         self.BADGE_BOOST_LABEL = "Badge Boost Calculator"

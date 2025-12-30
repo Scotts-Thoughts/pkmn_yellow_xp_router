@@ -79,7 +79,7 @@ def get_move_accuracy(
     if defending_pkmn.ability == gen_four_const.SAND_VEIL_ABILITY and weather == const.WEATHER_SANDSTORM:
         result = math.floor(result * 3277 / 4096)
 
-    if defending_pkmn.ability == gen_four_const.SNOW_CLOAK_ABILITY and weather == const.WEATHER_SANDSTORM:
+    if defending_pkmn.ability == gen_four_const.SNOW_CLOAK_ABILITY and weather == const.WEATHER_HAIL:
         result = math.floor(result * 3277 / 4096)
 
     return result
@@ -185,12 +185,6 @@ def calculate_gen_four_damage(
             move_type = const.TYPE_ICE
         elif weather == const.WEATHER_SANDSTORM:
             move_type = const.TYPE_ROCK
-
-    if (
-        attacking_ability == gen_four_const.TECHNICIAN_ABILITY and
-        base_power <= 60
-    ):
-        base_power = math.floor(60 * 1.5)
 
     if attacking_ability == gen_four_const.NORMALIZE_ABILITY:
         move_type = const.TYPE_NORMAL
@@ -321,14 +315,14 @@ def calculate_gen_four_damage(
     # when a crit occurs, always ignore negative modifiers for the attacking pokemon, and always ignore positive modifiers for the defensive pokemon
     if is_crit:
         if move.category == const.CATEGORY_PHYSICAL:
-            if attacking_stage_modifiers.special_attack_stage < 0:
-                attacking_stage_modifiers = universal_data_objects.StageModifiers()
-            if defending_stage_modifiers.special_defense_stage > 0:
-                defending_stage_modifiers = universal_data_objects.StageModifiers()
-        else:
             if attacking_stage_modifiers.attack_stage < 0:
                 attacking_stage_modifiers = universal_data_objects.StageModifiers()
             if defending_stage_modifiers.defense_stage > 0:
+                defending_stage_modifiers = universal_data_objects.StageModifiers()
+        else:
+            if attacking_stage_modifiers.special_attack_stage < 0:
+                attacking_stage_modifiers = universal_data_objects.StageModifiers()
+            if defending_stage_modifiers.special_defense_stage > 0:
                 defending_stage_modifiers = universal_data_objects.StageModifiers()
 
     if attacking_battle_stats is None:
@@ -419,6 +413,12 @@ def calculate_gen_four_damage(
         else:
             base_power = 120
 
+    if (
+        attacking_ability == gen_four_const.TECHNICIAN_ABILITY and
+        base_power <= 60
+    ):
+        base_power = math.floor(base_power * 1.5)
+
     # NOTE: for now, just ignoring the "edge case" of: what if the mon for mon-specific unique items has klutz?
     # it never occurs in normal gameplay, and would require a hack. so, wtv
     if attacking_pkmn.name == gen_four_const.MAROWAK_NAME and attacking_pkmn.held_item == gen_four_const.THICK_CLUB_NAME:
@@ -483,15 +483,15 @@ def calculate_gen_four_damage(
         is_weather_active and
         weather == const.WEATHER_SUN
     ):
-        defending_battle_stats.special_attack = math.floor(defending_battle_stats.special_attack * 1.5)
-        defending_battle_stats.special_defense = math.floor(defending_battle_stats.special_attack * 1.5)
+        defending_battle_stats.attack = math.floor(defending_battle_stats.attack * 1.5)
+        defending_battle_stats.special_defense = math.floor(defending_battle_stats.special_defense * 1.5)
     elif (
         attacking_ability == gen_four_const.FLOWER_GIFT_ABILITY and
         is_weather_active and
         weather == const.WEATHER_SUN
     ):
-        attacking_battle_stats.special_attack = math.floor(attacking_battle_stats.special_attack * 1.5)
-        attacking_battle_stats.special_defense = math.floor(attacking_battle_stats.special_attack * 1.5)
+        attacking_battle_stats.attack = math.floor(attacking_battle_stats.sattack * 1.5)
+        attacking_battle_stats.special_defense = math.floor(attacking_battle_stats.special_defense * 1.5)
     elif (
         attacking_ability == gen_four_const.SOLAR_POWER_ABILITY and
         is_weather_active and
@@ -507,14 +507,26 @@ def calculate_gen_four_damage(
         defending_battle_stats.defense = math.floor(defending_battle_stats.defense * 1.5)
     if attacking_ability == gen_four_const.GUTS_ABILITY and False:
         attacking_battle_stats.attack = math.floor(attacking_battle_stats.attack * 1.5)
-    if attacking_ability == gen_four_const.OVERGROW_ABILITY and move_type == const.TYPE_GRASS and False:
-        base_power = math.floor(base_power * 1.5)
-    if attacking_ability == gen_four_const.BLAZE_ABILITY and move_type == const.TYPE_FIRE and False:
-        base_power = math.floor(base_power * 1.5)
-    if attacking_ability == gen_four_const.TORRENT_ABILITY and move_type == const.TYPE_WATER and False:
-        base_power = math.floor(base_power * 1.5)
-    if attacking_ability == gen_four_const.SWARM_ABILITY and move_type == const.TYPE_BUG and False:
-        base_power = math.floor(base_power * 1.5)
+    
+    # Handle ability boosts (Overgrow, Blaze, Torrent, Swarm) via custom_move_data
+    # Check for ability boost strings: "Blaze Boost", "Overgrow Boost", "Torrent Boost", "Swarm Boost"
+    has_ability_boost = (
+        custom_move_data and (
+            "Blaze Boost" in custom_move_data or
+            "Overgrow Boost" in custom_move_data or
+            "Torrent Boost" in custom_move_data or
+            "Swarm Boost" in custom_move_data
+        )
+    )
+    if has_ability_boost:
+        if attacking_ability == gen_four_const.OVERGROW_ABILITY and move_type == const.TYPE_GRASS:
+            base_power = math.floor(base_power * 1.5)
+        elif attacking_ability == gen_four_const.BLAZE_ABILITY and move_type == const.TYPE_FIRE:
+            base_power = math.floor(base_power * 1.5)
+        elif attacking_ability == gen_four_const.TORRENT_ABILITY and move_type == const.TYPE_WATER:
+            base_power = math.floor(base_power * 1.5)
+        elif attacking_ability == gen_four_const.SWARM_ABILITY and move_type == const.TYPE_BUG:
+            base_power = math.floor(base_power * 1.5)
     
     if move.category == const.CATEGORY_SPECIAL:
         attacking_stat = attacking_battle_stats.special_attack

@@ -86,20 +86,32 @@ class NotesEditor(EventEditorBase):
         super().__init__(*args, **kwargs)
 
         self._notes_label = ttk.Label(self, text="Notes:")
-        self._notes_label.grid(row=self._cur_row, column=0, sticky=tk.W, padx=5, pady=5)
+        self._notes_label.grid(row=self._cur_row, column=0, sticky=tk.W, padx=5, pady=(2, 2))
         self._stat_label = ttk.Label(self, text="Stats with * are calculated with a badge boost", style="Contrast.TLabel")
-        self._stat_label.grid(row=self._cur_row, column=1, sticky=tk.W, padx=5, pady=5)
-        self._visibility = custom_components.CheckboxLabel(self, text="Show in battle summary?", toggle_command=self._toggle_show_in_battle_summary, flip=True)
-        self._visibility.grid(row=self._cur_row, column=2, sticky=tk.E, padx=5, pady=5)
+        self._stat_label.grid(row=self._cur_row, column=1, sticky=tk.W, padx=5, pady=(2, 2))
+        visibility_label = ttk.Label(self, text="Battle summary notes:")
+        visibility_label.grid(row=self._cur_row, column=2, sticky=tk.E, padx=5, pady=(2, 2))
+        self._visibility = custom_components.SimpleOptionMenu(
+            self, 
+            ["Show notes in battle summary when space allows", "Show notes in battle summary at all times", "Never show notes in battle summary"],
+            callback=self._on_visibility_changed,
+            width=50  # Make dropdown wider to show full text
+        )
+        self._visibility.grid(row=self._cur_row, column=3, sticky=tk.E, padx=5, pady=(2, 2))
+        # Initialize dropdown with current setting
+        self._load_visibility_setting()
         self._cur_row += 1
 
         self._notes = custom_components.SimpleText(self, height=8)
         self._notes.bind("<<TextModified>>", self._trigger_delayed_save)
-        self._notes.grid(row=self._cur_row, column=0, columnspan=3, sticky=tk.EW, padx=5, pady=5)
+        # Prevent Delete key from deleting the current event when notes area is focused
+        self._notes.bind('<Delete>', lambda e: "break")
+        self._notes.grid(row=self._cur_row, column=0, columnspan=4, sticky=tk.EW, padx=5, pady=(2, 2))
         self._cur_row += 1
 
         self.columnconfigure(0, weight=1, uniform="padding")
         self.columnconfigure(2, weight=1, uniform="padding")
+        self.columnconfigure(3, weight=0)  # Don't expand dropdown column
     
     @ignore_updates
     def configure(self, editor_params, save_callback=None, delayed_save_callback=None):
@@ -110,6 +122,8 @@ class NotesEditor(EventEditorBase):
         self._notes.delete(1.0, tk.END)
         if event_def is not None:
             self._notes.insert(1.0, event_def.notes)
+        # Load visibility setting when event is loaded
+        self._load_visibility_setting()
 
     def get_event(self) -> EventDefinition:
         return EventDefinition(notes=self._notes.get(1.0, tk.END).strip())
@@ -120,12 +134,48 @@ class NotesEditor(EventEditorBase):
     def disable(self):
         self._notes.disable()
     
-    def _toggle_show_in_battle_summary(self):
-        config.set_notes_visibility_in_battle_summary(self._visibility.is_checked())
-        logger.info(f"notes visibility state toggled to: {config.are_notes_visible_in_battle_summary()}")
+    def _on_visibility_changed(self, *args, **kwargs):
+        """Handle dropdown selection change."""
+        selected_text = self._visibility.get()
+        # Map dropdown text to config values
+        if selected_text == "Show notes in battle summary when space allows":
+            mode = "when_space_allows"
+        elif selected_text == "Show notes in battle summary at all times":
+            mode = "always"
+        elif selected_text == "Never show notes in battle summary":
+            mode = "never"
+        else:
+            mode = "when_space_allows"  # Default fallback
+        
+        config.set_notes_visibility_mode(mode)
+        logger.info(f"notes visibility mode changed to: {mode}")
+        
+        # Update main window menu if it exists
+        try:
+            root = self.winfo_toplevel()
+            if hasattr(root, '_update_battle_summary_notes_menu'):
+                root._update_battle_summary_notes_menu()
+        except Exception:
+            pass  # Main window might not exist yet
+        
         if self._notes_visibility_callback is not None:
             logger.info(f"doing the callback")
             self._notes_visibility_callback()
+    
+    def _load_visibility_setting(self):
+        """Load current visibility setting into dropdown."""
+        mode = config.get_notes_visibility_mode()
+        # Map config values to dropdown text
+        if mode == "when_space_allows":
+            text = "Show notes in battle summary when space allows"
+        elif mode == "always":
+            text = "Show notes in battle summary at all times"
+        elif mode == "never":
+            text = "Never show notes in battle summary"
+        else:
+            text = "Show notes in battle summary when space allows"  # Default fallback
+        
+        self._visibility.set(text)
 
 
 class TrainerFightEditor(EventEditorBase):

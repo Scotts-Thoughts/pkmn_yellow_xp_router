@@ -35,9 +35,32 @@ class BattleSummary(ttk.Frame):
         self._custom_move_data = None
         self._loading = False
 
-        self._base_frame = ttk.Frame(self)
-        self._base_frame.grid(row=0, column=0, sticky=tk.NSEW)
+        # Create canvas and scrollbar for scrolling when notes are always shown
+        self._canvas = tk.Canvas(self, highlightthickness=0)
+        self._scrollbar = ttk.Scrollbar(self, orient="vertical", command=self._canvas.yview)
+        self._canvas.configure(yscrollcommand=self._scrollbar.set)
+        
+        self._base_frame = ttk.Frame(self._canvas)
+        self._canvas_window = self._canvas.create_window((0, 0), window=self._base_frame, anchor="nw")
+        
+        # Initially grid without scrollbar
+        self._canvas.grid(row=0, column=0, sticky=tk.NSEW)
+        self._scrollbar.grid(row=0, column=1, sticky=tk.NS)
+        self._scrollbar.grid_remove()  # Hide scrollbar initially
+        
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        
         self._base_frame.columnconfigure(0, weight=1)
+        
+        # Bind canvas resize to update scroll region
+        self._canvas.bind('<Configure>', self._on_canvas_configure)
+        self._base_frame.bind('<Configure>', self._on_frame_configure)
+        
+        # Bind mouse wheel scrolling to canvas
+        self._canvas.bind('<MouseWheel>', self._on_mousewheel)
+        self._canvas.bind('<Button-4>', self._on_mousewheel)  # Linux scroll up
+        self._canvas.bind('<Button-5>', self._on_mousewheel)  # Linux scroll down
 
         self._top_bar = ttk.Frame(self._base_frame)
         self._top_bar.grid(row=0, column=0, sticky=tk.EW)
@@ -89,15 +112,77 @@ class BattleSummary(ttk.Frame):
         self.setup_moves.configure_moves(possible_setup_moves)
         self.enemy_setup_moves.configure_moves(possible_setup_moves)
     
+    def _on_canvas_configure(self, event):
+        """Update canvas scroll region when canvas is resized."""
+        self._canvas.itemconfig(self._canvas_window, width=event.width)
+        self._update_scroll_region()
+    
+    def _on_frame_configure(self, event):
+        """Update canvas scroll region when frame content changes."""
+        self._update_scroll_region()
+    
+    def _update_scroll_region(self):
+        """Update the scrollable region of the canvas."""
+        self._canvas.update_idletasks()
+        bbox = self._canvas.bbox("all")
+        if bbox:
+            self._canvas.config(scrollregion=bbox)
+    
+    def _on_mousewheel(self, event):
+        """Handle mouse wheel scrolling on canvas."""
+        # Only scroll if scrollbar is visible
+        if self._scrollbar.winfo_viewable():
+            # Windows and Mac
+            if event.delta:
+                self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            # Linux
+            elif event.num == 4:
+                self._canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                self._canvas.yview_scroll(1, "units")
+    
+    def enable_scrollbar(self):
+        """Enable scrollbar for battle summary content only if content exceeds visible area."""
+        self._update_scroll_region()
+        # Check if scrolling is actually needed - use after_idle to ensure layout is complete
+        self._canvas.after_idle(self._check_and_enable_scrollbar)
+    
+    def _check_and_enable_scrollbar(self):
+        """Check if scrollbar is needed and enable/disable accordingly."""
+        self._canvas.update_idletasks()
+        canvas_height = self._canvas.winfo_height()
+        bbox = self._canvas.bbox("all")
+        
+        if bbox and canvas_height > 0:
+            content_height = bbox[3] - bbox[1]  # bottom - top
+            # Only show scrollbar if content is taller than canvas (with small threshold to avoid flicker)
+            if content_height > canvas_height + 5:  # 5px threshold
+                self._scrollbar.grid(row=0, column=1, sticky=tk.NS)
+                self.columnconfigure(1, weight=0)  # Don't expand scrollbar column
+            else:
+                self._scrollbar.grid_remove()
+                # Reset scroll position to top when scrollbar is hidden
+                self._canvas.yview_moveto(0.0)
+        else:
+            self._scrollbar.grid_remove()
+            self._canvas.yview_moveto(0.0)
+    
+    def disable_scrollbar(self):
+        """Disable scrollbar for battle summary content."""
+        self._scrollbar.grid_remove()
+        self._update_scroll_region()
+    
     def hide_contents(self):
         self.should_render = False
-        self._base_frame.grid_forget()
+        self._canvas.grid_forget()
+        self._scrollbar.grid_remove()
     
     def show_contents(self):
         self.should_render = True
-        self._base_frame.grid_forget()
+        self._canvas.grid_forget()
         self._on_full_refresh()
-        self._base_frame.grid(row=0, column=0, sticky=tk.NSEW)
+        self._canvas.grid(row=0, column=0, sticky=tk.NSEW)
+        self._update_scroll_region()
 
     def _launch_config_popup(self, *args, **kwargs):
         BattleConfigWindow(self.winfo_toplevel(), battle_controller=self._controller)
@@ -166,6 +251,8 @@ class BattleSummary(ttk.Frame):
                 self._mon_pairs[idx].update_rendering()
 
         self._loading = False
+        # Update scroll region after rendering
+        self._update_scroll_region()
     
     def get_content_bounding_box(self):
         """Get bounding box that includes only visible content, excluding blank space at bottom."""
@@ -395,6 +482,18 @@ class PrefightCandySummary(ttk.Frame):
         if self._outer_callback is not None:
             self._outer_callback()
     
+    def _increment_candy(self, event=None):
+        """Increment pre-fight rare candies (F3 shortcut)."""
+        if not self._loading:
+            self.candy_count._raise_amt()
+        return "break"
+    
+    def _decrement_candy(self, event=None):
+        """Decrement pre-fight rare candies (F4 shortcut)."""
+        if not self._loading:
+            self.candy_count._lower_amt()
+        return "break"
+    
     def set_candy_count(self, new_amount):
         self._loading = True
         self.candy_count.set(new_amount)
@@ -504,13 +603,38 @@ class DamageSummary(ttk.Frame):
         self.pady = 0
         self.row_idx = 0
 
-        self.header = ttk.Frame(self, style="Primary.TFrame")
+        # Use tk.Frame instead of ttk.Frame to support background colors for highlights
+        # Get the primary color from the theme for default background
+        try:
+            # Try to get the primary color from the style
+            style = ttk.Style()
+            bg_color = style.lookup("Primary.TFrame", "background")
+            fg_color = style.lookup("Primary.TLabel", "foreground")
+            if not bg_color:
+                bg_color = ""
+            if not fg_color:
+                fg_color = ""
+        except Exception:
+            bg_color = ""
+            fg_color = ""
+        
+        self.header = tk.Frame(self, bg=bg_color)
         self.header.grid(row=self.row_idx, column=0, sticky=tk.NSEW, padx=self.padx, pady=self.pady)
         self.header.columnconfigure(0, weight=1)
         self.row_idx += 1
-
-        self.move_name_label = ttk.Label(self.header, style="BattleMovePrimary.TLabel")
+        
+        self.move_name_label = tk.Label(self.header, bg=bg_color, fg=fg_color, anchor="center", padx=0, pady=4)
+        # Make player move labels clickable for highlights (cursor will be updated when highlights are enabled)
+        if self._is_player_mon:
+            self.move_name_label.bind("<Button-1>", self._on_move_name_click)
+            self.move_name_label.bind("<Button-3>", self._on_move_name_right_click)  # Right-click to reset
         self.custom_data_dropdown = custom_components.SimpleOptionMenu(self.header, [""], callback=self._custom_data_callback, width=14)
+        # Also bind to <<ComboboxSelected>> event as a backup to ensure callback fires
+        self.custom_data_dropdown.bind("<<ComboboxSelected>>", self._custom_data_callback)
+        
+        # Setup move dropdown (for moves that modify stats)
+        self.setup_move_dropdown = custom_components.SimpleOptionMenu(self.header, ["0"], callback=self._setup_move_callback, width=8)
+        self.setup_move_dropdown.bind("<<ComboboxSelected>>", self._setup_move_callback)
 
         self.range_frame = ttk.Frame(self, style="Contrast.TFrame")
         self.range_frame.grid(row=self.row_idx, column=0, sticky=tk.NSEW, padx=self.padx, pady=self.pady)
@@ -554,6 +678,70 @@ class DamageSummary(ttk.Frame):
             self._controller.update_mimic_selection(self.custom_data_dropdown.get())
         else:
             self._controller.update_custom_move_data(self._mon_idx, self._move_idx, self._is_player_mon, self.custom_data_dropdown.get())
+    
+    def _setup_move_callback(self, *args, **kwargs):
+        if self._is_loading:
+            return
+        count = int(self.setup_move_dropdown.get())
+        self._controller.update_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon, count)
+
+    def _on_move_name_click(self, event):
+        """Handle click on move name to cycle highlight state"""
+        if not self._controller.get_show_move_highlights():
+            return
+        if self._is_player_mon:
+            # Update state in controller
+            self._controller.update_move_highlight(self._mon_idx, self._move_idx, self._is_player_mon, reset=False)
+            # Update UI immediately for instant feedback
+            self._update_highlight_colors()
+    
+    def _on_move_name_right_click(self, event):
+        """Handle right-click on move name to reset highlight state"""
+        if not self._controller.get_show_move_highlights():
+            return
+        if self._is_player_mon:
+            # Update state in controller
+            self._controller.update_move_highlight(self._mon_idx, self._move_idx, self._is_player_mon, reset=True)
+            # Update UI immediately for instant feedback
+            self._update_highlight_colors()
+    
+    def _update_highlight_colors(self):
+        """Update highlight colors immediately without full refresh"""
+        if not self._controller.get_show_move_highlights() or not self._is_player_mon:
+            return
+        
+        move = self._controller.get_move_info(self._mon_idx, self._move_idx, self._is_player_mon)
+        if move is None:
+            return
+        
+        highlight_state = self._controller.get_move_highlight_state(self._mon_idx, self._move_idx, self._is_player_mon)
+        
+        # Get default colors
+        try:
+            style = ttk.Style()
+            default_bg = style.lookup("Primary.TFrame", "background") or ""
+            default_fg = style.lookup("Primary.TLabel", "foreground") or ""
+        except Exception:
+            default_bg = ""
+            default_fg = ""
+        
+        # Update colors immediately
+        if highlight_state == 1:
+            # Dark green
+            self.header.configure(bg="#006400")
+            self.move_name_label.configure(background="#006400", foreground="white")
+        elif highlight_state == 2:
+            # Dark blue
+            self.header.configure(bg="#00008B")
+            self.move_name_label.configure(background="#00008B", foreground="white")
+        elif highlight_state == 3:
+            # Dark orange
+            self.header.configure(bg="#FF8C00")
+            self.move_name_label.configure(background="#FF8C00", foreground="white")
+        else:
+            # Default
+            self.header.configure(bg=default_bg)
+            self.move_name_label.configure(background=default_bg, foreground=default_fg)
 
     @staticmethod
     def format_message(kill_info):
@@ -591,14 +779,53 @@ class DamageSummary(ttk.Frame):
             custom_data_options = move.mimic_options
             custom_data_selection = move.mimic_data
 
+        # Check if this is a setup move (stat modifier move)
+        is_setup_move = False
+        max_setup_count = 0
+        if move is not None and self._move_name:
+            stat_mods = current_gen_info().move_db().get_stat_mod(self._move_name)
+            if stat_mods:
+                is_setup_move = True
+                # Determine max count based on stat stage changes
+                # Find the maximum absolute value of stat changes
+                max_stage_change = 0
+                for stat_mod in stat_mods:
+                    max_stage_change = max(max_stage_change, abs(stat_mod[1]))
+                
+                # +2 stages: max 3 uses (to reach +6)
+                # +1 stages: max 6 uses (to reach +6)
+                if max_stage_change >= 2:
+                    max_setup_count = 3
+                elif max_stage_change == 1:
+                    max_setup_count = 6
+        
+        # Get current setup usage count
+        current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
+        
+        # Layout header components
         if custom_data_options:
             self.move_name_label.grid_forget()
             self.move_name_label.grid(row=0, column=0)
-            self.custom_data_dropdown.grid(row=0, column=1)
+            col = 1
+            self.custom_data_dropdown.grid(row=0, column=col)
             self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
+            col += 1
+            if is_setup_move:
+                setup_options = [str(i) for i in range(max_setup_count + 1)]
+                self.setup_move_dropdown.grid(row=0, column=col)
+                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+            else:
+                self.setup_move_dropdown.grid_forget()
         else:
             self.move_name_label.grid_forget()
-            self.move_name_label.grid(row=0, column=0, columnspan=2)
+            if is_setup_move:
+                self.move_name_label.grid(row=0, column=0)
+                setup_options = [str(i) for i in range(max_setup_count + 1)]
+                self.setup_move_dropdown.grid(row=0, column=1)
+                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+            else:
+                self.move_name_label.grid(row=0, column=0, columnspan=2)
+                self.setup_move_dropdown.grid_forget()
             self.custom_data_dropdown.grid_forget()
 
 
@@ -610,6 +837,48 @@ class DamageSummary(ttk.Frame):
             self.crit_pct_damage_range.configure(text="")
         else:
             self.move_name_label.configure(text=f"{move.name}")
+            # Update highlight color based on state - change the header frame background
+            if self._is_player_mon and self._controller.get_show_move_highlights():
+                highlight_state = self._controller.get_move_highlight_state(self._mon_idx, self._move_idx, self._is_player_mon)
+                self.move_name_label.configure(cursor="hand2")
+                # Get default colors for reset
+                try:
+                    style = ttk.Style()
+                    default_bg = style.lookup("Primary.TFrame", "background") or ""
+                    default_fg = style.lookup("Primary.TLabel", "foreground") or ""
+                except Exception:
+                    default_bg = ""
+                    default_fg = ""
+                
+                if highlight_state == 1:
+                    # Dark green - set both header frame and label background
+                    self.header.configure(bg="#006400")
+                    self.move_name_label.configure(background="#006400", foreground="white")
+                elif highlight_state == 2:
+                    # Dark blue - set both header frame and label background
+                    self.header.configure(bg="#00008B")
+                    self.move_name_label.configure(background="#00008B", foreground="white")
+                elif highlight_state == 3:
+                    # Dark orange - set both header frame and label background
+                    self.header.configure(bg="#FF8C00")
+                    self.move_name_label.configure(background="#FF8C00", foreground="white")
+                else:
+                    # Default (reset to style default)
+                    self.header.configure(bg=default_bg)
+                    self.move_name_label.configure(background=default_bg, foreground=default_fg)
+            else:
+                # Reset to default when highlights are disabled
+                if self._is_player_mon:
+                    self.move_name_label.configure(cursor="")
+                try:
+                    style = ttk.Style()
+                    default_bg = style.lookup("Primary.TFrame", "background") or ""
+                    default_fg = style.lookup("Primary.TLabel", "foreground") or ""
+                except Exception:
+                    default_bg = ""
+                    default_fg = ""
+                self.header.configure(bg=default_bg)
+                self.move_name_label.configure(background=default_bg, foreground=default_fg)
             if move.damage_ranges is None:
                 self.damage_range.configure(text="")
                 self.pct_damage_range.configure(text="")
