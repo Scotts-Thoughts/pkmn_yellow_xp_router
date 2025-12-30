@@ -218,12 +218,44 @@ class GenThree(CurrentGen):
         # FireRed/LeafGreen use trainers 8-15 (Kanto gym leaders)
         if self._version_name in [const.FIRE_RED_VERSION, const.LEAF_GREEN_VERSION]:
             return self._major_fights[8:16]
-        # Emerald: Use indices 0-6, then 8 (Juan instead of Wallace)
+        # Emerald: Use indices 0-6, then 7 (Juan at index 7)
         elif self._version_name == const.EMERALD_VERSION:
-            return self._major_fights[:7] + [self._major_fights[8]]
-        # Ruby/Sapphire: Use indices 0-7 (ending with Wallace)
+            return self._major_fights[:8]  # Juan is already at index 7
+        # Ruby/Sapphire: Use indices 0-6, then 16 (Wallace at index 16 for gym leader)
         else:
-            return self._major_fights[:8]
+            return self._major_fights[:7] + [self._major_fights[16]]
+    
+    def get_elite_four_and_champion_names(self) -> List[str]:
+        # FireRed/LeafGreen: Elite Four at indices 72-75, Champion variants at 68-70 and 76
+        if self._version_name in [const.FIRE_RED_VERSION, const.LEAF_GREEN_VERSION]:
+            # Champion variants: Squirtle/Bulbasaur/Charmander at indices 68-70, plus Terry at 76
+            champion_variants = [name for name in self._major_fights if name.startswith("Champion")]
+            return [
+                self._major_fights[72],   # Elite Four Lorelei
+                self._major_fights[73],   # Elite Four Bruno
+                self._major_fights[74],   # Elite Four Agatha
+                self._major_fights[75],   # Elite Four Lance
+                champion_variants,        # All Champion variants
+            ]
+        # Emerald: Elite Four at indices 41-44, Champion at index 45, Steven at index 46
+        elif self._version_name == const.EMERALD_VERSION:
+            return [
+                self._major_fights[41],  # Elite Four Sidney
+                self._major_fights[42],  # Elite Four Phoebe
+                self._major_fights[43],  # Elite Four Glacia
+                self._major_fights[44],  # Elite Four Drake
+                self._major_fights[45],  # Champion Wallace
+                self._major_fights[46],  # Rival Steven
+            ]
+        # Ruby/Sapphire: Elite Four at indices 41-44, Champion at index 45
+        else:
+            return [
+                self._major_fights[41],  # Elite Four Sidney
+                self._major_fights[42],  # Elite Four Phoebe
+                self._major_fights[43],  # Elite Four Glacia
+                self._major_fights[44],  # Elite Four Drake
+                self._major_fights[45],  # Champion Wallace
+            ]
     
     def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         base_options = gen_three_const.CUSTOM_MOVE_DATA.get(move_name)

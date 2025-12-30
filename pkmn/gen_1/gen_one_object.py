@@ -211,6 +211,21 @@ class GenOne(CurrentGen):
         # Gen 1 always uses the first 8 trainers (indices 0-7)
         return self._major_fights[:8]
     
+    def get_elite_four_and_champion_names(self) -> List[str]:
+        # Gen 1: Elite Four at indices 8-11 (Agatha, Bruno, Lorelei, Lance)
+        # Champion: All Rival3 variants (there are multiple depending on rival's team)
+        elite_four = [
+            self._major_fights[8],   # Agatha 1
+            self._major_fights[9],   # Bruno 1
+            self._major_fights[10],  # Lorelei 1
+            self._major_fights[11],  # Lance 1
+        ]
+        # Find all Rival3 variants - they start at different indices
+        # Rival3 Squirtle/Bulbasaur/Charmander at indices 45-47
+        # Rival3 Jolteon/Flareon/Vaporeon at indices 62-64
+        champion_variants = [name for name in self._major_fights if "Rival3" in name]
+        return elite_four + [champion_variants]
+    
     def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         # Gen one moves that require custom data are already handled by the rendering engine
         # Mimc, and all multi-hit moves

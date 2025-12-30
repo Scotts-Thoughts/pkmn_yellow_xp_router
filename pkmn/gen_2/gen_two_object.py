@@ -223,8 +223,23 @@ class GenTwo(CurrentGen):
         return trainer_name in self._major_fights
     
     def get_gym_leader_names(self) -> List[str]:
-        # Gen 2 always uses the first 8 trainers (indices 0-7) - Johto gym leaders
-        return self._major_fights[:8]
+        # Gen 2: Gym leaders in game order (not array order)
+        # Array has them as: Falkner, Whitney, Bugsy, Morty, Chuck, Pryce, Jasmine, Clair
+        # But game order is: Falkner, Bugsy, Whitney, Morty, Chuck, Jasmine, Pryce, Clair
+        return [
+            self._major_fights[0],  # Falkner
+            self._major_fights[2],  # Bugsy
+            self._major_fights[1],  # Whitney
+            self._major_fights[3],  # Morty
+            self._major_fights[4],  # Chuck
+            self._major_fights[6],  # Jasmine
+            self._major_fights[5],  # Pryce
+            self._major_fights[7],  # Clair
+        ]
+    
+    def get_elite_four_and_champion_names(self) -> List[str]:
+        # Gen 2: Elite Four at indices 29-32, Champion at index 33, Red at index 42
+        return self._major_fights[29:34] + [self._major_fights[42]]
     
     def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         return gen_two_const.CUSTOM_MOVE_DATA.get(move_name)

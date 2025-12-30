@@ -402,6 +402,10 @@ class MainWindow(tk.Tk):
         # Gym leader shortcuts (1-8 keys)
         for i in range(1, 9):
             self.bind(f'<Key-{i}>', lambda event, gym_idx=i-1: self.select_gym_leader(gym_idx))
+        # Elite Four and Champion shortcuts (Control+1 through Control+6)
+        # Control+1-4: Elite Four, Control+5: Champion, Control+6: Red (Gen2/HGSS only)
+        for i in range(1, 7):
+            self.bind(f'<Control-Key-{i}>', lambda event, e4_idx=i-1: self.select_elite_four_or_champion(e4_idx))
         # detail update function
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<<TreeviewSelect>>", self._report_new_selection)
@@ -740,6 +744,45 @@ class MainWindow(tk.Tk):
             logger.error(f"Error selecting gym leader: {e}")
         
         return "break"  # Prevent default number key behavior
+    
+    def select_elite_four_or_champion(self, e4_idx):
+        """Select an Elite Four member or Champion by index (0-3 for Elite Four, 4 for Champion)."""
+        # Only work if a route is loaded
+        if self._controller.get_version() is None:
+            return "break"
+        
+        try:
+            # Get the Elite Four and Champion names for the current version
+            from pkmn.gen_factory import current_gen_info
+            e4_and_champion_names = current_gen_info().get_elite_four_and_champion_names()
+            
+            # Check if the index is valid
+            if e4_idx >= len(e4_and_champion_names):
+                return "break"
+            
+            # Get the trainer name(s) for this index
+            trainer_name_or_list = e4_and_champion_names[e4_idx]
+            
+            # Handle both single names and lists of variant names
+            if isinstance(trainer_name_or_list, list):
+                # Multiple variants (e.g., Rival3 Squirtle, Rival3 Jolteon, etc.)
+                # Find the first one that exists in the route
+                event_id = None
+                for variant_name in trainer_name_or_list:
+                    event_id = self._controller.find_first_event_by_trainer_name(variant_name)
+                    if event_id is not None:
+                        break
+            else:
+                # Single trainer name
+                event_id = self._controller.find_first_event_by_trainer_name(trainer_name_or_list)
+            
+            if event_id is not None:
+                # Select this event
+                self._controller.select_new_events([event_id])
+        except Exception as e:
+            logger.error(f"Error selecting Elite Four/Champion: {e}")
+        
+        return "break"  # Prevent default Control+number key behavior
     
     def record_button_clicked(self, event=None):
         """Toggle recording mode - can be called from button, menu, or F1 key."""

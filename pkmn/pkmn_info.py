@@ -111,6 +111,10 @@ class CurrentGen:
     def get_gym_leader_names(self) -> List[str]:
         raise NotImplementedError()
     
+    def get_elite_four_and_champion_names(self) -> List[str]:
+        """Returns a list of 5 trainer names: [E4 member 1, E4 member 2, E4 member 3, E4 member 4, Champion]"""
+        raise NotImplementedError()
+    
     def get_move_custom_data(self, move_name) -> List[str]:
         raise NotImplementedError()
     
