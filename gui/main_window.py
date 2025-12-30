@@ -336,6 +336,7 @@ class MainWindow(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<<TreeviewSelect>>", self._report_new_selection)
         self.bind("<Configure>", self._on_configure)
+        self.bind("<Map>", self._on_window_mapped_focus)
         self.bind(const.ROUTE_LIST_REFRESH_EVENT, self.update_run_status)
         self.bind(const.FORCE_QUIT_EVENT, self.cancel_and_quit)
 
@@ -373,6 +374,9 @@ class MainWindow(tk.Tk):
     def run(self):
         # TODO: is this the right place for it?
         self._controller.load_all_custom_versions()
+        # Ensure window has focus when event loop starts
+        self.update_idletasks()
+        self.after_idle(self._ensure_window_focus)
         self.mainloop()
 
     def _on_configure(self, e):
@@ -684,10 +688,20 @@ class MainWindow(tk.Tk):
     def _ensure_window_focus(self):
         """Ensure the main window has focus."""
         try:
-            self.focus_set()
+            # Lift the window to ensure it's on top
+            self.lift()
+            # Use focus_force() to ensure focus is set even if another window has it
+            # This is important for initial window focus
+            self.focus_force()
         except tk.TclError:
             # Window might have been destroyed, ignore
             pass
+    
+    def _on_window_mapped_focus(self, event=None):
+        """Handle window being mapped (becoming visible) - ensure it has focus."""
+        # Only set focus if this is the main window (not a child widget)
+        if event.widget == self:
+            self.after_idle(self._ensure_window_focus)
     
     def _show_landing_page(self):
         """Show landing page and hide route controls."""
@@ -696,6 +710,9 @@ class MainWindow(tk.Tk):
         self.landing_page.pack(fill=tk.BOTH, expand=True)
         # Refresh landing page route list
         self.landing_page.refresh_routes()
+        # Ensure focus is set on the main window
+        self.update_idletasks()
+        self.after(10, self._ensure_window_focus)
     
     def _show_route_controls(self):
         """Show route controls and hide landing page."""
@@ -703,7 +720,8 @@ class MainWindow(tk.Tk):
         self.new_route_page.pack_forget()
         self.info_panel.pack(expand=True, fill=tk.BOTH)
         # Ensure focus is set on the main window after switching views
-        self.focus_set()
+        self.update_idletasks()
+        self.after(10, self._ensure_window_focus)
     
     def _on_window_mapped(self, event=None):
         """Handle window being mapped (becoming visible) - check for auto-load."""
