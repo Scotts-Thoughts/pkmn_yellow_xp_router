@@ -106,7 +106,7 @@ class MainWindow(tk.Tk):
         self.recording_menu.add_command(label="Enable/Disable Recording", accelerator="F1", command=self.record_button_clicked)
         
         # Battle Summary menu
-        self.battle_summary_menu = tk.Menu(self.top_menu_bar, tearoff=0)
+        self.battle_summary_menu = tk.Menu(self.top_menu_bar, tearoff=0, postcommand=self._update_battle_summary_menu_state)
         # Battle Summary Notes submenu
         self.battle_summary_notes_menu = tk.Menu(self.battle_summary_menu, tearoff=0)
         self.battle_summary_menu.add_cascade(label="Battle Summary Notes", menu=self.battle_summary_notes_menu)
@@ -119,6 +119,29 @@ class MainWindow(tk.Tk):
             variable=self.show_move_highlights_var,
             command=self._toggle_move_highlights
         )
+        # Player Highlight Strategy submenu
+        self.battle_summary_menu.add_separator()
+        self.player_highlight_strategy_menu = tk.Menu(self.battle_summary_menu, tearoff=0)
+        self.player_highlight_strategy_var = tk.StringVar(value=config.get_player_highlight_strategy())
+        for strat in const.ALL_HIGHLIGHT_STRATS:
+            self.player_highlight_strategy_menu.add_radiobutton(
+                label=strat,
+                variable=self.player_highlight_strategy_var,
+                value=strat,
+                command=self._update_player_highlight_strategy
+            )
+        self.battle_summary_menu.add_cascade(label="Player Highlight Strategy", menu=self.player_highlight_strategy_menu)
+        # Enemy Highlight Strategy submenu
+        self.enemy_highlight_strategy_menu = tk.Menu(self.battle_summary_menu, tearoff=0)
+        self.enemy_highlight_strategy_var = tk.StringVar(value=config.get_enemy_highlight_strategy())
+        for strat in const.ALL_HIGHLIGHT_STRATS:
+            self.enemy_highlight_strategy_menu.add_radiobutton(
+                label=strat,
+                variable=self.enemy_highlight_strategy_var,
+                value=strat,
+                command=self._update_enemy_highlight_strategy
+            )
+        self.battle_summary_menu.add_cascade(label="Enemy Highlight Strategy", menu=self.enemy_highlight_strategy_menu)
 
         self.top_menu_bar.add_cascade(label="File", menu=self.file_menu)
         self.top_menu_bar.add_cascade(label="Events", menu=self.event_menu)
@@ -352,6 +375,9 @@ class MainWindow(tk.Tk):
         # Pre-fight rare candy shortcuts
         self.bind('<F4>', self.increment_prefight_candies)
         self.bind('<F3>', self.decrement_prefight_candies)
+        # Battle Summary shortcuts
+        self.bind('<F9>', self.toggle_player_highlight_strategy)
+        self.bind('<F10>', self.toggle_enemy_highlight_strategy)
         # Event actions
         self.bind('<Control-e>', self.move_group_up)
         # detail update function
@@ -561,6 +587,56 @@ class MainWindow(tk.Tk):
     def _update_move_highlights_menu_state(self):
         """Update the menu checkbox state to match the config state."""
         self.show_move_highlights_var.set(config.get_show_move_highlights())
+    
+    def _update_battle_summary_menu_state(self):
+        """Update all Battle Summary menu states to match config (called when menu opens)."""
+        self.show_move_highlights_var.set(config.get_show_move_highlights())
+        self.player_highlight_strategy_var.set(config.get_player_highlight_strategy())
+        self.enemy_highlight_strategy_var.set(config.get_enemy_highlight_strategy())
+    
+    def _update_player_highlight_strategy(self):
+        """Update Player Highlight Strategy setting from menu selection."""
+        config.set_player_highlight_strategy(self.player_highlight_strategy_var.get())
+        # Refresh battle summary if it exists - need full refresh to recalculate best moves
+        if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
+            self.event_details._battle_summary_controller._full_refresh()
+    
+    def _update_enemy_highlight_strategy(self):
+        """Update Enemy Highlight Strategy setting from menu selection."""
+        config.set_enemy_highlight_strategy(self.enemy_highlight_strategy_var.get())
+        # Refresh battle summary if it exists - need full refresh to recalculate best moves
+        if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
+            self.event_details._battle_summary_controller._full_refresh()
+    
+    def toggle_player_highlight_strategy(self, event=None):
+        """Toggle Player Highlight Strategy between Guaranteed Kill and Don't Highlight (F9 shortcut)."""
+        current_strat = config.get_player_highlight_strategy()
+        if current_strat == const.HIGHLIGHT_GUARANTEED_KILL:
+            new_strat = const.HIGHLIGHT_NONE
+        else:
+            new_strat = const.HIGHLIGHT_GUARANTEED_KILL
+        
+        config.set_player_highlight_strategy(new_strat)
+        self.player_highlight_strategy_var.set(new_strat)
+        # Refresh battle summary if it exists - need full refresh to recalculate best moves
+        if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
+            self.event_details._battle_summary_controller._full_refresh()
+        return "break"  # Prevent default F9 behavior
+    
+    def toggle_enemy_highlight_strategy(self, event=None):
+        """Toggle Enemy Highlight Strategy between Guaranteed Kill and Don't Highlight (F10 shortcut)."""
+        current_strat = config.get_enemy_highlight_strategy()
+        if current_strat == const.HIGHLIGHT_GUARANTEED_KILL:
+            new_strat = const.HIGHLIGHT_NONE
+        else:
+            new_strat = const.HIGHLIGHT_GUARANTEED_KILL
+        
+        config.set_enemy_highlight_strategy(new_strat)
+        self.enemy_highlight_strategy_var.set(new_strat)
+        # Refresh battle summary if it exists - need full refresh to recalculate best moves
+        if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
+            self.event_details._battle_summary_controller._full_refresh()
+        return "break"  # Prevent default F10 behavior
     
     def record_button_clicked(self, event=None):
         """Toggle recording mode - can be called from button, menu, or F1 key."""
