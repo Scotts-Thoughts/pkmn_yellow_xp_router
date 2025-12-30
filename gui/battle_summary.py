@@ -1014,16 +1014,16 @@ class DamageSummary(ttk.Frame):
         # Update colors immediately
         if highlight_state == 1:
             # Dark green
-            self.header.configure(bg="#006400")
-            self.move_name_label.configure(background="#006400", foreground="white")
+            self.header.configure(bg="#165416")
+            self.move_name_label.configure(background="#165416", foreground="white")
         elif highlight_state == 2:
             # Dark blue
-            self.header.configure(bg="#00008B")
-            self.move_name_label.configure(background="#00008B", foreground="white")
+            self.header.configure(bg="#212168")
+            self.move_name_label.configure(background="#212168", foreground="white")
         elif highlight_state == 3:
             # Dark orange
-            self.header.configure(bg="#FF8C00")
-            self.move_name_label.configure(background="#FF8C00", foreground="white")
+            self.header.configure(bg="#69400f")
+            self.move_name_label.configure(background="#69400f", foreground="white")
         else:
             # Default
             self.header.configure(bg=default_bg)
