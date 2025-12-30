@@ -641,19 +641,34 @@ class QuickMiscEvents(ttk.LabelFrame):
         self._buttons = ttk.Frame(self)
         self._buttons.pack(fill=tk.BOTH, anchor=tk.CENTER)
         self._btn_width = 8
+        
+        # Configure columns to have equal weight
+        self._buttons.columnconfigure(0, weight=1)
+        self._buttons.columnconfigure(1, weight=1)
 
+        # Column 0
         self._btn_move_tutor = custom_components.SimpleButton(self._buttons, text="Tutor Move", command=self.add_move)
         self._btn_move_tutor.grid(row=0, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
-        self._btn_evolve = custom_components.SimpleButton(self._buttons, text="Evolve", command=self.add_evolve)
-        self._btn_evolve.grid(row=1, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
         self._btn_add_save = custom_components.SimpleButton(self._buttons, text="Add Save", command=self.add_save)
-        self._btn_add_save.grid(row=2, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        self._btn_add_save.grid(row=1, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
         self._btn_add_heal = custom_components.SimpleButton(self._buttons, text="Add Heal", command=self.add_heal)
-        self._btn_add_heal.grid(row=3, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        self._btn_add_heal.grid(row=2, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
         self._btn_add_black_out = custom_components.SimpleButton(self._buttons, text="Add Black Out", command=self.add_black_out)
-        self._btn_add_black_out.grid(row=4, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        self._btn_add_black_out.grid(row=3, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
         self._btn_add_notes = custom_components.SimpleButton(self._buttons, text="Add Notes", command=self.add_notes)
-        self._btn_add_notes.grid(row=5, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        self._btn_add_notes.grid(row=4, column=0, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        
+        # Column 1
+        self._btn_evolve = custom_components.SimpleButton(self._buttons, text="Evolve", command=self.add_evolve)
+        self._btn_evolve.grid(row=0, column=1, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        self._btn_add_candies_2 = custom_components.SimpleButton(self._buttons, text="Add 2 Candies", command=self.add_candies_2)
+        self._btn_add_candies_2.grid(row=1, column=1, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        self._btn_add_candies_3 = custom_components.SimpleButton(self._buttons, text="Add 3 Candies", command=self.add_candies_3)
+        self._btn_add_candies_3.grid(row=2, column=1, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        self._btn_add_candies_5 = custom_components.SimpleButton(self._buttons, text="Add 5 Candies", command=self.add_candies_5)
+        self._btn_add_candies_5.grid(row=3, column=1, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
+        self._btn_add_candies_10 = custom_components.SimpleButton(self._buttons, text="Add 10 Candies", command=self.add_candies_10)
+        self._btn_add_candies_10.grid(row=4, column=1, padx=self.padx, pady=self.pady + 1, sticky=tk.EW)
 
         self.bind(self._controller.register_event_selection(self), self.update_button_status)
         self.bind(self._controller.register_version_change(self), self.update_pkmn_version)
@@ -667,6 +682,10 @@ class QuickMiscEvents(ttk.LabelFrame):
             self._btn_add_heal.disable()
             self._btn_add_black_out.disable()
             self._btn_add_notes.disable()
+            self._btn_add_candies_2.disable()
+            self._btn_add_candies_3.disable()
+            self._btn_add_candies_5.disable()
+            self._btn_add_candies_10.disable()
             return
 
         self._btn_move_tutor.enable()
@@ -675,6 +694,10 @@ class QuickMiscEvents(ttk.LabelFrame):
         self._btn_add_heal.enable()
         self._btn_add_black_out.enable()
         self._btn_add_notes.enable()
+        self._btn_add_candies_2.enable()
+        self._btn_add_candies_3.enable()
+        self._btn_add_candies_5.enable()
+        self._btn_add_candies_10.enable()
     
     def update_pkmn_version(self, *args, **kwargs):
         self._uninitialized = False
@@ -717,4 +740,28 @@ class QuickMiscEvents(ttk.LabelFrame):
 
     def add_notes(self, *args, **kwargs):
         self._controller.new_event(EventDefinition(), insert_after=self._controller.get_single_selected_event_id())
+    
+    def add_candies_2(self, *args, **kwargs):
+        self._controller.new_event(
+            EventDefinition(rare_candy=RareCandyEventDefinition(2)),
+            insert_after=self._controller.get_single_selected_event_id()
+        )
+    
+    def add_candies_3(self, *args, **kwargs):
+        self._controller.new_event(
+            EventDefinition(rare_candy=RareCandyEventDefinition(3)),
+            insert_after=self._controller.get_single_selected_event_id()
+        )
+    
+    def add_candies_5(self, *args, **kwargs):
+        self._controller.new_event(
+            EventDefinition(rare_candy=RareCandyEventDefinition(5)),
+            insert_after=self._controller.get_single_selected_event_id()
+        )
+    
+    def add_candies_10(self, *args, **kwargs):
+        self._controller.new_event(
+            EventDefinition(rare_candy=RareCandyEventDefinition(10)),
+            insert_after=self._controller.get_single_selected_event_id()
+        )
     
