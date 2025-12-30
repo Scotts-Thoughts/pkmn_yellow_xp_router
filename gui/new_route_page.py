@@ -212,6 +212,10 @@ class NewRoutePage(ttk.Frame):
     
     def _populate_game_table(self):
         """Populate the game selection table with all available games."""
+        # Clear existing entries
+        for item in self.game_treeview.get_children():
+            self.game_treeview.delete(item)
+        
         # Get all available games (including custom gens)
         all_games = gen_factory.get_gen_names(real_gens=True, custom_gens=True)
         
@@ -517,6 +521,35 @@ class NewRoutePage(ttk.Frame):
             custom_ability_idx=custom_ability_idx,
             custom_nature=custom_nature
         )
+    
+    def refresh_game_list(self):
+        """Refresh the game list - useful after background loading completes."""
+        # Remember the currently selected game
+        current_selection = None
+        selection = self.game_treeview.selection()
+        if selection:
+            item = selection[0]
+            values = self.game_treeview.item(item, "values")
+            if len(values) > 0:
+                current_selection = values[0]
+        
+        # Repopulate the game table
+        self._populate_game_table()
+        
+        # Try to restore the previous selection, or select first item
+        if current_selection:
+            # Find and select the previously selected game
+            for item in self.game_treeview.get_children():
+                values = self.game_treeview.item(item, "values")
+                if len(values) > 0 and values[0] == current_selection:
+                    self.game_treeview.selection_set(item)
+                    self.game_treeview.focus(item)
+                    break
+        elif len(self.game_treeview.get_children()) > 0:
+            # No previous selection, select first item
+            first_item = self.game_treeview.get_children()[0]
+            self.game_treeview.selection_set(first_item)
+            self.game_treeview.focus(first_item)
     
     def reset_form(self):
         """Resets the form to its initial state."""

@@ -937,6 +937,8 @@ class MainWindow(tk.Tk):
         self.landing_page.pack_forget()
         self.info_panel.pack_forget()
         self.new_route_page.pack(fill=tk.BOTH, expand=True)
+        # Refresh the game list in case background generation loading has completed
+        self.new_route_page.refresh_game_list()
         # Enable loading popup now that page is being shown to user
         self.new_route_page._suppress_loading_popup = False
     
