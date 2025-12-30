@@ -61,7 +61,10 @@ class GenFactory:
             try:
                 base_gen = self._all_gens.get(cur_base_version)
                 if base_gen == None:
-                    raise ValueError(f"Invalid base gen specified: {cur_base_version}")
+                    # Base gen not loaded yet - skip this custom gen for now
+                    # This can happen during startup when generations are loading in background
+                    logger.info(f"Skipping custom gen {cur_custom_gen_name}: base gen {cur_base_version} not loaded yet")
+                    continue
                 self._custom_gens[cur_custom_gen_name] = base_gen.load_custom_gen(
                     cur_custom_gen_name,
                     cur_path

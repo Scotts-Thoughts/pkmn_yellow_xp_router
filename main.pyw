@@ -28,9 +28,13 @@ if __name__ == '__main__':
     if not os.path.exists(config.get_user_data_dir()):
         os.makedirs(config.get_user_data_dir())
     
-    setup.init_base_generations()
+    # Load only default generation first for faster startup
+    # Remaining generations will load in background after window is shown
+    setup.init_default_generation_only()
     controller = MainController()
     app = MainWindow(controller)
+    # Load remaining generations in background after window is created
+    app.after_idle(setup.load_remaining_generations_in_background)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         background_thread = executor.submit(setup.route_startup_check_for_upgrade, app)
 

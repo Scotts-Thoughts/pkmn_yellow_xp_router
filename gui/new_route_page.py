@@ -47,6 +47,7 @@ class NewRoutePage(ttk.Frame):
         self._pkmn_list_cache = {}  # Cache pokemon lists per game/filter combination: (game, filter) -> list
         self._last_pkmn_filter = ""  # Track last filter to avoid unnecessary updates
         self._loading_popup = None  # Loading popup window
+        self._suppress_loading_popup = True  # Suppress popup during initial startup
         
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -253,6 +254,8 @@ class NewRoutePage(ttk.Frame):
         """Show loading popup."""
         if self._loading_popup is not None:
             return  # Already showing
+        if self._suppress_loading_popup:
+            return  # Suppressed during startup
         
         # Get the main window (parent of parent)
         main_window = self.winfo_toplevel()
@@ -428,6 +431,8 @@ class NewRoutePage(ttk.Frame):
         """Update DV frame and hide loading popup."""
         self.custom_dvs_frame.config_for_target_game_and_mon(gen_obj, pokemon)
         self._hide_loading_popup()
+        # Enable popup for future use after initial setup
+        self._suppress_loading_popup = False
     
     def _pkmn_filter_callback(self, *args, **kwargs):
         """Handle pokemon filter change."""

@@ -610,19 +610,19 @@ class BattleSummaryController:
                         level_up_mon_idx = idx
                         break
                 
-                    # If a level-up occurred, clear badge boosts from base_modifier for Pokemon AFTER the level-up
-                    # (level-up removes all erroneously applied badge boosts)
-                    # Note: Badge boosts still apply to the Pokemon where the level-up occurs
-                    base_attack_bb = 0
-                    base_defense_bb = 0
-                    base_speed_bb = 0
-                    base_special_bb = 0
-                    if level_up_mon_idx is None or mon_idx <= level_up_mon_idx:
-                        # No level-up yet, or calculating for Pokemon up to and including the level-up - preserve base badge boosts
-                        base_attack_bb = base_modifier.attack_badge_boosts
-                        base_defense_bb = base_modifier.defense_badge_boosts
-                        base_speed_bb = base_modifier.speed_badge_boosts
-                        base_special_bb = base_modifier.special_badge_boosts
+                # If a level-up occurred, clear badge boosts from base_modifier for Pokemon AFTER the level-up
+                # (level-up removes all erroneously applied badge boosts)
+                # Note: Badge boosts still apply to the Pokemon where the level-up occurs
+                base_attack_bb = 0
+                base_defense_bb = 0
+                base_speed_bb = 0
+                base_special_bb = 0
+                if level_up_mon_idx is None or mon_idx <= level_up_mon_idx:
+                    # No level-up yet, or calculating for Pokemon up to and including the level-up - preserve base badge boosts
+                    base_attack_bb = base_modifier.attack_badge_boosts
+                    base_defense_bb = base_modifier.defense_badge_boosts
+                    base_speed_bb = base_modifier.speed_badge_boosts
+                    base_special_bb = base_modifier.special_badge_boosts
                 
                 # Combine stage modifiers and badge boosts separately
                 # Badge boosts from accumulated modifiers are the ones we care about (from per-move setup usage)
@@ -1158,6 +1158,10 @@ class BattleSummaryController:
             cur_move_data = self._enemy_move_data
 
         if pkmn_idx < 0 or pkmn_idx >= len(cur_move_data) or move_idx < 0 or move_idx >= 4:
+            return None
+        
+        # Check if the inner list has enough elements
+        if move_idx >= len(cur_move_data[pkmn_idx]):
             return None
         
         return cur_move_data[pkmn_idx][move_idx]

@@ -1,7 +1,6 @@
 import os
 import threading
 import logging
-import time
 
 import tkinter as tk
 from tkinter import ttk, font, messagebox
@@ -420,8 +419,25 @@ class MainWindow(tk.Tk):
             self._show_landing_page()
 
     def run(self):
-        # TODO: is this the right place for it?
-        self._controller.load_all_custom_versions()
+        # Load custom versions after background generations finish loading
+        # Use after_idle to ensure it happens after the window is shown
+        def _load_custom_versions_after_background():
+            # Wait a bit for background loading to complete, then load custom gens
+            # Custom gen loading will skip any whose base gens aren't ready yet
+            import time
+            from utils import setup
+            # Give background thread a moment to start
+            time.sleep(0.1)
+            # Try to wait for background loading (with timeout)
+            setup.wait_for_background_loading_complete(timeout=5)
+            # Now load custom versions (will skip any whose base gens aren't ready)
+            try:
+                self._controller.load_all_custom_versions()
+            except Exception as e:
+                # Log but don't crash - custom gens will be skipped if base gens aren't ready
+                logger.warning(f"Some custom gens couldn't be loaded: {e}")
+        
+        self.after_idle(_load_custom_versions_after_background)
         # Ensure window has focus when event loop starts
         self.update_idletasks()
         self.after_idle(self._ensure_window_focus)
@@ -429,7 +445,8 @@ class MainWindow(tk.Tk):
 
     def _on_configure(self, e):
         if e.widget == self:
-            time.sleep(0.015)
+            # Removed sleep - was causing lag on window resize
+            pass
     
     def _on_close(self, *args, **kwargs):
         # Save window geometry and state
@@ -761,6 +778,8 @@ class MainWindow(tk.Tk):
         self.landing_page.pack_forget()
         self.info_panel.pack_forget()
         self.new_route_page.pack(fill=tk.BOTH, expand=True)
+        # Enable loading popup now that page is being shown to user
+        self.new_route_page._suppress_loading_popup = False
     
     def _cancel_new_route_page(self):
         """Handle cancel from new route page - return to route if one was loaded, otherwise landing page."""
