@@ -91,7 +91,15 @@ class CheckboxTreeview(ttk.Treeview):
         elem = widget.identify("element", x, y)
         if "image" in elem:
             # a box was clicked
-            self.trigger_checkbox(single_item=self.identify_row(y))
+            # Save the current selection before toggling the checkbox
+            current_selection = list(self.selection())
+            clicked_item = self.identify_row(y)
+            # Toggle the checkbox
+            self.trigger_checkbox(single_item=clicked_item)
+            # Restore the original selection (preventing the clicked item from being selected)
+            self.selection_set(current_selection)
+            # Return "break" to prevent the default selection behavior
+            return "break"
     
     def trigger_checkbox(self, single_item=None):
         if single_item is None:
