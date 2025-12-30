@@ -35,9 +35,32 @@ class BattleSummary(ttk.Frame):
         self._custom_move_data = None
         self._loading = False
 
-        self._base_frame = ttk.Frame(self)
-        self._base_frame.grid(row=0, column=0, sticky=tk.NSEW)
+        # Create canvas and scrollbar for scrolling when notes are always shown
+        self._canvas = tk.Canvas(self, highlightthickness=0)
+        self._scrollbar = ttk.Scrollbar(self, orient="vertical", command=self._canvas.yview)
+        self._canvas.configure(yscrollcommand=self._scrollbar.set)
+        
+        self._base_frame = ttk.Frame(self._canvas)
+        self._canvas_window = self._canvas.create_window((0, 0), window=self._base_frame, anchor="nw")
+        
+        # Initially grid without scrollbar
+        self._canvas.grid(row=0, column=0, sticky=tk.NSEW)
+        self._scrollbar.grid(row=0, column=1, sticky=tk.NS)
+        self._scrollbar.grid_remove()  # Hide scrollbar initially
+        
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        
         self._base_frame.columnconfigure(0, weight=1)
+        
+        # Bind canvas resize to update scroll region
+        self._canvas.bind('<Configure>', self._on_canvas_configure)
+        self._base_frame.bind('<Configure>', self._on_frame_configure)
+        
+        # Bind mouse wheel scrolling to canvas
+        self._canvas.bind('<MouseWheel>', self._on_mousewheel)
+        self._canvas.bind('<Button-4>', self._on_mousewheel)  # Linux scroll up
+        self._canvas.bind('<Button-5>', self._on_mousewheel)  # Linux scroll down
 
         self._top_bar = ttk.Frame(self._base_frame)
         self._top_bar.grid(row=0, column=0, sticky=tk.EW)
@@ -89,15 +112,77 @@ class BattleSummary(ttk.Frame):
         self.setup_moves.configure_moves(possible_setup_moves)
         self.enemy_setup_moves.configure_moves(possible_setup_moves)
     
+    def _on_canvas_configure(self, event):
+        """Update canvas scroll region when canvas is resized."""
+        self._canvas.itemconfig(self._canvas_window, width=event.width)
+        self._update_scroll_region()
+    
+    def _on_frame_configure(self, event):
+        """Update canvas scroll region when frame content changes."""
+        self._update_scroll_region()
+    
+    def _update_scroll_region(self):
+        """Update the scrollable region of the canvas."""
+        self._canvas.update_idletasks()
+        bbox = self._canvas.bbox("all")
+        if bbox:
+            self._canvas.config(scrollregion=bbox)
+    
+    def _on_mousewheel(self, event):
+        """Handle mouse wheel scrolling on canvas."""
+        # Only scroll if scrollbar is visible
+        if self._scrollbar.winfo_viewable():
+            # Windows and Mac
+            if event.delta:
+                self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            # Linux
+            elif event.num == 4:
+                self._canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                self._canvas.yview_scroll(1, "units")
+    
+    def enable_scrollbar(self):
+        """Enable scrollbar for battle summary content only if content exceeds visible area."""
+        self._update_scroll_region()
+        # Check if scrolling is actually needed - use after_idle to ensure layout is complete
+        self._canvas.after_idle(self._check_and_enable_scrollbar)
+    
+    def _check_and_enable_scrollbar(self):
+        """Check if scrollbar is needed and enable/disable accordingly."""
+        self._canvas.update_idletasks()
+        canvas_height = self._canvas.winfo_height()
+        bbox = self._canvas.bbox("all")
+        
+        if bbox and canvas_height > 0:
+            content_height = bbox[3] - bbox[1]  # bottom - top
+            # Only show scrollbar if content is taller than canvas (with small threshold to avoid flicker)
+            if content_height > canvas_height + 5:  # 5px threshold
+                self._scrollbar.grid(row=0, column=1, sticky=tk.NS)
+                self.columnconfigure(1, weight=0)  # Don't expand scrollbar column
+            else:
+                self._scrollbar.grid_remove()
+                # Reset scroll position to top when scrollbar is hidden
+                self._canvas.yview_moveto(0.0)
+        else:
+            self._scrollbar.grid_remove()
+            self._canvas.yview_moveto(0.0)
+    
+    def disable_scrollbar(self):
+        """Disable scrollbar for battle summary content."""
+        self._scrollbar.grid_remove()
+        self._update_scroll_region()
+    
     def hide_contents(self):
         self.should_render = False
-        self._base_frame.grid_forget()
+        self._canvas.grid_forget()
+        self._scrollbar.grid_remove()
     
     def show_contents(self):
         self.should_render = True
-        self._base_frame.grid_forget()
+        self._canvas.grid_forget()
         self._on_full_refresh()
-        self._base_frame.grid(row=0, column=0, sticky=tk.NSEW)
+        self._canvas.grid(row=0, column=0, sticky=tk.NSEW)
+        self._update_scroll_region()
 
     def _launch_config_popup(self, *args, **kwargs):
         BattleConfigWindow(self.winfo_toplevel(), battle_controller=self._controller)
@@ -166,6 +251,8 @@ class BattleSummary(ttk.Frame):
                 self._mon_pairs[idx].update_rendering()
 
         self._loading = False
+        # Update scroll region after rendering
+        self._update_scroll_region()
     
     def get_content_bounding_box(self):
         """Get bounding box that includes only visible content, excluding blank space at bottom."""

@@ -104,11 +104,19 @@ class MainWindow(tk.Tk):
 
         self.recording_menu = tk.Menu(self.top_menu_bar, tearoff=0)
         self.recording_menu.add_command(label="Enable/Disable Recording", accelerator="F1", command=self.record_button_clicked)
+        
+        # Battle Summary menu
+        self.battle_summary_menu = tk.Menu(self.top_menu_bar, tearoff=0)
+        # Battle Summary Notes submenu
+        self.battle_summary_notes_menu = tk.Menu(self.battle_summary_menu, tearoff=0)
+        self.battle_summary_menu.add_cascade(label="Battle Summary Notes", menu=self.battle_summary_notes_menu)
+        self._update_battle_summary_notes_menu()
 
         self.top_menu_bar.add_cascade(label="File", menu=self.file_menu)
         self.top_menu_bar.add_cascade(label="Events", menu=self.event_menu)
         self.top_menu_bar.add_cascade(label="Folders", menu=self.folder_menu)
         self.top_menu_bar.add_cascade(label="Recording", menu=self.recording_menu)
+        self.top_menu_bar.add_cascade(label="Battle Summary", menu=self.battle_summary_menu)
 
         # main container for everything to sit in... might be unnecessary?
         self.primary_window = ttk.Frame(self)
@@ -501,6 +509,40 @@ class MainWindow(tk.Tk):
             background=const.VERSION_COLORS.get(self._controller.get_version(), "white")
         )
         self.record_button.enable()
+    
+    def _update_battle_summary_notes_menu(self):
+        """Update the battle summary notes menu with current selection."""
+        # Clear existing items
+        self.battle_summary_notes_menu.delete(0, tk.END)
+        
+        current_mode = config.get_notes_visibility_mode()
+        options = [
+            ("Show notes in battle summary when space allows", "when_space_allows"),
+            ("Show notes in battle summary at all times", "always"),
+            ("Never show notes in battle summary", "never")
+        ]
+        
+        for label, mode in options:
+            is_selected = (current_mode == mode)
+            self.battle_summary_notes_menu.add_command(
+                label=("✓ " if is_selected else "  ") + label,
+                command=lambda m=mode: self._set_battle_summary_notes_mode(m)
+            )
+    
+    def _set_battle_summary_notes_mode(self, mode):
+        """Set the battle summary notes visibility mode."""
+        config.set_notes_visibility_mode(mode)
+        self._update_battle_summary_notes_menu()
+        # Trigger update in event details if it exists
+        if hasattr(self, 'event_details'):
+            self.event_details._update_notes_visibility_in_battle_summary()
+        # Update dropdown in notes editor if it exists
+        if hasattr(self, 'event_details') and hasattr(self.event_details, 'trainer_notes'):
+            try:
+                if hasattr(self.event_details.trainer_notes, '_load_visibility_setting'):
+                    self.event_details.trainer_notes._load_visibility_setting()
+            except Exception:
+                pass
     
     def record_button_clicked(self, event=None):
         """Toggle recording mode - can be called from button, menu, or F1 key."""
