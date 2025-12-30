@@ -779,6 +779,9 @@ class InventoryChangeState(WatchForResetState):
         # Set it to True if we are getting flagged for it externally. Otherwise set it to False
         self._held_item_changed = self.external_held_item_flag
         self.external_held_item_flag = False
+        
+        # Note: EVs are cached in OverworldState (machine._cached_evs) BEFORE we enter this state
+        # This is crucial because EV changes happen BEFORE inventory changes are detected
     
     def _on_exit(self, next_state: State):
         if next_state.state_type != StateType.RESETTING:
@@ -787,12 +790,38 @@ class InventoryChangeState(WatchForResetState):
             if next_state.state_type == StateType.RARE_CANDY:
                 return
             
+            # If transitioning to VITAMIN state, skip item cache update here
+            # UseVitaminState._on_exit will handle it with vitamin_flag=True
+            if next_state.state_type == StateType.VITAMIN:
+                return
+            
+            # Check if EVs changed by comparing machine's cached EVs (from overworld) with current EVs
+            # Machine's cached_evs were captured in OverworldState BEFORE the EV change happened
+            current_evs = {
+                'hp': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]).value,
+                'attack': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]).value,
+                'defense': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]).value,
+                'speed': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]).value,
+                'special_attack': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]).value,
+                'special_defense': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]).value,
+            }
+            
+            evs_changed = any(
+                current_evs[stat] != self.machine._cached_evs.get(stat) 
+                for stat in current_evs.keys() 
+                if self.machine._cached_evs.get(stat) is not None and current_evs[stat] is not None
+            )
+            
             logger.info(f"InventoryChangeState._on_exit: old_cache = {self.machine._cached_items}")
+            logger.info(f"InventoryChangeState._on_exit: cached EVs = {self.machine._cached_evs}, current EVs = {current_evs}, changed = {evs_changed}")
+            
+            # Use vitamin_flag if EVs changed
             self.machine._item_cache_update(
                 sale_expected=self._money_gained,
                 purchase_expected=self._money_lost,
                 money_change_amount=self._money_change_amount,
-                held_item_changed=self._held_item_changed
+                held_item_changed=self._held_item_changed,
+                vitamin_flag=evs_changed
             )
     
     @auto_reset
@@ -811,6 +840,19 @@ class InventoryChangeState(WatchForResetState):
             # Check if level increased - this indicates rare candy usage
             if prev_prop.value is not None and new_prop.value is not None and new_prop.value > prev_prop.value:
                 return StateType.RARE_CANDY
+        elif new_prop.path in gh_gen_four_const.ALL_KEYS_STAT_EXP:
+            # Check if any EV changed - this indicates vitamin usage
+            # We only care about the solo mon (slot 0)
+            if (
+                new_prop.path == gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0] or
+                new_prop.path == gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0] or
+                new_prop.path == gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0] or
+                new_prop.path == gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0] or
+                new_prop.path == gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0] or
+                new_prop.path == gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]
+            ):
+                if prev_prop.value is not None and new_prop.value is not None and new_prop.value != prev_prop.value:
+                    return StateType.VITAMIN
         elif new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
             if self._seconds_delay <= 0:
                 return StateType.OVERWORLD
@@ -923,12 +965,40 @@ class UseVitaminState(WatchForResetState):
         self._item_removal_detected = False
         self._cur_delay = self.BASE_DELAY
         self._error_delay = self.ERROR_DELAY
+        # Note: Don't cache EVs here - they've already changed by the time we enter this state
+        # Use machine's cached EVs from OverworldState instead (cached BEFORE the change)
+        logger.info(f"Vitamin state entered. Machine's cached EVs (from before change): {self.machine._cached_evs}")
     
     def _on_exit(self, next_state: State):
         if next_state.state_type != StateType.RESETTING:
             if self._error_delay <= 0:
                 logger.error(f"Vitamin state hit error timeout. Will attempt to see if any vitamins were used anyways")
-            self.machine._item_cache_update(vitamin_flag=True)
+            
+            # Check if EVs changed by comparing machine's cached EVs (from overworld) with current EVs
+            # Machine's cached_evs were captured in OverworldState BEFORE the EV change happened
+            current_evs = {
+                'hp': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]).value,
+                'attack': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]).value,
+                'defense': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]).value,
+                'speed': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]).value,
+                'special_attack': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]).value,
+                'special_defense': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]).value,
+            }
+            logger.info(f"Vitamin state exiting. Cached EVs (from overworld): {self.machine._cached_evs}, Current EVs: {current_evs}")
+            
+            # Check if any EV changed by comparing with machine's cached EVs
+            evs_changed = any(
+                current_evs[stat] != self.machine._cached_evs.get(stat) 
+                for stat in current_evs.keys() 
+                if self.machine._cached_evs.get(stat) is not None and current_evs[stat] is not None
+            )
+            
+            if evs_changed:
+                logger.info(f"EVs changed, vitamin was applied")
+                self.machine._item_cache_update(vitamin_flag=True)
+            else:
+                logger.info(f"EVs did not change, vitamin was dropped/sold")
+                self.machine._item_cache_update(vitamin_flag=False)
     
     @auto_reset
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
@@ -1064,6 +1134,20 @@ class OverworldState(WatchForResetState):
                     self.machine._blackout_defeated_trainer_mons = []
                     self.machine._blackout_trainer_name = ""
                     self.machine._blackout_initial_map = None
+        
+        # Cache current EVs for vitamin detection (cache early in overworld, before inventory changes)
+        self._update_ev_cache()
+    
+    def _update_ev_cache(self):
+        """Update the machine's EV cache for vitamin detection"""
+        self.machine._cached_evs = {
+            'hp': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]).value,
+            'attack': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]).value,
+            'defense': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]).value,
+            'speed': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]).value,
+            'special_attack': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]).value,
+            'special_defense': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]).value,
+        }
     
     def _on_exit(self, next_state: State):
         if isinstance(next_state, InventoryChangeState):
@@ -1246,6 +1330,9 @@ class OverworldState(WatchForResetState):
                     return StateType.MOVE_DELETE
                 else:
                     return StateType.TM
+        # Note: EV changes are now handled in InventoryChangeState (for vitamins)
+        # This is similar to how rare candy is handled - item change triggers INVENTORY_CHANGE,
+        # then level/EV change triggers RARE_CANDY/VITAMIN state
         # elif new_prop.path in gh_gen_four_const.ALL_KEYS_STAT_EXP:
         #     if not self._waiting_for_registration and not self._wrong_mon_in_slot_1:
         #         return StateType.VITAMIN
@@ -1314,6 +1401,9 @@ class OverworldState(WatchForResetState):
             elif self._validation_delay == 0:
                 #self._validate()
                 self._validation_delay -= 1
+            
+            # Update EV cache every game second for vitamin detection
+            self._update_ev_cache()
 
             if (
                 self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value == 'Battle' and

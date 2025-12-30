@@ -40,6 +40,12 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_PLAYER_TEAM_IV_SPEED           = [f"player.team.{i}.ivs.speed" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_ATTACK  = [f"player.team.{i}.ivs.special_attack" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_DEFENSE = [f"player.team.{i}.ivs.special_defense" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_EV_HP              = [f"player.team.{i}.evs.hp" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_EV_ATTACK          = [f"player.team.{i}.evs.attack" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE         = [f"player.team.{i}.evs.defense" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_EV_SPEED           = [f"player.team.{i}.evs.speed" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK  = [f"player.team.{i}.evs.special_attack" for i in range(0, 6)]
+        self.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE = [f"player.team.{i}.evs.special_defense" for i in range(0, 6)]
 
         self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.moves.0.move"
         self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.moves.1.move"

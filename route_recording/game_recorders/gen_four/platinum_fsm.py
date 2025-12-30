@@ -96,6 +96,7 @@ class Machine:
         self._cached_items = {}
         self._cached_moves = [None, None, None, None]
         self._cached_money = 0
+        self._cached_evs = {}  # Cache EVs from overworld to detect vitamin usage
 
         # Blackout detection flags and cached Pokemon (passed from BattleState to OverworldState)
         self._potential_blackout_flag = False
