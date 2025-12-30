@@ -104,6 +104,8 @@ class NotesEditor(EventEditorBase):
 
         self._notes = custom_components.SimpleText(self, height=8)
         self._notes.bind("<<TextModified>>", self._trigger_delayed_save)
+        # Prevent Delete key from deleting the current event when notes area is focused
+        self._notes.bind('<Delete>', lambda e: "break")
         self._notes.grid(row=self._cur_row, column=0, columnspan=4, sticky=tk.EW, padx=5, pady=(2, 2))
         self._cur_row += 1
 
