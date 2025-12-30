@@ -603,12 +603,31 @@ class DamageSummary(ttk.Frame):
         self.pady = 0
         self.row_idx = 0
 
-        self.header = ttk.Frame(self, style="Primary.TFrame")
+        # Use tk.Frame instead of ttk.Frame to support background colors for highlights
+        # Get the primary color from the theme for default background
+        try:
+            # Try to get the primary color from the style
+            style = ttk.Style()
+            bg_color = style.lookup("Primary.TFrame", "background")
+            fg_color = style.lookup("Primary.TLabel", "foreground")
+            if not bg_color:
+                bg_color = ""
+            if not fg_color:
+                fg_color = ""
+        except Exception:
+            bg_color = ""
+            fg_color = ""
+        
+        self.header = tk.Frame(self, bg=bg_color)
         self.header.grid(row=self.row_idx, column=0, sticky=tk.NSEW, padx=self.padx, pady=self.pady)
         self.header.columnconfigure(0, weight=1)
         self.row_idx += 1
-
-        self.move_name_label = ttk.Label(self.header, style="BattleMovePrimary.TLabel")
+        
+        self.move_name_label = tk.Label(self.header, bg=bg_color, fg=fg_color, anchor="center", padx=0, pady=4)
+        # Make player move labels clickable for highlights (cursor will be updated when highlights are enabled)
+        if self._is_player_mon:
+            self.move_name_label.bind("<Button-1>", self._on_move_name_click)
+            self.move_name_label.bind("<Button-3>", self._on_move_name_right_click)  # Right-click to reset
         self.custom_data_dropdown = custom_components.SimpleOptionMenu(self.header, [""], callback=self._custom_data_callback, width=14)
         # Also bind to <<ComboboxSelected>> event as a backup to ensure callback fires
         self.custom_data_dropdown.bind("<<ComboboxSelected>>", self._custom_data_callback)
@@ -655,6 +674,64 @@ class DamageSummary(ttk.Frame):
             self._controller.update_mimic_selection(self.custom_data_dropdown.get())
         else:
             self._controller.update_custom_move_data(self._mon_idx, self._move_idx, self._is_player_mon, self.custom_data_dropdown.get())
+
+    def _on_move_name_click(self, event):
+        """Handle click on move name to cycle highlight state"""
+        if not self._controller.get_show_move_highlights():
+            return
+        if self._is_player_mon:
+            # Update state in controller
+            self._controller.update_move_highlight(self._mon_idx, self._move_idx, self._is_player_mon, reset=False)
+            # Update UI immediately for instant feedback
+            self._update_highlight_colors()
+    
+    def _on_move_name_right_click(self, event):
+        """Handle right-click on move name to reset highlight state"""
+        if not self._controller.get_show_move_highlights():
+            return
+        if self._is_player_mon:
+            # Update state in controller
+            self._controller.update_move_highlight(self._mon_idx, self._move_idx, self._is_player_mon, reset=True)
+            # Update UI immediately for instant feedback
+            self._update_highlight_colors()
+    
+    def _update_highlight_colors(self):
+        """Update highlight colors immediately without full refresh"""
+        if not self._controller.get_show_move_highlights() or not self._is_player_mon:
+            return
+        
+        move = self._controller.get_move_info(self._mon_idx, self._move_idx, self._is_player_mon)
+        if move is None:
+            return
+        
+        highlight_state = self._controller.get_move_highlight_state(self._mon_idx, self._move_idx, self._is_player_mon)
+        
+        # Get default colors
+        try:
+            style = ttk.Style()
+            default_bg = style.lookup("Primary.TFrame", "background") or ""
+            default_fg = style.lookup("Primary.TLabel", "foreground") or ""
+        except Exception:
+            default_bg = ""
+            default_fg = ""
+        
+        # Update colors immediately
+        if highlight_state == 1:
+            # Dark green
+            self.header.configure(bg="#006400")
+            self.move_name_label.configure(background="#006400", foreground="white")
+        elif highlight_state == 2:
+            # Dark blue
+            self.header.configure(bg="#00008B")
+            self.move_name_label.configure(background="#00008B", foreground="white")
+        elif highlight_state == 3:
+            # Dark orange
+            self.header.configure(bg="#FF8C00")
+            self.move_name_label.configure(background="#FF8C00", foreground="white")
+        else:
+            # Default
+            self.header.configure(bg=default_bg)
+            self.move_name_label.configure(background=default_bg, foreground=default_fg)
 
     @staticmethod
     def format_message(kill_info):
@@ -711,6 +788,48 @@ class DamageSummary(ttk.Frame):
             self.crit_pct_damage_range.configure(text="")
         else:
             self.move_name_label.configure(text=f"{move.name}")
+            # Update highlight color based on state - change the header frame background
+            if self._is_player_mon and self._controller.get_show_move_highlights():
+                highlight_state = self._controller.get_move_highlight_state(self._mon_idx, self._move_idx, self._is_player_mon)
+                self.move_name_label.configure(cursor="hand2")
+                # Get default colors for reset
+                try:
+                    style = ttk.Style()
+                    default_bg = style.lookup("Primary.TFrame", "background") or ""
+                    default_fg = style.lookup("Primary.TLabel", "foreground") or ""
+                except Exception:
+                    default_bg = ""
+                    default_fg = ""
+                
+                if highlight_state == 1:
+                    # Dark green - set both header frame and label background
+                    self.header.configure(bg="#006400")
+                    self.move_name_label.configure(background="#006400", foreground="white")
+                elif highlight_state == 2:
+                    # Dark blue - set both header frame and label background
+                    self.header.configure(bg="#00008B")
+                    self.move_name_label.configure(background="#00008B", foreground="white")
+                elif highlight_state == 3:
+                    # Dark orange - set both header frame and label background
+                    self.header.configure(bg="#FF8C00")
+                    self.move_name_label.configure(background="#FF8C00", foreground="white")
+                else:
+                    # Default (reset to style default)
+                    self.header.configure(bg=default_bg)
+                    self.move_name_label.configure(background=default_bg, foreground=default_fg)
+            else:
+                # Reset to default when highlights are disabled
+                if self._is_player_mon:
+                    self.move_name_label.configure(cursor="")
+                try:
+                    style = ttk.Style()
+                    default_bg = style.lookup("Primary.TFrame", "background") or ""
+                    default_fg = style.lookup("Primary.TLabel", "foreground") or ""
+                except Exception:
+                    default_bg = ""
+                    default_fg = ""
+                self.header.configure(bg=default_bg)
+                self.move_name_label.configure(background=default_bg, foreground=default_fg)
             if move.damage_ranges is None:
                 self.damage_range.configure(text="")
                 self.pct_damage_range.configure(text="")

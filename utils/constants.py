@@ -142,6 +142,7 @@ class Constants:
         self.ENEMY_FIELD_MOVES_KEY = "enemy_field_moves"
         self.MIMIC_SELECTION = "mimic_selection"
         self.CUSTOM_MOVE_DATA = "custom_move_data"
+        self.MOVE_HIGHLIGHTS = "move_highlights"
         self.EXP_SPLIT = "exp_split"
         self.WEATHER = "weather"
         self.PAY_DAY_AMOUNT = "pay_day_amount"
@@ -309,6 +310,7 @@ class Constants:
         self.IGNORE_ACCURACY_IN_DAMAGE_CALCS = "ignore_accuracy_in_damage_calcs"
         self.DAMAGE_SEARCH_DEPTH = "damage_search_depth"
         self.FORCE_FULL_SEARCH = "force_full_search"
+        self.SHOW_MOVE_HIGHLIGHTS = "show_move_highlights"
 
         self.CUSTOM_FONT_NAME_KEY = "custom_font_name"
         self.DEBUG_MODE_KEY = "debug_mode"

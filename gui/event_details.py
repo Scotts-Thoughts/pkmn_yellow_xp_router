@@ -93,7 +93,7 @@ class EventDetails(ttk.Frame):
         self.bind(self._controller.register_record_mode_change(self), self._handle_selection)
         self.bind(self._controller.register_route_change(self), self._handle_route_change)
         self.bind(self._controller.register_version_change(self), self._handle_version_change)
-        self.bind(self._battle_summary_controller.register_nonload_change(self), self.update_existing_event)
+        self.bind(self._battle_summary_controller.register_nonload_change(self), self.update_existing_event_after_delay)
         # Bind to battle summary refresh to update notes visibility when matchups change
         self.bind(self._battle_summary_controller.register_refresh(self), self._on_battle_summary_refresh)
         self._controller.register_pre_save_hook(self.force_and_clear_event_update)

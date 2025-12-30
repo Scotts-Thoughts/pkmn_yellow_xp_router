@@ -73,6 +73,7 @@ class BattleSummaryController:
         self._mimic_options:List[str] = []
         self._player_mimic_selection:str = ""
         self._custom_move_data:List[Dict[str, Dict[str, str]]] = []
+        self._move_highlights:List[Dict[str, Dict[str, int]]] = []
         self._cached_definition_order = []
         self._weather = None
         self._double_battle_flag = False
@@ -204,6 +205,128 @@ class BattleSummaryController:
             )
         
         self._full_refresh()
+
+    def get_show_move_highlights(self) -> bool:
+        return config.get_show_move_highlights()
+
+    def update_move_highlight(self, pkmn_idx:int, move_idx:int, is_player_mon:bool, reset=False):
+        """Cycle through highlight states: 0 (default) -> 1 (dark green) -> 2 (dark blue) -> 3 (dark orange) -> 0
+        If reset=True, immediately set to 0 (default)"""
+        if self._event_group_id is None:
+            return
+        
+        # Get the move name
+        if is_player_mon:
+            move_data = self._player_move_data
+        else:
+            move_data = self._enemy_move_data
+        
+        if pkmn_idx < 0 or pkmn_idx >= len(move_data) or move_idx < 0 or move_idx >= len(move_data[pkmn_idx]):
+            return
+        
+        move_info = move_data[pkmn_idx][move_idx]
+        if move_info is None:
+            return
+        
+        move_name = move_info.name
+        
+        # Ensure move_highlights structure exists
+        while len(self._move_highlights) <= pkmn_idx:
+            self._move_highlights.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+        
+        lookup_key = const.PLAYER_KEY if is_player_mon else const.ENEMY_KEY
+        current_state = self._move_highlights[pkmn_idx][lookup_key].get(move_name, 0)
+        
+        if reset:
+            # Reset to default immediately
+            new_state = 0
+        else:
+            # Cycle: 0 -> 1 -> 2 -> 3 -> 0
+            new_state = (current_state + 1) % 4
+        
+        self._move_highlights[pkmn_idx][lookup_key][move_name] = new_state
+        
+        # Trigger nonload change for delayed save (don't refresh immediately - UI updates directly)
+        self._on_nonload_change()
+
+    def get_move_highlight_state(self, pkmn_idx:int, move_idx:int, is_player_mon:bool) -> int:
+        """Get highlight state for a move: 0 (default), 1 (dark green), 2 (dark blue), 3 (dark orange)"""
+        if pkmn_idx < 0 or pkmn_idx >= len(self._move_highlights):
+            return 0
+        
+        # Get the move name
+        if is_player_mon:
+            move_data = self._player_move_data
+        else:
+            move_data = self._enemy_move_data
+        
+        if move_idx < 0 or move_idx >= len(move_data[pkmn_idx]) or move_data[pkmn_idx][move_idx] is None:
+            return 0
+        
+        move_name = move_data[pkmn_idx][move_idx].name
+        lookup_key = const.PLAYER_KEY if is_player_mon else const.ENEMY_KEY
+        
+        return self._move_highlights[pkmn_idx][lookup_key].get(move_name, 0)
+
+    def _save_move_highlights_to_event(self):
+        """Save move highlights to the current event - called via nonload_change event (delayed)"""
+        if self._event_group_id is None:
+            return
+        
+        event_group = self._main_controller.get_event_by_id(self._event_group_id)
+        if event_group is None or event_group.event_definition is None or event_group.event_definition.trainer_def is None:
+            return
+        
+        # Reorder highlights according to cached definition order
+        if self._move_highlights and self._cached_definition_order:
+            reordered_highlights = [self._move_highlights[x] for x in self._cached_definition_order]
+        else:
+            reordered_highlights = self._move_highlights if self._move_highlights else None
+        
+        # Check if highlights are empty (all states are 0 or missing)
+        is_empty = True
+        if reordered_highlights:
+            for pkmn_highlights in reordered_highlights:
+                for key in [const.PLAYER_KEY, const.ENEMY_KEY]:
+                    if pkmn_highlights.get(key):
+                        for move_name, state in pkmn_highlights[key].items():
+                            if state != 0:
+                                is_empty = False
+                                break
+                        if not is_empty:
+                            break
+                    if not is_empty:
+                        break
+                if not is_empty:
+                    break
+        
+        if is_empty:
+            reordered_highlights = None
+        
+        # Create updated trainer definition
+        trainer_def = event_group.event_definition.trainer_def
+        updated_trainer_def = TrainerEventDefinition(
+            trainer_def.trainer_name,
+            second_trainer_name=trainer_def.second_trainer_name,
+            verbose_export=trainer_def.verbose_export,
+            setup_moves=trainer_def.setup_moves,
+            mimic_selection=trainer_def.mimic_selection,
+            custom_move_data=trainer_def.custom_move_data,
+            enemy_setup_moves=trainer_def.enemy_setup_moves,
+            player_field_moves=trainer_def.player_field_moves,
+            enemy_field_moves=trainer_def.enemy_field_moves,
+            exp_split=trainer_def.exp_split,
+            weather=trainer_def.weather,
+            pay_day_amount=trainer_def.pay_day_amount,
+            mon_order=trainer_def.mon_order,
+            transformed=trainer_def.transformed,
+            move_highlights=reordered_highlights,
+        )
+        
+        self._main_controller.update_existing_event(
+            self._event_group_id,
+            EventDefinition(trainer_def=updated_trainer_def),
+        )
     
     def update_player_strategy(self, strat):
         config.set_player_highlight_strategy(strat)
@@ -516,6 +639,27 @@ class BattleSummaryController:
         else:
             self._custom_move_data = [copy.deepcopy(x.custom_move_data) for x in event_group.event_definition.get_pokemon_list()]
 
+        # Load move highlights (backward compatible - handle missing data)
+        # move_highlights are stored in definition order (mon_order), need to convert to display order
+        if trainer_def.move_highlights:
+            # _cached_definition_order maps: display_idx -> definition_idx
+            # So for each display index, we need to get the definition index and use that to index into move_highlights
+            self._move_highlights = []
+            num_pokemon = len(event_group.event_definition.get_pokemon_list())
+            for display_idx in range(num_pokemon):
+                if display_idx < len(self._cached_definition_order):
+                    def_idx = self._cached_definition_order[display_idx]
+                    if def_idx < len(trainer_def.move_highlights):
+                        self._move_highlights.append(copy.deepcopy(trainer_def.move_highlights[def_idx]))
+                    else:
+                        self._move_highlights.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+                else:
+                    self._move_highlights.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+        else:
+            self._move_highlights = []
+            for _ in range(len(event_group.event_definition.get_pokemon_list())):
+                self._move_highlights.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+
         self._original_player_mon_list = []
         self._transformed_mon_list = []
         self._original_enemy_mon_list = []
@@ -562,9 +706,11 @@ class BattleSummaryController:
         self._player_setup_move_list = []
         self._enemy_setup_move_list = []
         self._custom_move_data = []
+        self._move_highlights = []
         self._cached_definition_order = list(range(len(enemy_mons)))
         for _ in range(len(enemy_mons)):
             self._custom_move_data.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+            self._move_highlights.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
 
         self._original_player_mon_list = []
         self._original_enemy_mon_list = []
@@ -600,6 +746,8 @@ class BattleSummaryController:
         self._player_setup_move_list = []
         self._enemy_setup_move_list = []
         self._custom_move_data = []
+        self._move_highlights = []
+        self._show_move_highlights = False
         self._original_player_mon_list = []
         self._transformed_mon_list = []
         self._original_enemy_mon_list = []
@@ -628,6 +776,41 @@ class BattleSummaryController:
         # NOTE: somewhat gross, but we are intentionally ignoring the extra fields here (exp_split, mon_order, etc)
         # Instead, we expect that the place this is called is smart enough to fill in the extra pieces that we don't
         # have full info to replicate here
+        # Check if move highlights are present
+        is_move_highlights_present = False
+        if self._move_highlights:
+            for cur_test in self._move_highlights:
+                if len(cur_test.get(const.PLAYER_KEY, {})) > 0 or len(cur_test.get(const.ENEMY_KEY, {})) > 0:
+                    # Check if any highlight state is non-zero
+                    for key in [const.PLAYER_KEY, const.ENEMY_KEY]:
+                        for move_name, state in cur_test.get(key, {}).items():
+                            if state != 0:
+                                is_move_highlights_present = True
+                                break
+                        if is_move_highlights_present:
+                            break
+                    if is_move_highlights_present:
+                        break
+        
+        if is_move_highlights_present:
+            # Convert from display order back to definition order
+            # _cached_definition_order maps display_idx -> definition_idx
+            # We need to create definition_idx -> display_idx mapping
+            def_to_display = {}
+            for display_idx, def_idx in enumerate(self._cached_definition_order):
+                def_to_display[def_idx] = display_idx
+            
+            # Now reorder: for each definition index, get the corresponding display index data
+            final_move_highlights = []
+            for def_idx in sorted(def_to_display.keys()):
+                display_idx = def_to_display[def_idx]
+                if display_idx < len(self._move_highlights):
+                    final_move_highlights.append(copy.deepcopy(self._move_highlights[display_idx]))
+                else:
+                    final_move_highlights.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+        else:
+            final_move_highlights = None
+
         return TrainerEventDefinition(
             self._trainer_name,
             second_trainer_name=self._second_trainer_name,
@@ -637,6 +820,7 @@ class BattleSummaryController:
             custom_move_data=final_custom_move_data,
             weather=self._weather,
             transformed=self._is_player_transformed,
+            move_highlights=final_move_highlights,
         )
 
     def get_pkmn_info(self, pkmn_idx, is_player_mon) -> PkmnRenderInfo:

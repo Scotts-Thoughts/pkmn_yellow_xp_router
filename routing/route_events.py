@@ -211,6 +211,7 @@ class TrainerEventDefinition:
             pay_day_amount=0,
             mon_order=None,
             transformed=False,
+            move_highlights=None,
         ):
         self.trainer_name = trainer_name
         self.second_trainer_name = second_trainer_name
@@ -240,6 +241,9 @@ class TrainerEventDefinition:
             mon_order = []
         self.mon_order = mon_order
         self.transformed = transformed
+        if move_highlights is None:
+            move_highlights = []
+        self.move_highlights:List[Dict[str, Dict[str, int]]] = move_highlights
 
     def serialize(self):
         return {
@@ -257,6 +261,7 @@ class TrainerEventDefinition:
             const.PAY_DAY_AMOUNT: self.pay_day_amount,
             const.MON_ORDER: self.mon_order,
             const.TRANSFORMED: self.transformed,
+            const.MOVE_HIGHLIGHTS: self.move_highlights if self.move_highlights else None,
         }
     
     @staticmethod
@@ -289,6 +294,7 @@ class TrainerEventDefinition:
             mon_order=raw_val.get(const.MON_ORDER),
             second_trainer_name=raw_val.get(const.SECOND_TRAINER_NAME, ""),
             transformed=raw_val.get(const.TRANSFORMED, False),
+            move_highlights=raw_val.get(const.MOVE_HIGHLIGHTS),
         )
     
     def __str__(self):

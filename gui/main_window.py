@@ -111,6 +111,14 @@ class MainWindow(tk.Tk):
         self.battle_summary_notes_menu = tk.Menu(self.battle_summary_menu, tearoff=0)
         self.battle_summary_menu.add_cascade(label="Battle Summary Notes", menu=self.battle_summary_notes_menu)
         self._update_battle_summary_notes_menu()
+        # Show Move Highlights toggle
+        self.battle_summary_menu.add_separator()
+        self.show_move_highlights_var = tk.BooleanVar(value=config.get_show_move_highlights())
+        self.battle_summary_menu.add_checkbutton(
+            label="Show Move Highlights",
+            variable=self.show_move_highlights_var,
+            command=self._toggle_move_highlights
+        )
 
         self.top_menu_bar.add_cascade(label="File", menu=self.file_menu)
         self.top_menu_bar.add_cascade(label="Events", menu=self.event_menu)
@@ -539,10 +547,20 @@ class MainWindow(tk.Tk):
         # Update dropdown in notes editor if it exists
         if hasattr(self, 'event_details') and hasattr(self.event_details, 'trainer_notes'):
             try:
-                if hasattr(self.event_details.trainer_notes, '_load_visibility_setting'):
-                    self.event_details.trainer_notes._load_visibility_setting()
+                self.event_details.trainer_notes._load_visibility_setting()
             except Exception:
                 pass
+    
+    def _toggle_move_highlights(self):
+        """Toggle the Show Move Highlights setting."""
+        config.set_show_move_highlights(self.show_move_highlights_var.get())
+        # Refresh battle summary if it exists
+        if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
+            self.event_details._battle_summary_controller._on_refresh()
+    
+    def _update_move_highlights_menu_state(self):
+        """Update the menu checkbox state to match the config state."""
+        self.show_move_highlights_var.set(config.get_show_move_highlights())
     
     def record_button_clicked(self, event=None):
         """Toggle recording mode - can be called from button, menu, or F1 key."""
