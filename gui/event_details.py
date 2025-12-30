@@ -96,6 +96,10 @@ class EventDetails(ttk.Frame):
         self.bind(self._battle_summary_controller.register_nonload_change(self), self.update_existing_event)
         self._controller.register_pre_save_hook(self.force_and_clear_event_update)
 
+        # Bind keyboard shortcuts for pre-fight rare candies
+        self.bind('<F3>', self._increment_prefight_candies)
+        self.bind('<F4>', self._decrement_prefight_candies)
+
         self._tab_changed_callback()
     
     def _tab_changed_callback(self, *args, **kwargs):
@@ -284,6 +288,28 @@ class EventDetails(ttk.Frame):
                 self.battle_summary_frame.get_enemy_ranges_bounding_box,
                 suffix="_enemy_ranges"
             )
+    
+    def _increment_prefight_candies(self, event=None):
+        """Handle F3 key to increment pre-fight rare candies."""
+        try:
+            if self.tabbed_states.index(self.tabbed_states.select()) == self.battle_summary_tab_index:
+                if self.battle_summary_frame.should_render:
+                    self.battle_summary_frame.candy_summary._increment_candy(event)
+        except (tk.TclError, ValueError):
+            # Tab might not be selected or widget might not exist
+            pass
+        return "break"
+    
+    def _decrement_prefight_candies(self, event=None):
+        """Handle F4 key to decrement pre-fight rare candies."""
+        try:
+            if self.tabbed_states.index(self.tabbed_states.select()) == self.battle_summary_tab_index:
+                if self.battle_summary_frame.should_render:
+                    self.battle_summary_frame.candy_summary._decrement_candy(event)
+        except (tk.TclError, ValueError):
+            # Tab might not be selected or widget might not exist
+            pass
+        return "break"
     
     def _take_scaled_screenshot(self, bbox_getter, suffix=""):
         """Take a screenshot with UI scaled up by 1.5x for better quality."""

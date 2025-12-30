@@ -395,6 +395,18 @@ class PrefightCandySummary(ttk.Frame):
         if self._outer_callback is not None:
             self._outer_callback()
     
+    def _increment_candy(self, event=None):
+        """Increment pre-fight rare candies (F3 shortcut)."""
+        if not self._loading:
+            self.candy_count._raise_amt()
+        return "break"
+    
+    def _decrement_candy(self, event=None):
+        """Decrement pre-fight rare candies (F4 shortcut)."""
+        if not self._loading:
+            self.candy_count._lower_amt()
+        return "break"
+    
     def set_candy_count(self, new_amount):
         self._loading = True
         self.candy_count.set(new_amount)

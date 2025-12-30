@@ -333,6 +333,9 @@ class MainWindow(tk.Tk):
         self.bind('<F6>', self.screenshot_battle_summary)
         self.bind('<F7>', self.export_player_ranges)
         self.bind('<F8>', self.export_enemy_ranges)
+        # Pre-fight rare candy shortcuts
+        self.bind('<F4>', self.increment_prefight_candies)
+        self.bind('<F3>', self.decrement_prefight_candies)
         # Event actions
         self.bind('<Control-e>', self.move_group_up)
         # detail update function
@@ -463,6 +466,12 @@ class MainWindow(tk.Tk):
     
     def screenshot_battle_summary(self, *args, **kwargs):
         self.event_details.take_battle_summary_screenshot()
+    
+    def increment_prefight_candies(self, *args, **kwargs):
+        self.event_details._increment_prefight_candies()
+    
+    def decrement_prefight_candies(self, *args, **kwargs):
+        self.event_details._decrement_prefight_candies()
     
     def export_player_ranges(self, *args, **kwargs):
         self.event_details.take_player_ranges_screenshot()
