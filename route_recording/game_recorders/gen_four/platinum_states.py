@@ -406,9 +406,14 @@ class BattleState(WatchForResetState):
                 if not any([True for x in final_exp_split if x > 1]):
                     final_exp_split = None
                 
-                final_mon_order = [self._enemy_mon_order.index(x) + 1 for x in sorted(self._enemy_mon_order)]
-                if self._multi_battle:
-                    final_mon_order = [] # ! ignores mon order for multi battles (hacky solution, incomplete)
+                # In battles with two trainers, skip setting mon_order
+                # The Pokemon from both trainers are interleaved in get_pokemon_list(),
+                # and applying a custom mon_order would disrupt this interleaving,
+                # causing some Pokemon to be skipped and incorrect experience to accumulate
+                if self._second_trainer_name:
+                    final_mon_order = None
+                else:
+                    final_mon_order = [self._enemy_mon_order.index(x) + 1 for x in sorted(self._enemy_mon_order)]
 
                 return_custom_move_data = None
                 if gen_four_const.RETURN_MOVE_NAME in self.machine._cached_moves:
