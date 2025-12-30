@@ -115,6 +115,7 @@ class MainWindow(tk.Tk):
         self.show_move_highlights_var = tk.BooleanVar(value=config.get_show_move_highlights())
         self.battle_summary_menu.add_checkbutton(
             label="Show Move Highlights",
+            accelerator="Shift+F2",
             variable=self.show_move_highlights_var,
             command=self._toggle_move_highlights
         )
@@ -141,6 +142,15 @@ class MainWindow(tk.Tk):
                 command=self._update_enemy_highlight_strategy
             )
         self.battle_summary_menu.add_cascade(label="Enemy Highlight Strategy", menu=self.enemy_highlight_strategy_menu)
+        # Test Moves toggle
+        self.battle_summary_menu.add_separator()
+        self.test_moves_enabled_var = tk.BooleanVar(value=config.get_test_moves_enabled())
+        self.battle_summary_menu.add_checkbutton(
+            label="Test Moves",
+            accelerator="Shift+F1",
+            variable=self.test_moves_enabled_var,
+            command=self._toggle_test_moves
+        )
 
         self.top_menu_bar.add_cascade(label="File", menu=self.file_menu)
         self.top_menu_bar.add_cascade(label="Events", menu=self.event_menu)
@@ -355,9 +365,15 @@ class MainWindow(tk.Tk):
         # recording actions
         self.bind_all('<KeyPress-F1>', self.record_button_clicked)
         self.bind_all('<F1>', self.record_button_clicked)
+        # test moves toggle
+        self.bind('<Shift-F1>', self._toggle_test_moves)
         # auto-load toggle - bind to window only, not all widgets, to avoid interfering with text entry
         self.bind('<KeyPress-F2>', self.toggle_auto_load_most_recent_route)
         self.bind('<F2>', self.toggle_auto_load_most_recent_route)
+        # move highlights toggle
+        self.bind('<Shift-F2>', self._toggle_move_highlights)
+        # tab switching
+        self.bind('<grave>', self._toggle_event_tabs)
         # navigation
         self.bind('<Home>', self.scroll_to_top)
         self.bind('<End>', self.scroll_to_bottom)
@@ -596,12 +612,46 @@ class MainWindow(tk.Tk):
             except Exception:
                 pass
     
-    def _toggle_move_highlights(self):
+    def _toggle_move_highlights(self, event=None):
         """Toggle the Show Move Highlights setting."""
+        # If called from keyboard shortcut, toggle the variable first
+        if event is not None:
+            new_value = not config.get_show_move_highlights()
+            self.show_move_highlights_var.set(new_value)
+        
         config.set_show_move_highlights(self.show_move_highlights_var.get())
         # Refresh battle summary if it exists
         if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
             self.event_details._battle_summary_controller._on_refresh()
+        
+        # Return "break" to prevent default behavior when called from keyboard
+        if event is not None:
+            return "break"
+    
+    def _toggle_test_moves(self, event=None):
+        """Toggle the Test Moves setting."""
+        # If called from keyboard shortcut, toggle the variable first
+        if event is not None:
+            new_value = not config.get_test_moves_enabled()
+            self.test_moves_enabled_var.set(new_value)
+        
+        config.set_test_moves_enabled(self.test_moves_enabled_var.get())
+        # Refresh battle summary if it exists
+        if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
+            self.event_details._battle_summary_controller._on_refresh()
+        
+        # Return "break" to prevent default behavior when called from keyboard
+        if event is not None:
+            return "break"
+    
+    def _toggle_event_tabs(self, event=None):
+        """Toggle between Pre-Event State and Battle Summary tabs."""
+        if hasattr(self, 'event_details'):
+            self.event_details.change_tabs()
+        
+        # Return "break" to prevent default behavior when called from keyboard
+        if event is not None:
+            return "break"
     
     def _update_move_highlights_menu_state(self):
         """Update the menu checkbox state to match the config state."""

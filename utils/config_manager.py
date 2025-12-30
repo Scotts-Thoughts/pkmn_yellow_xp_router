@@ -29,6 +29,7 @@ class Config:
     DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE = False
     DEFAULT_LANDING_PAGE_SEARCH_FILTER = ""
     DEFAULT_SHOW_MOVE_HIGHLIGHTS = True
+    DEFAULT_TEST_MOVES_ENABLED = False
 
     def __init__(self):
         self.reload()
@@ -82,6 +83,7 @@ class Config:
         self._auto_load_most_recent_route = raw.get(const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY, self.DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE)
         self._landing_page_search_filter = raw.get(const.LANDING_PAGE_SEARCH_FILTER_KEY, self.DEFAULT_LANDING_PAGE_SEARCH_FILTER)
         self._show_move_highlights = raw.get(const.SHOW_MOVE_HIGHLIGHTS, self.DEFAULT_SHOW_MOVE_HIGHLIGHTS)
+        self._test_moves_enabled = raw.get(const.TEST_MOVES_ENABLED, self.DEFAULT_TEST_MOVES_ENABLED)
     
     def _save(self):
         if not os.path.exists(const.GLOBAL_CONFIG_DIR):
@@ -115,6 +117,7 @@ class Config:
                 const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY: self._auto_load_most_recent_route,
                 const.LANDING_PAGE_SEARCH_FILTER_KEY: self._landing_page_search_filter,
                 const.SHOW_MOVE_HIGHLIGHTS: self._show_move_highlights,
+                const.TEST_MOVES_ENABLED: self._test_moves_enabled,
             }, f, indent=4)
     
     def set_window_geometry(self, new_geometry):
@@ -326,6 +329,13 @@ class Config:
     
     def get_show_move_highlights(self):
         return self._show_move_highlights
+    
+    def set_test_moves_enabled(self, enabled):
+        self._test_moves_enabled = enabled
+        self._save()
+    
+    def get_test_moves_enabled(self):
+        return self._test_moves_enabled
     
     def reset_all_colors(self):
         self._success_color = self.DEFAULT_SUCCESS

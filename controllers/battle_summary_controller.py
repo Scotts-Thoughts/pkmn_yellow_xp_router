@@ -544,6 +544,20 @@ class BattleSummaryController:
                 self._enemy_move_data[mon_idx].append(cur_enemy_move_data)
 
             #####
+            # Add test moves (player moves 5-8) if enabled
+            #####
+            if config.get_test_moves_enabled():
+                test_moves = self._main_controller.get_raw_route().test_moves
+                for test_idx in range(4):
+                    # Only process if test move is defined (not empty or None)
+                    if test_idx < len(test_moves) and test_moves[test_idx] and test_moves[test_idx].strip():
+                        test_move_name = test_moves[test_idx].strip()
+                        test_move_data = self._recalculate_single_move(mon_idx, True, test_move_name, move_idx=4 + test_idx)
+                        self._player_move_data[mon_idx].append(test_move_data)
+                    else:
+                        self._player_move_data[mon_idx].append(None)
+
+            #####
             # Finally out of move data loop. Update best moves
             #####
             self._update_best_move_inplace(mon_idx, True)
@@ -1157,7 +1171,17 @@ class BattleSummaryController:
         else:
             cur_move_data = self._enemy_move_data
 
-        if pkmn_idx < 0 or pkmn_idx >= len(cur_move_data) or move_idx < 0 or move_idx >= 4:
+        if pkmn_idx < 0 or pkmn_idx >= len(cur_move_data) or move_idx < 0:
+            return None
+        
+        # For player moves, allow indices 0-7 when test moves are enabled (0-3 regular, 4-7 test)
+        # For enemy moves, only allow 0-3
+        if is_player_mon:
+            max_idx = 7 if config.get_test_moves_enabled() else 3
+        else:
+            max_idx = 3
+        
+        if move_idx > max_idx:
             return None
         
         # Check if the inner list has enough elements
@@ -1211,6 +1235,38 @@ class BattleSummaryController:
 
     def is_player_transformed(self) -> bool:
         return self._is_player_transformed
+    
+    def get_test_moves_enabled(self) -> bool:
+        return config.get_test_moves_enabled()
+    
+    def get_test_moves(self) -> List[str]:
+        test_moves = self._main_controller.get_raw_route().test_moves.copy()
+        # Ensure we always have exactly 4 slots, defaulting to empty strings
+        while len(test_moves) < 4:
+            test_moves.append("")
+        return test_moves[:4]
+    
+    def update_test_move(self, slot_idx:int, move_name:str):
+        """Update a test move slot (0-3) with a new move name"""
+        if slot_idx < 0 or slot_idx >= 4:
+            return
+        
+        # Get current test moves from router
+        test_moves = self._main_controller.get_raw_route().test_moves
+        
+        # Ensure we have 4 slots
+        while len(test_moves) < 4:
+            test_moves.append("")
+        
+        # Update the specific slot
+        test_moves[slot_idx] = move_name
+        
+        # Save back to router (this will trigger save when route is saved)
+        self._main_controller.get_raw_route().test_moves = test_moves
+        
+        # Trigger refresh and mark as changed (so route file gets saved)
+        self._full_refresh()
+        self._on_nonload_change()
 
     @staticmethod
     def _is_move_better(new_move:MoveRenderInfo, prev_move:MoveRenderInfo, strat:str, other_mon:PkmnRenderInfo) -> bool:

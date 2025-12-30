@@ -144,6 +144,7 @@ class Constants:
         self.CUSTOM_MOVE_DATA = "custom_move_data"
         self.MOVE_HIGHLIGHTS = "move_highlights"
         self.MOVE_SETUP_USAGE = "move_setup_usage"
+        self.TEST_MOVES_KEY = "test_moves"
         self.EXP_SPLIT = "exp_split"
         self.WEATHER = "weather"
         self.PAY_DAY_AMOUNT = "pay_day_amount"
@@ -312,6 +313,7 @@ class Constants:
         self.DAMAGE_SEARCH_DEPTH = "damage_search_depth"
         self.FORCE_FULL_SEARCH = "force_full_search"
         self.SHOW_MOVE_HIGHLIGHTS = "show_move_highlights"
+        self.TEST_MOVES_ENABLED = "test_moves_enabled"
 
         self.CUSTOM_FONT_NAME_KEY = "custom_font_name"
         self.DEBUG_MODE_KEY = "debug_mode"

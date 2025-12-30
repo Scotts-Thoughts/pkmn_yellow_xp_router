@@ -559,9 +559,18 @@ class MonPairSummary(ttk.Frame):
 
         self.move_list:List[DamageSummary] = []
         self._did_draw:List[bool] = []
+        # Create 8 regular moves (4 player, 4 enemy)
         for cur_idx in range(8):
             self.move_list.append(DamageSummary(self._controller, self._mon_idx, cur_idx % 4, cur_idx < 4, self))
             self._did_draw.append(False)
+        
+        # Create 4 test move slots (player moves 5-8) - only shown when test moves is enabled
+        self.test_move_slots:List[DamageSummary] = []
+        self._did_draw_test_moves:List[bool] = []
+        for slot_idx in range(4):
+            # Test moves are player moves with indices 4-7
+            self.test_move_slots.append(DamageSummary(self._controller, self._mon_idx, 4 + slot_idx, True, self, is_test_move=True))
+            self._did_draw_test_moves.append(False)
     
     def update_rendering(self):
         player_rendering_info = self._controller.get_pkmn_info(self._mon_idx, True)
@@ -570,12 +579,21 @@ class MonPairSummary(ttk.Frame):
         self.left_label.configure(text=f"{player_rendering_info}")
         self.right_label.configure(text=f"{enemy_rendering_info}")
 
+        # Check if test moves is enabled
+        test_moves_enabled = self._controller.get_test_moves_enabled()
+
+        # Render regular moves (4 player moves always, 4 enemy moves only if test moves disabled)
         for cur_idx, cur_move in enumerate(self.move_list):
             column_idx = cur_idx
             if column_idx >= 4:
                 column_idx += 1
 
-            if self._controller.get_move_info(cur_move._mon_idx, cur_move._move_idx, cur_move._is_player_mon) is not None:
+            # Hide enemy moves if test moves is enabled
+            if cur_idx >= 4 and test_moves_enabled:
+                if self._did_draw[cur_idx]:
+                    cur_move.grid_forget()
+                    self._did_draw[cur_idx] = False
+            elif self._controller.get_move_info(cur_move._mon_idx, cur_move._move_idx, cur_move._is_player_mon) is not None:
                 if not self._did_draw[cur_idx]:
                     cur_move.grid(row=1, column=column_idx, sticky=tk.NSEW)
                     self._did_draw[cur_idx] = True
@@ -585,15 +603,256 @@ class MonPairSummary(ttk.Frame):
                 if self._did_draw[cur_idx]:
                     cur_move.grid_forget()
                     self._did_draw[cur_idx] = False
+        
+        # Show/hide test move slots (replace enemy moves on right side)
+        if test_moves_enabled:
+            for slot_idx, test_move in enumerate(self.test_move_slots):
+                column_idx = 5 + slot_idx  # Columns 5-8 for right side (where enemy moves were)
+                if not self._did_draw_test_moves[slot_idx]:
+                    test_move.grid(row=1, column=column_idx, sticky=tk.NSEW)
+                    self._did_draw_test_moves[slot_idx] = True
+                test_move.update_rendering()
+        else:
+            # Hide test move slots
+            for slot_idx, test_move in enumerate(self.test_move_slots):
+                if self._did_draw_test_moves[slot_idx]:
+                    test_move.grid_forget()
+                    self._did_draw_test_moves[slot_idx] = False
+
+
+class AutocompleteEntry(ttk.Frame):
+    """A text entry with autocomplete dropdown that filters as you type"""
+    def __init__(self, parent, values, callback=None, width=20, **kwargs):
+        super().__init__(parent, **kwargs)
+        
+        self._all_values = values
+        self._callback = callback
+        self._original_value = ""
+        self._selecting = False  # Flag to track when a selection is being made
+        
+        # Create the entry widget
+        self._entry_var = tk.StringVar()
+        self._entry = ttk.Entry(self, textvariable=self._entry_var, width=width)
+        self._entry.pack(fill=tk.BOTH, expand=True)
+        
+        # Create the listbox for suggestions (initially hidden)
+        self._listbox = None
+        self._listbox_visible = False
+        
+        # Bind events
+        self._entry.bind('<KeyRelease>', self._on_key_release)
+        self._entry.bind('<FocusIn>', self._on_focus_in)
+        self._entry.bind('<FocusOut>', self._on_focus_out)
+        self._entry.bind('<Return>', self._on_return)
+        self._entry.bind('<Escape>', self._on_escape)
+        self._entry.bind('<Down>', self._on_down_arrow)
+        
+    def _on_focus_in(self, event):
+        """Store original value and clear text when focused"""
+        self._selecting = False  # Reset flag when gaining focus
+        self._original_value = self._entry_var.get()
+        # Clear the text to allow easy typing
+        self._entry_var.set("")
+    
+    def _on_key_release(self, event):
+        """Filter and show suggestions as user types"""
+        # Ignore special keys
+        if event.keysym in ['Return', 'Escape', 'Tab', 'Up', 'Down', 'Left', 'Right', 
+                           'Shift_L', 'Shift_R', 'Control_L', 'Control_R', 'Alt_L', 'Alt_R']:
+            return
+        
+        # Get current text
+        current_text = self._entry_var.get()
+        
+        # Filter values
+        if not current_text:
+            filtered = self._all_values[:50]  # Show first 50 if empty
+        else:
+            search = current_text.lower()
+            filtered = [v for v in self._all_values if search in v.lower()][:50]  # Limit to 50 results
+        
+        # Show filtered results
+        if filtered and current_text:
+            self._show_listbox(filtered)
+        else:
+            self._hide_listbox()
+    
+    def _on_down_arrow(self, event):
+        """Move focus to listbox on down arrow"""
+        if self._listbox_visible and self._listbox:
+            self._selecting = True  # Prevent focus out from closing listbox
+            self._listbox.focus_set()
+            if self._listbox.size() > 0:
+                self._listbox.selection_clear(0, tk.END)
+                self._listbox.selection_set(0)
+                self._listbox.see(0)
+        return "break"
+    
+    def _on_return(self, event):
+        """Accept the current value or first filtered result"""
+        self._selecting = True
+        current = self._entry_var.get()
+        
+        # If listbox is visible and has items, use the selected one
+        if self._listbox_visible and self._listbox and self._listbox.size() > 0:
+            selection = self._listbox.curselection()
+            if selection:
+                value = self._listbox.get(selection[0])
+                self.set(value)
+            else:
+                # Use first item if nothing selected
+                value = self._listbox.get(0)
+                self.set(value)
+        elif current in self._all_values:
+            # Current value is valid
+            pass
+        else:
+            # Invalid value, revert to original
+            self._entry_var.set(self._original_value)
+        
+        self._hide_listbox()
+        if self._callback:
+            self._callback()
+        # Reset flag after a delay to ensure focus out handler sees it
+        self.after(200, lambda: setattr(self, '_selecting', False))
+        return "break"
+    
+    def _on_escape(self, event):
+        """Revert to original value and hide listbox"""
+        self._selecting = False
+        self._entry_var.set(self._original_value)
+        self._hide_listbox()
+        return "break"
+    
+    def _on_focus_out(self, event):
+        """Handle focus loss"""
+        # Small delay to allow listbox click to register
+        self.after(100, self._delayed_focus_out)
+    
+    def _delayed_focus_out(self):
+        """Always revert to original value when focus is lost (unless explicitly selected)"""
+        # If a selection is being made, don't interfere
+        if self._selecting:
+            return
+        
+        # Hide the listbox if it's still visible
+        self._hide_listbox()
+        
+        # Always revert to original value when clicking away
+        # Only explicit selection (Enter or clicking listbox) should change the value
+        self._entry_var.set(self._original_value)
+    
+    def _show_listbox(self, values):
+        """Show the listbox with filtered values"""
+        # Recreate listbox if it doesn't exist or was destroyed
+        if not self._listbox or not self._listbox.winfo_exists():
+            # Create listbox as a toplevel window
+            self._listbox_window = tk.Toplevel(self)
+            self._listbox_window.wm_overrideredirect(True)
+            
+            self._listbox = tk.Listbox(self._listbox_window, height=10)
+            self._listbox.pack(fill=tk.BOTH, expand=True)
+            
+            # Bind listbox events
+            self._listbox.bind('<ButtonPress-1>', self._on_listbox_button_press)
+            self._listbox.bind('<ButtonRelease-1>', self._on_listbox_click)
+            self._listbox.bind('<Return>', self._on_listbox_select)
+            self._listbox.bind('<Escape>', self._on_escape)
+            self._listbox.bind('<FocusOut>', self._on_listbox_focus_out)
+        
+        # Update listbox content
+        self._listbox.delete(0, tk.END)
+        for value in values:
+            self._listbox.insert(tk.END, value)
+        
+        # Position the listbox below the entry
+        try:
+            x = self._entry.winfo_rootx()
+            y = self._entry.winfo_rooty() + self._entry.winfo_height()
+            width = self._entry.winfo_width()
+            self._listbox_window.geometry(f"{width}x200+{x}+{y}")
+            self._listbox_window.deiconify()  # Make sure it's visible
+            self._listbox_window.lift()
+            self._listbox_visible = True
+        except Exception:
+            # If positioning fails, recreate next time
+            self._listbox = None
+            self._listbox_visible = False
+    
+    def _hide_listbox(self):
+        """Hide the listbox"""
+        if self._listbox and self._listbox.winfo_exists():
+            try:
+                self._listbox_window.withdraw()
+            except Exception:
+                pass
+        self._listbox_visible = False
+    
+    def _on_listbox_button_press(self, event):
+        """Set flag when mouse button is pressed on listbox (before focus change)"""
+        self._selecting = True
+    
+    def _on_listbox_click(self, event):
+        """Handle click on listbox item"""
+        if self._listbox:
+            selection = self._listbox.curselection()
+            if selection:
+                value = self._listbox.get(selection[0])
+                self.set(value)
+                self._hide_listbox()
+                if self._callback:
+                    self._callback()
+        # Reset flag after a delay to ensure focus out handler sees it
+        self.after(200, lambda: setattr(self, '_selecting', False))
+    
+    def _on_listbox_select(self, event):
+        """Handle Enter key in listbox"""
+        self._selecting = True
+        if self._listbox:
+            selection = self._listbox.curselection()
+            if selection:
+                value = self._listbox.get(selection[0])
+                self.set(value)
+                self._hide_listbox()
+                if self._callback:
+                    self._callback()
+        # Reset flag after a delay to ensure focus out handler sees it
+        self.after(200, lambda: setattr(self, '_selecting', False))
+        return "break"
+    
+    def _on_listbox_focus_out(self, event):
+        """Hide listbox when it loses focus"""
+        # If selection is in progress (Enter was pressed), let the selection handler deal with it
+        # Otherwise, revert and hide after a delay
+        self.after(100, self._handle_listbox_focus_out)
+    
+    def _handle_listbox_focus_out(self):
+        """Handle listbox losing focus after a delay"""
+        if not self._selecting:
+            # No selection in progress, so revert to original value
+            self._entry_var.set(self._original_value)
+        self._hide_listbox()
+        # Reset the selecting flag after a delay
+        self.after(100, lambda: setattr(self, '_selecting', False))
+    
+    def get(self):
+        """Get the current value"""
+        return self._entry_var.get()
+    
+    def set(self, value):
+        """Set the current value"""
+        self._entry_var.set(value)
+        self._original_value = value
 
 
 class DamageSummary(ttk.Frame):
-    def __init__(self, controller:BattleSummaryController, mon_idx, move_idx, is_player_mon, *args, **kwargs):
+    def __init__(self, controller:BattleSummaryController, mon_idx, move_idx, is_player_mon, *args, is_test_move=False, **kwargs):
         super().__init__(*args, **kwargs)
         self._controller = controller
         self._mon_idx = mon_idx
         self._move_idx = move_idx
         self._is_player_mon = is_player_mon
+        self._is_test_move = is_test_move
         self._move_name = None
         self._is_loading = False
 
@@ -623,9 +882,23 @@ class DamageSummary(ttk.Frame):
         self.header.columnconfigure(0, weight=1)
         self.row_idx += 1
         
+        # For test moves, create a move selection dropdown instead of a label
+        # Only show dropdown for the first Pokemon (mon_idx == 0) since test moves are global
+        if self._is_test_move and self._mon_idx == 0:
+            all_moves = current_gen_info().move_db().get_filtered_names()
+            all_moves.insert(0, "")  # Add empty option at the start
+            
+            # Use custom autocomplete entry for filtering
+            self.test_move_dropdown = AutocompleteEntry(
+                self.header, 
+                all_moves, 
+                callback=self._on_test_move_changed,
+                width=18
+            )
+        
         self.move_name_label = tk.Label(self.header, bg=bg_color, fg=fg_color, anchor="center", padx=0, pady=4)
         # Make player move labels clickable for highlights (cursor will be updated when highlights are enabled)
-        if self._is_player_mon:
+        if self._is_player_mon and not self._is_test_move:
             self.move_name_label.bind("<Button-1>", self._on_move_name_click)
             self.move_name_label.bind("<Button-3>", self._on_move_name_right_click)  # Right-click to reset
         self.custom_data_dropdown = custom_components.SimpleOptionMenu(self.header, [""], callback=self._custom_data_callback, width=14)
@@ -684,6 +957,19 @@ class DamageSummary(ttk.Frame):
             return
         count = int(self.setup_move_dropdown.get())
         self._controller.update_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon, count)
+    
+    def _on_test_move_changed(self, *args, **kwargs):
+        """Called when user selects a test move from the dropdown"""
+        if self._is_loading:
+            return
+        
+        if not hasattr(self, 'test_move_dropdown'):
+            return
+            
+        selected_move = self.test_move_dropdown.get()
+        # Test move indices are 4-7, so slot_idx is move_idx - 4
+        slot_idx = self._move_idx - 4
+        self._controller.update_test_move(slot_idx, selected_move)
 
     def _on_move_name_click(self, event):
         """Handle click on move name to cycle highlight state"""
@@ -803,7 +1089,35 @@ class DamageSummary(ttk.Frame):
         current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
         
         # Layout header components
-        if custom_data_options:
+        # For test moves, show dropdown for first Pokemon only, label for others
+        if self._is_test_move:
+            # Update test move dropdown selection
+            test_moves = self._controller.get_test_moves()
+            slot_idx = self._move_idx - 4
+            if slot_idx >= 0 and slot_idx < len(test_moves):
+                current_test_move = test_moves[slot_idx]
+                
+                # Only show dropdown for first Pokemon (mon_idx == 0), show label for others
+                if self._mon_idx == 0:
+                    if hasattr(self, 'test_move_dropdown'):
+                        # Set the combobox value
+                        current_val = current_test_move if current_test_move else ""
+                        if self.test_move_dropdown.get() != current_val:
+                            self.test_move_dropdown.set(current_val)
+                        self.test_move_dropdown.grid(row=0, column=0)
+                    self.move_name_label.grid_forget()
+                else:
+                    # For other Pokemon, just show the selected move as a label
+                    self.move_name_label.configure(text=current_test_move if current_test_move else "")
+                    self.move_name_label.grid(row=0, column=0, columnspan=2)
+                    if hasattr(self, 'test_move_dropdown'):
+                        self.test_move_dropdown.grid_forget()
+            
+            self.custom_data_dropdown.grid_forget()
+            self.setup_move_dropdown.grid_forget()
+        elif custom_data_options:
+            if hasattr(self, 'test_move_dropdown'):
+                self.test_move_dropdown.grid_forget()
             self.move_name_label.grid_forget()
             self.move_name_label.grid(row=0, column=0)
             col = 1
@@ -817,6 +1131,8 @@ class DamageSummary(ttk.Frame):
             else:
                 self.setup_move_dropdown.grid_forget()
         else:
+            if hasattr(self, 'test_move_dropdown'):
+                self.test_move_dropdown.grid_forget()
             self.move_name_label.grid_forget()
             if is_setup_move:
                 self.move_name_label.grid(row=0, column=0)
@@ -835,6 +1151,7 @@ class DamageSummary(ttk.Frame):
             self.pct_damage_range.configure(text="")
             self.crit_damage_range.configure(text="")
             self.crit_pct_damage_range.configure(text="")
+            self.num_to_kill.configure(text="")
         else:
             self.move_name_label.configure(text=f"{move.name}")
             # Update highlight color based on state - change the header frame background

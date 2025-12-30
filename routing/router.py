@@ -24,6 +24,7 @@ class Router:
         self.event_item_lookup = {}
 
         self.level_up_move_defs:Dict[Tuple[str, int, str], route_events.LearnMoveEventDefinition] = {}
+        self.test_moves:List[str] = ["", "", "", ""]
         self.defeated_trainers = set()
     
     def _reset_events(self):
@@ -33,6 +34,7 @@ class Router:
         self.event_item_lookup = {}
 
         self.defeated_trainers = set()
+        self.test_moves = ["", "", "", ""]
     
     def _change_version(self, new_version):
         self.pkmn_version = new_version
@@ -432,6 +434,7 @@ class Router:
             const.NATURE_KEY: self.init_route_state.solo_pkmn.nature.value,
             const.PKMN_VERSION_KEY: self.pkmn_version,
             const.TASK_LEARN_MOVE_LEVELUP: [x.serialize() for x in self.level_up_move_defs.values()],
+            const.TEST_MOVES_KEY: self.test_moves,
             const.EVENTS: [self.root_folder.serialize()]
         }
 
@@ -474,6 +477,13 @@ class Router:
                 custom_nature=result.get(const.NATURE_KEY),
             )
         
+        # Load test moves
+        self.test_moves = result.get(const.TEST_MOVES_KEY, ["", "", "", ""])
+        # Ensure we always have exactly 4 slots
+        while len(self.test_moves) < 4:
+            self.test_moves.append("")
+        self.test_moves = self.test_moves[:4]
+
         if len(result[const.EVENTS]) > 0:
             self._load_events_recursive(self.root_folder, result[const.EVENTS][0])
 
