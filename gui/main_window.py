@@ -214,9 +214,10 @@ class MainWindow(tk.Tk):
         self.top_left_controls = ttk.Frame(self.left_info_panel)
         self.top_left_controls.pack(fill=tk.X, anchor=tk.CENTER)
         # Configure columns: 3 columns for Trainers/Items/Wild Pkmn
-        self.top_left_controls.grid_columnconfigure(0, weight=1, uniform="quick_add")
-        self.top_left_controls.grid_columnconfigure(1, weight=1, uniform="quick_add")
-        self.top_left_controls.grid_columnconfigure(2, weight=1, uniform="quick_add")
+        # Trainers and Items get more space (weight=2), Wild Pkmn/Misc get less (weight=1)
+        self.top_left_controls.grid_columnconfigure(0, weight=2)  # Trainers
+        self.top_left_controls.grid_columnconfigure(1, weight=2)  # Items
+        self.top_left_controls.grid_columnconfigure(2, weight=1)  # Wild Pkmn/Misc
 
         self.recorder_status = RecorderStatus(self._controller, self._recorder_controller, self.top_left_controls)
 
