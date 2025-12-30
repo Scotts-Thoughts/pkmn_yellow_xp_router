@@ -8,6 +8,7 @@ from datetime import datetime
 from gui import custom_components
 from utils.constants import const
 from utils import io_utils
+from utils.config_manager import config
 from pkmn.gen_factory import _gen_factory as gen_factory
 
 
@@ -18,18 +19,19 @@ class LandingPage(ttk.Frame):
     SORT_GAME = "game"
     SORT_ALPHABETICAL = "alphabetical"
     
-    def __init__(self, parent, controller, on_create_route: Callable, on_load_route: Callable, *args, **kwargs):
+    def __init__(self, parent, controller, on_create_route: Callable, on_load_route: Callable, on_auto_load_toggle: Callable = None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self._controller = controller
         self._on_create_route = on_create_route
         self._on_load_route = on_load_route
+        self._on_auto_load_toggle = on_auto_load_toggle
         self._current_sort = self.SORT_MOST_RECENT
         self._route_metadata_cache = {}  # Cache: route_name -> (game_version, mtime)
         self._selected_game_filter = "All Games"  # Remember last selected game filter
         self._search_text = ""  # Current search filter text
         
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(4, weight=1)
         
         # Title
         title_label = ttk.Label(self, text="Pokemon XP Router", font=("", 24, "bold"))
@@ -57,12 +59,22 @@ class LandingPage(ttk.Frame):
             width=30,
             style="Large.TButton"
         )
-        self.load_button.grid(row=2, column=0, pady=(0, 20), ipady=10)
+        self.load_button.grid(row=2, column=0, pady=(0, 10), ipady=10)
         self.load_button.disable()
+        
+        # Auto-load toggle checkbox
+        self.auto_load_var = tk.BooleanVar(value=config.get_auto_load_most_recent_route())
+        self.auto_load_checkbox = ttk.Checkbutton(
+            self,
+            text="Automatically Load Most Recent Route on Startup",
+            variable=self.auto_load_var,
+            command=self._on_auto_load_toggle_changed
+        )
+        self.auto_load_checkbox.grid(row=3, column=0, pady=(0, 20))
         
         # Routes section - limit width and prevent expansion
         routes_frame = ttk.Frame(self)
-        routes_frame.grid(row=3, column=0, sticky="ns", padx=50, pady=20)
+        routes_frame.grid(row=4, column=0, sticky="ns", padx=50, pady=20)
         routes_frame.grid_columnconfigure(0, weight=1)
         routes_frame.grid_rowconfigure(3, weight=1)
         # Set fixed width - don't expand beyond this
@@ -209,6 +221,13 @@ class LandingPage(ttk.Frame):
                 if route_name and route_name != "No saved routes found":
                     route_path = io_utils.get_existing_route_path(route_name)
                     self._on_load_route(route_path)
+    
+    def _on_auto_load_toggle_changed(self):
+        """Handle auto-load toggle checkbox change."""
+        config.set_auto_load_most_recent_route(self.auto_load_var.get())
+        # Notify parent window to sync menu if callback provided
+        if self._on_auto_load_toggle:
+            self._on_auto_load_toggle()
     
     def _on_route_selection_changed(self, event=None):
         """Enable/disable load button based on selection."""

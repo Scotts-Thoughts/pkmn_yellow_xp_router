@@ -70,6 +70,14 @@ class MainWindow(tk.Tk):
         self.file_menu.add_command(label="Load Route", accelerator="Ctrl+L", command=self.open_load_route_window)
         self.file_menu.add_command(label="Save Route", accelerator="Ctrl+S", command=self.save_route)
         self.file_menu.add_command(label="Close Route", accelerator="Ctrl+Shift+C", command=self.close_route)
+        self.file_menu.add_separator()
+        self.auto_load_menu_var = tk.BooleanVar(value=config.get_auto_load_most_recent_route())
+        self.file_menu.add_checkbutton(
+            label="Automatically Load Most Recent Route on Startup",
+            accelerator="F2",
+            command=self.toggle_auto_load_most_recent_route,
+            variable=self.auto_load_menu_var
+        )
         self.file_menu.add_command(label="Export Notes", accelerator="Ctrl+Shift+W", command=self.export_notes)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Screenshot Event List", command=self.screenshot_event_list)
@@ -111,9 +119,10 @@ class MainWindow(tk.Tk):
             self.primary_window,
             self._controller,
             on_create_route=self.open_new_route_window,
-            on_load_route=self._load_route_from_landing_page
+            on_load_route=self._load_route_from_landing_page,
+            on_auto_load_toggle=self._on_landing_page_auto_load_toggle
         )
-        self.landing_page.pack(fill=tk.BOTH, expand=True)
+        # Don't pack initially - will be shown only if needed (after checking auto-load setting)
 
         # Track if route was loaded before opening new route page
         self._route_loaded_before_new_route = False
@@ -306,6 +315,9 @@ class MainWindow(tk.Tk):
         # recording actions
         self.bind_all('<KeyPress-F1>', self.record_button_clicked)
         self.bind_all('<F1>', self.record_button_clicked)
+        # auto-load toggle - bind to window only, not all widgets, to avoid interfering with text entry
+        self.bind('<KeyPress-F2>', self.toggle_auto_load_most_recent_route)
+        self.bind('<F2>', self.toggle_auto_load_most_recent_route)
         # navigation
         self.bind('<Home>', self.scroll_to_top)
         self.bind('<End>', self.scroll_to_bottom)
@@ -342,8 +354,21 @@ class MainWindow(tk.Tk):
         self.summary_window = None
         self.setup_summary_window = None
         
-        # Initially show landing page, hide route controls
-        self._show_landing_page()
+        # Check if auto-load is enabled - if so, skip landing page entirely
+        self._auto_load_checked = False
+        if config.get_auto_load_most_recent_route():
+            # Find the most recent route immediately (synchronously)
+            most_recent_route = self._find_most_recent_route()
+            if most_recent_route:
+                # Skip landing page entirely, go straight to loading route
+                # Load route as soon as window is ready (minimal delay)
+                self.after(10, lambda: self._load_route_immediately(most_recent_route))
+            else:
+                # No routes available - show landing page
+                self._show_landing_page()
+        else:
+            # Show landing page normally
+            self._show_landing_page()
 
     def run(self):
         # TODO: is this the right place for it?
@@ -649,6 +674,20 @@ class MainWindow(tk.Tk):
         """Load a route from the landing page."""
         self._controller.load_route(route_path)
         self._show_route_controls()
+        # Ensure the window has focus after switching views
+        # Process pending events first, then set focus
+        self.update_idletasks()
+        # Use after to set focus in the next event loop iteration
+        # This ensures all widget updates are complete before focusing
+        self.after(50, self._ensure_window_focus)
+    
+    def _ensure_window_focus(self):
+        """Ensure the main window has focus."""
+        try:
+            self.focus_set()
+        except tk.TclError:
+            # Window might have been destroyed, ignore
+            pass
     
     def _show_landing_page(self):
         """Show landing page and hide route controls."""
@@ -663,6 +702,51 @@ class MainWindow(tk.Tk):
         self.landing_page.pack_forget()
         self.new_route_page.pack_forget()
         self.info_panel.pack(expand=True, fill=tk.BOTH)
+        # Ensure focus is set on the main window after switching views
+        self.focus_set()
+    
+    def _on_window_mapped(self, event=None):
+        """Handle window being mapped (becoming visible) - check for auto-load."""
+        # Only check once
+        if self._auto_load_checked:
+            return
+        self._check_if_window_ready_for_auto_load()
+    
+    def _find_most_recent_route(self):
+        """Find the most recent route synchronously. Returns route path or None."""
+        # Get all routes and find the most recent one
+        all_routes = io_utils.get_existing_route_names(load_backups=False)
+        if not all_routes:
+            return None
+        
+        # Get the most recent route by modification time
+        most_recent_route = None
+        most_recent_mtime = 0
+        
+        for route_name in all_routes:
+            route_path = io_utils.get_existing_route_path(route_name)
+            try:
+                mtime = os.path.getmtime(route_path)
+                if mtime > most_recent_mtime:
+                    most_recent_mtime = mtime
+                    most_recent_route = route_path
+            except Exception:
+                continue
+        
+        return most_recent_route
+    
+    def _load_route_immediately(self, route_path):
+        """Load route immediately without showing landing page."""
+        if self._auto_load_checked:
+            return
+        self._auto_load_checked = True
+        
+        # Load the route directly
+        self._controller.load_route(route_path)
+        self._show_route_controls()
+        # Ensure the window has focus after loading
+        self.update_idletasks()
+        self.after(50, self._ensure_window_focus)
 
     def open_customize_dvs_window(self, *args, **kwargs):
         if self._controller.is_empty():
@@ -767,6 +851,20 @@ class MainWindow(tk.Tk):
             insert_after=all_event_ids[0] if len(all_event_ids) == 1 else None
         )
 
+    def toggle_auto_load_most_recent_route(self, event=None):
+        """Toggle the auto-load most recent route setting."""
+        new_value = not config.get_auto_load_most_recent_route()
+        config.set_auto_load_most_recent_route(new_value)
+        self.auto_load_menu_var.set(new_value)
+        # Update landing page checkbox if it exists
+        if hasattr(self, 'landing_page') and hasattr(self.landing_page, 'auto_load_var'):
+            self.landing_page.auto_load_var.set(new_value)
+        return "break"  # Prevent default F2 behavior
+    
+    def _on_landing_page_auto_load_toggle(self):
+        """Handle auto-load toggle from landing page - sync menu."""
+        self.auto_load_menu_var.set(config.get_auto_load_most_recent_route())
+    
     def cancel_and_quit(self, *args, **kwargs):
         self.destroy()
 

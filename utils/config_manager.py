@@ -26,6 +26,7 @@ class Config:
     DEFAULT_DEBUG_MODE = False
     DEFAULT_AUTO_SWITCH = True
     DEFAULT_NOTES_VISIBILITY = False
+    DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE = False
 
     def __init__(self):
         self.reload()
@@ -68,6 +69,7 @@ class Config:
         self._debug_mode = raw.get(const.DEBUG_MODE_KEY, self.DEFAULT_DEBUG_MODE)
         self._auto_switch = raw.get(const.AUTO_SWITCH_KEY, self.DEFAULT_AUTO_SWITCH)
         self._notes_visibility = raw.get(const.NOTES_VISIBILITY_KEY, self.DEFAULT_NOTES_VISIBILITY)
+        self._auto_load_most_recent_route = raw.get(const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY, self.DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE)
     
     def _save(self):
         if not os.path.exists(const.GLOBAL_CONFIG_DIR):
@@ -98,6 +100,7 @@ class Config:
                 const.DEBUG_MODE_KEY: self._debug_mode,
                 const.AUTO_SWITCH_KEY: self._auto_switch,
                 const.NOTES_VISIBILITY_KEY: self._notes_visibility,
+                const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY: self._auto_load_most_recent_route,
             }, f, indent=4)
     
     def set_window_geometry(self, new_geometry):
@@ -272,6 +275,13 @@ class Config:
     
     def are_notes_visible_in_battle_summary(self):
         return self._notes_visibility
+    
+    def set_auto_load_most_recent_route(self, do_auto_load):
+        self._auto_load_most_recent_route = do_auto_load
+        self._save()
+    
+    def get_auto_load_most_recent_route(self):
+        return self._auto_load_most_recent_route
     
     def reset_all_colors(self):
         self._success_color = self.DEFAULT_SUCCESS
