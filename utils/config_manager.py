@@ -27,6 +27,7 @@ class Config:
     DEFAULT_AUTO_SWITCH = True
     DEFAULT_NOTES_VISIBILITY = False
     DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE = False
+    DEFAULT_LANDING_PAGE_SEARCH_FILTER = ""
 
     def __init__(self):
         self.reload()
@@ -70,6 +71,7 @@ class Config:
         self._auto_switch = raw.get(const.AUTO_SWITCH_KEY, self.DEFAULT_AUTO_SWITCH)
         self._notes_visibility = raw.get(const.NOTES_VISIBILITY_KEY, self.DEFAULT_NOTES_VISIBILITY)
         self._auto_load_most_recent_route = raw.get(const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY, self.DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE)
+        self._landing_page_search_filter = raw.get(const.LANDING_PAGE_SEARCH_FILTER_KEY, self.DEFAULT_LANDING_PAGE_SEARCH_FILTER)
     
     def _save(self):
         if not os.path.exists(const.GLOBAL_CONFIG_DIR):
@@ -101,6 +103,7 @@ class Config:
                 const.AUTO_SWITCH_KEY: self._auto_switch,
                 const.NOTES_VISIBILITY_KEY: self._notes_visibility,
                 const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY: self._auto_load_most_recent_route,
+                const.LANDING_PAGE_SEARCH_FILTER_KEY: self._landing_page_search_filter,
             }, f, indent=4)
     
     def set_window_geometry(self, new_geometry):
@@ -282,6 +285,14 @@ class Config:
     
     def get_auto_load_most_recent_route(self):
         return self._auto_load_most_recent_route
+    
+    def set_landing_page_search_filter(self, search_filter):
+        if search_filter != self._landing_page_search_filter:
+            self._landing_page_search_filter = search_filter
+            self._save()
+    
+    def get_landing_page_search_filter(self):
+        return self._landing_page_search_filter
     
     def reset_all_colors(self):
         self._success_color = self.DEFAULT_SUCCESS

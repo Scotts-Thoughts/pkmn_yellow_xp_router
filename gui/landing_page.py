@@ -28,7 +28,9 @@ class LandingPage(ttk.Frame):
         self._current_sort = self.SORT_MOST_RECENT
         self._route_metadata_cache = {}  # Cache: route_name -> (game_version, mtime)
         self._selected_game_filter = "All Games"  # Remember last selected game filter
-        self._search_text = ""  # Current search filter text
+        # Load saved search filter from config
+        saved_search_filter = config.get_landing_page_search_filter()
+        self._search_text = saved_search_filter.strip().lower() if saved_search_filter else ""
         
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(4, weight=1)
@@ -146,7 +148,8 @@ class LandingPage(ttk.Frame):
         self.search_entry = custom_components.SimpleEntry(
             search_frame,
             callback=self._on_search_changed,
-            width=60
+            width=60,
+            initial_value=saved_search_filter if saved_search_filter else ""
         )
         self.search_entry.grid(row=0, column=1, sticky="ew")
         
@@ -273,7 +276,10 @@ class LandingPage(ttk.Frame):
     
     def _on_search_changed(self, *args):
         """Handle search text change."""
-        self._search_text = self.search_entry.get().strip().lower()
+        search_value = self.search_entry.get()
+        self._search_text = search_value.strip().lower()
+        # Save the search filter to config
+        config.set_landing_page_search_filter(search_value)
         self.refresh_routes()
     
     def _get_route_metadata(self, route_name: str) -> Tuple[str, str, str, float]:
