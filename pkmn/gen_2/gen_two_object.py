@@ -222,7 +222,7 @@ class GenTwo(CurrentGen):
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
     
-    def get_move_custom_data(self, move_name) -> List[str]:
+    def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         return gen_two_const.CUSTOM_MOVE_DATA.get(move_name)
     
     def get_hidden_power(self, dvs: universal_data_objects.StatBlock) -> Tuple[str, int]:
