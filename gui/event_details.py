@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class EventDetails(ttk.Frame):
     def __init__(self, controller:MainController, *args, **kwargs):
-        self.state_summary_width = 900
+        self.state_summary_width = 750  # Reduced from 900 to give more space to event list
         self.battle_summary_width = 1400
         self.save_delay = 2
         super().__init__(*args, **kwargs, width=self.state_summary_width)
@@ -37,20 +37,50 @@ class EventDetails(ttk.Frame):
         self.notebook_holder.grid(row=0, column=0, padx=2, pady=2, sticky=tk.NSEW)
         self.notebook_holder.columnconfigure(0, weight=1)
         self.notebook_holder.rowconfigure(0, weight=1)
+        
         self.tabbed_states = ttk.Notebook(self.notebook_holder)
         self.tabbed_states.enable_traversal()
+        # Notebook fills entire space - content area extends full width
+        self.tabbed_states.grid(row=0, column=0, sticky=tk.NSEW)
+        
+        # Place checkbox beside the tabs using place() - positioned after tabs
+        self.auto_change_tab_checkbox = custom_components.CheckboxLabel(self.notebook_holder, text="Switch tabs automatically", flip=True, toggle_command=self._handle_auto_switch_toggle)
+        self.auto_change_tab_checkbox.set_checked(config.do_auto_switch())
+        
+        # Function to position checkbox beside tabs
+        def position_checkbox():
+            try:
+                # Calculate approximate tab width: "Pre-event State" + "Battle Summary" ≈ 250-300px
+                # Position checkbox right after tabs with some padding
+                tab_width = 280  # Approximate width of both tabs
+                self.auto_change_tab_checkbox.place(x=tab_width, y=2)
+            except:
+                pass  # Ignore errors during initialization
+        
+        # Update position after widget is mapped and when tabs change
+        self.notebook_holder.bind('<Map>', lambda e: self.after_idle(position_checkbox))
+        self.tabbed_states.bind('<<NotebookTabChanged>>', lambda e: self.after_idle(position_checkbox))
+        # Also call after initial setup
+        self.after_idle(position_checkbox)
 
         self.pre_state_frame = ttk.Frame(self.tabbed_states)
         self.pre_state_frame.grid(row=0, column=0, padx=2, pady=2, sticky=tk.NSEW)
-        self.auto_change_tab_checkbox = custom_components.CheckboxLabel(self.pre_state_frame, text="Switch tabs automatically", flip=True, toggle_command=self._handle_auto_switch_toggle)
-        self.auto_change_tab_checkbox.grid(column=1, row=0, padx=10, pady=5, columnspan=2)
-        self.auto_change_tab_checkbox.set_checked(config.do_auto_switch())
-        self.state_pre_viewer = StateViewer(self.pre_state_frame)
-        self.state_pre_viewer.grid(column=1, row=2, padx=10, pady=10, columnspan=2)
-
+        # Configure parent frame to have a single column that expands
         self.pre_state_frame.columnconfigure(0, weight=1)
-        self.pre_state_frame.columnconfigure(3, weight=1)
-        self.pre_state_frame.rowconfigure(5, weight=1)
+        self.pre_state_frame.rowconfigure(0, weight=0)  # Top section (state viewer) doesn't expand vertically
+        self.pre_state_frame.rowconfigure(1, weight=1)  # Bottom section (event details) expands vertically
+
+        # Create a container frame for the state viewer section with its own independent column configuration
+        self.state_viewer_container = ttk.Frame(self.pre_state_frame)
+        self.state_viewer_container.grid(row=0, column=0, padx=10, pady=10, sticky=tk.NSEW)
+        # Configure columns independently for the state viewer section
+        self.state_viewer_container.columnconfigure(0, weight=1)
+        self.state_viewer_container.columnconfigure(1, weight=2)  # StateViewer column expands
+        self.state_viewer_container.columnconfigure(2, weight=2)  # StateViewer spans columns 1-2
+        self.state_viewer_container.columnconfigure(3, weight=1)
+        
+        self.state_pre_viewer = StateViewer(self.state_viewer_container)
+        self.state_pre_viewer.grid(column=1, row=0, padx=0, pady=0, columnspan=2, sticky=tk.NSEW)
 
         self.battle_summary_frame = battle_summary.BattleSummary(self._battle_summary_controller, self.tabbed_states, width=self.battle_summary_width)
         self.battle_summary_frame.grid(row=1, column=0, padx=2, pady=2)
@@ -60,16 +90,19 @@ class EventDetails(ttk.Frame):
         self.pre_state_tab_index = 0
         self.tabbed_states.add(self.battle_summary_frame, text="Battle Summary")
         self.battle_summary_tab_index = 1
-        self.tabbed_states.grid(row=0, column=0, sticky=tk.NSEW)
         self.tabbed_states.columnconfigure(0, weight=1)
         self.tabbed_states.rowconfigure(0, weight=1)
 
+        # Create a container frame for the event details section with its own independent column configuration
         self.event_details_frame = ttk.Frame(self.pre_state_frame)
-        self.event_details_frame.grid(row=5, column=0, columnspan=4, sticky=tk.NSEW)
+        self.event_details_frame.grid(row=1, column=0, padx=10, pady=10, sticky=tk.NSEW)
+        # Configure columns independently for the event details section
+        self.event_details_frame.columnconfigure(0, weight=1)
+        self.event_details_frame.columnconfigure(1, weight=1)
+        self.event_details_frame.columnconfigure(2, weight=1)
+        self.event_details_frame.columnconfigure(3, weight=1)
         self.event_details_frame.rowconfigure(0, weight=1, uniform="group")
         self.event_details_frame.rowconfigure(2, weight=1, uniform="group")
-        self.event_details_frame.columnconfigure(0, weight=1, uniform="group")
-        self.event_details_frame.columnconfigure(2, weight=1, uniform="group")
 
         self.footer_frame = ttk.Frame(self)
         self.footer_frame.grid(row=1, column=0, padx=5, pady=(2, 2), sticky=tk.EW)

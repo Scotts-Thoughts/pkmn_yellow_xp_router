@@ -334,8 +334,9 @@ class MainWindow(tk.Tk):
         self.event_details.pack_propagate(0)
 
         self.info_panel.grid_rowconfigure(0, weight=1)
-        # these uniform values don't have to be a specific value, they just have to match
-        self.info_panel.grid_columnconfigure(0, weight=1, uniform="test")
+        # Configure columns: left panel (event list) gets more space, right panel (event details) gets less
+        self.info_panel.grid_columnconfigure(0, weight=3)  # Left panel (event list)
+        self.info_panel.grid_columnconfigure(1, weight=1)  # Right panel (event details)
 
         # main route actions
         self.bind('<Control-x>', self.open_customize_dvs_window)

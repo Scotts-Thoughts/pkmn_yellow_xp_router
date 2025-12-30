@@ -87,17 +87,15 @@ class NotesEditor(EventEditorBase):
 
         self._notes_label = ttk.Label(self, text="Notes:")
         self._notes_label.grid(row=self._cur_row, column=0, sticky=tk.W, padx=5, pady=(2, 2))
-        self._stat_label = ttk.Label(self, text="Stats with * are calculated with a badge boost", style="Contrast.TLabel")
-        self._stat_label.grid(row=self._cur_row, column=1, sticky=tk.W, padx=5, pady=(2, 2))
         visibility_label = ttk.Label(self, text="Battle summary notes:")
-        visibility_label.grid(row=self._cur_row, column=2, sticky=tk.E, padx=5, pady=(2, 2))
+        visibility_label.grid(row=self._cur_row, column=1, sticky=tk.E, padx=5, pady=(2, 2))
         self._visibility = custom_components.SimpleOptionMenu(
             self, 
             ["Show notes in battle summary when space allows", "Show notes in battle summary at all times", "Never show notes in battle summary"],
             callback=self._on_visibility_changed,
             width=50  # Make dropdown wider to show full text
         )
-        self._visibility.grid(row=self._cur_row, column=3, sticky=tk.E, padx=5, pady=(2, 2))
+        self._visibility.grid(row=self._cur_row, column=2, sticky=tk.E, padx=5, pady=(2, 2))
         # Initialize dropdown with current setting
         self._load_visibility_setting()
         self._cur_row += 1
@@ -200,8 +198,14 @@ class TrainerFightEditor(EventEditorBase):
 
         self._info_frame = ttk.Frame(self)
         self._info_frame.pack(fill=tk.BOTH)
-        self._info_frame.columnconfigure(0, weight=1, uniform="group")
-        self._info_frame.columnconfigure(13, weight=1, uniform="group")
+        # Configure columns 0 and 13 as minimal spacers
+        self._info_frame.columnconfigure(0, weight=0, minsize=0)
+        self._info_frame.columnconfigure(13, weight=0, minsize=0)
+        # Configure columns 1-12 for equal spacing of enemy Pokemon
+        # All columns 1-12 use the same uniform name so they're equal width
+        # Each Pokemon spans 4 columns, so each Pokemon gets equal space (4/12 = 1/3)
+        for col in range(1, 13):
+            self._info_frame.columnconfigure(col, weight=1, uniform="pkmn_col")
         self._info_frame.rowconfigure(0, weight=1, uniform="group")
         self._info_frame.rowconfigure(5, weight=1, uniform="group")
         self._all_pkmn = [PkmnViewer(self._info_frame, font_size=10) for _ in range(6)]
@@ -262,16 +266,19 @@ class TrainerFightEditor(EventEditorBase):
             col_idx = 4 * (idx % 3) + 1
 
             self._all_pkmn[idx].set_pkmn(cur_pkmn, speed_style=speed_style)
-            self._all_pkmn[idx].grid(row=row_idx, column=col_idx, columnspan=4, padx=5, pady=5)
+            # Pokemon stats take most of the space, controls tucked underneath
+            self._all_pkmn[idx].grid(row=row_idx, column=col_idx, columnspan=4, padx=5, pady=(5, 0), sticky=tk.NW)
 
-            self._all_order_labels[idx].grid(row=row_idx + 1, column=col_idx, padx=2, pady=(5, 10))
+            # Tuck Mon Order and Exp Split controls under the stats area in a compact layout
+            # Put them side by side in the same row, using less horizontal space
+            self._all_order_labels[idx].grid(row=row_idx + 1, column=col_idx, padx=(5, 2), pady=(2, 5), sticky=tk.W)
             self._all_order_menus[idx].new_values(order_values)
             self._all_order_menus[idx].set(cur_pkmn.mon_order)
-            self._all_order_menus[idx].grid(row=row_idx + 1, column=col_idx + 1, padx=2, pady=(5, 10))
+            self._all_order_menus[idx].grid(row=row_idx + 1, column=col_idx + 1, padx=2, pady=(2, 5), sticky=tk.W)
 
-            self._all_exp_labels[idx].grid(row=row_idx + 1, column=col_idx + 2, padx=2, pady=(5, 10))
+            self._all_exp_labels[idx].grid(row=row_idx + 1, column=col_idx + 2, padx=(10, 2), pady=(2, 5), sticky=tk.W)
             self._all_exp_splits[idx].set(cur_pkmn.exp_split)
-            self._all_exp_splits[idx].grid(row=row_idx + 1, column=col_idx + 3, padx=2, pady=(5, 10))
+            self._all_exp_splits[idx].grid(row=row_idx + 1, column=col_idx + 3, padx=2, pady=(2, 5), sticky=tk.W)
 
         
         for missing_idx in range(idx+1, 6):

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class StatExpViewer(ttk.Frame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.config(height=150, width=250)
+        self.config(height=150)  # Removed fixed width to allow horizontal expansion
         self._net_gain_column:StatColumn = None
         self._realized_stat_xp_column:StatColumn = None
         self._total_stat_xp_column:StatColumn = None
@@ -63,6 +63,11 @@ class StatExpViewer(ttk.Frame):
         self._total_stat_xp_column.set_labels(self._stat_labels)
         self._total_stat_xp_column.set_header(total_header)
         self._total_stat_xp_column.grid(row=0, column=2)
+        
+        # Configure columns to expand horizontally
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
+        self.columnconfigure(2, weight=1)
 
     def _vals_from_stat_block(self, stat_block:universal_data_objects.StatBlock):
         if current_gen_info().get_generation() >= 2:

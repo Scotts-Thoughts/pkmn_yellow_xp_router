@@ -42,6 +42,10 @@ class PkmnViewer(ttk.Frame):
 
         if not self.stats_only:
             self.move_column.grid(row=5, column=1, sticky=tk.E)
+        
+        # Configure columns to expand horizontally
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
 
 
     def set_pkmn(self, pkmn:universal_data_objects.EnemyPkmn, badges:universal_data_objects.BadgeList=None, speed_style=None):

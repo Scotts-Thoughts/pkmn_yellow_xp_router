@@ -14,12 +14,21 @@ logger = logging.getLogger(__name__)
 class StateViewer(ttk.Frame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Solo Pokemon stats at the top - expand horizontally to fill available space
         self.pkmn = PkmnViewer(self, font_size=12)
-        self.pkmn.grid(row=0, column=0, padx=5, pady=5, sticky=tk.S)
+        self.pkmn.grid(row=0, column=0, padx=5, pady=5, sticky=tk.NSEW)
+        # Stat experience underneath the main stats - expand horizontally
         self.stat_xp = StatExpViewer(self)
-        self.stat_xp.grid(row=0, column=1, padx=5, pady=5, sticky=tk.S)
+        self.stat_xp.grid(row=1, column=0, padx=5, pady=5, sticky=tk.NSEW)
+        # Badge boost note in the main content area
+        self._badge_boost_label = ttk.Label(self, text="Stats with * are calculated with a badge boost", style="Contrast.TLabel")
+        self._badge_boost_label.grid(row=2, column=0, padx=5, pady=(0, 5), sticky=tk.W)
+        # Inventory gets more space (spans all rows) - expand to fill
         self.inventory = InventoryViewer(self)
-        self.inventory.grid(row=0, column=2, padx=5, pady=5, sticky=tk.S)
+        self.inventory.grid(row=0, column=1, rowspan=3, padx=5, pady=5, sticky=tk.NSEW)
+        # Configure columns: both columns expand to fill horizontal space
+        self.columnconfigure(0, weight=1)  # Stats column expands
+        self.columnconfigure(1, weight=2)  # Inventory gets more space
     
     def set_state(self, cur_state:full_route_state.RouteState):
         if cur_state is None:
