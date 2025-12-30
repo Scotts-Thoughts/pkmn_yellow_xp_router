@@ -38,6 +38,7 @@ class Config:
             raw = {}
         
         self._window_geometry = raw.get(const.CONFIG_WINDOW_GEOMETRY, "")
+        self._window_state = raw.get(const.CONFIG_WINDOW_STATE, "normal")
         self._user_data_dir = raw.get(const.USER_LOCATION_DATA_KEY, io_utils.get_default_user_data_dir())
         const.config_user_data_dir(self._user_data_dir)
         self._images_dir = raw.get(
@@ -75,6 +76,7 @@ class Config:
         with open(const.GLOBAL_CONFIG_FILE, 'w') as f:
             json.dump({
                 const.CONFIG_WINDOW_GEOMETRY: self._window_geometry,
+                const.CONFIG_WINDOW_STATE: self._window_state,
                 const.USER_LOCATION_DATA_KEY: self._user_data_dir,
                 const.SUCCESS_COLOR_KEY: self._success_color,
                 const.WARNING_COLOR_KEY: self._warning_color,
@@ -105,6 +107,14 @@ class Config:
 
     def get_window_geometry(self):
         return self._window_geometry
+    
+    def set_window_state(self, new_state):
+        if new_state != self._window_state:
+            self._window_state = new_state
+            self._save()
+
+    def get_window_state(self):
+        return self._window_state
     
     def get_user_data_dir(self):
         return self._user_data_dir

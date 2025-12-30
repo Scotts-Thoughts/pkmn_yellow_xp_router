@@ -23,6 +23,8 @@ from gui.popups.custom_gen_popup import CustomGenWindow
 from gui.recorder_status import RecorderStatus
 from gui.route_search_component import RouteSearch
 from gui.setup_summary_window import SetupSummaryWindow
+from gui.landing_page import LandingPage
+from gui.new_route_page import NewRoutePage
 from route_recording.recorder import RecorderController
 from utils.constants import const
 from utils.config_manager import config
@@ -43,6 +45,14 @@ class MainWindow(tk.Tk):
         if not geometry:
             geometry = "2000x1200"
         self.geometry(geometry)
+        
+        # Restore window state (maximized/normal)
+        window_state = config.get_window_state()
+        if window_state == "zoomed":
+            self.state("zoomed")
+        elif window_state == "iconic":
+            self.state("iconic")
+        
         self.title("Pokemon RBY XP Router")
 
         self.call("source", os.path.join(const.ASSETS_PATH, "azure.tcl"))
@@ -59,6 +69,7 @@ class MainWindow(tk.Tk):
         self.file_menu.add_command(label="New Route", accelerator="Ctrl+N", command=self.open_new_route_window)
         self.file_menu.add_command(label="Load Route", accelerator="Ctrl+L", command=self.open_load_route_window)
         self.file_menu.add_command(label="Save Route", accelerator="Ctrl+S", command=self.save_route)
+        self.file_menu.add_command(label="Close Route", accelerator="Ctrl+Shift+C", command=self.close_route)
         self.file_menu.add_command(label="Export Notes", accelerator="Ctrl+Shift+W", command=self.export_notes)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Screenshot Event List", command=self.screenshot_event_list)
@@ -83,17 +94,42 @@ class MainWindow(tk.Tk):
         self.folder_menu.add_command(label="New Folder", command=self.open_new_folder_window)
         self.folder_menu.add_command(label="Rename Cur Folder", command=self.rename_folder)
 
+        self.recording_menu = tk.Menu(self.top_menu_bar, tearoff=0)
+        self.recording_menu.add_command(label="Enable/Disable Recording", accelerator="F1", command=self.record_button_clicked)
+
         self.top_menu_bar.add_cascade(label="File", menu=self.file_menu)
         self.top_menu_bar.add_cascade(label="Events", menu=self.event_menu)
         self.top_menu_bar.add_cascade(label="Folders", menu=self.folder_menu)
+        self.top_menu_bar.add_cascade(label="Recording", menu=self.recording_menu)
 
         # main container for everything to sit in... might be unnecessary?
         self.primary_window = ttk.Frame(self)
         self.primary_window.pack(fill=tk.BOTH, expand=True)
 
-        # create container for split columns
+        # Landing page (shown when no route is loaded)
+        self.landing_page = LandingPage(
+            self.primary_window,
+            self._controller,
+            on_create_route=self.open_new_route_window,
+            on_load_route=self._load_route_from_landing_page
+        )
+        self.landing_page.pack(fill=tk.BOTH, expand=True)
+
+        # Track if route was loaded before opening new route page
+        self._route_loaded_before_new_route = False
+        
+        # New route page (shown when creating a new route)
+        self.new_route_page = NewRoutePage(
+            self.primary_window,
+            self._controller,
+            on_cancel=self._cancel_new_route_page,
+            on_create=self._create_route_from_page
+        )
+        # Don't pack initially - will be shown when creating new route
+
+        # create container for split columns (hidden initially)
         self.info_panel = ttk.Frame(self.primary_window)
-        self.info_panel.pack(expand=True, fill=tk.BOTH)
+        # Don't pack initially - will be shown when route is loaded
 
         # left panel for controls and event list
         self.left_info_panel = ttk.Frame(self.info_panel)
@@ -130,6 +166,10 @@ class MainWindow(tk.Tk):
 
         self.top_left_controls = ttk.Frame(self.left_info_panel)
         self.top_left_controls.pack(fill=tk.X, anchor=tk.CENTER)
+        # Configure columns: 3 columns for Trainers/Items/Wild Pkmn
+        self.top_left_controls.grid_columnconfigure(0, weight=1, uniform="quick_add")
+        self.top_left_controls.grid_columnconfigure(1, weight=1, uniform="quick_add")
+        self.top_left_controls.grid_columnconfigure(2, weight=1, uniform="quick_add")
 
         self.recorder_status = RecorderStatus(self._controller, self._recorder_controller, self.top_left_controls)
 
@@ -153,55 +193,57 @@ class MainWindow(tk.Tk):
             self.top_left_controls,
         )
 
-        self.recorder_status.grid(row=0, column=0, sticky=tk.NSEW, padx=5, pady=5, columnspan=4)
-        self.trainer_add.grid(row=0, column=0, sticky=tk.NSEW, padx=5, pady=5)
-        self.item_add.grid(row=0, column=1, sticky=tk.NSEW, padx=5, pady=5)
-        self.wild_pkmn_add.grid(row=0, column=2, sticky=tk.NSEW, padx=5, pady=5)
-        self.misc_add.grid(row=0, column=3, sticky=tk.NSEW, padx=5, pady=5)
-
-        self.group_controls = ttk.Frame(self.left_info_panel)
-        self.group_controls.pack(fill=tk.X, anchor=tk.CENTER)
+        # Container for filters and control buttons (left side of second row)
+        self.filters_and_controls_frame = ttk.Frame(self.top_left_controls)
+        
+        # Route search (filters) - inside the filters_and_controls_frame
+        self.route_search = RouteSearch(self._controller, self.filters_and_controls_frame)
+        
+        # Group controls (buttons) - inside the filters_and_controls_frame, above filters
+        self.group_controls = ttk.Frame(self.filters_and_controls_frame)
 
         button_spacing_cols = []
         button_col_idx = 0
 
-        self.show_summary_btn = custom_components.SimpleButton(self.group_controls, text='Run Summary', command=self.open_summary_window, width=15)
-        self.show_summary_btn.grid(row=0, column=button_col_idx, padx=5, pady=1, sticky=tk.NSEW)
-        self.show_setup_summary_btn = custom_components.SimpleButton(self.group_controls, text='Setup Summary', command=self.open_setup_summary_window, width=15)
-        self.show_setup_summary_btn.grid(row=1, column=button_col_idx, padx=5, pady=1, sticky=tk.NSEW)
+        # Compress buttons to fit within filter area - reduce width and padding
+        self.show_summary_btn = custom_components.SimpleButton(self.group_controls, text='Run Summary', command=self.open_summary_window, width=12)
+        self.show_summary_btn.grid(row=0, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
+        self.show_setup_summary_btn = custom_components.SimpleButton(self.group_controls, text='Setup Summary', command=self.open_setup_summary_window, width=12)
+        self.show_setup_summary_btn.grid(row=1, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
         button_col_idx += 1
 
         button_spacing_cols.append(button_col_idx)
         button_col_idx += 1
         
-        self.move_group_up_button = custom_components.SimpleButton(self.group_controls, text='Move Event Up', command=self.move_group_up, width=15)
-        self.move_group_up_button.grid(row=0, column=button_col_idx, padx=5, pady=1)
-        self.move_group_down_button = custom_components.SimpleButton(self.group_controls, text='Move Event Down', command=self.move_group_down, width=15)
-        self.move_group_down_button.grid(row=1, column=button_col_idx, padx=5, pady=1)
+        self.move_group_up_button = custom_components.SimpleButton(self.group_controls, text='Move Event Up', command=self.move_group_up, width=12)
+        self.move_group_up_button.grid(row=0, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
+        self.move_group_down_button = custom_components.SimpleButton(self.group_controls, text='Move Event Down', command=self.move_group_down, width=12)
+        self.move_group_down_button.grid(row=1, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
         button_col_idx += 1
 
-        self.highlight_toggle_button = custom_components.SimpleButton(self.group_controls, text='Enable/Disable', command=self.toggle_enable_disable, width=15)
-        self.highlight_toggle_button.grid(row=0, column=button_col_idx, padx=5, pady=1)
-        self.highlight_toggle_button = custom_components.SimpleButton(self.group_controls, text='Toggle Highlight', command=self.toggle_event_highlight, width=15)
-        self.highlight_toggle_button.grid(row=1, column=button_col_idx, padx=5, pady=1)
-        button_col_idx += 1
-
-        button_spacing_cols.append(button_col_idx)
-        button_col_idx += 1
-
-        self.transfer_event_button = custom_components.SimpleButton(self.group_controls, text='Transfer Event', command=self.open_transfer_event_window, width=15)
-        self.transfer_event_button.grid(row=0, column=button_col_idx, padx=5, pady=1)
-        self.delete_event_button = custom_components.SimpleButton(self.group_controls, text='Delete Event', command=self.delete_group, width=15)
-        self.delete_event_button.grid(row=1, column=button_col_idx, padx=5, pady=1)
+        self.highlight_toggle_button = custom_components.SimpleButton(self.group_controls, text='Enable/Disable', command=self.toggle_enable_disable, width=12)
+        self.highlight_toggle_button.grid(row=0, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
+        self.highlight_toggle_button2 = custom_components.SimpleButton(self.group_controls, text='Toggle Highlight', command=self.toggle_event_highlight, width=12)
+        self.highlight_toggle_button2.grid(row=1, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
         button_col_idx += 1
 
         button_spacing_cols.append(button_col_idx)
         button_col_idx += 1
 
-        self.new_folder_button = custom_components.SimpleButton(self.group_controls, text='New Folder', command=self.open_new_folder_window, width=15)
-        self.new_folder_button.grid(row=0, column=button_col_idx, padx=5, pady=1)
-        self.rename_folder_button = custom_components.SimpleButton(self.group_controls, text='Rename Folder', command=self.rename_folder, width=15)
-        self.rename_folder_button.grid(row=1, column=button_col_idx, padx=5, pady=1)
+        self.transfer_event_button = custom_components.SimpleButton(self.group_controls, text='Transfer Event', command=self.open_transfer_event_window, width=12)
+        self.transfer_event_button.grid(row=0, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
+        self.delete_event_button = custom_components.SimpleButton(self.group_controls, text='Delete Event', command=self.delete_group, width=12)
+        self.delete_event_button.grid(row=1, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
+        button_col_idx += 1
+
+        button_spacing_cols.append(button_col_idx)
+        button_col_idx += 1
+
+        # New Folder and Rename Folder buttons - compressed to fit within filter toggle space
+        self.new_folder_button = custom_components.SimpleButton(self.group_controls, text='New Folder', command=self.open_new_folder_window, width=12)
+        self.new_folder_button.grid(row=0, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
+        self.rename_folder_button = custom_components.SimpleButton(self.group_controls, text='Rename Folder', command=self.rename_folder, width=12)
+        self.rename_folder_button.grid(row=1, column=button_col_idx, padx=2, pady=1, sticky=tk.NSEW)
         button_col_idx += 1
 
         button_spacing_cols.append(button_col_idx)
@@ -210,8 +252,22 @@ class MainWindow(tk.Tk):
         for cur_spacer_idx in button_spacing_cols:
             self.group_controls.columnconfigure(cur_spacer_idx, weight=1)
 
-        self.route_search = RouteSearch(self._controller, self.left_info_panel)
+        # Pack group_controls first (above filters), then route_search (filters)
+        self.group_controls.pack(fill=tk.X, anchor=tk.CENTER)
         self.route_search.pack(fill=tk.X, anchor=tk.CENTER)
+
+        # Initially hide recorder_status, show quick add components
+        self.recorder_status.grid(row=0, column=0, sticky=tk.NSEW, padx=5, pady=5, columnspan=3)
+        self.recorder_status.grid_remove()  # Hide initially
+        
+        # Row 1: Trainers, Items, Wild Pkmn
+        self.trainer_add.grid(row=1, column=0, sticky=tk.NSEW, padx=5, pady=5)
+        self.item_add.grid(row=1, column=1, sticky=tk.NSEW, padx=5, pady=5)
+        self.wild_pkmn_add.grid(row=1, column=2, sticky=tk.NSEW, padx=5, pady=5)
+        
+        # Row 2: Filters/Controls on left (columns 0-1), Misc on right (column 2, aligned with Wild Pkmn)
+        self.filters_and_controls_frame.grid(row=2, column=0, columnspan=2, sticky=tk.NSEW, padx=5, pady=5)
+        self.misc_add.grid(row=2, column=2, sticky=tk.NSEW, padx=5, pady=5)
 
         self.frame_for_event_list = ttk.Frame(self.left_info_panel)
         self.frame_for_event_list.pack(fill=tk.BOTH, anchor=tk.CENTER, expand=True)
@@ -238,6 +294,7 @@ class MainWindow(tk.Tk):
         self.bind('<Control-n>', self.open_new_route_window)
         self.bind('<Control-a>', self.open_load_route_window)
         self.bind('<Control-s>', self.save_route)
+        self.bind('<Control-C>', self.close_route)  # Ctrl+Shift+C
         self.bind('<Control-W>', self.export_notes)
         # event actions
         self.bind('<Control-d>', self.move_group_down)
@@ -246,6 +303,9 @@ class MainWindow(tk.Tk):
         self.bind('<Control-r>', self.open_transfer_event_window)
         self.bind('<Control-b>', self.delete_group)
         self.bind('<Delete>', self.delete_group)
+        # recording actions
+        self.bind_all('<KeyPress-F1>', self.record_button_clicked)
+        self.bind_all('<F1>', self.record_button_clicked)
         # navigation
         self.bind('<Home>', self.scroll_to_top)
         self.bind('<End>', self.scroll_to_bottom)
@@ -275,12 +335,15 @@ class MainWindow(tk.Tk):
         self.bind(self._controller.register_record_mode_change(self), self._on_record_mode_changed)
         self.bind(self._controller.register_message_callback(self), self._on_route_message)
         # TODO: should this be moved directly to the event list class?
-        self.bind(self._controller.register_route_change(self), self.event_list.refresh)
+        self.bind(self._controller.register_route_change(self), self._on_route_change)
 
         self.event_list.refresh()
         self.new_event_window = None
         self.summary_window = None
         self.setup_summary_window = None
+        
+        # Initially show landing page, hide route controls
+        self._show_landing_page()
 
     def run(self):
         # TODO: is this the right place for it?
@@ -292,7 +355,16 @@ class MainWindow(tk.Tk):
             time.sleep(0.015)
     
     def _on_close(self, *args, **kwargs):
+        # Save window geometry and state
         config.set_window_geometry(self.geometry())
+        # Get current window state (zoomed = maximized, normal = not maximized)
+        current_state = self.state()
+        if current_state == "zoomed":
+            config.set_window_state("zoomed")
+        elif current_state == "iconic":
+            config.set_window_state("iconic")
+        else:
+            config.set_window_state("normal")
 
         if self._controller.has_unsaved_changes():
             if not messagebox.askyesno("Quit?", "Route has unsaved changes. Quit without saving?"):
@@ -324,6 +396,16 @@ class MainWindow(tk.Tk):
     
     def _on_route_message(self, *args, **kwargs):
         self.message_label.set_message(self._controller.get_next_message_info())
+    
+    def _on_route_change(self, *args, **kwargs):
+        """Handle route change event - refresh event list and show route controls."""
+        self.event_list.refresh()
+        # Show route controls if we have a route loaded (has init_route_state set)
+        # Check if route has been initialized (has a pokemon version)
+        if self._controller.get_version() is not None:
+            self._show_route_controls()
+        else:
+            self._show_landing_page()
 
     def save_route(self, *args, **kwargs):
         route_name = self.route_name.get()
@@ -379,16 +461,30 @@ class MainWindow(tk.Tk):
         )
         self.record_button.enable()
     
-    def record_button_clicked(self, *args, **kwargs):
+    def record_button_clicked(self, event=None):
+        """Toggle recording mode - can be called from button, menu, or F1 key."""
         self._controller.set_record_mode(not self._controller.is_record_mode_active())
+        return "break"  # Prevent default F1 behavior (Windows help)
     
     def _on_record_mode_changed(self, *args, **kwargs):
         if self._controller.is_record_mode_active():
             self.record_button.configure(text="Cancel\nRecording")
-            self.recorder_status.lift()
+            # Show recorder status, hide quick add components and filters/controls
+            self.recorder_status.grid()
+            self.trainer_add.grid_remove()
+            self.item_add.grid_remove()
+            self.wild_pkmn_add.grid_remove()
+            self.misc_add.grid_remove()
+            self.filters_and_controls_frame.grid_remove()
         else:
             self.record_button.configure(text="Enable\nRecording")
-            self.recorder_status.lower()
+            # Hide recorder status, show quick add components and filters/controls
+            self.recorder_status.grid_remove()
+            self.trainer_add.grid()
+            self.item_add.grid()
+            self.wild_pkmn_add.grid()
+            self.misc_add.grid()
+            self.filters_and_controls_frame.grid()
         self._handle_new_selection()
 
     def trainer_preview(self, *args, **kwargs):
@@ -478,10 +574,95 @@ class MainWindow(tk.Tk):
         ConfigWindow(self)
     
     def open_new_route_window(self, *args, **kwargs):
-        NewRouteWindow(self, self._controller)
+        """Show the new route creation page."""
+        # Track if a route was loaded before opening new route page
+        self._route_loaded_before_new_route = self._controller.get_version() is not None
+        self._show_new_route_page()
+    
+    def _show_new_route_page(self):
+        """Show new route page and hide other views."""
+        self.landing_page.pack_forget()
+        self.info_panel.pack_forget()
+        self.new_route_page.pack(fill=tk.BOTH, expand=True)
+    
+    def _cancel_new_route_page(self):
+        """Handle cancel from new route page - return to route if one was loaded, otherwise landing page."""
+        if self._route_loaded_before_new_route:
+            # Return to the route that was loaded before
+            self._show_route_controls()
+        else:
+            # No route was loaded, go to landing page
+            self._show_landing_page()
+        self._route_loaded_before_new_route = False  # Reset flag
+    
+    def _create_route_from_page(self, solo_mon, base_route_path, pkmn_version, custom_dvs=None, custom_ability_idx=None, custom_nature=None):
+        """Create route from the new route page."""
+        self._controller.create_new_route(
+            solo_mon,
+            base_route_path,
+            pkmn_version,
+            custom_dvs=custom_dvs,
+            custom_ability_idx=custom_ability_idx,
+            custom_nature=custom_nature
+        )
+        # Route controls will be shown via route change event
+    
+    def close_route(self, *args, **kwargs):
+        """Close the current route and return to landing page."""
+        # Check if there's actually a route loaded
+        if self._controller.get_version() is None:
+            return
+        
+        # Check for unsaved changes
+        if self._controller.has_unsaved_changes():
+            response = messagebox.askyesnocancel(
+                "Unsaved Changes",
+                "Route has unsaved changes. Save before closing?"
+            )
+            if response is None:  # Cancel
+                return
+            elif response:  # Yes - save
+                route_name = self.route_name.get()
+                if not route_name:
+                    messagebox.showwarning("No Route Name", "Please enter a route name before saving.")
+                    return
+                self._controller.save_route(route_name)
+        
+        # Clear the route by resetting the router state
+        self._controller._data.init_route_state = None
+        self._controller._data.pkmn_version = None
+        self._controller._data._reset_events()
+        self._controller._data.level_up_move_defs = {}
+        self._controller._data.defeated_trainers = set()
+        self._controller._route_name = ""
+        self._controller._selected_ids = []
+        self._controller._unsaved_changes = False
+        self._controller._on_name_change()
+        self._controller._on_version_change()
+        self._controller._on_event_selection()
+        self._controller._on_route_change()
     
     def open_load_route_window(self, *args, **kwargs):
         LoadRouteWindow(self, self._controller)
+    
+    def _load_route_from_landing_page(self, route_path):
+        """Load a route from the landing page."""
+        self._controller.load_route(route_path)
+        self._show_route_controls()
+    
+    def _show_landing_page(self):
+        """Show landing page and hide route controls."""
+        self.new_route_page.pack_forget()
+        self.info_panel.pack_forget()
+        self.landing_page.pack(fill=tk.BOTH, expand=True)
+        # Refresh landing page route list
+        self.landing_page.refresh_routes()
+    
+    def _show_route_controls(self):
+        """Show route controls and hide landing page."""
+        self.landing_page.pack_forget()
+        self.new_route_page.pack_forget()
+        self.info_panel.pack(expand=True, fill=tk.BOTH)
 
     def open_customize_dvs_window(self, *args, **kwargs):
         if self._controller.is_empty():

@@ -325,6 +325,7 @@ class Constants:
 
         self.CONFIG_ROUTE_ONE_PATH = "route_one_path"
         self.CONFIG_WINDOW_GEOMETRY = "tkinter_window_geometry"
+        self.CONFIG_WINDOW_STATE = "tkinter_window_state"
 
         self.STATE_SUMMARY_LABEL = "State Summary"
         self.BADGE_BOOST_LABEL = "Badge Boost Calculator"
