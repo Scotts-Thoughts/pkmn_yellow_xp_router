@@ -108,6 +108,9 @@ class CurrentGen:
     def is_major_fight(self, trainer_name) -> str:
         raise NotImplementedError()
     
+    def get_gym_leader_names(self) -> List[str]:
+        raise NotImplementedError()
+    
     def get_move_custom_data(self, move_name) -> List[str]:
         raise NotImplementedError()
     

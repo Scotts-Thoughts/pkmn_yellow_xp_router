@@ -222,6 +222,10 @@ class GenTwo(CurrentGen):
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
     
+    def get_gym_leader_names(self) -> List[str]:
+        # Gen 2 always uses the first 8 trainers (indices 0-7) - Johto gym leaders
+        return self._major_fights[:8]
+    
     def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         return gen_two_const.CUSTOM_MOVE_DATA.get(move_name)
     

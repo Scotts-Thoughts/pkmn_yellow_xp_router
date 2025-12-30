@@ -207,6 +207,10 @@ class GenOne(CurrentGen):
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
     
+    def get_gym_leader_names(self) -> List[str]:
+        # Gen 1 always uses the first 8 trainers (indices 0-7)
+        return self._major_fights[:8]
+    
     def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         # Gen one moves that require custom data are already handled by the rendering engine
         # Mimc, and all multi-hit moves

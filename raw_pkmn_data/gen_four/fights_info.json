@@ -28,11 +28,6 @@
         "Leader Blue"    : "earth"
     },
     "major_fights": [
-        "Galactic Boss Cyrus Rematch 3",
-        "Rival Chimchar 7",
-        "Rival Piplup 7",
-        "Rival Turtwig 7",
-
         "Leader Roark",
         "Leader Gardenia",
         "Leader Maylene",
@@ -42,12 +37,6 @@
         "Leader Candice",
         "Leader Volkner",
 
-        "Elite Four Aaron",
-        "Elite Four Bertha",
-        "Elite Four Flint",
-        "Elite Four Lucian",
-        "Champion Cynthia",
-
         "Leader Falkner",
         "Leader Bugsy",
         "Leader Whitney",
@@ -56,7 +45,19 @@
         "Leader Jasmine",
         "Leader Pryce",
         "Leader Clair",
+
         "Leader Blue",
+
+        "Galactic Boss Cyrus Rematch 3",
+        "Rival Chimchar 7",
+        "Rival Piplup 7",
+        "Rival Turtwig 7",
+
+        "Elite Four Aaron",
+        "Elite Four Bertha",
+        "Elite Four Flint",
+        "Elite Four Lucian",
+        "Champion Cynthia",
 
         "Elite Four Will",
         "Elite Four Koga",

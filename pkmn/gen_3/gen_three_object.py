@@ -214,6 +214,17 @@ class GenThree(CurrentGen):
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
     
+    def get_gym_leader_names(self) -> List[str]:
+        # FireRed/LeafGreen use trainers 8-15 (Kanto gym leaders)
+        if self._version_name in [const.FIRE_RED_VERSION, const.LEAF_GREEN_VERSION]:
+            return self._major_fights[8:16]
+        # Emerald: Use indices 0-6, then 8 (Juan instead of Wallace)
+        elif self._version_name == const.EMERALD_VERSION:
+            return self._major_fights[:7] + [self._major_fights[8]]
+        # Ruby/Sapphire: Use indices 0-7 (ending with Wallace)
+        else:
+            return self._major_fights[:8]
+    
     def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         base_options = gen_three_const.CUSTOM_MOVE_DATA.get(move_name)
         

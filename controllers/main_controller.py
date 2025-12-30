@@ -517,6 +517,22 @@ class MainController:
         
         # Can't insert after EventItems, only other event types
         return not isinstance(cur_obj, EventItem)
+    
+    def find_first_event_by_trainer_name(self, trainer_name):
+        """Find the first event in the route that matches the given trainer name."""
+        def search_folder(folder):
+            for child in folder.children:
+                if isinstance(child, EventFolder):
+                    result = search_folder(child)
+                    if result is not None:
+                        return result
+                elif isinstance(child, routing.route_events.EventGroup):
+                    if (child.event_definition.trainer_def is not None and 
+                        child.event_definition.trainer_def.trainer_name == trainer_name):
+                        return child.group_id
+            return None
+        
+        return search_folder(self._data.root_folder)
 
     def save_route(self, route_name):
         try:

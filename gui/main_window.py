@@ -374,6 +374,8 @@ class MainWindow(tk.Tk):
         self.bind('<Shift-F2>', self._toggle_move_highlights)
         # tab switching
         self.bind('<grave>', self._toggle_event_tabs)
+        # Run Summary shortcut
+        self.bind('<Control-grave>', self.open_summary_window)
         # navigation
         self.bind('<Home>', self.scroll_to_top)
         self.bind('<End>', self.scroll_to_bottom)
@@ -397,6 +399,9 @@ class MainWindow(tk.Tk):
         self.bind('<F10>', self.toggle_enemy_highlight_strategy)
         # Event actions
         self.bind('<Control-e>', self.move_group_up)
+        # Gym leader shortcuts (1-8 keys)
+        for i in range(1, 9):
+            self.bind(f'<Key-{i}>', lambda event, gym_idx=i-1: self.select_gym_leader(gym_idx))
         # detail update function
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<<TreeviewSelect>>", self._report_new_selection)
@@ -706,6 +711,35 @@ class MainWindow(tk.Tk):
         if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
             self.event_details._battle_summary_controller._full_refresh()
         return "break"  # Prevent default F10 behavior
+    
+    def select_gym_leader(self, gym_idx):
+        """Select a gym leader event by index (0-7 for keys 1-8)."""
+        # Only work if a route is loaded
+        if self._controller.get_version() is None:
+            return "break"
+        
+        try:
+            # Get the gym leader names for the current version
+            from pkmn.gen_factory import current_gen_info
+            gym_leader_names = current_gen_info().get_gym_leader_names()
+            
+            # Check if the index is valid
+            if gym_idx >= len(gym_leader_names):
+                return "break"
+            
+            # Get the trainer name for this gym index
+            trainer_name = gym_leader_names[gym_idx]
+            
+            # Find the first event with this trainer name
+            event_id = self._controller.find_first_event_by_trainer_name(trainer_name)
+            
+            if event_id is not None:
+                # Select this event
+                self._controller.select_new_events([event_id])
+        except Exception as e:
+            logger.error(f"Error selecting gym leader: {e}")
+        
+        return "break"  # Prevent default number key behavior
     
     def record_button_clicked(self, event=None):
         """Toggle recording mode - can be called from button, menu, or F1 key."""

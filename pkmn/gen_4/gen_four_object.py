@@ -212,6 +212,14 @@ class GenFour(CurrentGen):
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
     
+    def get_gym_leader_names(self) -> List[str]:
+        # HeartGold/SoulSilver use trainers 8-15 (Johto gym leaders)
+        # All other Gen 4 games use trainers 0-7 (Sinnoh gym leaders)
+        if self._version_name in [const.HEART_GOLD_VERSION, const.SOUL_SILVER_VERSION]:
+            return self._major_fights[8:16]
+        else:
+            return self._major_fights[:8]
+    
     def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
         base_options = gen_four_const.CUSTOM_MOVE_DATA.get(move_name)
         
