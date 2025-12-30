@@ -321,6 +321,8 @@ class Constants:
         self.NOTES_VISIBILITY_KEY = "notes_visibility"
         self.AUTO_LOAD_MOST_RECENT_ROUTE_KEY = "auto_load_most_recent_route"
         self.LANDING_PAGE_SEARCH_FILTER_KEY = "landing_page_search_filter"
+        self.LANDING_PAGE_SORT_KEY = "landing_page_sort"
+        self.LANDING_PAGE_GAME_FILTER_KEY = "landing_page_game_filter"
 
         # not configurable, just for important events in route list
         self.IMPORTANT_COLOR = "#b3b6b7"

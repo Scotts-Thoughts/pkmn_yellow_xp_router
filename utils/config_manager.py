@@ -28,6 +28,8 @@ class Config:
     DEFAULT_NOTES_VISIBILITY = "when_space_allows"  # Options: "when_space_allows", "always", "never"
     DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE = False
     DEFAULT_LANDING_PAGE_SEARCH_FILTER = ""
+    DEFAULT_LANDING_PAGE_SORT = "most_recent"
+    DEFAULT_LANDING_PAGE_GAME_FILTER = "All Games"
     DEFAULT_SHOW_MOVE_HIGHLIGHTS = True
     DEFAULT_TEST_MOVES_ENABLED = False
 
@@ -82,6 +84,8 @@ class Config:
             self._notes_visibility = self.DEFAULT_NOTES_VISIBILITY
         self._auto_load_most_recent_route = raw.get(const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY, self.DEFAULT_AUTO_LOAD_MOST_RECENT_ROUTE)
         self._landing_page_search_filter = raw.get(const.LANDING_PAGE_SEARCH_FILTER_KEY, self.DEFAULT_LANDING_PAGE_SEARCH_FILTER)
+        self._landing_page_sort = raw.get(const.LANDING_PAGE_SORT_KEY, self.DEFAULT_LANDING_PAGE_SORT)
+        self._landing_page_game_filter = raw.get(const.LANDING_PAGE_GAME_FILTER_KEY, self.DEFAULT_LANDING_PAGE_GAME_FILTER)
         self._show_move_highlights = raw.get(const.SHOW_MOVE_HIGHLIGHTS, self.DEFAULT_SHOW_MOVE_HIGHLIGHTS)
         self._test_moves_enabled = raw.get(const.TEST_MOVES_ENABLED, self.DEFAULT_TEST_MOVES_ENABLED)
     
@@ -116,6 +120,8 @@ class Config:
                 const.NOTES_VISIBILITY_KEY: self._notes_visibility,
                 const.AUTO_LOAD_MOST_RECENT_ROUTE_KEY: self._auto_load_most_recent_route,
                 const.LANDING_PAGE_SEARCH_FILTER_KEY: self._landing_page_search_filter,
+                const.LANDING_PAGE_SORT_KEY: self._landing_page_sort,
+                const.LANDING_PAGE_GAME_FILTER_KEY: self._landing_page_game_filter,
                 const.SHOW_MOVE_HIGHLIGHTS: self._show_move_highlights,
                 const.TEST_MOVES_ENABLED: self._test_moves_enabled,
             }, f, indent=4)
@@ -322,6 +328,22 @@ class Config:
     
     def get_landing_page_search_filter(self):
         return self._landing_page_search_filter
+    
+    def set_landing_page_sort(self, sort_value):
+        if sort_value != self._landing_page_sort:
+            self._landing_page_sort = sort_value
+            self._save()
+    
+    def get_landing_page_sort(self):
+        return self._landing_page_sort
+    
+    def set_landing_page_game_filter(self, game_filter):
+        if game_filter != self._landing_page_game_filter:
+            self._landing_page_game_filter = game_filter
+            self._save()
+    
+    def get_landing_page_game_filter(self):
+        return self._landing_page_game_filter
     
     def set_show_move_highlights(self, show):
         self._show_move_highlights = show

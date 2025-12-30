@@ -25,9 +25,10 @@ class LandingPage(ttk.Frame):
         self._on_create_route = on_create_route
         self._on_load_route = on_load_route
         self._on_auto_load_toggle = on_auto_load_toggle
-        self._current_sort = self.SORT_MOST_RECENT
+        # Load saved sort and filter selections from config
+        self._current_sort = config.get_landing_page_sort()
         self._route_metadata_cache = {}  # Cache: route_name -> (game_version, mtime)
-        self._selected_game_filter = "All Games"  # Remember last selected game filter
+        self._selected_game_filter = config.get_landing_page_game_filter()
         # Load saved search filter from config
         saved_search_filter = config.get_landing_page_search_filter()
         self._search_text = saved_search_filter.strip().lower() if saved_search_filter else ""
@@ -93,7 +94,7 @@ class LandingPage(ttk.Frame):
         sort_label = ttk.Label(sort_controls_frame, text="Sort by:")
         sort_label.pack(side=tk.LEFT, padx=(0, 10))
         
-        self.sort_var = tk.StringVar(value=self.SORT_MOST_RECENT)
+        self.sort_var = tk.StringVar(value=self._current_sort)
         self.sort_var.trace("w", self._on_sort_changed)
         
         # Most Recent (left)
@@ -134,8 +135,11 @@ class LandingPage(ttk.Frame):
             default_val=self._selected_game_filter
         )
         self.game_filter_dropdown.config(width=20)
-        # Initially hidden - will be shown when Game sort is selected
-        self.game_filter_dropdown.pack_forget()
+        # Show dropdown if Game sort is the saved preference, otherwise hide it
+        if self._current_sort == self.SORT_GAME:
+            self.game_filter_dropdown.pack(side=tk.LEFT, padx=(10, 0))
+        else:
+            self.game_filter_dropdown.pack_forget()
         
         # Search bar (on its own row, full width)
         search_frame = ttk.Frame(routes_frame)
@@ -249,6 +253,8 @@ class LandingPage(ttk.Frame):
     def _on_sort_changed(self, *args):
         """Handle sort option change."""
         self._current_sort = self.sort_var.get()
+        # Save the sort selection to config
+        config.set_landing_page_sort(self._current_sort)
         
         # Show/hide game filter dropdown based on sort selection
         if self._current_sort == self.SORT_GAME:
@@ -262,6 +268,7 @@ class LandingPage(ttk.Frame):
                 except:
                     self.game_filter_dropdown.set("All Games")
                     self._selected_game_filter = "All Games"
+                    config.set_landing_page_game_filter(self._selected_game_filter)
         else:
             self.game_filter_dropdown.pack_forget()
         
@@ -272,6 +279,8 @@ class LandingPage(ttk.Frame):
         selected_game = self.game_filter_dropdown.get()
         if selected_game:
             self._selected_game_filter = selected_game
+            # Save the game filter selection to config
+            config.set_landing_page_game_filter(self._selected_game_filter)
             self.refresh_routes()
     
     def _on_search_changed(self, *args):
