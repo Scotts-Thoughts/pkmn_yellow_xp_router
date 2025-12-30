@@ -80,10 +80,10 @@ class MainWindow(tk.Tk):
         )
         self.file_menu.add_command(label="Export Notes", accelerator="Ctrl+Shift+W", command=self.export_notes)
         self.file_menu.add_separator()
-        self.file_menu.add_command(label="Screenshot Event List", command=self.screenshot_event_list)
-        self.file_menu.add_command(label="Screenshot Battle Summary", accelerator="Ctrl+Q", command=self.screenshot_battle_summary)
-        self.file_menu.add_command(label="Export Player Ranges", accelerator="Ctrl+W", command=self.export_player_ranges)
-        self.file_menu.add_command(label="Export Enemy Ranges", accelerator="Ctrl+E", command=self.export_enemy_ranges)
+        self.file_menu.add_command(label="Screenshot Event List", accelerator="F5", command=self.screenshot_event_list)
+        self.file_menu.add_command(label="Screenshot Battle Summary", accelerator="F6", command=self.screenshot_battle_summary)
+        self.file_menu.add_command(label="Screenshot Player Ranges:", accelerator="F7", command=self.export_player_ranges)
+        self.file_menu.add_command(label="Screenshot Enemy Ranges", accelerator="F8", command=self.export_enemy_ranges)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Config Font", accelerator="Ctrl+Shift+D", command=self.open_config_window)
         self.file_menu.add_command(label="Custom Gens", accelerator="Ctrl+Shift+E", command=self.open_custom_gens_window)
@@ -91,7 +91,7 @@ class MainWindow(tk.Tk):
         self.file_menu.add_command(label="Open Data Folder", accelerator="Ctrl+Shift+O", command=self.open_data_location)
 
         self.event_menu = tk.Menu(self.top_menu_bar, tearoff=0)
-        self.event_menu.add_command(label="Move Event Up", command=self.move_group_up)
+        self.event_menu.add_command(label="Move Event Up", accelerator="Ctrl+E", command=self.move_group_up)
         self.event_menu.add_command(label="Move Event Down", accelerator="Ctrl+D", command=self.move_group_down)
         self.event_menu.add_command(label="Enable/Disable", accelerator="Ctrl+C", command=self.toggle_enable_disable)
         self.event_menu.add_command(label="Toggle Highlight", accelerator="Ctrl+V", command=self.toggle_event_highlight)
@@ -322,16 +322,19 @@ class MainWindow(tk.Tk):
         self.bind('<Home>', self.scroll_to_top)
         self.bind('<End>', self.scroll_to_bottom)
         # folder actions (keyboard shortcuts removed - now used for export)
-        # config integrations (Ctrl+E removed - now used for Export Enemy Ranges)
+        # config integrations
         self.bind('<Control-D>', self.open_config_window)
         self.bind('<Control-Z>', self.open_app_config_window)
         self.bind('<Control-R>', self.open_summary_window)
         self.bind('<Control-T>', self.open_setup_summary_window)
         self.bind('<Control-A>', self.open_data_location)
-        # Battle summary export shortcuts
-        self.bind('<Control-q>', self.screenshot_battle_summary)
-        self.bind('<Control-w>', self.export_player_ranges)
-        self.bind('<Control-e>', self.export_enemy_ranges)
+        # Screenshot shortcuts
+        self.bind('<F5>', self.screenshot_event_list)
+        self.bind('<F6>', self.screenshot_battle_summary)
+        self.bind('<F7>', self.export_player_ranges)
+        self.bind('<F8>', self.export_enemy_ranges)
+        # Event actions
+        self.bind('<Control-e>', self.move_group_up)
         # detail update function
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<<TreeviewSelect>>", self._report_new_selection)
