@@ -27,6 +27,7 @@ class Gen4GameHookConstants:
         self.KEY_PLAYER_MON_SPECIES    = "player.team.0.species"
         self.KEY_PLAYER_MON_HELD_ITEM  = "player.team.0.held_item"
         self.KEY_PLAYER_MON_FRIENDSHIP = "player.team.0.friendship"
+        self.KEY_PLAYER_MON_PID        = "player.team.0.internals.personality_value"
 
         self.ALL_KEYS_BATTLE_SOLO_HP = "battle.player.team.0.stats.hp"
         self.ALL_KEYS_BATTLE_TEAM_HP = [f"battle.player.team.{i}.stats.hp" for i in range(0, 6)]
@@ -68,8 +69,10 @@ class Gen4GameHookConstants:
         self.KEY_BATTLE_FLAGS                = "battle.other.outcome_flags"
         self.KEY_BATTLE_PLAYER_MON_PARTY_POS = "battle.player.party_position"
         self.KEY_BATTLE_PLAYER_MON_HP        = "battle.player.active_pokemon.stats.hp"
+        self.KEY_BATTLE_PLAYER_MON_EXP       = "battle.player.team.0.exp"
         self.KEY_BATTLE_ALLY_MON_PARTY_POS   = "battle.player.party_position_2"
         self.KEY_BATTLE_ALLY_MON_HP          = "battle.player.active_pokemon_2.stats.hp"
+        self.KEY_BATTLE_ALLY_MON_PID         = "battle.player.active_pokemon_2.internals.personality_value"
 
         self.KEY_BATTLE_TRAINER_A_NUMBER       = "battle.opponent.id"
         self.KEY_BATTLE_TRAINER_B_NUMBER       = "battle.opponent_2.id"
@@ -78,10 +81,14 @@ class Gen4GameHookConstants:
         self.KEY_BATTLE_FIRST_ENEMY_LEVEL      = "battle.opponent.active_pokemon.level"
         self.KEY_BATTLE_FIRST_ENEMY_HP         = "battle.opponent.active_pokemon.stats.hp"
         self.KEY_BATTLE_FIRST_ENEMY_PARTY_POS  = "battle.opponent.party_position"
+        self.KEY_BATTLE_FIRST_ENEMY_PID        = "battle.opponent.active_pokemon.internals.personality_value"
         self.KEY_BATTLE_SECOND_ENEMY_SPECIES   = "battle.opponent_2.active_pokemon.species"
         self.KEY_BATTLE_SECOND_ENEMY_LEVEL     = "battle.opponent_2.active_pokemon.level"
         self.KEY_BATTLE_SECOND_ENEMY_HP        = "battle.opponent_2.active_pokemon.stats.hp"
         self.KEY_BATTLE_SECOND_ENEMY_PARTY_POS = "battle.opponent_2.party_position"
+        self.KEY_BATTLE_SECOND_ENEMY_PID       = "battle.opponent_2.active_pokemon.internals.personality_value"
+        self.ALL_KEYS_BATTLE_ENEMY_1_PID = [f"battle.opponent.team.{i}.internals.personality_value" for i in range(0, 6)]
+        self.ALL_KEYS_BATTLE_ENEMY_2_PID = [f"battle.opponent_2.team.{i}.internals.personality_value" for i in range(0, 6)]
 
         self.ALL_KEYS_ENEMY_TEAM_SPECIES = [f"battle.opponent.team.{i}.species" for i in range(0, 6)]
         self.ALL_KEYS_ENEMY_2_TEAM_SPECIES = [f"battle.opponent_2.team.{i}.species" for i in range(0, 6)]
@@ -140,6 +147,7 @@ class Gen4GameHookConstants:
             self.KEY_PLAYER_MON_LEVEL,
             self.KEY_PLAYER_MON_SPECIES,
             self.KEY_PLAYER_MON_HELD_ITEM,
+            self.KEY_PLAYER_MON_PID,
             self.KEY_GAMETIME_SECONDS,
             self.KEY_TRAINER_BATTLE_FLAG,
             self.KEY_BATTLE_OUTCOME,
@@ -149,16 +157,20 @@ class Gen4GameHookConstants:
             self.KEY_BATTLE_ALLY_NUMBER,
             self.KEY_BATTLE_PLAYER_MON_HP,
             self.KEY_BATTLE_PLAYER_MON_PARTY_POS,
+            self.KEY_BATTLE_PLAYER_MON_EXP,
             self.KEY_BATTLE_ALLY_MON_HP,
             self.KEY_BATTLE_ALLY_MON_PARTY_POS,
+            self.KEY_BATTLE_ALLY_MON_PID,
             self.KEY_BATTLE_FIRST_ENEMY_SPECIES,
             self.KEY_BATTLE_FIRST_ENEMY_LEVEL,
             self.KEY_BATTLE_FIRST_ENEMY_HP,
             self.KEY_BATTLE_FIRST_ENEMY_PARTY_POS,
+            self.KEY_BATTLE_FIRST_ENEMY_PID,
             self.KEY_BATTLE_SECOND_ENEMY_SPECIES,
             self.KEY_BATTLE_SECOND_ENEMY_LEVEL,
             self.KEY_BATTLE_SECOND_ENEMY_HP,
             self.KEY_BATTLE_SECOND_ENEMY_PARTY_POS,
+            self.KEY_BATTLE_SECOND_ENEMY_PID,
             self.KEY_AUDIO_SOUND_EFFECT_1,
             self.KEY_AUDIO_SOUND_EFFECT_2,
             self.KEY_SAVE_COUNT,

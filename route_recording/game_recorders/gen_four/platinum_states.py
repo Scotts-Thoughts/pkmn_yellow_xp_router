@@ -279,6 +279,16 @@ class BattleState(WatchForResetState):
         self._watching_for_map_change = False
         self._initial_map = self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
         
+        # PID-based exp split tracking for double battles
+        self._solo_mon_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_PID).value
+        self._current_ally_pid = None
+        self._ally_hp_zero = False
+        
+        # NEW: Track by enemy PID instead of position
+        self._enemy_pids_in_battle = []  # List of enemy PIDs (in order they appear in enemy team)
+        self._enemy_pid_to_participating_player_pids = {}  # Map: enemy_pid -> set of player PIDs that participated
+        self._enemy_pid_to_exp_split = {}  # Map: enemy_pid -> split count (set when exp is awarded)
+        
         self._delayed_initialization.begin_waiting()
     
     def _get_num_enemy_trainer_pokemon(self):
@@ -348,13 +358,52 @@ class BattleState(WatchForResetState):
 
             num_enemy_pokemon = self._get_num_enemy_trainer_pokemon()
             self._enemy_pos_lookup = self._get_enemy_pos_lookup()
+            
+            # NEW: Initialize enemy PID tracking - read all enemy team PIDs at battle start
+            self._enemy_pids_in_battle = []
+            for cur_key in gh_gen_four_const.ALL_KEYS_BATTLE_ENEMY_1_PID:
+                enemy_pid = self.machine._gamehook_client.get(cur_key).value
+                if enemy_pid and enemy_pid != 0:
+                    self._enemy_pids_in_battle.append(enemy_pid)
+            if self.trainer_2 > 0:
+                for cur_key in gh_gen_four_const.ALL_KEYS_BATTLE_ENEMY_2_PID:
+                    enemy_pid = self.machine._gamehook_client.get(cur_key).value
+                    if enemy_pid and enemy_pid != 0:
+                        self._enemy_pids_in_battle.append(enemy_pid)
+            
+            logger.info(f"[EXP_SPLIT] ===== BATTLE INITIALIZATION =====")
+            logger.info(f"[EXP_SPLIT] Enemy PIDs in battle: {self._enemy_pids_in_battle}")
+            logger.info(f"[EXP_SPLIT] Num enemies: {num_enemy_pokemon}")
+            logger.info(f"[EXP_SPLIT] Solo PID: {self._solo_mon_pid}")
+            logger.info(f"[EXP_SPLIT] Is double battle: {self._is_double_battle}")
+            logger.info(f"[EXP_SPLIT] Is multi-battle: {self._multi_battle}")
+            
+            # Initialize participation tracking for each enemy PID
+            for enemy_pid in self._enemy_pids_in_battle:
+                if self._is_double_battle and not self._multi_battle:
+                    # Double battle: start with solo + ally
+                    self._current_ally_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PID).value
+                    self._enemy_pid_to_participating_player_pids[enemy_pid] = set([self._solo_mon_pid, self._current_ally_pid])
+                    logger.info(f"[EXP_SPLIT] Enemy PID {enemy_pid} starts with participants: {self._enemy_pid_to_participating_player_pids[enemy_pid]}")
+                else:
+                    # Single or multi-battle: only solo mon
+                    self._enemy_pid_to_participating_player_pids[enemy_pid] = set([self._solo_mon_pid])
+                    logger.info(f"[EXP_SPLIT] Enemy PID {enemy_pid} starts with participants: {self._enemy_pid_to_participating_player_pids[enemy_pid]}")
+            
+            if self._is_double_battle and not self._multi_battle:
+                logger.info(f"[EXP_SPLIT] Initial Ally PID: {self._current_ally_pid}")
+                self._enemy_mon_order = [0, 1]
+            else:
+                self._enemy_mon_order = [0]
+            
+            logger.info(f"[EXP_SPLIT] ===== END BATTLE INITIALIZATION =====")
+            
+            # For backward compatibility, also track legacy exp_split
             if self._is_double_battle and not self._multi_battle:
                 ally_mon_pos = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
                 self._exp_split = [set([0, ally_mon_pos]) for _ in range(num_enemy_pokemon)]
-                self._enemy_mon_order = [0, 1]
             else:
                 self._exp_split = [set([0]) for _ in range(num_enemy_pokemon)]
-                self._enemy_mon_order = [0]
 
             return_custom_move_data = None
             if gen_four_const.RETURN_MOVE_NAME in self.machine._cached_moves:
@@ -402,9 +451,32 @@ class BattleState(WatchForResetState):
                 self.machine._blackout_initial_map = self._initial_map
             
             if self.is_trainer_battle == 'Trainer':
-                final_exp_split = [len(x) for x in self._exp_split]
-                if not any([True for x in final_exp_split if x > 1]):
+                logger.info(f"[EXP_SPLIT] ===== BATTLE EXIT =====")
+                logger.info(f"[EXP_SPLIT] Enemy PIDs in team order: {self._enemy_pids_in_battle}")
+                logger.info(f"[EXP_SPLIT] Exp split mapping (by PID): {self._enemy_pid_to_exp_split}")
+                logger.info(f"[EXP_SPLIT] Raw _exp_split (legacy): {self._exp_split}")
+                
+                # Remap exp splits from PID mapping to team order
+                final_exp_split = []
+                for enemy_pid in self._enemy_pids_in_battle:
+                    if enemy_pid in self._enemy_pid_to_exp_split:
+                        split_count = self._enemy_pid_to_exp_split[enemy_pid]
+                        final_exp_split.append(split_count)
+                        logger.info(f"[EXP_SPLIT] Enemy PID {enemy_pid} → split count {split_count}")
+                    else:
+                        # Pokemon was not defeated, default to 1 (shouldn't happen in normal battles)
+                        final_exp_split.append(1)
+                        logger.info(f"[EXP_SPLIT] Enemy PID {enemy_pid} → no split recorded, defaulting to 1")
+                
+                logger.info(f"[EXP_SPLIT] Final exp_split in team order: {final_exp_split}")
+                
+                # If no splits > 1, set to None
+                if not any([x > 1 for x in final_exp_split]):
+                    logger.info(f"[EXP_SPLIT] No splits > 1, setting to None")
                     final_exp_split = None
+                else:
+                    logger.info(f"[EXP_SPLIT] Final exp_split with splits: {final_exp_split}")
+                logger.info(f"[EXP_SPLIT] ===== END BATTLE EXIT =====")
                 
                 # In battles with two trainers, skip setting mon_order
                 # The Pokemon from both trainers are interleaved in get_pokemon_list(),
@@ -520,8 +592,60 @@ class BattleState(WatchForResetState):
         # Map change handling moved to OverworldState - transition to OVERWORLD when watching for blackout
         # This allows OverworldState to handle map changes and check team HP
 
-        if new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS:
-            logger.info(f"EXP changed in battle. Cached species: '{self._cached_first_mon_species}', level: {self._cached_first_mon_level}, is_trainer: {self.is_trainer_battle}")
+        if new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_EXPPOINTS or new_prop.path == gh_gen_four_const.KEY_BATTLE_PLAYER_MON_EXP:
+            logger.info(f"[EXP_SPLIT] ===== EXP CHANGE DETECTED =====")
+            logger.info(f"[EXP_SPLIT] Path: {new_prop.path}, Old: {prev_prop.value}, New: {new_prop.value}, Diff: {new_prop.value - prev_prop.value if prev_prop.value and new_prop.value else 'N/A'}")
+            logger.info(f"[EXP_SPLIT] Cached first: '{self._cached_first_mon_species}' level {self._cached_first_mon_level}")
+            logger.info(f"[EXP_SPLIT] Cached second: '{self._cached_second_mon_species}' level {self._cached_second_mon_level}")
+            logger.info(f"[EXP_SPLIT] Is trainer battle: {self.is_trainer_battle}")
+            logger.info(f"[EXP_SPLIT] Ally HP zero flag: {self._ally_hp_zero}")
+            logger.info(f"[EXP_SPLIT] Current ally PID: {self._current_ally_pid}")
+            
+            # NEW APPROACH: Get the enemy PID that just fainted (from active enemy slots)
+            # When an enemy faints, their HP goes to 0 but they remain in the active slot briefly
+            # We cached their species/level when HP hit 0, now we need to match that to their PID
+            defeated_enemy_pid = None
+            
+            # Check first enemy slot
+            if self._cached_first_mon_species or self._cached_first_mon_level:
+                first_enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_PID).value
+                logger.info(f"[EXP_SPLIT] First enemy cached, checking PID: {first_enemy_pid}")
+                if first_enemy_pid and first_enemy_pid in self._enemy_pid_to_participating_player_pids:
+                    defeated_enemy_pid = first_enemy_pid
+                    logger.info(f"[EXP_SPLIT] Matched defeated enemy to first slot PID: {defeated_enemy_pid}")
+                elif first_enemy_pid:
+                    logger.info(f"[EXP_SPLIT] WARNING: First enemy PID {first_enemy_pid} not in tracking dictionary!")
+            
+            # Check second enemy slot
+            if not defeated_enemy_pid and (self._cached_second_mon_species or self._cached_second_mon_level):
+                second_enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PID).value
+                logger.info(f"[EXP_SPLIT] Second enemy cached, checking PID: {second_enemy_pid}")
+                if second_enemy_pid and second_enemy_pid in self._enemy_pid_to_participating_player_pids:
+                    defeated_enemy_pid = second_enemy_pid
+                    logger.info(f"[EXP_SPLIT] Matched defeated enemy to second slot PID: {defeated_enemy_pid}")
+                elif second_enemy_pid:
+                    logger.info(f"[EXP_SPLIT] WARNING: Second enemy PID {second_enemy_pid} not in tracking dictionary!")
+            
+            # Calculate and record the exp split for this enemy PID
+            if defeated_enemy_pid and defeated_enemy_pid in self._enemy_pid_to_participating_player_pids:
+                participating_player_pids = self._enemy_pid_to_participating_player_pids[defeated_enemy_pid].copy()
+                split_count = len(participating_player_pids)
+                
+                logger.info(f"[EXP_SPLIT] FINAL exp split for enemy PID {defeated_enemy_pid}: {split_count} participants")
+                logger.info(f"[EXP_SPLIT] Participating player PIDs: {participating_player_pids}")
+                
+                # Store the split count mapped by enemy PID
+                self._enemy_pid_to_exp_split[defeated_enemy_pid] = split_count
+                logger.info(f"[EXP_SPLIT] Stored split count {split_count} for enemy PID {defeated_enemy_pid}")
+                logger.info(f"[EXP_SPLIT] Current exp split mapping: {self._enemy_pid_to_exp_split}")
+            else:
+                logger.info(f"[EXP_SPLIT] WARNING: Could not determine defeated enemy PID for exp split calculation")
+            
+            # Reset ally faint flag after processing exp
+            self._ally_hp_zero = False
+            logger.info(f"[EXP_SPLIT] Reset ally_hp_zero flag")
+            logger.info(f"[EXP_SPLIT] ===== END EXP CHANGE =====")
+            
             if self._cached_first_mon_species or self._cached_first_mon_level:
                 if self.is_trainer_battle == 'Trainer':
                     self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
@@ -568,7 +692,14 @@ class BattleState(WatchForResetState):
         #     if new_prop.value and not self._battle_started:
         #         self._delayed_initialization.trigger()
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP:
-            if new_prop.value == 0:
+            if new_prop.value == 0 and prev_prop.value > 0:
+                logger.info(f"[EXP_SPLIT] ===== FIRST ENEMY FAINTED =====")
+                logger.info(f"[EXP_SPLIT] First enemy HP: {prev_prop.value} -> {new_prop.value}")
+                
+                # Get the enemy PID
+                enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_PID).value
+                logger.info(f"[EXP_SPLIT] First enemy PID: {enemy_pid}")
+                
                 # Always cache when HP hits 0 (like Emerald) - allows caching multiple Pokemon
                 # If there's already a cached Pokemon, add it to defeated list before overwriting (for trainer battles)
                 if (self._cached_first_mon_species or self._cached_first_mon_level) and self.is_trainer_battle == 'Trainer':
@@ -577,16 +708,31 @@ class BattleState(WatchForResetState):
                         self._cached_first_mon_level,
                         trainer_pkmn=True
                     )))
-                    logger.info(f"Adding previously cached Pokemon to defeated list before overwriting: {self._cached_first_mon_species} level {self._cached_first_mon_level}")
+                    logger.info(f"[EXP_SPLIT] Adding previously cached Pokemon to defeated list before overwriting: {self._cached_first_mon_species} level {self._cached_first_mon_level}")
                 
                 species_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_SPECIES).value
                 level_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_LEVEL).value
                 self._cached_first_mon_species = self.machine.gh_converter.pkmn_name_convert(species_raw)
                 self._cached_first_mon_level = level_raw
-                logger.info(f"Cached wild Pokemon: {self._cached_first_mon_species} level {self._cached_first_mon_level} (raw: {species_raw}, {level_raw})")
+                logger.info(f"[EXP_SPLIT] Cached first enemy: {self._cached_first_mon_species} level {self._cached_first_mon_level} (raw: {species_raw}, {level_raw})")
                 self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
+                
+                # Log participation info for this enemy PID
+                if enemy_pid in self._enemy_pid_to_participating_player_pids:
+                    logger.info(f"[EXP_SPLIT] Current participating player PIDs for enemy PID {enemy_pid}: {self._enemy_pid_to_participating_player_pids[enemy_pid]}")
+                else:
+                    logger.info(f"[EXP_SPLIT] WARNING: Enemy PID {enemy_pid} not found in tracking dictionary!")
+                logger.info(f"[EXP_SPLIT] Ally HP zero flag: {self._ally_hp_zero}")
+                logger.info(f"[EXP_SPLIT] ===== END FIRST ENEMY FAINTED =====")
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP:
-            if new_prop.value == 0:
+            if new_prop.value == 0 and prev_prop.value > 0:
+                logger.info(f"[EXP_SPLIT] ===== SECOND ENEMY FAINTED =====")
+                logger.info(f"[EXP_SPLIT] Second enemy HP: {prev_prop.value} -> {new_prop.value}")
+                
+                # Get the enemy PID
+                enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PID).value
+                logger.info(f"[EXP_SPLIT] Second enemy PID: {enemy_pid}")
+                
                 # Always cache when HP hits 0 (like Emerald) - allows caching multiple Pokemon
                 # If there's already a cached Pokemon, add it to defeated list before overwriting (for trainer battles)
                 if (self._cached_second_mon_species or self._cached_second_mon_level) and self.is_trainer_battle == 'Trainer':
@@ -595,11 +741,60 @@ class BattleState(WatchForResetState):
                         self._cached_second_mon_level,
                         trainer_pkmn=True
                     )))
-                    logger.info(f"Adding previously cached Pokemon to defeated list before overwriting: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
+                    logger.info(f"[EXP_SPLIT] Adding previously cached Pokemon to defeated list before overwriting: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
                 
                 self._cached_second_mon_species = self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_SPECIES).value)
                 self._cached_second_mon_level = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_LEVEL).value
+                logger.info(f"[EXP_SPLIT] Cached second enemy: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
                 self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
+                
+                # Log participation info for this enemy PID
+                if enemy_pid in self._enemy_pid_to_participating_player_pids:
+                    logger.info(f"[EXP_SPLIT] Current participating player PIDs for enemy PID {enemy_pid}: {self._enemy_pid_to_participating_player_pids[enemy_pid]}")
+                else:
+                    logger.info(f"[EXP_SPLIT] WARNING: Enemy PID {enemy_pid} not found in tracking dictionary!")
+                logger.info(f"[EXP_SPLIT] Ally HP zero flag: {self._ally_hp_zero}")
+                logger.info(f"[EXP_SPLIT] ===== END SECOND ENEMY FAINTED =====")
+        elif new_prop.path == gh_gen_four_const.KEY_BATTLE_ALLY_MON_PID and not self._multi_battle:
+            # Track PID changes for ally Pokemon in double battles
+            if self._is_double_battle and new_prop.value is not None and new_prop.value != 0:
+                new_pid = new_prop.value
+                if new_pid != self._current_ally_pid:
+                    logger.info(f"[EXP_SPLIT] ===== ALLY PID CHANGE =====")
+                    logger.info(f"[EXP_SPLIT] Old ally PID: {self._current_ally_pid}")
+                    logger.info(f"[EXP_SPLIT] New ally PID: {new_pid}")
+                    self._current_ally_pid = new_pid
+                    self._ally_hp_zero = False  # Reset ally faint flag
+                    
+                    # Get currently active enemy PIDs
+                    first_enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_PID).value
+                    second_enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PID).value
+                    first_enemy_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP).value
+                    second_enemy_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP).value
+                    
+                    logger.info(f"[EXP_SPLIT] First enemy PID: {first_enemy_pid}, HP: {first_enemy_hp}")
+                    logger.info(f"[EXP_SPLIT] Second enemy PID: {second_enemy_pid}, HP: {second_enemy_hp}")
+                    
+                    # Add new PID to all living enemies' participation sets (by enemy PID)
+                    if first_enemy_pid and first_enemy_hp and first_enemy_hp > 0:
+                        if first_enemy_pid in self._enemy_pid_to_participating_player_pids:
+                            self._enemy_pid_to_participating_player_pids[first_enemy_pid].add(new_pid)
+                            logger.info(f"[EXP_SPLIT] Added player PID {new_pid} to enemy PID {first_enemy_pid}. Player PIDs now: {self._enemy_pid_to_participating_player_pids[first_enemy_pid]}")
+                        else:
+                            logger.info(f"[EXP_SPLIT] WARNING: First enemy PID {first_enemy_pid} not in tracking dictionary!")
+                    
+                    if self._is_double_battle and second_enemy_pid and second_enemy_hp and second_enemy_hp > 0:
+                        if second_enemy_pid in self._enemy_pid_to_participating_player_pids:
+                            self._enemy_pid_to_participating_player_pids[second_enemy_pid].add(new_pid)
+                            logger.info(f"[EXP_SPLIT] Added player PID {new_pid} to enemy PID {second_enemy_pid}. Player PIDs now: {self._enemy_pid_to_participating_player_pids[second_enemy_pid]}")
+                        else:
+                            logger.info(f"[EXP_SPLIT] WARNING: Second enemy PID {second_enemy_pid} not in tracking dictionary!")
+                    
+                    logger.info(f"[EXP_SPLIT] ===== END ALLY PID CHANGE =====")
+                else:
+                    logger.info(f"[EXP_SPLIT] Ally PID unchanged: {new_pid}")
+            elif new_prop.value is None or new_prop.value == 0:
+                logger.info(f"[EXP_SPLIT] Ally PID set to None/0 (value: {new_prop.value})")
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_PLAYER_MON_HP:
             player_mon_pos = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value
             if player_mon_pos == 0 and new_prop.value <= 0:
@@ -616,7 +811,31 @@ class BattleState(WatchForResetState):
                     if player_mon_pos in self._exp_split[second_enemy_mon_pos]:
                         self._exp_split[second_enemy_mon_pos].remove(player_mon_pos)
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP and not self._multi_battle:
-            if self._is_double_battle and new_prop.value <= 0:
+            if self._is_double_battle and new_prop.value <= 0 and prev_prop.value > 0:
+                # Mark ally as fainted for PID-based tracking
+                logger.info(f"[EXP_SPLIT] ===== ALLY FAINTED =====")
+                logger.info(f"[EXP_SPLIT] Ally HP: {prev_prop.value} -> {new_prop.value}")
+                logger.info(f"[EXP_SPLIT] Current ally PID: {self._current_ally_pid}")
+                logger.info(f"[EXP_SPLIT] Setting ally_hp_zero flag to True")
+                self._ally_hp_zero = True
+                
+                # CRITICAL: Remove ally PID from ALL enemy PIDs in the dictionary
+                if self._current_ally_pid:
+                    for enemy_pid in self._enemy_pid_to_participating_player_pids:
+                        if self._current_ally_pid in self._enemy_pid_to_participating_player_pids[enemy_pid]:
+                            self._enemy_pid_to_participating_player_pids[enemy_pid].discard(self._current_ally_pid)
+                            logger.info(f"[EXP_SPLIT] Removed ally PID {self._current_ally_pid} from enemy PID {enemy_pid}. Player PIDs now: {self._enemy_pid_to_participating_player_pids[enemy_pid]}")
+                
+                # Log enemy status for context
+                first_enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_PID).value
+                second_enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PID).value
+                first_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP).value
+                second_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP).value
+                logger.info(f"[EXP_SPLIT] First enemy PID: {first_enemy_pid}, HP: {first_hp}")
+                logger.info(f"[EXP_SPLIT] Second enemy PID: {second_enemy_pid}, HP: {second_hp}")
+                logger.info(f"[EXP_SPLIT] ===== END ALLY FAINTED =====")
+                
+                # Legacy exp_split tracking (for backwards compatibility)
                 # for each of these we want to remove the ally from exp split if the enemy mon is still alive
                 # additionally, we also want to remove from the exp split if the enemy is cached, as this means they died on the same turn (e.g. earthquake)
                 # if the enemy has no HP *AND* is not cached for exp distribution, then they have died and enemy trainer has no further mons
@@ -663,17 +882,30 @@ class BattleState(WatchForResetState):
                     if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0:
                         self._exp_split[self._get_second_enemy_mon_pos()].add(new_prop.value)
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS:
-            if self._is_double_battle and new_prop.value >= 0 and new_prop.value < 6:
+            if self._is_double_battle and not self._multi_battle and new_prop.value >= 0 and new_prop.value < 6:
                 if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0:
                     self._exp_split[self._get_first_enemy_mon_pos()].add(new_prop.value)
                 if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0:
                     self._exp_split[self._get_second_enemy_mon_pos()].add(new_prop.value)
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_PARTY_POS:
             real_new_value = self._get_first_enemy_mon_pos(value=new_prop.value)
+            logger.info(f"[EXP_SPLIT] ===== FIRST ENEMY SWITCHED =====")
+            logger.info(f"[EXP_SPLIT] Enemy party pos changed: {prev_prop.value} -> {new_prop.value}")
+            logger.info(f"[EXP_SPLIT] Real enemy position: {real_new_value}")
+            
             if real_new_value >= 0 and real_new_value < len(self._exp_split):
+                # NEW: With enemy PID tracking, we don't need to reset anything!
+                # The enemy PID remains associated with the Pokemon regardless of position.
+                # Just log the new enemy PID for debugging
+                new_enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_PID).value
+                logger.info(f"[EXP_SPLIT] New enemy PID in first slot: {new_enemy_pid}")
+                if new_enemy_pid in self._enemy_pid_to_participating_player_pids:
+                    logger.info(f"[EXP_SPLIT] Participating player PIDs for this enemy: {self._enemy_pid_to_participating_player_pids[new_enemy_pid]}")
+                
+                # Legacy exp_split tracking (for backwards compatibility)
                 if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_HP).value > 0:
                     self._exp_split[real_new_value] = set([self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
-                if self._is_double_battle and self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
+                if self._is_double_battle and not self._multi_battle and self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
                     self._exp_split[real_new_value].add(self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value)
 
                 # NOTE: this logic won't perfectly reflect things if the player uses roar/whirlwind
@@ -701,18 +933,33 @@ class BattleState(WatchForResetState):
                         self._cached_first_mon_level = level_raw
                         logger.info(f"Cached wild Pokemon (from party pos change): {self._cached_first_mon_species} level {self._cached_first_mon_level}")
                         self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
+            logger.info(f"[EXP_SPLIT] ===== END FIRST ENEMY SWITCHED =====")
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS:
             real_new_value = self._get_second_enemy_mon_pos(value=new_prop.value)
+            logger.info(f"[EXP_SPLIT] ===== SECOND ENEMY SWITCHED =====")
+            logger.info(f"[EXP_SPLIT] Enemy party pos changed: {prev_prop.value} -> {new_prop.value}")
+            logger.info(f"[EXP_SPLIT] Real enemy position: {real_new_value}")
+            
             if self._is_double_battle and real_new_value >= 0 and real_new_value < len(self._exp_split):
+                # NEW: With enemy PID tracking, we don't need to reset anything!
+                # The enemy PID remains associated with the Pokemon regardless of position.
+                # Just log the new enemy PID for debugging
+                new_enemy_pid = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PID).value
+                logger.info(f"[EXP_SPLIT] New enemy PID in second slot: {new_enemy_pid}")
+                if new_enemy_pid in self._enemy_pid_to_participating_player_pids:
+                    logger.info(f"[EXP_SPLIT] Participating player PIDs for this enemy: {self._enemy_pid_to_participating_player_pids[new_enemy_pid]}")
+                
+                # Legacy exp_split tracking (for backwards compatibility)
                 if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_HP).value > 0:
                     self._exp_split[real_new_value] = set([self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
-                if self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
+                if not self._multi_battle and self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
                     self._exp_split[real_new_value].add(self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value)
 
                 # NOTE: this logic won't perfectly reflect things if the player uses roar/whirlwind
                 # or if the enemy trainer switches pokemon (and doesn't only send out new mons on previous death)
                 if real_new_value not in self._enemy_mon_order:
                     self._enemy_mon_order.append(real_new_value)
+            logger.info(f"[EXP_SPLIT] ===== END SECOND ENEMY SWITCHED =====")
         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_SPECIES:
             # Species changed - could be an evolution! Update team cache to detect it
             # This handles the case where evolution occurs during battle end transition
