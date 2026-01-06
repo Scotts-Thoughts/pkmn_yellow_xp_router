@@ -1211,9 +1211,6 @@ class EvolutionEditor(EventEditorBase):
     def _pkmn_filter_callback(self, *args, **kwargs):
         self._pkmn_types.new_values(current_gen_info().pkmn_db().get_filtered_names(filter_val=self._pkmn_filter.get().strip(), growth_rate=self._growth_rate))
 
-    def _pkmn_filter_callback(self, *args, **kwargs):
-        self._pkmn_types.new_values(current_gen_info().pkmn_db().get_filtered_names(filter_val=self._pkmn_filter.get().strip(), growth_rate=self._growth_rate))
-
 
 class EventEditorFactory:
     # NOTE: any event type that we want to support must have an entry in this map

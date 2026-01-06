@@ -14,6 +14,45 @@ from utils.config_manager import config
 from utils.constants import const
 from pkmn.gen_factory import current_gen_info
 
+
+def _blend_color(color1: str, color2: str, alpha: float) -> str:
+    """Blend two hex colors with the given alpha (0.0 to 1.0).
+    alpha=0.0 means fully color2, alpha=1.0 means fully color1.
+    Returns a hex color string."""
+    def hex_to_rgb(hex_color: str) -> tuple:
+        """Convert hex color to RGB tuple."""
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) == 3:
+            hex_color = ''.join([c*2 for c in hex_color])
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def rgb_to_hex(rgb: tuple) -> str:
+        """Convert RGB tuple to hex color string."""
+        return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+    
+    # Convert Tcl objects to strings if needed (always convert to string)
+    color1_str = str(color1) if color1 else ""
+    color2_str = str(color2) if color2 else ""
+    
+    # Handle empty strings or invalid colors
+    if not color1_str or not color1_str.startswith('#'):
+        return color2_str if color2_str else "#000000"
+    if not color2_str or not color2_str.startswith('#'):
+        return color1_str if color1_str else "#000000"
+    
+    try:
+        rgb1 = hex_to_rgb(color1_str)
+        rgb2 = hex_to_rgb(color2_str)
+        # Blend: result = color1 * alpha + color2 * (1 - alpha)
+        blended = tuple(
+            int(rgb1[i] * alpha + rgb2[i] * (1 - alpha))
+            for i in range(3)
+        )
+        return rgb_to_hex(blended)
+    except Exception:
+        # If blending fails, return color2 (background)
+        return str(color2) if color2 else "#000000"
+
 logger = logging.getLogger(__name__)
 
 
@@ -896,6 +935,14 @@ class AutocompleteEntry(ttk.Frame):
         """Set the current value"""
         self._entry_var.set(value)
         self._original_value = value
+    
+    def enable(self):
+        """Enable the entry field"""
+        self._entry.configure(state="normal")
+    
+    def disable(self):
+        """Disable the entry field"""
+        self._entry.configure(state="disabled")
 
 
 class DamageSummary(ttk.Frame):
@@ -908,6 +955,7 @@ class DamageSummary(ttk.Frame):
         self._is_test_move = is_test_move
         self._move_name = None
         self._is_loading = False
+        self._setup_move_cache = {}  # Cache for setup move info: {move_name: (is_setup, max_count)}
 
         self.columnconfigure(0, weight=1)
 
@@ -1044,6 +1092,111 @@ class DamageSummary(ttk.Frame):
             # Update UI immediately for instant feedback
             self._update_highlight_colors()
     
+    def _restore_dropdowns_immediately(self):
+        """Restore dropdown grid positions immediately based on current move state"""
+        try:
+            move = self._controller.get_move_info(self._mon_idx, self._move_idx, self._is_player_mon)
+            if move is None:
+                return
+            
+            # Get custom data options (fast - already available on move object)
+            custom_data_options = None
+            custom_data_selection = None
+            if move is not None:
+                custom_data_options = move.custom_data_options
+                custom_data_selection = move.custom_data_selection
+            if self._move_name == const.MIMIC_MOVE_NAME:
+                custom_data_options = move.mimic_options
+                custom_data_selection = move.mimic_data
+            
+            # Restore custom_data_dropdown immediately if it exists
+            col = 1
+            if custom_data_options:
+                if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
+                    self.custom_data_dropdown.grid(row=0, column=col)
+                    self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
+                col += 1
+            
+            # Check if this is a setup move (use cache to avoid repeated database lookups)
+            is_setup_move = False
+            max_setup_count = 0
+            if move is not None and self._move_name:
+                # Check cache first
+                if self._move_name in self._setup_move_cache:
+                    is_setup_move, max_setup_count = self._setup_move_cache[self._move_name]
+                else:
+                    # Cache miss - show dropdown IMMEDIATELY with default, don't wait for anything
+                    # Show it first, then get the current value and update async
+                    if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
+                        # Show dropdown immediately with default max count (6) and default value (0)
+                        # Don't call get_move_setup_usage() here - it might be slow
+                        setup_options = [str(i) for i in range(7)]  # 0-6
+                        if custom_data_options:
+                            self.setup_move_dropdown.grid(row=0, column=col)
+                        else:
+                            self.setup_move_dropdown.grid(row=0, column=1)
+                        self.setup_move_dropdown.new_values(setup_options, default_val="0")  # Use "0" as default, update async
+                    
+                    # Do the database lookup in the background and update if needed
+                    def update_setup_dropdown():
+                        try:
+                            stat_mods = current_gen_info().move_db().get_stat_mod(self._move_name)
+                            if stat_mods:
+                                is_setup = True
+                                max_stage_change = 0
+                                for stat_mod in stat_mods:
+                                    # stat_mod is a tuple (stat_name, stage_change)
+                                    stage_change = abs(stat_mod[1]) if isinstance(stat_mod, tuple) else abs(stat_mod)
+                                    if stage_change > max_stage_change:
+                                        max_stage_change = stage_change
+                                if max_stage_change >= 2:
+                                    max_count = 3
+                                elif max_stage_change == 1:
+                                    max_count = 6
+                                else:
+                                    max_count = 0
+                            else:
+                                is_setup = False
+                                max_count = 0
+                            
+                            # Cache the result
+                            self._setup_move_cache[self._move_name] = (is_setup, max_count)
+                            
+                            # Update dropdown if it's actually a setup move
+                            if is_setup and hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
+                                # Get current setup count and update dropdown
+                                current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
+                                if max_count != 6:  # Update options if different from default
+                                    setup_options = [str(i) for i in range(max_count + 1)]
+                                else:
+                                    setup_options = [str(i) for i in range(7)]  # Keep 0-6
+                                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+                            else:
+                                # Not a setup move - hide the dropdown
+                                if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
+                                    self.setup_move_dropdown.grid_remove()
+                        except Exception:
+                            pass
+                    
+                    # Schedule the lookup to run asynchronously (non-blocking)
+                    # Use after(0) to run as soon as possible, but don't block UI
+                    self.after(0, update_setup_dropdown)
+                    return  # Return early, dropdown is already shown
+            
+            # Get current setup usage count
+            current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
+            
+            # Restore setup_move_dropdown if it's a setup move
+            if is_setup_move and hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
+                setup_options = [str(i) for i in range(max_setup_count + 1)]
+                if custom_data_options:
+                    self.setup_move_dropdown.grid(row=0, column=col)
+                else:
+                    self.setup_move_dropdown.grid(row=0, column=1)
+                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+        except Exception:
+            pass
+    
     def _update_highlight_colors(self):
         """Update highlight colors immediately without full refresh"""
         if not self._controller.get_show_move_highlights() or not self._is_player_mon:
@@ -1058,29 +1211,125 @@ class DamageSummary(ttk.Frame):
         # Get default colors
         try:
             style = ttk.Style()
-            default_bg = style.lookup("Primary.TFrame", "background") or ""
-            default_fg = style.lookup("Primary.TLabel", "foreground") or ""
+            default_bg = str(style.lookup("Primary.TFrame", "background") or "")
+            default_fg = str(style.lookup("Primary.TLabel", "foreground") or "")
         except Exception:
             default_bg = ""
             default_fg = ""
+        
+        # Check if fade is enabled and move has no highlight
+        fade_enabled = config.get_fade_moves_without_highlight() and config.get_show_move_highlights()
+        should_fade = fade_enabled and highlight_state == 0
         
         # Update colors immediately
         if highlight_state == 1:
             # Dark green
             self.header.configure(bg="#165416")
             self.move_name_label.configure(background="#165416", foreground="white")
+            self._reset_fade_elements_to_normal()
+            self._restore_dropdowns_immediately()  # Restore dropdowns immediately when highlighted
         elif highlight_state == 2:
             # Dark blue
             self.header.configure(bg="#212168")
             self.move_name_label.configure(background="#212168", foreground="white")
+            self._reset_fade_elements_to_normal()
+            self._restore_dropdowns_immediately()  # Restore dropdowns immediately when highlighted
         elif highlight_state == 3:
             # Dark orange
             self.header.configure(bg="#69400f")
             self.move_name_label.configure(background="#69400f", foreground="white")
+            self._reset_fade_elements_to_normal()
+            self._restore_dropdowns_immediately()  # Restore dropdowns immediately when highlighted
         else:
-            # Default
-            self.header.configure(bg=default_bg)
-            self.move_name_label.configure(background=default_bg, foreground=default_fg)
+            # Default - apply fade if enabled
+            if should_fade:
+                # Blend foreground color with background at 0.1 opacity
+                faded_fg = _blend_color(default_fg, default_bg, 0.1)
+                self.header.configure(bg=default_bg)
+                self.move_name_label.configure(background=default_bg, foreground=faded_fg)
+                self._apply_fade_to_all_elements(faded_fg, default_bg)
+            else:
+                # Normal default
+                self.header.configure(bg=default_bg)
+                self.move_name_label.configure(background=default_bg, foreground=default_fg)
+                self._reset_fade_elements_to_normal()
+                self._restore_dropdowns_immediately()  # Restore dropdowns when not faded
+    
+    
+    def _apply_fade_to_all_elements(self, faded_fg, default_bg):
+        """Apply fade effect to all elements immediately - no delays"""
+        try:
+            style = ttk.Style()
+            # Fade damage range labels
+            contrast_fg = str(style.lookup("Contrast.TLabel", "foreground") or "")
+            contrast_bg = str(style.lookup("Contrast.TFrame", "background") or "")
+            if contrast_fg and contrast_bg:
+                faded_contrast_fg = _blend_color(contrast_fg, contrast_bg, 0.1)
+                self.damage_range.configure(foreground=faded_contrast_fg)
+                self.pct_damage_range.configure(foreground=faded_contrast_fg)
+                self.crit_damage_range.configure(foreground=faded_contrast_fg)
+                self.crit_pct_damage_range.configure(foreground=faded_contrast_fg)
+            
+            # Fade KO text (num_to_kill)
+            secondary_fg = str(style.lookup("Secondary.TLabel", "foreground") or "")
+            secondary_bg = str(style.lookup("Secondary.TFrame", "background") or "")
+            if secondary_fg and secondary_bg:
+                faded_secondary_fg = _blend_color(secondary_fg, secondary_bg, 0.1)
+                self.num_to_kill.configure(foreground=faded_secondary_fg)
+            
+            # Hide dropdowns when faded (setup_move_dropdown, custom_data_dropdown)
+            if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
+                self.setup_move_dropdown.grid_remove()
+            if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
+                self.custom_data_dropdown.grid_remove()
+            if hasattr(self, 'test_move_dropdown') and self.test_move_dropdown.winfo_exists():
+                # Fade the entry text in test_move_dropdown
+                try:
+                    self.test_move_dropdown._entry.configure(foreground=faded_fg)
+                    self.test_move_dropdown.disable()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    
+    def _reset_fade_elements_to_normal(self):
+        """Reset all fade elements to normal colors immediately - no delays"""
+        try:
+            style = ttk.Style()
+            # Reset damage range labels
+            contrast_fg = str(style.lookup("Contrast.TLabel", "foreground") or "")
+            if contrast_fg:
+                self.damage_range.configure(foreground=contrast_fg)
+                self.pct_damage_range.configure(foreground=contrast_fg)
+                self.crit_damage_range.configure(foreground=contrast_fg)
+                self.crit_pct_damage_range.configure(foreground=contrast_fg)
+            
+            # Reset KO text
+            secondary_fg = str(style.lookup("Secondary.TLabel", "foreground") or "")
+            if secondary_fg:
+                self.num_to_kill.configure(foreground=secondary_fg)
+            
+            # Show and re-enable dropdowns
+            if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
+                # Restore grid position if it was previously shown
+                # The grid position will be restored in update_rendering when needed
+                pass
+            if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
+                # Restore grid position if it was previously shown
+                # The grid position will be restored in update_rendering when needed
+                pass
+            if hasattr(self, 'test_move_dropdown') and self.test_move_dropdown.winfo_exists():
+                # Reset the entry text color in test_move_dropdown
+                try:
+                    style = ttk.Style()
+                    default_fg = str(style.lookup("TEntry", "foreground") or "")
+                    if default_fg:
+                        self.test_move_dropdown._entry.configure(foreground=default_fg)
+                    self.test_move_dropdown.enable()
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     @staticmethod
     def format_message(kill_info):
@@ -1104,7 +1353,16 @@ class DamageSummary(ttk.Frame):
         self._move_name = None if move is None else move.name
 
         self._is_loading = True
-        if move is None or not move.is_best_move:
+        # Check if fade is enabled and move has no highlight
+        fade_enabled = config.get_fade_moves_without_highlight() and config.get_show_move_highlights()
+        highlight_state = 0
+        if self._is_player_mon and self._controller.get_show_move_highlights():
+            highlight_state = self._controller.get_move_highlight_state(self._mon_idx, self._move_idx, self._is_player_mon)
+        
+        # Disable Player Highlight Strategy entirely when fade is enabled (for performance)
+        if fade_enabled and self._is_player_mon:
+            self.unflag_as_best_move()
+        elif move is None or not move.is_best_move:
             self.unflag_as_best_move()
         else:
             self.flag_as_best_move()
@@ -1122,21 +1380,28 @@ class DamageSummary(ttk.Frame):
         is_setup_move = False
         max_setup_count = 0
         if move is not None and self._move_name:
-            stat_mods = current_gen_info().move_db().get_stat_mod(self._move_name)
-            if stat_mods:
-                is_setup_move = True
-                # Determine max count based on stat stage changes
-                # Find the maximum absolute value of stat changes
-                max_stage_change = 0
-                for stat_mod in stat_mods:
-                    max_stage_change = max(max_stage_change, abs(stat_mod[1]))
-                
-                # +2 stages: max 3 uses (to reach +6)
-                # +1 stages: max 6 uses (to reach +6)
-                if max_stage_change >= 2:
-                    max_setup_count = 3
-                elif max_stage_change == 1:
-                    max_setup_count = 6
+            # Check cache first to avoid repeated database lookups
+            if self._move_name in self._setup_move_cache:
+                is_setup_move, max_setup_count = self._setup_move_cache[self._move_name]
+            else:
+                # Cache miss - do database lookup and cache the result
+                stat_mods = current_gen_info().move_db().get_stat_mod(self._move_name)
+                if stat_mods:
+                    is_setup_move = True
+                    # Determine max count based on stat stage changes
+                    # Find the maximum absolute value of stat changes
+                    max_stage_change = 0
+                    for stat_mod in stat_mods:
+                        max_stage_change = max(max_stage_change, abs(stat_mod[1]))
+                    
+                    # +2 stages: max 3 uses (to reach +6)
+                    # +1 stages: max 6 uses (to reach +6)
+                    if max_stage_change >= 2:
+                        max_setup_count = 3
+                    elif max_stage_change == 1:
+                        max_setup_count = 6
+                # Cache the result for future use
+                self._setup_move_cache[self._move_name] = (is_setup_move, max_setup_count)
         
         # Get current setup usage count
         current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
@@ -1220,6 +1485,10 @@ class DamageSummary(ttk.Frame):
                     default_bg = ""
                     default_fg = ""
                 
+                # Check if fade is enabled and move has no highlight
+                fade_enabled = config.get_fade_moves_without_highlight() and config.get_show_move_highlights()
+                should_fade = fade_enabled and highlight_state == 0
+                
                 if highlight_state == 1:
                     # Dark green - set both header frame and label background
                     self.header.configure(bg="#006400")
@@ -1233,22 +1502,135 @@ class DamageSummary(ttk.Frame):
                     self.header.configure(bg="#FF8C00")
                     self.move_name_label.configure(background="#FF8C00", foreground="white")
                 else:
-                    # Default (reset to style default)
-                    self.header.configure(bg=default_bg)
-                    self.move_name_label.configure(background=default_bg, foreground=default_fg)
+                    # Default - apply fade if enabled
+                    if should_fade:
+                        # Blend foreground color with background at 0.1 opacity
+                        faded_fg = _blend_color(default_fg, default_bg, 0.1)
+                        self.header.configure(bg=default_bg)
+                        self.move_name_label.configure(background=default_bg, foreground=faded_fg)
+                        
+                        # Also fade damage range labels, KO text, and dropdowns
+                        try:
+                            style = ttk.Style()
+                            contrast_fg = str(style.lookup("Contrast.TLabel", "foreground") or "")
+                            contrast_bg = str(style.lookup("Contrast.TFrame", "background") or "")
+                            if contrast_fg and contrast_bg:
+                                faded_contrast_fg = _blend_color(contrast_fg, contrast_bg, 0.1)
+                                self.damage_range.configure(foreground=faded_contrast_fg)
+                                self.pct_damage_range.configure(foreground=faded_contrast_fg)
+                                self.crit_damage_range.configure(foreground=faded_contrast_fg)
+                                self.crit_pct_damage_range.configure(foreground=faded_contrast_fg)
+                            
+                            # Fade KO text
+                            secondary_fg = str(style.lookup("Secondary.TLabel", "foreground") or "")
+                            secondary_bg = str(style.lookup("Secondary.TFrame", "background") or "")
+                            if secondary_fg and secondary_bg:
+                                faded_secondary_fg = _blend_color(secondary_fg, secondary_bg, 0.1)
+                                self.num_to_kill.configure(foreground=faded_secondary_fg)
+                            
+                            # Hide dropdowns when faded (only if they were previously shown)
+                            # Check if they should be visible based on move properties
+                            if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
+                                # Only hide if it was previously shown (grid_info exists)
+                                try:
+                                    if self.setup_move_dropdown.grid_info():
+                                        self.setup_move_dropdown.grid_remove()
+                                except Exception:
+                                    pass
+                            if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
+                                # Only hide if it was previously shown (grid_info exists)
+                                try:
+                                    if self.custom_data_dropdown.grid_info():
+                                        self.custom_data_dropdown.grid_remove()
+                                except Exception:
+                                    pass
+                            if hasattr(self, 'test_move_dropdown') and self.test_move_dropdown.winfo_exists():
+                                try:
+                                    self.test_move_dropdown._entry.configure(foreground=faded_fg)
+                                    self.test_move_dropdown.disable()
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+                    else:
+                        # Normal default
+                        self.header.configure(bg=default_bg)
+                        self.move_name_label.configure(background=default_bg, foreground=default_fg)
+                        
+                        # Reset damage range labels, KO text, and dropdowns to default
+                        try:
+                            style = ttk.Style()
+                            contrast_fg = str(style.lookup("Contrast.TLabel", "foreground") or "")
+                            if contrast_fg:
+                                self.damage_range.configure(foreground=contrast_fg)
+                                self.pct_damage_range.configure(foreground=contrast_fg)
+                                self.crit_damage_range.configure(foreground=contrast_fg)
+                                self.crit_pct_damage_range.configure(foreground=contrast_fg)
+                            
+                            secondary_fg = str(style.lookup("Secondary.TLabel", "foreground") or "")
+                            if secondary_fg:
+                                self.num_to_kill.configure(foreground=secondary_fg)
+                            
+                            # Reset and re-enable dropdowns
+                            # Show dropdowns (grid position will be restored in update_rendering)
+                            # No need to do anything here - update_rendering will handle showing them
+                            if hasattr(self, 'test_move_dropdown') and self.test_move_dropdown.winfo_exists():
+                                try:
+                                    default_fg = str(style.lookup("TEntry", "foreground") or "")
+                                    if default_fg:
+                                        self.test_move_dropdown._entry.configure(foreground=default_fg)
+                                    self.test_move_dropdown.enable()
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
             else:
                 # Reset to default when highlights are disabled
                 if self._is_player_mon:
                     self.move_name_label.configure(cursor="")
                 try:
                     style = ttk.Style()
-                    default_bg = style.lookup("Primary.TFrame", "background") or ""
-                    default_fg = style.lookup("Primary.TLabel", "foreground") or ""
+                    default_bg = str(style.lookup("Primary.TFrame", "background") or "")
+                    default_fg = str(style.lookup("Primary.TLabel", "foreground") or "")
                 except Exception:
                     default_bg = ""
                     default_fg = ""
                 self.header.configure(bg=default_bg)
                 self.move_name_label.configure(background=default_bg, foreground=default_fg)
+            
+            # Handle enemy move fading (fade enemy moves that are NOT the best move)
+            if not self._is_player_mon and config.get_fade_moves_without_highlight() and config.get_show_move_highlights():
+                # Fade enemy moves that are NOT the best move (not highlighted in red)
+                if move is not None and not move.is_best_move:
+                    try:
+                        style = ttk.Style()
+                        default_bg = str(style.lookup("Primary.TFrame", "background") or "")
+                        default_fg = str(style.lookup("Primary.TLabel", "foreground") or "")
+                        if default_bg and default_fg:
+                            faded_fg = _blend_color(default_fg, default_bg, 0.1)
+                            self.header.configure(bg=default_bg)
+                            self.move_name_label.configure(background=default_bg, foreground=faded_fg)
+                            self._apply_fade_to_all_elements(faded_fg, default_bg)
+                            # Disable dropdowns for faded enemy moves
+                            if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
+                                self.custom_data_dropdown.disable()
+                    except Exception:
+                        pass
+                else:
+                    # Reset to normal if it's the best move or move is None
+                    try:
+                        style = ttk.Style()
+                        default_bg = str(style.lookup("Primary.TFrame", "background") or "")
+                        default_fg = str(style.lookup("Primary.TLabel", "foreground") or "")
+                        if default_bg and default_fg:
+                            self.header.configure(bg=default_bg)
+                            self.move_name_label.configure(background=default_bg, foreground=default_fg)
+                            self._reset_fade_elements_to_normal()
+                            # Re-enable dropdowns for unfaded enemy moves
+                            if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
+                                self.custom_data_dropdown.enable()
+                    except Exception:
+                        pass
             if move.damage_ranges is None:
                 self.damage_range.configure(text="")
                 self.pct_damage_range.configure(text="")
@@ -1256,6 +1638,92 @@ class DamageSummary(ttk.Frame):
                 self.crit_pct_damage_range.configure(text="")
             
             else:
+                # Apply fade to damage range labels if enabled and move has no highlight
+                fade_enabled = config.get_fade_moves_without_highlight() and config.get_show_move_highlights()
+                should_fade = False
+                if fade_enabled:
+                    if self._is_player_mon:
+                        highlight_state = self._controller.get_move_highlight_state(self._mon_idx, self._move_idx, self._is_player_mon)
+                        should_fade = highlight_state == 0
+                    else:
+                        # For enemy moves, fade if NOT the best move (not highlighted in red)
+                        should_fade = not move.is_best_move
+                
+                # Get contrast colors for damage range labels
+                try:
+                    style = ttk.Style()
+                    contrast_fg = str(style.lookup("Contrast.TLabel", "foreground") or "")
+                    contrast_bg = str(style.lookup("Contrast.TFrame", "background") or "")
+                except Exception:
+                    contrast_fg = ""
+                    contrast_bg = ""
+                
+                # Apply fade to damage range labels, KO text, and dropdowns if needed
+                if should_fade and contrast_fg and contrast_bg:
+                    faded_contrast_fg = _blend_color(contrast_fg, contrast_bg, 0.1)
+                    self.damage_range.configure(foreground=faded_contrast_fg)
+                    self.pct_damage_range.configure(foreground=faded_contrast_fg)
+                    self.crit_damage_range.configure(foreground=faded_contrast_fg)
+                    self.crit_pct_damage_range.configure(foreground=faded_contrast_fg)
+                    
+                    # Fade KO text
+                    try:
+                        secondary_fg = str(style.lookup("Secondary.TLabel", "foreground") or "")
+                        secondary_bg = str(style.lookup("Secondary.TFrame", "background") or "")
+                        if secondary_fg and secondary_bg:
+                            faded_secondary_fg = _blend_color(secondary_fg, secondary_bg, 0.1)
+                            self.num_to_kill.configure(foreground=faded_secondary_fg)
+                    except Exception:
+                        pass
+                    
+                    # Fade and disable dropdowns
+                    try:
+                        # Get faded foreground for move name (already calculated above)
+                        default_fg_str = str(default_fg) if default_fg else ""
+                        default_bg_str = str(default_bg) if default_bg else ""
+                        if default_fg_str and default_bg_str:
+                            faded_fg = _blend_color(default_fg_str, default_bg_str, 0.1)
+                            
+                            if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
+                                self.setup_move_dropdown.grid_remove()
+                            if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
+                                self.custom_data_dropdown.grid_remove()
+                            if hasattr(self, 'test_move_dropdown') and self.test_move_dropdown.winfo_exists():
+                                try:
+                                    self.test_move_dropdown._entry.configure(foreground=faded_fg)
+                                    self.test_move_dropdown.disable()
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+                else:
+                    # Reset to default contrast colors
+                    if contrast_fg:
+                        self.damage_range.configure(foreground=contrast_fg)
+                        self.pct_damage_range.configure(foreground=contrast_fg)
+                        self.crit_damage_range.configure(foreground=contrast_fg)
+                        self.crit_pct_damage_range.configure(foreground=contrast_fg)
+                    
+                    # Reset KO text and dropdowns to default
+                    try:
+                        secondary_fg = str(style.lookup("Secondary.TLabel", "foreground") or "")
+                        if secondary_fg:
+                            self.num_to_kill.configure(foreground=secondary_fg)
+                        
+                        # Reset and re-enable dropdowns
+                        # Show dropdowns (grid position will be restored in update_rendering)
+                        # No need to do anything here - update_rendering will handle showing them
+                        if hasattr(self, 'test_move_dropdown') and self.test_move_dropdown.winfo_exists():
+                            try:
+                                default_fg = str(style.lookup("TEntry", "foreground") or "")
+                                if default_fg:
+                                    self.test_move_dropdown._entry.configure(foreground=default_fg)
+                                self.test_move_dropdown.enable()
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+                
                 self.damage_range.configure(text=f"{move.damage_ranges.min_damage} - {move.damage_ranges.max_damage}")
                 pct_min_damage = round(move.damage_ranges.min_damage / move.defending_mon_hp * 100)
                 pct_max_damage = round(move.damage_ranges.max_damage / move.defending_mon_hp * 100)

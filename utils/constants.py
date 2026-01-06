@@ -315,6 +315,7 @@ class Constants:
         self.DAMAGE_SEARCH_DEPTH = "damage_search_depth"
         self.FORCE_FULL_SEARCH = "force_full_search"
         self.SHOW_MOVE_HIGHLIGHTS = "show_move_highlights"
+        self.FADE_MOVES_WITHOUT_HIGHLIGHT = "fade_moves_without_highlight"
         self.HIGHLIGHT_BRANCHED_MANDATORY = "highlight_branched_mandatory"
         self.TEST_MOVES_ENABLED = "test_moves_enabled"
 

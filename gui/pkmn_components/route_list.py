@@ -1,5 +1,7 @@
 from controllers.main_controller import MainController
 import logging
+import tkinter as tk
+import tkinter.ttk as ttk
 
 from gui import custom_components
 from routing import route_events

@@ -131,6 +131,13 @@ class MainWindow(tk.Tk):
             variable=self.show_move_highlights_var,
             command=self._toggle_move_highlights
         )
+        # Fade Moves Without a Highlight toggle
+        self.fade_moves_without_highlight_var = tk.BooleanVar(value=config.get_fade_moves_without_highlight())
+        self.battle_summary_menu.add_checkbutton(
+            label="Fade Moves Without a Highlight",
+            variable=self.fade_moves_without_highlight_var,
+            command=self._toggle_fade_moves_without_highlight
+        )
         # Player Highlight Strategy submenu
         self.battle_summary_menu.add_separator()
         self.player_highlight_strategy_menu = tk.Menu(self.battle_summary_menu, tearoff=0)
@@ -541,12 +548,14 @@ class MainWindow(tk.Tk):
         self.event_list.refresh()
         
         # Restore focus to the widget that had it (if it was a text field)
+        # Do this immediately after refresh, not with after_idle, to prevent any delay
         if focused_widget is not None:
             try:
                 # Check if it's a text field widget
                 if isinstance(focused_widget, (tk.Text, ttk.Entry)) or (hasattr(focused_widget, 'winfo_class') and focused_widget.winfo_class() in ('Text', 'TEntry')):
-                    # Use after_idle to ensure the focus is restored after the refresh completes
-                    self.after_idle(lambda: self._restore_text_field_focus(focused_widget))
+                    # Restore focus immediately
+                    if focused_widget.winfo_exists():
+                        focused_widget.focus_set()
             except Exception:
                 pass
         
@@ -658,9 +667,38 @@ class MainWindow(tk.Tk):
             self.show_move_highlights_var.set(new_value)
         
         config.set_show_move_highlights(self.show_move_highlights_var.get())
+        # Update fade toggle state (enable/disable based on show_move_highlights)
+        self._update_fade_toggle_state()
         # Refresh battle summary if it exists
         if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
             self.event_details._battle_summary_controller._on_refresh()
+    
+    def _toggle_fade_moves_without_highlight(self, event=None):
+        """Toggle the Fade Moves Without a Highlight setting."""
+        # Only allow toggling if Show Move Highlights is enabled
+        if not config.get_show_move_highlights():
+            # Revert the toggle if Show Move Highlights is disabled
+            self.fade_moves_without_highlight_var.set(config.get_fade_moves_without_highlight())
+            return
+        
+        config.set_fade_moves_without_highlight(self.fade_moves_without_highlight_var.get())
+        # Refresh battle summary if it exists
+        if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
+            self.event_details._battle_summary_controller._on_refresh()
+    
+    def _update_fade_toggle_state(self):
+        """Update the fade toggle state (enable/disable based on Show Move Highlights)."""
+        show_highlights_enabled = config.get_show_move_highlights()
+        # Find the index of the fade toggle in the menu
+        try:
+            # The fade toggle is the item after "Show Move Highlights"
+            fade_index = self.battle_summary_menu.index("Fade Moves Without a Highlight")
+            if show_highlights_enabled:
+                self.battle_summary_menu.entryconfig(fade_index, state="normal")
+            else:
+                self.battle_summary_menu.entryconfig(fade_index, state="disabled")
+        except Exception:
+            pass  # Menu item might not exist yet
     
     def _toggle_highlight_branched_mandatory(self):
         """Toggle the Highlight Branched Mandatory Battles setting."""
@@ -701,6 +739,8 @@ class MainWindow(tk.Tk):
     def _update_battle_summary_menu_state(self):
         """Update all Battle Summary menu states to match config (called when menu opens)."""
         self.show_move_highlights_var.set(config.get_show_move_highlights())
+        self.fade_moves_without_highlight_var.set(config.get_fade_moves_without_highlight())
+        self._update_fade_toggle_state()
         self.player_highlight_strategy_var.set(config.get_player_highlight_strategy())
         self.enemy_highlight_strategy_var.set(config.get_enemy_highlight_strategy())
     
