@@ -317,6 +317,44 @@ class SimpleEntry(ttk.Entry):
         super().__init__(*args, **kwargs, textvariable=self._value)
         if callback is not None:
             self._value.trace_add("write", callback)
+        
+        # Register focus events to disable keyboard shortcuts during text entry
+        self.bind('<FocusIn>', self._on_focus_in)
+        self.bind('<FocusOut>', self._on_focus_out)
+        self.bind('<Button-1>', self._on_click)
+    
+    def _on_focus_in(self, event):
+        """Register that this text field has gained focus."""
+        self._register_focus()
+    
+    def _on_focus_out(self, event):
+        """Register that this text field has lost focus."""
+        self._unregister_focus()
+    
+    def _on_click(self, event):
+        """Handle click to ensure focus is set."""
+        self.focus_set()
+        self._register_focus()
+        # Don't prevent default click behavior
+        return None
+    
+    def _register_focus(self):
+        """Register focus with main window if available."""
+        try:
+            root = self.winfo_toplevel()
+            if hasattr(root, 'register_text_field_focus'):
+                root.register_text_field_focus(self)
+        except Exception:
+            pass  # Main window might not exist yet
+    
+    def _unregister_focus(self):
+        """Unregister focus with main window if available."""
+        try:
+            root = self.winfo_toplevel()
+            if hasattr(root, 'unregister_text_field_focus'):
+                root.unregister_text_field_focus()
+        except Exception:
+            pass  # Main window might not exist yet
     
     def get(self):
         return self._value.get()
@@ -353,6 +391,15 @@ class AmountEntry(ttk.Frame):
         self._up_button = SimpleButton(self, text="^", command=self._raise_amt, width=1)
         self._up_button.grid(row=0, column=2)
         self._update_buttons()
+        
+        # Bind click events on the frame to focus the entry field
+        self.bind('<Button-1>', self._on_frame_click)
+    
+    def _on_frame_click(self, event):
+        """Handle click on frame to focus the entry field."""
+        # Only focus if clicking on the frame itself, not on child widgets
+        if event.widget == self:
+            self._amount.focus_set()
     
     def _lower_amt(self, *args, **kwargs):
         try:
@@ -429,6 +476,11 @@ class SimpleText(tk.Text):
         self._orig = self._w + "_orig"
         self.tk.call("rename", self._w, self._orig)
         self.tk.createcommand(self._w, self._proxy)
+        
+        # Register focus events to disable keyboard shortcuts during text entry
+        self.bind('<FocusIn>', self._on_focus_in)
+        self.bind('<FocusOut>', self._on_focus_out)
+        self.bind('<Button-1>', self._on_click)
 
     def _proxy(self, command, *args):
         cmd = (self._orig, command) + args
@@ -438,6 +490,39 @@ class SimpleText(tk.Text):
             self.event_generate("<<TextModified>>")
 
         return result
+    
+    def _on_focus_in(self, event):
+        """Register that this text field has gained focus."""
+        self._register_focus()
+    
+    def _on_focus_out(self, event):
+        """Register that this text field has lost focus."""
+        self._unregister_focus()
+    
+    def _on_click(self, event):
+        """Handle click to ensure focus is set."""
+        self.focus_set()
+        self._register_focus()
+        # Don't prevent default click behavior
+        return None
+    
+    def _register_focus(self):
+        """Register focus with main window if available."""
+        try:
+            root = self.winfo_toplevel()
+            if hasattr(root, 'register_text_field_focus'):
+                root.register_text_field_focus(self)
+        except Exception:
+            pass  # Main window might not exist yet
+    
+    def _unregister_focus(self):
+        """Unregister focus with main window if available."""
+        try:
+            root = self.winfo_toplevel()
+            if hasattr(root, 'unregister_text_field_focus'):
+                root.unregister_text_field_focus()
+        except Exception:
+            pass  # Main window might not exist yet
 
     def enable(self):
         self.configure(state="normal")

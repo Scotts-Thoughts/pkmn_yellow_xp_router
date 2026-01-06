@@ -104,6 +104,11 @@ class NotesEditor(EventEditorBase):
         self._notes.bind("<<TextModified>>", self._trigger_delayed_save)
         # Prevent Delete key from deleting the current event when notes area is focused
         self._notes.bind('<Delete>', lambda e: "break")
+        # Add blue highlight when focused (like other text entry fields)
+        # highlightbackground is the color when not focused, highlightcolor is when focused
+        self._notes.configure(highlightthickness=2, highlightcolor="#0078d4", highlightbackground="gray")
+        self._notes.bind('<FocusIn>', self._on_notes_focus_in)
+        self._notes.bind('<FocusOut>', self._on_notes_focus_out)
         self._notes.grid(row=self._cur_row, column=0, columnspan=4, sticky=tk.EW, padx=5, pady=(2, 2))
         self._cur_row += 1
 
@@ -174,6 +179,14 @@ class NotesEditor(EventEditorBase):
             text = "Show notes in battle summary when space allows"  # Default fallback
         
         self._visibility.set(text)
+    
+    def _on_notes_focus_in(self, event):
+        """Handle focus in on notes text box - show blue highlight."""
+        self._notes.configure(highlightbackground="#0078d4")
+    
+    def _on_notes_focus_out(self, event):
+        """Handle focus out on notes text box - hide blue highlight."""
+        self._notes.configure(highlightbackground="gray")
 
 
 class TrainerFightEditor(EventEditorBase):

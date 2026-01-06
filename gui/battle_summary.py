@@ -468,6 +468,9 @@ class PrefightCandySummary(ttk.Frame):
         super().__init__(*args, **kwargs)
         self._outer_callback = callback
         self._loading = False
+        
+        # Debounce timer for candy callback to prevent focus loss during typing
+        self._candy_callback_timer = None
 
         self.label = ttk.Label(self, text="Prefight Candies:")
         self.label.grid(row=0, column=0, padx=2)
@@ -479,6 +482,18 @@ class PrefightCandySummary(ttk.Frame):
         if self._loading:
             return
         
+        # Cancel any pending callback
+        if self._candy_callback_timer is not None:
+            self.after_cancel(self._candy_callback_timer)
+        
+        # Schedule the callback to run after a short delay (300ms)
+        # This allows the user to type multiple characters without triggering route changes on each keystroke
+        if self._outer_callback is not None:
+            self._candy_callback_timer = self.after(300, self._delayed_candy_callback)
+    
+    def _delayed_candy_callback(self):
+        """Execute the candy callback after a delay to prevent focus loss during typing."""
+        self._candy_callback_timer = None
         if self._outer_callback is not None:
             self._outer_callback()
     
@@ -646,6 +661,40 @@ class AutocompleteEntry(ttk.Frame):
         self._entry.bind('<Return>', self._on_return)
         self._entry.bind('<Escape>', self._on_escape)
         self._entry.bind('<Down>', self._on_down_arrow)
+        self._entry.bind('<Button-1>', self._on_click)
+        
+        # Also bind click on the frame
+        self.bind('<Button-1>', self._on_frame_click)
+    
+    def _on_click(self, event):
+        """Handle click to ensure focus is set."""
+        self._entry.focus_set()
+        self._register_focus()
+        return None
+    
+    def _on_frame_click(self, event):
+        """Handle click on frame to focus the entry field."""
+        if event.widget == self:
+            self._entry.focus_set()
+            self._register_focus()
+    
+    def _register_focus(self):
+        """Register focus with main window if available."""
+        try:
+            root = self.winfo_toplevel()
+            if hasattr(root, 'register_text_field_focus'):
+                root.register_text_field_focus(self._entry)
+        except Exception:
+            pass  # Main window might not exist yet
+    
+    def _unregister_focus(self):
+        """Unregister focus with main window if available."""
+        try:
+            root = self.winfo_toplevel()
+            if hasattr(root, 'unregister_text_field_focus'):
+                root.unregister_text_field_focus()
+        except Exception:
+            pass  # Main window might not exist yet
         
     def _on_focus_in(self, event):
         """Store original value and clear text when focused"""
@@ -653,6 +702,8 @@ class AutocompleteEntry(ttk.Frame):
         self._original_value = self._entry_var.get()
         # Clear the text to allow easy typing
         self._entry_var.set("")
+        # Register focus with main window
+        self._register_focus()
     
     def _on_key_release(self, event):
         """Filter and show suggestions as user types"""
@@ -726,6 +777,8 @@ class AutocompleteEntry(ttk.Frame):
     
     def _on_focus_out(self, event):
         """Handle focus loss"""
+        # Unregister focus with main window
+        self._unregister_focus()
         # Small delay to allow listbox click to register
         self.after(100, self._delayed_focus_out)
     

@@ -39,6 +39,11 @@ class MainWindow(tk.Tk):
         super().__init__()
         self._controller = controller
         self._recorder_controller = RecorderController(self._controller)
+        
+        # Track text field focus state to disable keyboard shortcuts during text entry
+        self._text_field_has_focus = False
+        # Store reference to currently focused text field to preserve focus during route changes
+        self._focused_text_field = None
 
         geometry = config.get_window_geometry()
         if not geometry:
@@ -406,9 +411,10 @@ class MainWindow(tk.Tk):
         self.bind('<F10>', self.toggle_enemy_highlight_strategy)
         # Event actions
         self.bind('<Control-e>', self.move_group_up)
-        # Gym leader shortcuts (1-8 keys)
+        # Gym leader shortcuts (1-8 keys) - disabled when text fields have focus
         for i in range(1, 9):
             self.bind(f'<Key-{i}>', lambda event, gym_idx=i-1: self.select_gym_leader(gym_idx))
+            self.bind(f'<Shift-Key-{i}>', lambda event, gym_idx=i-1: self.select_gym_leader(gym_idx))
         # Elite Four and Champion shortcuts (Control+1 through Control+6)
         # Control+1-4: Elite Four, Control+5: Champion, Control+6: Red (Gen2/HGSS only)
         for i in range(1, 7):
@@ -418,6 +424,8 @@ class MainWindow(tk.Tk):
         self.bind("<<TreeviewSelect>>", self._report_new_selection)
         self.bind("<Configure>", self._on_configure)
         self.bind("<Map>", self._on_window_mapped_focus)
+        # Bind click events to detect when user clicks outside text fields
+        self.bind("<Button-1>", self._on_window_click)
         self.bind(const.ROUTE_LIST_REFRESH_EVENT, self.update_run_status)
         self.bind(const.FORCE_QUIT_EVENT, self.cancel_and_quit)
 
@@ -527,7 +535,21 @@ class MainWindow(tk.Tk):
     
     def _on_route_change(self, *args, **kwargs):
         """Handle route change event - refresh event list and show route controls."""
+        # Use stored reference to focused text field if available, otherwise get current focus
+        focused_widget = self._focused_text_field if self._focused_text_field is not None else self.focus_get()
+        
         self.event_list.refresh()
+        
+        # Restore focus to the widget that had it (if it was a text field)
+        if focused_widget is not None:
+            try:
+                # Check if it's a text field widget
+                if isinstance(focused_widget, (tk.Text, ttk.Entry)) or (hasattr(focused_widget, 'winfo_class') and focused_widget.winfo_class() in ('Text', 'TEntry')):
+                    # Use after_idle to ensure the focus is restored after the refresh completes
+                    self.after_idle(lambda: self._restore_text_field_focus(focused_widget))
+            except Exception:
+                pass
+        
         # Show route controls if we have a route loaded (has init_route_state set)
         # Check if route has been initialized (has a pokemon version)
         if self._controller.get_version() is not None:
@@ -748,6 +770,10 @@ class MainWindow(tk.Tk):
     
     def select_gym_leader(self, gym_idx):
         """Select a gym leader event by index (0-7 for keys 1-8)."""
+        # Don't execute if a text field has focus
+        if self._text_field_has_focus:
+            return "break"
+        
         # Only work if a route is loaded
         if self._controller.get_version() is None:
             return "break"
@@ -768,12 +794,27 @@ class MainWindow(tk.Tk):
             event_id = self._controller.find_first_event_by_trainer_name(trainer_name)
             
             if event_id is not None:
-                # Select this event
+                # Select this event (but don't take focus)
                 self._controller.select_new_events([event_id])
         except Exception as e:
             logger.error(f"Error selecting gym leader: {e}")
         
         return "break"  # Prevent default number key behavior
+    
+    def register_text_field_focus(self, widget=None):
+        """Register that a text field has gained focus."""
+        self._text_field_has_focus = True
+        if widget is not None:
+            self._focused_text_field = widget
+    
+    def unregister_text_field_focus(self):
+        """Register that a text field has lost focus."""
+        self._text_field_has_focus = False
+        self._focused_text_field = None
+    
+    def is_text_field_focused(self):
+        """Check if any text field currently has focus."""
+        return self._text_field_has_focus
     
     def select_elite_four_or_champion(self, e4_idx):
         """Select an Elite Four member or Champion by index (0-3 for Elite Four, 4 for Champion)."""
@@ -875,9 +916,26 @@ class MainWindow(tk.Tk):
         # just re-use the variable temporarily
         all_event_ids = self._controller.get_all_selected_ids()
         if all_event_ids != self.event_list.get_all_selected_event_ids():
+            # Save current focus widget before updating selection
+            focused_widget = self.focus_get()
             self.event_list.set_all_selected_event_ids(all_event_ids)
+            # Restore focus to the widget that had it (if it was a text field)
+            if focused_widget is not None and isinstance(focused_widget, (tk.Text, ttk.Entry)):
+                try:
+                    # Use after_idle to ensure the focus is restored after the selection update completes
+                    self.after_idle(lambda: self._restore_text_field_focus(focused_widget))
+                except tk.TclError:
+                    pass  # Widget might have been destroyed
 
         self.event_list.scroll_to_selected_events()
+    
+    def _restore_text_field_focus(self, widget):
+        """Restore focus to a text field widget."""
+        try:
+            if widget.winfo_exists():
+                widget.focus_set()
+        except (tk.TclError, AttributeError):
+            pass  # Widget might have been destroyed
 
         # now assign it the value it will have for the rest of the function
         all_event_ids = self.event_list.get_all_selected_event_ids(allow_event_items=False)
@@ -1030,6 +1088,67 @@ class MainWindow(tk.Tk):
         # Only set focus if this is the main window (not a child widget)
         if event.widget == self:
             self.after_idle(self._ensure_window_focus)
+    
+    def _on_window_click(self, event):
+        """Handle clicks on the window to detect when user clicks outside text fields."""
+        # Get the widget that was clicked
+        clicked_widget = event.widget
+        
+        # Check if the clicked widget is a text entry field or its parent (for AmountEntry)
+        is_text_field = isinstance(clicked_widget, (tk.Text, ttk.Entry))
+        
+        # Also check if it's inside an AmountEntry frame or other text field container
+        if not is_text_field:
+            # Walk up the widget hierarchy to see if we're inside a text field container
+            parent = clicked_widget
+            while parent:
+                if isinstance(parent, (tk.Text, ttk.Entry)):
+                    is_text_field = True
+                    break
+                # Check if we're inside an AmountEntry (which contains a SimpleEntry)
+                if hasattr(parent, '_amount') and isinstance(parent._amount, tk.Text):
+                    is_text_field = True
+                    break
+                try:
+                    parent = parent.master
+                except AttributeError:
+                    break
+        
+        # If not clicking on a text field, remove focus from any text field
+        if not is_text_field:
+            # Check what widget currently has focus
+            focused_widget = self.focus_get()
+            if focused_widget is not None and isinstance(focused_widget, (tk.Text, ttk.Entry)):
+                # Remove focus from the text field by focusing something else
+                try:
+                    # Try to focus the clicked widget or a focusable parent
+                    target_widget = clicked_widget
+                    while target_widget:
+                        try:
+                            if hasattr(target_widget, 'focus_set'):
+                                # Don't focus the main window itself, try to find a child widget
+                                if target_widget != self:
+                                    target_widget.focus_set()
+                                    break
+                        except:
+                            pass
+                        try:
+                            target_widget = target_widget.master
+                        except AttributeError:
+                            # If we can't find a focusable widget, focus the event list
+                            try:
+                                self.event_list.focus_set()
+                            except:
+                                pass
+                            break
+                except Exception:
+                    # Fallback: focus the event list
+                    try:
+                        self.event_list.focus_set()
+                    except:
+                        pass
+                # Unregister text field focus
+                self._text_field_has_focus = False
     
     def _show_landing_page(self):
         """Show landing page and hide route controls."""

@@ -21,6 +21,9 @@ class RouteSearch(ttk.Frame):
 
         self._filter_vals = []
         self._filter_components = []
+        
+        # Debounce timer for search callback to prevent focus loss during typing
+        self._search_callback_timer = None
 
         num_filters_per_row = 5
         for cur_idx, event_type in enumerate(const.ROUTE_EVENT_TYPES):
@@ -50,6 +53,17 @@ class RouteSearch(ttk.Frame):
         self.search_val.set("")
 
     def search_callback(self, *args, **kwargs):
+        # Cancel any pending callback
+        if self._search_callback_timer is not None:
+            self.after_cancel(self._search_callback_timer)
+        
+        # Schedule the callback to run after a short delay (300ms)
+        # This allows the user to type multiple characters without triggering route changes on each keystroke
+        self._search_callback_timer = self.after(300, self._delayed_search_callback)
+    
+    def _delayed_search_callback(self):
+        """Execute the search callback after a delay to prevent focus loss during typing."""
+        self._search_callback_timer = None
         self._controller.set_route_search(self.search_val.get())
 
     def curry_filter_callback(self, string_val):
