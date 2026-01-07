@@ -46,7 +46,10 @@ class RouteList(custom_components.CustomGridview):
         self.bind("<<TreeviewOpen>>", self._treeview_opened_callback)
         self.bind("<<TreeviewClose>>", self._treeview_closed_callback)
         # Bind click events to unregister text field focus when clicking on event list
-        self.bind("<Button-1>", self._on_event_list_click)
+        # IMPORTANT: use add=True so we don't overwrite CheckboxTreeview's checkbox click handler
+        self.bind("<Button-1>", self._on_event_list_click, True)
+        # Right-click toggles enable/disable without changing current selection
+        self.bind("<Button-3>", self._on_event_list_right_click, True)
         # Prevent treeview from taking focus during programmatic selection changes
         self.bind("<FocusIn>", self._on_treeview_focus_in)
 
@@ -83,6 +86,24 @@ class RouteList(custom_components.CustomGridview):
                 root.unregister_text_field_focus()
         except Exception:
             pass
+
+    def _on_event_list_right_click(self, event):
+        """
+        Right-click an event row to toggle enable/disable without selecting/focusing that row.
+        This intentionally preserves the current selection.
+        """
+        # Treat right-click as interacting with the event list (so hotkeys are re-enabled if needed)
+        self._on_event_list_click(event)
+
+        clicked_item = self.identify_row(event.y)
+        if not clicked_item:
+            return "break"
+
+        # Preserve selection so right-click does not change the currently selected event(s)
+        current_selection = list(self.selection())
+        self.trigger_checkbox(single_item=clicked_item)
+        self.selection_set(current_selection)
+        return "break"
     
     def _on_treeview_focus_in(self, event):
         """Prevent treeview from taking focus during programmatic updates."""
@@ -97,6 +118,21 @@ class RouteList(custom_components.CustomGridview):
                         return "break"
             except Exception:
                 pass
+
+    def _box_click(self, event):
+        """
+        Override CheckboxTreeview checkbox click behavior so checkbox clicks also unregister
+        text-field focus (while still preventing selection changes).
+        """
+        try:
+            elem = self.identify("element", event.x, event.y)
+            if "image" in elem:
+                # a checkbox was clicked; consider this an interaction with the event list
+                self._on_event_list_click(event)
+        except Exception:
+            pass
+
+        return super()._box_click(event)
     
     def checkbox_item_callback_fn(self, item_id, new_state):
         raw_obj = self._controller.get_event_by_id(self._get_route_id_from_item_id(item_id))
