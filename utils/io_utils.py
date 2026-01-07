@@ -3,10 +3,105 @@ import os
 import shutil
 import re
 import logging
+import json
+import time
 
 from utils.constants import const
 
 logger = logging.getLogger(__name__)
+
+
+def is_likely_cloud_placeholder(file_path: str) -> bool:
+    """Check if a file might be a cloud storage placeholder (Dropbox, iCloud, etc.).
+    
+    Cloud storage services on macOS use placeholder files that appear in the
+    filesystem but aren't fully downloaded. These files often have a reported
+    size > 0 but return empty content when read.
+    """
+    try:
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return False
+        
+        # Get reported file size
+        stat_result = os.stat(file_path)
+        reported_size = stat_result.st_size
+        
+        # If the file reports size 0, it's just empty, not a placeholder
+        if reported_size == 0:
+            return False
+        
+        # Try to read the file and check if content is empty
+        with open(file_path, 'r') as f:
+            content = f.read()
+        
+        # If reported size > 0 but content is empty, likely a placeholder
+        if reported_size > 0 and len(content) == 0:
+            return True
+        
+        return False
+    except Exception:
+        return False
+
+
+def read_json_file_safe(file_path: str, max_wait_seconds: float = 2.0) -> dict:
+    """Read a JSON file, handling cloud storage placeholder files.
+    
+    On macOS, cloud storage services (Dropbox, iCloud, OneDrive) may show files
+    as placeholders that need to be downloaded. This function attempts to detect
+    this situation and wait briefly for the download to complete.
+    
+    Args:
+        file_path: Path to the JSON file
+        max_wait_seconds: Maximum time to wait for placeholder download
+    
+    Returns:
+        The parsed JSON data
+    
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        ValueError: If the file is empty or a cloud placeholder that couldn't be read
+        json.JSONDecodeError: If the file contains invalid JSON
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    # Check if this might be a cloud placeholder
+    stat_result = os.stat(file_path)
+    reported_size = stat_result.st_size
+    
+    # First attempt to read
+    with open(file_path, 'r') as f:
+        content = f.read()
+    
+    # If we got content, parse it
+    if content:
+        return json.loads(content)
+    
+    # If reported size > 0 but content is empty, this is likely a cloud placeholder
+    if reported_size > 0:
+        # Wait a bit and retry - accessing the file may trigger download
+        wait_time = 0.0
+        wait_interval = 0.25
+        
+        while wait_time < max_wait_seconds:
+            time.sleep(wait_interval)
+            wait_time += wait_interval
+            
+            with open(file_path, 'r') as f:
+                content = f.read()
+            
+            if content:
+                return json.loads(content)
+        
+        # Still empty after waiting - likely a cloud placeholder that hasn't synced
+        raise ValueError(
+            f"File appears to be a cloud storage placeholder that hasn't been downloaded: {file_path}\n"
+            f"If using Dropbox/iCloud/OneDrive, please ensure the file is set to 'Available offline' or has finished syncing."
+        )
+    
+    # File is genuinely empty
+    raise ValueError(f"File is empty: {file_path}")
 
 
 def sanitize_string(string:str):

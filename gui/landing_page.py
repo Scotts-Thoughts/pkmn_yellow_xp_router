@@ -321,10 +321,15 @@ class LandingPage(ttk.Frame):
         game_version = "Unknown"
         species_name = "Unknown"
         try:
-            with open(route_path, 'r') as f:
-                route_data = json.load(f)
-                game_version = route_data.get(const.PKMN_VERSION_KEY, "Unknown")
-                species_name = route_data.get(const.NAME_KEY, "Unknown")
+            route_data = io_utils.read_json_file_safe(route_path, max_wait_seconds=0.5)
+            game_version = route_data.get(const.PKMN_VERSION_KEY, "Unknown")
+            species_name = route_data.get(const.NAME_KEY, "Unknown")
+        except ValueError as e:
+            # File is empty or cloud placeholder - check if it's a cloud sync issue
+            if io_utils.is_likely_cloud_placeholder(route_path):
+                game_version = "(Sync pending)"
+                species_name = "(Sync pending)"
+            # else leave as "Unknown"
         except Exception:
             pass
         

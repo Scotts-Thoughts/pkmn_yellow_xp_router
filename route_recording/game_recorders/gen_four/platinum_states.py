@@ -112,7 +112,7 @@ class UninitializedState(WatchForResetState):
         if new_prop.path == gh_gen_four_const.KEY_GAMETIME_SECONDS:
             if self._seconds_delay <= 0:
                 if (
-                    self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value is 'Battle'
+                    self.machine._gamehook_client.get(gh_gen_four_const.META_STATE).value == 'Battle'
                 ):
                     return StateType.BATTLE
                 else:
@@ -338,7 +338,7 @@ class BattleState(WatchForResetState):
             self._is_double_battle = False
         else:
             self._is_double_battle = True
-            if self._ally_id is not 0:
+            if self._ally_id != 0:
                 self._multi_battle = True
         # self._is_tutorial_battle = self.machine._gamehook_client.get(gh_gen_four_const.KEY_TUTORIAL_BATTLE_FLAG).value
         self.is_trainer_battle = battle_mode

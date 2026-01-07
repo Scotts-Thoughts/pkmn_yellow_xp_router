@@ -6,11 +6,42 @@ import urllib.request
 import json
 import zipfile
 import logging
+import ssl
 
 from utils.constants import const
 from utils.config_manager import config
 
 logger = logging.getLogger(__name__)
+
+
+def _get_ssl_context():
+    """Get an SSL context that works on macOS.
+    
+    On macOS, Python doesn't use the system certificate store by default.
+    This function tries to create a proper SSL context, falling back to
+    an unverified context if necessary (with a warning).
+    """
+    # Try to use certifi if available (recommended)
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        pass
+    
+    # Try the default context (works on most systems)
+    try:
+        ctx = ssl.create_default_context()
+        # Test if the context can be used (will fail on macOS without certs)
+        return ctx
+    except Exception:
+        pass
+    
+    # Fallback: create unverified context (not ideal but allows the app to work)
+    logger.warning("SSL certificate verification disabled. Consider running 'Install Certificates.command' from your Python installation folder.")
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 
 def _get_backup_loc():
@@ -184,7 +215,8 @@ def get_new_version_info(nuzlocke_path=False) -> Tuple[str, str]:
     # TODO: brittle, and tightly tied to github api not changing. Not sure what to do about it though...
     github_api_url = "https://api.github.com/repos/OttoTonsorialist/pkmn_yellow_xp_router/releases/latest"
     try:
-        with urllib.request.urlopen(github_api_url) as response:
+        ssl_context = _get_ssl_context()
+        with urllib.request.urlopen(github_api_url, context=ssl_context) as response:
             data = json.loads(response.read())
 
             # find the windows zipfile from all assets

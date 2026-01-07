@@ -452,8 +452,11 @@ class Router:
     def load(self, route_path, load_events_only=False):
         # if we're using a template, we're going to path the full path in
         # otherwise, the name should exist in one of the two save dirs
-        with open(route_path, 'r') as f:
-            result = json.load(f)
+        try:
+            result = io_utils.read_json_file_safe(route_path)
+        except ValueError as e:
+            # Re-raise with more context for cloud placeholder files
+            raise ValueError(f"Could not load route file: {e}") from e
         
         self._reset_events()
 

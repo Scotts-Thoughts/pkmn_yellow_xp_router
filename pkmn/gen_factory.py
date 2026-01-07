@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple
 import logging
 
 from utils.constants import const
+from utils import io_utils
 from pkmn.pkmn_info import CurrentGen
 
 logger = logging.getLogger(__name__)
@@ -86,21 +87,39 @@ class GenFactory:
             return result
 
         for custom_gen_folder in os.listdir(const.CUSTOM_GENS_DIR):
+            # Skip hidden files/folders (like .DS_Store on macOS)
+            if custom_gen_folder.startswith('.'):
+                continue
+            
+            custom_gen_path = os.path.join(const.CUSTOM_GENS_DIR, custom_gen_folder)
+            # Skip if not a directory
+            if not os.path.isdir(custom_gen_path):
+                continue
+            
+            metadata_path = os.path.join(custom_gen_path, const.CUSTOM_GEN_META_FILE_NAME)
             try:
-                with open(os.path.join(const.CUSTOM_GENS_DIR, custom_gen_folder, const.CUSTOM_GEN_META_FILE_NAME), 'r') as f:
-                    metadata = json.load(f)
+                metadata = io_utils.read_json_file_safe(metadata_path, max_wait_seconds=1.0)
                 
                 cur_custom_gen_name = metadata[const.CUSTOM_GEN_NAME_KEY]
                 base_version = metadata[const.BASE_GEN_NAME_KEY]
                 result.append(
                     (
-                        os.path.join(const.CUSTOM_GENS_DIR, custom_gen_folder), 
+                        custom_gen_path, 
                         base_version,
                         cur_custom_gen_name
                     )
                 )
+            except ValueError as e:
+                # File is empty or cloud placeholder
+                if io_utils.is_likely_cloud_placeholder(metadata_path):
+                    logger.warning(f"Custom gen metadata appears to be a cloud placeholder (not yet synced): {metadata_path}")
+                else:
+                    logger.error(f"Failed to load metadata for custom gen with path: {custom_gen_path}")
+                    logger.error(str(e))
+            except FileNotFoundError:
+                logger.warning(f"Custom gen folder missing metadata file: {custom_gen_path}")
             except Exception as e:
-                logger.error(f"Failed to load metadata for custom gen with path: {os.path.join(const.CUSTOM_GENS_DIR, custom_gen_folder)}")
+                logger.error(f"Failed to load metadata for custom gen with path: {custom_gen_path}")
                 logger.exception(e)
         
         return result
