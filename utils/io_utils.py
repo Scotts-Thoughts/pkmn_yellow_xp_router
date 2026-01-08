@@ -111,8 +111,8 @@ def sanitize_string(string:str):
 
 
 def get_path_safe_string(raw_string):
-    value = re.sub('[^\w\s-]', '', raw_string).strip().lower()
-    value = re.sub('[-\s]+', '-', value)
+    value = re.sub(r'[^\w\s-]', '', raw_string).strip().lower()
+    value = re.sub(r'[-\s]+', '-', value)
     return value
 
 

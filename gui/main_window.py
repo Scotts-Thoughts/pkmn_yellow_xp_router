@@ -378,7 +378,8 @@ class MainWindow(tk.Tk):
         self.bind('<Control-d>', self.move_group_down)
         self.bind('<Control-c>', self.toggle_enable_disable)
         self.bind('<Control-v>', self.toggle_event_highlight)
-        self.bind('<Control-r>', self.open_transfer_event_window)
+        # Control+r is now used for rare candy filter toggle (see below)
+        # Transfer Event can still be accessed via menu (Event > Transfer Event) or the button
         self.bind('<Control-b>', self.delete_group)
         self.bind('<Delete>', self.delete_group)
         # recording actions
@@ -402,8 +403,14 @@ class MainWindow(tk.Tk):
         # config integrations
         self.bind('<Control-D>', self.open_config_window)
         self.bind('<Control-Z>', self.open_app_config_window)
-        self.bind('<Control-R>', self.open_summary_window)
-        self.bind('<Control-T>', self.open_setup_summary_window)
+        # Event filter shortcuts
+        # Note: Control+r was previously used for Transfer Event, but is now overridden for filter toggle
+        # Transfer Event can still be accessed via menu (Event > Transfer Event) or the button
+        # Use bind_all to ensure shortcuts work even when other widgets have focus
+        self.bind_all('<Control-f>', self.toggle_fight_trainer_filter)
+        self.bind_all('<Control-r>', self.toggle_rare_candy_filter)  # Overrides Transfer Event shortcut
+        self.bind_all('<Control-t>', self.toggle_tm_hm_filter)
+        self.bind_all('<Control-g>', self.toggle_vitamin_filter)
         self.bind('<Control-A>', self.open_data_location)
         # Screenshot shortcuts
         self.bind('<F5>', self.screenshot_event_list)
@@ -1369,6 +1376,42 @@ class MainWindow(tk.Tk):
     def _on_landing_page_auto_load_toggle(self):
         """Handle auto-load toggle from landing page - sync menu."""
         self.auto_load_menu_var.set(config.get_auto_load_most_recent_route())
+    
+    def toggle_fight_trainer_filter(self, event=None):
+        """Toggle the Fight Trainer event filter."""
+        try:
+            if hasattr(self, 'route_search') and self.route_search:
+                self.route_search.toggle_filter_by_type(const.TASK_TRAINER_BATTLE)
+        except Exception as e:
+            logger.error(f"Error toggling Fight Trainer filter: {e}")
+        return "break"
+    
+    def toggle_rare_candy_filter(self, event=None):
+        """Toggle the Use Rare Candy event filter."""
+        try:
+            if hasattr(self, 'route_search') and self.route_search:
+                self.route_search.toggle_filter_by_type(const.TASK_RARE_CANDY)
+        except Exception as e:
+            logger.error(f"Error toggling Rare Candy filter: {e}")
+        return "break"
+    
+    def toggle_tm_hm_filter(self, event=None):
+        """Toggle the Learn TM/HM Move event filter."""
+        try:
+            if hasattr(self, 'route_search') and self.route_search:
+                self.route_search.toggle_filter_by_type(const.TASK_LEARN_MOVE_TM)
+        except Exception as e:
+            logger.error(f"Error toggling TM/HM filter: {e}")
+        return "break"
+    
+    def toggle_vitamin_filter(self, event=None):
+        """Toggle the Use Vitamin event filter."""
+        try:
+            if hasattr(self, 'route_search') and self.route_search:
+                self.route_search.toggle_filter_by_type(const.TASK_VITAMIN)
+        except Exception as e:
+            logger.error(f"Error toggling Vitamin filter: {e}")
+        return "break"
     
     def cancel_and_quit(self, *args, **kwargs):
         self.destroy()

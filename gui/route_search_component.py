@@ -76,3 +76,11 @@ class RouteSearch(ttk.Frame):
             self._controller.set_route_filter_types(self._filter_vals)
         
         return inner
+    
+    def toggle_filter_by_type(self, event_type):
+        """Toggle a filter by event type name."""
+        # Find the checkbox for this event type
+        for checkbox in self._filter_components:
+            if checkbox._text_label.cget("text") == event_type:
+                checkbox.toggle_checked()
+                return
