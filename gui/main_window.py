@@ -97,6 +97,8 @@ class MainWindow(tk.Tk):
         self.event_menu = tk.Menu(self.top_menu_bar, tearoff=0, postcommand=self._update_event_menu_state)
         self.event_menu.add_command(label="Move Event Up", accelerator="Ctrl+E", command=self.move_group_up)
         self.event_menu.add_command(label="Move Event Down", accelerator="Ctrl+D", command=self.move_group_down)
+        self.event_menu.add_command(label="Move Event Up To Next Folder", accelerator="Ctrl+Shift+E", command=self.move_group_to_adjacent_folder_up)
+        self.event_menu.add_command(label="Move Event Down To Next Folder", accelerator="Ctrl+Shift+D", command=self.move_group_to_adjacent_folder_down)
         self.event_menu.add_command(label="Enable/Disable", accelerator="Ctrl+C", command=self.toggle_enable_disable)
         self.event_menu.add_command(label="Toggle Highlight", accelerator="Ctrl+V", command=self.toggle_event_highlight)
         self.event_menu.add_command(label="Transfer Event", accelerator="Ctrl+R", command=self.open_transfer_event_window)
@@ -378,6 +380,8 @@ class MainWindow(tk.Tk):
         self.bind('<Control-d>', self.move_group_down)
         self.bind('<Control-c>', self.toggle_enable_disable)
         self.bind('<Control-v>', self.toggle_event_highlight)
+        self.bind('<Control-Shift-E>', self.move_group_to_adjacent_folder_up)
+        self.bind('<Control-Shift-D>', self.move_group_to_adjacent_folder_down)
         # Control+r is now used for rare candy filter toggle (see below)
         # Transfer Event can still be accessed via menu (Event > Transfer Event) or the button
         self.bind('<Control-b>', self.delete_group)
@@ -1284,6 +1288,13 @@ class MainWindow(tk.Tk):
     def move_group_down(self, event=None):
         # NOTE: have to reverse the list since we move items one at a time
         self._controller.move_groups_down(reversed(self.event_list.get_all_selected_event_ids(allow_event_items=False)))
+
+    def move_group_to_adjacent_folder_up(self, event=None):
+        self._controller.move_groups_to_adjacent_folder_up(self.event_list.get_all_selected_event_ids(allow_event_items=False))
+
+    def move_group_to_adjacent_folder_down(self, event=None):
+        # NOTE: have to reverse the list since we move items one at a time
+        self._controller.move_groups_to_adjacent_folder_down(reversed(self.event_list.get_all_selected_event_ids(allow_event_items=False)))
 
     def toggle_event_highlight(self, event=None):
         self._controller.toggle_event_highlight(self.event_list.get_all_selected_event_ids(allow_event_items=False))

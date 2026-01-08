@@ -320,6 +320,71 @@ class Router:
             logger.exception(e)
             raise ValueError(f"Failed to find event object with id: {event_id}")
 
+    def move_event_to_adjacent_folder(self, event_id, move_up_flag):
+        # Move event to adjacent folder (up = previous folder, down = next folder)
+        # When moving up: move to the end of the previous folder
+        # When moving down: move to the beginning of the next folder
+        try:
+            obj_to_move = self.get_event_obj(event_id)
+            if obj_to_move is None:
+                raise ValueError(f"Cannot find event object with id: {event_id}")
+            
+            current_folder = obj_to_move.parent
+            if current_folder is None:
+                raise ValueError(f"Event {event_id} has no parent folder")
+            
+            grandparent_folder = current_folder.parent
+            if grandparent_folder is None:
+                # Event is in root folder, cannot move to adjacent folder
+                raise ValueError(f"Event {event_id} is in root folder, cannot move to adjacent folder")
+            
+            # Find the current folder's index in the grandparent's children
+            try:
+                current_folder_idx = grandparent_folder.children.index(current_folder)
+            except ValueError:
+                raise ValueError(f"Current folder not found in grandparent's children")
+            
+            # Find the adjacent folder
+            if move_up_flag:
+                # Find the previous folder (before current_folder)
+                target_folder = None
+                for i in range(current_folder_idx - 1, -1, -1):
+                    sibling = grandparent_folder.children[i]
+                    if isinstance(sibling, route_events.EventFolder):
+                        target_folder = sibling
+                        break
+                
+                if target_folder is None:
+                    raise ValueError(f"No previous folder found for event {event_id}")
+                
+                # Move to the end of the target folder
+                current_folder.remove_child(obj_to_move)
+                target_folder.add_child(obj_to_move)
+            else:
+                # Find the next folder (after current_folder)
+                target_folder = None
+                for i in range(current_folder_idx + 1, len(grandparent_folder.children)):
+                    sibling = grandparent_folder.children[i]
+                    if isinstance(sibling, route_events.EventFolder):
+                        target_folder = sibling
+                        break
+                
+                if target_folder is None:
+                    raise ValueError(f"No next folder found for event {event_id}")
+                
+                # Move to the beginning of the target folder
+                current_folder.remove_child(obj_to_move)
+                if target_folder.children:
+                    target_folder.insert_child_after(obj_to_move, before_obj=target_folder.children[0])
+                else:
+                    target_folder.add_child(obj_to_move)
+            
+            self._recalc()
+        except Exception as e:
+            logger.error(f"Failed to move event object to adjacent folder: {event_id}")
+            logger.exception(e)
+            raise
+
     def toggle_event_highlight(self, event_id):
         # NOTE: can only move within a folder. To change folders, need to call a separate function
         try:

@@ -286,6 +286,19 @@ class MainController:
         self._on_route_change()
 
     @handle_exceptions
+    def move_groups_to_adjacent_folder_up(self, event_ids):
+        for cur_event in event_ids:
+            self._data.move_event_to_adjacent_folder(cur_event, True)
+        self._on_route_change()
+
+    @handle_exceptions
+    def move_groups_to_adjacent_folder_down(self, event_ids):
+        # NOTE: list is already reversed in main_window before being passed here
+        for cur_event in event_ids:
+            self._data.move_event_to_adjacent_folder(cur_event, False)
+        self._on_route_change()
+
+    @handle_exceptions
     def delete_events(self, event_ids):
         self._data.batch_remove_events(event_ids)
 
