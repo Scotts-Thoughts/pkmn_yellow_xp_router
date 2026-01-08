@@ -75,6 +75,8 @@ class CurrentGen:
         custom_move_data:str,
         defending_pkmn:universal_data_objects.EnemyPkmn,
         weather:str,
+        attacking_stage_modifiers:universal_data_objects.StageModifiers=None,
+        defending_stage_modifiers:universal_data_objects.StageModifiers=None,
     ) -> int:
         raise NotImplementedError()
     

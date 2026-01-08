@@ -35,7 +35,16 @@ def get_crit_rate(cur_mon:universal_data_objects.EnemyPkmn, move:universal_data_
     return (1/2)
 
 
-def get_move_accuracy(pkmn:universal_data_objects.EnemyPkmn, move:universal_data_objects.Move, custom_move_data:str, defending_pkmn:universal_data_objects.EnemyPkmn, weather:str, special_types:List[str]):
+def get_move_accuracy(
+    pkmn:universal_data_objects.EnemyPkmn,
+    move:universal_data_objects.Move,
+    custom_move_data:str,
+    defending_pkmn:universal_data_objects.EnemyPkmn,
+    weather:str,
+    special_types:List[str],
+    attacking_stage_modifiers:universal_data_objects.StageModifiers=None,
+    defending_stage_modifiers:universal_data_objects.StageModifiers=None,
+):
     if move.name == gen_three_const.NATURE_POWER_MOVE_NAME:
         if custom_move_data == gen_three_const.TALL_GRASS_TERRAIN:
             result = 75
@@ -69,6 +78,28 @@ def get_move_accuracy(pkmn:universal_data_objects.EnemyPkmn, move:universal_data
     
     if defending_pkmn.ability == gen_three_const.SAND_VEIL_ABILITY and weather == const.WEATHER_SANDSTORM:
         result = math.floor(result * 3277 / 4096)
+    
+    # Apply accuracy/evasion stage modifiers
+    # Gen III+ combines accuracy and evasion stages first, then applies a single multiplier
+    if attacking_stage_modifiers is None:
+        attacking_stage_modifiers = universal_data_objects.StageModifiers()
+    if defending_stage_modifiers is None:
+        defending_stage_modifiers = universal_data_objects.StageModifiers()
+    
+    # Combine stages: accuracy_stage - evasion_stage (capped at -6 to +6)
+    combined_stage = attacking_stage_modifiers.accuracy_stage - defending_stage_modifiers.evasion_stage
+    combined_stage = max(-6, min(6, combined_stage))
+    
+    # Gen III-IV accuracy multipliers (for combined stage)
+    accuracy_multipliers = {
+        -6: 33/100, -5: 36/100, -4: 43/100, -3: 50/100, -2: 60/100, -1: 75/100,
+        0: 100/100,
+        +1: 133/100, +2: 166/100, +3: 200/100, +4: 233/100, +5: 266/100, +6: 300/100
+    }
+    
+    accuracy_multiplier = accuracy_multipliers[combined_stage]
+    result = result * accuracy_multiplier
+    result = max(1, min(100, math.floor(result)))
 
     return result
 

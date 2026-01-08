@@ -1009,6 +1009,11 @@ class DamageSummary(ttk.Frame):
         # Setup move dropdown (for moves that modify stats)
         self.setup_move_dropdown = custom_components.SimpleOptionMenu(self.header, ["0"], callback=self._setup_move_callback, width=8)
         self.setup_move_dropdown.bind("<<ComboboxSelected>>", self._setup_move_callback)
+        # Add keyboard navigation: up/down arrows increment/decrement value when dropdown is closed
+        self.setup_move_dropdown.bind("<Key-Up>", self._on_setup_move_arrow_key)
+        self.setup_move_dropdown.bind("<Key-Down>", self._on_setup_move_arrow_key)
+        # Prevent default behavior when dropdown is closed
+        self.setup_move_dropdown.bind("<KeyPress>", self._on_setup_move_key_press, add="+")
 
         self.range_frame = ttk.Frame(self, style="Contrast.TFrame")
         self.range_frame.grid(row=self.row_idx, column=0, sticky=tk.NSEW, padx=self.padx, pady=self.pady)
@@ -1058,6 +1063,65 @@ class DamageSummary(ttk.Frame):
             return
         count = int(self.setup_move_dropdown.get())
         self._controller.update_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon, count)
+    
+    def _on_setup_move_key_press(self, event):
+        """Handle key press to prevent default arrow key behavior when dropdown is closed"""
+        if event.keysym in ['Up', 'Down']:
+            # Check if dropdown is currently open (combobox state is 'readonly' when closed)
+            try:
+                # If the combobox is in readonly state and has focus, prevent default behavior
+                # The actual navigation will be handled by _on_setup_move_arrow_key
+                if self.setup_move_dropdown['state'] == 'readonly':
+                    # Let our handler deal with it
+                    pass
+            except Exception:
+                pass
+    
+    def _on_setup_move_arrow_key(self, event):
+        """Handle up/down arrow keys to increment/decrement setup move count when dropdown is closed"""
+        if self._is_loading:
+            return
+        
+        # Only handle if dropdown is closed (readonly state)
+        try:
+            if self.setup_move_dropdown['state'] != 'readonly':
+                # Dropdown is open, let default behavior handle it
+                return
+        except Exception:
+            return
+        
+        # Get current value and options
+        current_val = self.setup_move_dropdown.get()
+        try:
+            current_count = int(current_val)
+        except ValueError:
+            current_count = 0
+        
+        options = self.setup_move_dropdown.cur_options
+        if not options:
+            return
+        
+        # Find current index
+        try:
+            current_idx = options.index(current_val)
+        except ValueError:
+            current_idx = 0
+        
+        # Increment or decrement based on key
+        if event.keysym == 'Up':
+            new_idx = min(current_idx + 1, len(options) - 1)
+        else:  # Down
+            new_idx = max(current_idx - 1, 0)
+        
+        # Update value if changed
+        if new_idx != current_idx:
+            new_val = options[new_idx]
+            self.setup_move_dropdown.set(new_val)
+            # Trigger callback to update the controller
+            self._setup_move_callback()
+        
+        # Prevent default behavior (reopening dropdown)
+        return "break"
     
     def _on_test_move_changed(self, *args, **kwargs):
         """Called when user selects a test move from the dropdown"""

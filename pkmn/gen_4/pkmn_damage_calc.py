@@ -44,6 +44,8 @@ def get_move_accuracy(
     custom_move_data:str,
     defending_pkmn:universal_data_objects.EnemyPkmn,
     weather:str,
+    attacking_stage_modifiers:universal_data_objects.StageModifiers=None,
+    defending_stage_modifiers:universal_data_objects.StageModifiers=None,
 ):
     if pkmn.ability == gen_four_const.NO_GUARD_ABILITY or defending_pkmn.ability == gen_four_const.NO_GUARD_ABILITY:
         return None
@@ -81,6 +83,29 @@ def get_move_accuracy(
 
     if defending_pkmn.ability == gen_four_const.SNOW_CLOAK_ABILITY and weather == const.WEATHER_HAIL:
         result = math.floor(result * 3277 / 4096)
+    
+    # Apply accuracy/evasion stage modifiers
+    # Gen V+ combines accuracy and evasion stages first, then applies a single multiplier
+    # Gen IV uses same formula as Gen III
+    if attacking_stage_modifiers is None:
+        attacking_stage_modifiers = universal_data_objects.StageModifiers()
+    if defending_stage_modifiers is None:
+        defending_stage_modifiers = universal_data_objects.StageModifiers()
+    
+    # Combine stages: accuracy_stage - evasion_stage (capped at -6 to +6)
+    combined_stage = attacking_stage_modifiers.accuracy_stage - defending_stage_modifiers.evasion_stage
+    combined_stage = max(-6, min(6, combined_stage))
+    
+    # Gen V+ accuracy multipliers (for combined stage): (3 + stage) / 3 if stage >= 0, else 3 / (3 - stage)
+    # But Bulbapedia shows Gen V+ uses: 3/9, 3/8, 3/7, 3/6, 3/5, 3/4, 3/3, 4/3, 5/3, 6/3, 7/3, 8/3, 9/3
+    # Which simplifies to the same formula: (3 + stage) / 3 for positive, 3 / (3 - stage) for negative
+    if combined_stage >= 0:
+        accuracy_multiplier = (3 + combined_stage) / 3
+    else:
+        accuracy_multiplier = 3 / (3 - combined_stage)
+    
+    result = result * accuracy_multiplier
+    result = max(1, min(100, math.floor(result)))
 
     return result
 

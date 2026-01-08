@@ -22,6 +22,53 @@ def get_crit_rate(pkmn:universal_data_objects.EnemyPkmn, move:universal_data_obj
     return (17 / 256)
 
 
+def get_move_accuracy(
+    pkmn:universal_data_objects.EnemyPkmn,
+    move:universal_data_objects.Move,
+    custom_move_data:str,
+    defending_pkmn:universal_data_objects.EnemyPkmn,
+    weather:str,
+    attacking_stage_modifiers:universal_data_objects.StageModifiers=None,
+    defending_stage_modifiers:universal_data_objects.StageModifiers=None,
+):
+    """Calculate move accuracy with accuracy/evasion stage modifiers
+    
+    Gen II uses separate multipliers for accuracy and evasion stages:
+    - Accuracy multipliers: -6:33/100, -5:36/100, -4:43/100, -3:50/100, -2:60/100, -1:75/100, 0:100/100, +1:133/100, +2:166/100, +3:200/100, +4:233/100, +5:266/100, +6:300/100
+    - Evasion multipliers: +6:33/100, +5:36/100, +4:43/100, +3:50/100, +2:60/100, +1:75/100, 0:100/100, -1:133/100, -2:166/100, -3:200/100, -4:233/100, -5:266/100, -6:300/100
+    These are multiplied together.
+    """
+    if move.accuracy is None:
+        return None
+    
+    result = move.accuracy
+    
+    if attacking_stage_modifiers is None:
+        attacking_stage_modifiers = universal_data_objects.StageModifiers()
+    if defending_stage_modifiers is None:
+        defending_stage_modifiers = universal_data_objects.StageModifiers()
+    
+    # Gen II accuracy multipliers (separate for accuracy and evasion)
+    accuracy_multipliers = {
+        -6: 33/100, -5: 36/100, -4: 43/100, -3: 50/100, -2: 60/100, -1: 75/100,
+        0: 100/100,
+        +1: 133/100, +2: 166/100, +3: 200/100, +4: 233/100, +5: 266/100, +6: 300/100
+    }
+    
+    # Apply accuracy stage modifier from attacker
+    accuracy_stage = max(-6, min(6, attacking_stage_modifiers.accuracy_stage))
+    accuracy_multiplier = accuracy_multipliers[accuracy_stage]
+    
+    # Apply evasion stage modifier from defender (inverted: +evasion = -accuracy)
+    evasion_stage = max(-6, min(6, defending_stage_modifiers.evasion_stage))
+    evasion_multiplier = accuracy_multipliers[-evasion_stage]  # Invert evasion stage
+    
+    result = result * accuracy_multiplier * evasion_multiplier
+    result = max(1, min(100, math.floor(result)))
+    
+    return result
+
+
 def calculate_gen_two_damage(
     attacking_pkmn:universal_data_objects.EnemyPkmn,
     attacking_species:universal_data_objects.PokemonSpecies,

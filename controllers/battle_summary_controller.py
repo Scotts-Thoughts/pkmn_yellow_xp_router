@@ -610,8 +610,41 @@ class BattleSummaryController:
                 crit_mon = attacking_mon
                 crit_mon_stats = attacking_mon_stats
             
-            # Calculate accumulated setup modifiers from previous moves
-            accumulated_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, True)
+            # Calculate accumulated setup modifiers for the attacking player Pokemon
+            # Include: 1) player's own self-targeting modifiers (like Swords Dance), 2) enemy's enemy-targeting modifiers (like Charm)
+            player_self_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, True, target_self=True)
+            enemy_enemy_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, False, target_self=False)
+            # Combine both sources of modifiers
+            if current_gen_info().get_generation() == 1:
+                accumulated_modifiers = StageModifiers(
+                    attack=max(min(player_self_modifiers.attack_stage + enemy_enemy_modifiers.attack_stage, 6), -6),
+                    defense=max(min(player_self_modifiers.defense_stage + enemy_enemy_modifiers.defense_stage, 6), -6),
+                    speed=max(min(player_self_modifiers.speed_stage + enemy_enemy_modifiers.speed_stage, 6), -6),
+                    special_attack=max(min(player_self_modifiers.special_attack_stage + enemy_enemy_modifiers.special_attack_stage, 6), -6),
+                    special_defense=max(min(player_self_modifiers.special_defense_stage + enemy_enemy_modifiers.special_defense_stage, 6), -6),
+                    accuracy=max(min(player_self_modifiers.accuracy_stage + enemy_enemy_modifiers.accuracy_stage, 6), -6),
+                    evasion=max(min(player_self_modifiers.evasion_stage + enemy_enemy_modifiers.evasion_stage, 6), -6),
+                    attack_bb=player_self_modifiers.attack_badge_boosts + enemy_enemy_modifiers.attack_badge_boosts,
+                    defense_bb=player_self_modifiers.defense_badge_boosts + enemy_enemy_modifiers.defense_badge_boosts,
+                    speed_bb=player_self_modifiers.speed_badge_boosts + enemy_enemy_modifiers.speed_badge_boosts,
+                    special_bb=player_self_modifiers.special_badge_boosts + enemy_enemy_modifiers.special_badge_boosts,
+                )
+            else:
+                accumulated_modifiers = player_self_modifiers
+                if enemy_enemy_modifiers.attack_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.ATK, enemy_enemy_modifiers.attack_stage)])
+                if enemy_enemy_modifiers.defense_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.DEF, enemy_enemy_modifiers.defense_stage)])
+                if enemy_enemy_modifiers.speed_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.SPE, enemy_enemy_modifiers.speed_stage)])
+                if enemy_enemy_modifiers.special_attack_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.SPA, enemy_enemy_modifiers.special_attack_stage)])
+                if enemy_enemy_modifiers.special_defense_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.SPD, enemy_enemy_modifiers.special_defense_stage)])
+                if enemy_enemy_modifiers.accuracy_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.ACC, enemy_enemy_modifiers.accuracy_stage)])
+                if enemy_enemy_modifiers.evasion_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.EV, enemy_enemy_modifiers.evasion_stage)])
             # Combine base stage modifier with accumulated modifiers
             base_modifier = self._player_stage_modifier
             # For Gen 1, we need to preserve badge boosts from accumulated modifiers
@@ -674,7 +707,79 @@ class BattleSummaryController:
             attacking_field_status = self._player_field_status
             defending_mon = self._original_enemy_mon_list[mon_idx]
             defending_mon_stats = None
-            defending_stage_modifiers = self._enemy_stage_modifier
+            # Calculate accumulated setup modifiers for the defending enemy Pokemon
+            # Note: defending_mon is the enemy Pokemon, so we use is_player_mon=False
+            # Include: 1) enemy's own self-targeting modifiers, 2) player's enemy-targeting modifiers
+            enemy_self_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, False, target_self=True)
+            player_enemy_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, True, target_self=False)
+            # Combine both sources of modifiers
+            accumulated_defending_modifiers = StageModifiers()
+            if current_gen_info().get_generation() == 1:
+                accumulated_defending_modifiers = StageModifiers(
+                    attack=max(min(enemy_self_modifiers.attack_stage + player_enemy_modifiers.attack_stage, 6), -6),
+                    defense=max(min(enemy_self_modifiers.defense_stage + player_enemy_modifiers.defense_stage, 6), -6),
+                    speed=max(min(enemy_self_modifiers.speed_stage + player_enemy_modifiers.speed_stage, 6), -6),
+                    special_attack=max(min(enemy_self_modifiers.special_attack_stage + player_enemy_modifiers.special_attack_stage, 6), -6),
+                    special_defense=max(min(enemy_self_modifiers.special_defense_stage + player_enemy_modifiers.special_defense_stage, 6), -6),
+                    accuracy=max(min(enemy_self_modifiers.accuracy_stage + player_enemy_modifiers.accuracy_stage, 6), -6),
+                    evasion=max(min(enemy_self_modifiers.evasion_stage + player_enemy_modifiers.evasion_stage, 6), -6),
+                    attack_bb=enemy_self_modifiers.attack_badge_boosts + player_enemy_modifiers.attack_badge_boosts,
+                    defense_bb=enemy_self_modifiers.defense_badge_boosts + player_enemy_modifiers.defense_badge_boosts,
+                    speed_bb=enemy_self_modifiers.speed_badge_boosts + player_enemy_modifiers.speed_badge_boosts,
+                    special_bb=enemy_self_modifiers.special_badge_boosts + player_enemy_modifiers.special_badge_boosts,
+                )
+            else:
+                accumulated_defending_modifiers = enemy_self_modifiers
+                if player_enemy_modifiers.attack_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.ATK, player_enemy_modifiers.attack_stage)])
+                if player_enemy_modifiers.defense_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.DEF, player_enemy_modifiers.defense_stage)])
+                if player_enemy_modifiers.speed_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.SPE, player_enemy_modifiers.speed_stage)])
+                if player_enemy_modifiers.special_attack_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.SPA, player_enemy_modifiers.special_attack_stage)])
+                if player_enemy_modifiers.special_defense_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.SPD, player_enemy_modifiers.special_defense_stage)])
+                if player_enemy_modifiers.accuracy_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.ACC, player_enemy_modifiers.accuracy_stage)])
+                if player_enemy_modifiers.evasion_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.EV, player_enemy_modifiers.evasion_stage)])
+            # Combine base enemy stage modifier with accumulated modifiers
+            base_defending_modifier = self._enemy_stage_modifier
+            # For Gen 1, we need to preserve badge boosts from accumulated modifiers
+            # For other gens, just combine stage modifiers
+            if current_gen_info().get_generation() == 1:
+                # Combine stage modifiers and badge boosts separately
+                defending_stage_modifiers = StageModifiers(
+                    attack=max(min(base_defending_modifier.attack_stage + accumulated_defending_modifiers.attack_stage, 6), -6),
+                    defense=max(min(base_defending_modifier.defense_stage + accumulated_defending_modifiers.defense_stage, 6), -6),
+                    speed=max(min(base_defending_modifier.speed_stage + accumulated_defending_modifiers.speed_stage, 6), -6),
+                    special_attack=max(min(base_defending_modifier.special_attack_stage + accumulated_defending_modifiers.special_attack_stage, 6), -6),
+                    special_defense=max(min(base_defending_modifier.special_defense_stage + accumulated_defending_modifiers.special_defense_stage, 6), -6),
+                    accuracy=max(min(base_defending_modifier.accuracy_stage + accumulated_defending_modifiers.accuracy_stage, 6), -6),
+                    evasion=max(min(base_defending_modifier.evasion_stage + accumulated_defending_modifiers.evasion_stage, 6), -6),
+                    attack_bb=base_defending_modifier.attack_badge_boosts + accumulated_defending_modifiers.attack_badge_boosts,
+                    defense_bb=base_defending_modifier.defense_badge_boosts + accumulated_defending_modifiers.defense_badge_boosts,
+                    speed_bb=base_defending_modifier.speed_badge_boosts + accumulated_defending_modifiers.speed_badge_boosts,
+                    special_bb=base_defending_modifier.special_badge_boosts + accumulated_defending_modifiers.special_badge_boosts,
+                )
+            else:
+                # For non-Gen 1, combine stage modifiers normally
+                defending_stage_modifiers = base_defending_modifier
+                if accumulated_defending_modifiers.attack_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.ATK, accumulated_defending_modifiers.attack_stage)])
+                if accumulated_defending_modifiers.defense_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.DEF, accumulated_defending_modifiers.defense_stage)])
+                if accumulated_defending_modifiers.speed_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.SPE, accumulated_defending_modifiers.speed_stage)])
+                if accumulated_defending_modifiers.special_attack_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.SPA, accumulated_defending_modifiers.special_attack_stage)])
+                if accumulated_defending_modifiers.special_defense_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.SPD, accumulated_defending_modifiers.special_defense_stage)])
+                if accumulated_defending_modifiers.accuracy_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.ACC, accumulated_defending_modifiers.accuracy_stage)])
+                if accumulated_defending_modifiers.evasion_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.EV, accumulated_defending_modifiers.evasion_stage)])
             defending_field_status = self._enemy_field_status
             custom_lookup_key = const.PLAYER_KEY
         else:
@@ -683,8 +788,41 @@ class BattleSummaryController:
             crit_mon = attacking_mon
             crit_mon_stats = attacking_mon_stats
             
-            # Calculate accumulated setup modifiers from previous moves
-            accumulated_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, False)
+            # Calculate accumulated setup modifiers for the attacking enemy Pokemon
+            # Include: 1) enemy's own self-targeting modifiers (like Curse), 2) player's enemy-targeting modifiers (like Mud-Slap)
+            enemy_self_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, False, target_self=True, calculating_for_enemy=True)
+            player_enemy_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, True, target_self=False, calculating_for_enemy=True)
+            # Combine both sources of modifiers
+            if current_gen_info().get_generation() == 1:
+                accumulated_modifiers = StageModifiers(
+                    attack=max(min(enemy_self_modifiers.attack_stage + player_enemy_modifiers.attack_stage, 6), -6),
+                    defense=max(min(enemy_self_modifiers.defense_stage + player_enemy_modifiers.defense_stage, 6), -6),
+                    speed=max(min(enemy_self_modifiers.speed_stage + player_enemy_modifiers.speed_stage, 6), -6),
+                    special_attack=max(min(enemy_self_modifiers.special_attack_stage + player_enemy_modifiers.special_attack_stage, 6), -6),
+                    special_defense=max(min(enemy_self_modifiers.special_defense_stage + player_enemy_modifiers.special_defense_stage, 6), -6),
+                    accuracy=max(min(enemy_self_modifiers.accuracy_stage + player_enemy_modifiers.accuracy_stage, 6), -6),
+                    evasion=max(min(enemy_self_modifiers.evasion_stage + player_enemy_modifiers.evasion_stage, 6), -6),
+                    attack_bb=enemy_self_modifiers.attack_badge_boosts + player_enemy_modifiers.attack_badge_boosts,
+                    defense_bb=enemy_self_modifiers.defense_badge_boosts + player_enemy_modifiers.defense_badge_boosts,
+                    speed_bb=enemy_self_modifiers.speed_badge_boosts + player_enemy_modifiers.speed_badge_boosts,
+                    special_bb=enemy_self_modifiers.special_badge_boosts + player_enemy_modifiers.special_badge_boosts,
+                )
+            else:
+                accumulated_modifiers = enemy_self_modifiers
+                if player_enemy_modifiers.attack_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.ATK, player_enemy_modifiers.attack_stage)])
+                if player_enemy_modifiers.defense_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.DEF, player_enemy_modifiers.defense_stage)])
+                if player_enemy_modifiers.speed_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.SPE, player_enemy_modifiers.speed_stage)])
+                if player_enemy_modifiers.special_attack_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.SPA, player_enemy_modifiers.special_attack_stage)])
+                if player_enemy_modifiers.special_defense_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.SPD, player_enemy_modifiers.special_defense_stage)])
+                if player_enemy_modifiers.accuracy_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.ACC, player_enemy_modifiers.accuracy_stage)])
+                if player_enemy_modifiers.evasion_stage != 0:
+                    accumulated_modifiers = accumulated_modifiers.apply_stat_mod([(const.EV, player_enemy_modifiers.evasion_stage)])
             # Combine base stage modifier with accumulated modifiers
             base_modifier = self._enemy_stage_modifier
             # For Gen 1, we need to preserve badge boosts from accumulated modifiers
@@ -730,7 +868,118 @@ class BattleSummaryController:
             else:
                 defending_mon = self._original_player_mon_list[mon_idx]
                 defending_mon_stats = None
-            defending_stage_modifiers = self._player_stage_modifier
+            # Calculate accumulated setup modifiers for the defending player Pokemon
+            # Note: defending_mon is the player Pokemon, so we use is_player_mon=True
+            # Include: 1) player's own self-targeting modifiers, 2) enemy's enemy-targeting modifiers
+            player_self_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, True, target_self=True)
+            enemy_enemy_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, False, target_self=False)
+            # Combine both sources of modifiers
+            accumulated_defending_modifiers = StageModifiers()
+            if current_gen_info().get_generation() == 1:
+                # Check if the solo Pokemon leveled up before or during this Pokemon's battle
+                level_up_mon_idx = None
+                for idx in range(len(self._leveled_up_pokemon)):
+                    if self._leveled_up_pokemon[idx]:
+                        level_up_mon_idx = idx
+                        break
+                
+                # If a level-up occurred, clear badge boosts from player_self_modifiers for Pokemon AFTER the level-up
+                player_bb_attack = player_self_modifiers.attack_badge_boosts
+                player_bb_defense = player_self_modifiers.defense_badge_boosts
+                player_bb_speed = player_self_modifiers.speed_badge_boosts
+                player_bb_special = player_self_modifiers.special_badge_boosts
+                if level_up_mon_idx is not None and mon_idx > level_up_mon_idx:
+                    player_bb_attack = 0
+                    player_bb_defense = 0
+                    player_bb_speed = 0
+                    player_bb_special = 0
+                
+                accumulated_defending_modifiers = StageModifiers(
+                    attack=max(min(player_self_modifiers.attack_stage + enemy_enemy_modifiers.attack_stage, 6), -6),
+                    defense=max(min(player_self_modifiers.defense_stage + enemy_enemy_modifiers.defense_stage, 6), -6),
+                    speed=max(min(player_self_modifiers.speed_stage + enemy_enemy_modifiers.speed_stage, 6), -6),
+                    special_attack=max(min(player_self_modifiers.special_attack_stage + enemy_enemy_modifiers.special_attack_stage, 6), -6),
+                    special_defense=max(min(player_self_modifiers.special_defense_stage + enemy_enemy_modifiers.special_defense_stage, 6), -6),
+                    accuracy=max(min(player_self_modifiers.accuracy_stage + enemy_enemy_modifiers.accuracy_stage, 6), -6),
+                    evasion=max(min(player_self_modifiers.evasion_stage + enemy_enemy_modifiers.evasion_stage, 6), -6),
+                    attack_bb=player_bb_attack + enemy_enemy_modifiers.attack_badge_boosts,
+                    defense_bb=player_bb_defense + enemy_enemy_modifiers.defense_badge_boosts,
+                    speed_bb=player_bb_speed + enemy_enemy_modifiers.speed_badge_boosts,
+                    special_bb=player_bb_special + enemy_enemy_modifiers.special_badge_boosts,
+                )
+            else:
+                accumulated_defending_modifiers = player_self_modifiers
+                if enemy_enemy_modifiers.attack_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.ATK, enemy_enemy_modifiers.attack_stage)])
+                if enemy_enemy_modifiers.defense_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.DEF, enemy_enemy_modifiers.defense_stage)])
+                if enemy_enemy_modifiers.speed_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.SPE, enemy_enemy_modifiers.speed_stage)])
+                if enemy_enemy_modifiers.special_attack_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.SPA, enemy_enemy_modifiers.special_attack_stage)])
+                if enemy_enemy_modifiers.special_defense_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.SPD, enemy_enemy_modifiers.special_defense_stage)])
+                if enemy_enemy_modifiers.accuracy_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.ACC, enemy_enemy_modifiers.accuracy_stage)])
+                if enemy_enemy_modifiers.evasion_stage != 0:
+                    accumulated_defending_modifiers = accumulated_defending_modifiers.apply_stat_mod([(const.EV, enemy_enemy_modifiers.evasion_stage)])
+            # Combine base player stage modifier with accumulated modifiers
+            base_defending_modifier = self._player_stage_modifier
+            # For Gen 1, we need to preserve badge boosts from accumulated modifiers
+            # For other gens, just combine stage modifiers
+            if current_gen_info().get_generation() == 1:
+                # Check if the solo Pokemon leveled up before or during this Pokemon's battle
+                level_up_mon_idx = None
+                for idx in range(len(self._leveled_up_pokemon)):
+                    if self._leveled_up_pokemon[idx]:
+                        level_up_mon_idx = idx
+                        break
+                
+                # If a level-up occurred, clear badge boosts from base_defending_modifier for Pokemon AFTER the level-up
+                # (level-up removes all erroneously applied badge boosts)
+                # Note: Badge boosts still apply to the Pokemon where the level-up occurs
+                base_attack_bb = 0
+                base_defense_bb = 0
+                base_speed_bb = 0
+                base_special_bb = 0
+                if level_up_mon_idx is None or mon_idx <= level_up_mon_idx:
+                    # No level-up yet, or calculating for Pokemon up to and including the level-up - preserve base badge boosts
+                    base_attack_bb = base_defending_modifier.attack_badge_boosts
+                    base_defense_bb = base_defending_modifier.defense_badge_boosts
+                    base_speed_bb = base_defending_modifier.speed_badge_boosts
+                    base_special_bb = base_defending_modifier.special_badge_boosts
+                
+                # Combine stage modifiers and badge boosts separately
+                defending_stage_modifiers = StageModifiers(
+                    attack=max(min(base_defending_modifier.attack_stage + accumulated_defending_modifiers.attack_stage, 6), -6),
+                    defense=max(min(base_defending_modifier.defense_stage + accumulated_defending_modifiers.defense_stage, 6), -6),
+                    speed=max(min(base_defending_modifier.speed_stage + accumulated_defending_modifiers.speed_stage, 6), -6),
+                    special_attack=max(min(base_defending_modifier.special_attack_stage + accumulated_defending_modifiers.special_attack_stage, 6), -6),
+                    special_defense=max(min(base_defending_modifier.special_defense_stage + accumulated_defending_modifiers.special_defense_stage, 6), -6),
+                    accuracy=max(min(base_defending_modifier.accuracy_stage + accumulated_defending_modifiers.accuracy_stage, 6), -6),
+                    evasion=max(min(base_defending_modifier.evasion_stage + accumulated_defending_modifiers.evasion_stage, 6), -6),
+                    attack_bb=base_attack_bb + accumulated_defending_modifiers.attack_badge_boosts,
+                    defense_bb=base_defense_bb + accumulated_defending_modifiers.defense_badge_boosts,
+                    speed_bb=base_speed_bb + accumulated_defending_modifiers.speed_badge_boosts,
+                    special_bb=base_special_bb + accumulated_defending_modifiers.special_badge_boosts,
+                )
+            else:
+                # For non-Gen 1, combine stage modifiers normally
+                defending_stage_modifiers = base_defending_modifier
+                if accumulated_defending_modifiers.attack_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.ATK, accumulated_defending_modifiers.attack_stage)])
+                if accumulated_defending_modifiers.defense_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.DEF, accumulated_defending_modifiers.defense_stage)])
+                if accumulated_defending_modifiers.speed_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.SPE, accumulated_defending_modifiers.speed_stage)])
+                if accumulated_defending_modifiers.special_attack_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.SPA, accumulated_defending_modifiers.special_attack_stage)])
+                if accumulated_defending_modifiers.special_defense_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.SPD, accumulated_defending_modifiers.special_defense_stage)])
+                if accumulated_defending_modifiers.accuracy_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.ACC, accumulated_defending_modifiers.accuracy_stage)])
+                if accumulated_defending_modifiers.evasion_stage != 0:
+                    defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.EV, accumulated_defending_modifiers.evasion_stage)])
             defending_field_status = self._player_field_status
             custom_lookup_key = const.ENEMY_KEY
 
@@ -793,7 +1042,11 @@ class BattleSummaryController:
             if config.do_ignore_accuracy():
                 accuracy = 100
             else:
-                accuracy = current_gen_info().get_move_accuracy(attacking_mon, move, custom_data_selection, defending_mon, self._weather)
+                accuracy = current_gen_info().get_move_accuracy(
+                    attacking_mon, move, custom_data_selection, defending_mon, self._weather,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers
+                )
                 if accuracy is None:
                     accuracy = 100
 
@@ -845,7 +1098,7 @@ class BattleSummaryController:
         self._player_field_status = self._calc_field_status(self._player_setup_move_list)
         self._enemy_setup_move_list = trainer_def.enemy_setup_moves.copy()
         self._enemy_stage_modifier = self._calc_stage_modifier(self._enemy_setup_move_list)
-        self._enemy_stage_modifier = self._calc_field_status(self._enemy_setup_move_list)
+        self._enemy_field_status = self._calc_field_status(self._enemy_setup_move_list)
         self._cached_definition_order = [x.mon_order - 1 for x in event_group.event_definition.get_pokemon_list(definition_order=True)]
         if not trainer_def.custom_move_data:
             self._custom_move_data = []
@@ -1359,8 +1612,16 @@ class BattleSummaryController:
         
         return result
 
-    def _calc_accumulated_setup_modifiers(self, mon_idx:int, move_idx:int, is_player_mon:bool) -> StageModifiers:
-        """Calculate accumulated stage modifiers from all setup moves used up to this point in the battle"""
+    def _calc_accumulated_setup_modifiers(self, mon_idx:int, move_idx:int, is_player_mon:bool, target_self:bool=True, calculating_for_enemy:bool=False) -> StageModifiers:
+        """Calculate accumulated stage modifiers from all setup moves used up to this point in the battle
+        
+        Args:
+            mon_idx: Index of the Pokemon
+            move_idx: Index of the move being calculated
+            is_player_mon: True if getting moves from player Pokemon, False for enemy
+            target_self: If True, only include modifiers that target self. If False, only include modifiers that target enemy/foe.
+            calculating_for_enemy: True if we're calculating modifiers for an enemy Pokemon (affects whether to check previous battles)
+        """
         result = StageModifiers()
         
         if mon_idx < 0:
@@ -1368,44 +1629,66 @@ class BattleSummaryController:
         
         key = const.PLAYER_KEY if is_player_mon else const.ENEMY_KEY
         
-        # Check all previous Pokemon (mon_idx 0 to mon_idx-1)
-        for prev_mon_idx in range(mon_idx):
-            if prev_mon_idx >= len(self._move_setup_usage):
-                continue
-            
-            if key not in self._move_setup_usage[prev_mon_idx]:
-                continue
-            
-            # Get the previous Pokemon's move list
-            if is_player_mon:
-                if self._is_player_transformed:
-                    prev_mon = self._transformed_mon_list[prev_mon_idx]
+        # When calculating enemy-targeting modifiers (target_self=False), we need to be careful:
+        # - If calculating for enemy mon (is_player_mon=False, target_self=False): only include player moves from THIS battle (mon_idx)
+        #   because player moves that lower enemy stats only affect the specific enemy mon they were used against
+        # - If calculating for player mon (is_player_mon=True, target_self=False): include enemy moves from ALL battles (0 to mon_idx)
+        #   because enemy moves that lower player stats affect all player moves against all enemies
+        # - For self-targeting modifiers (target_self=True): include all previous battles as normal
+        
+        # Determine if we should check previous battles
+        # - Self-targeting modifiers (target_self=True): always check previous battles
+        # - Enemy-targeting modifiers for player (is_player_mon=True, target_self=False, calculating_for_enemy=False): check previous battles (enemy moves affect all player moves)
+        # - Enemy-targeting modifiers for enemy (is_player_mon=True, target_self=False, calculating_for_enemy=True): DON'T check previous battles (player moves only affect specific enemy)
+        should_check_previous = target_self or (is_player_mon and not target_self and not calculating_for_enemy)
+        
+        if should_check_previous:
+            # Check all previous Pokemon (mon_idx 0 to mon_idx-1)
+            # This applies to:
+            # - Self-targeting modifiers (target_self=True) - always accumulate across battles
+            # - Enemy-targeting modifiers for player (is_player_mon=True, target_self=False) - enemy moves affect all player moves
+            for prev_mon_idx in range(mon_idx):
+                if prev_mon_idx >= len(self._move_setup_usage):
+                    continue
+                
+                if key not in self._move_setup_usage[prev_mon_idx]:
+                    continue
+                
+                # Get the previous Pokemon's move list
+                if is_player_mon:
+                    if self._is_player_transformed:
+                        prev_mon = self._transformed_mon_list[prev_mon_idx]
+                    else:
+                        prev_mon = self._original_player_mon_list[prev_mon_idx]
                 else:
-                    prev_mon = self._original_player_mon_list[prev_mon_idx]
-            else:
-                prev_mon = self._original_enemy_mon_list[prev_mon_idx]
-            
-            # Check all moves for this previous Pokemon
-            setup_usage = self._move_setup_usage[prev_mon_idx][key]
-            for prev_move_idx in range(4):  # Check all 4 move slots
-                if prev_move_idx < len(prev_mon.move_list) and prev_move_idx in setup_usage:
-                    move_name = prev_mon.move_list[prev_move_idx]
-                    if move_name:
-                        # Handle Mimic special case
-                        if move_name == const.MIMIC_MOVE_NAME:
-                            if self._mimic_selection:
-                                move_name = self._mimic_selection
-                            else:
-                                continue
-                        
-                        count = setup_usage[prev_move_idx]
-                        if count > 0:
-                            stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
-                            if stat_mods:
-                                # Apply the stat mods count times
-                                # For Gen 1, apply_stat_mod handles badge boosts correctly
-                                for _ in range(count):
-                                    result = result.apply_stat_mod(stat_mods)
+                    prev_mon = self._original_enemy_mon_list[prev_mon_idx]
+                
+                # Check all moves for this previous Pokemon
+                setup_usage = self._move_setup_usage[prev_mon_idx][key]
+                for prev_move_idx in range(4):  # Check all 4 move slots
+                    if prev_move_idx < len(prev_mon.move_list) and prev_move_idx in setup_usage:
+                        move_name = prev_mon.move_list[prev_move_idx]
+                        if move_name:
+                            # Handle Mimic special case
+                            if move_name == const.MIMIC_MOVE_NAME:
+                                if self._mimic_selection:
+                                    move_name = self._mimic_selection
+                                else:
+                                    continue
+                            
+                            count = setup_usage[prev_move_idx]
+                            if count > 0:
+                                # Get stat mods filtered by target
+                                stat_mods = current_gen_info().move_db().get_stat_mod_for_target(move_name, target_self=target_self)
+                                if stat_mods:
+                                    # Apply the stat mods count times
+                                    # For Gen 1, apply_stat_mod handles badge boosts correctly
+                                    for _ in range(count):
+                                        result = result.apply_stat_mod(stat_mods)
+        # else: target_self=False and is_player_mon=False
+        # This means we're calculating enemy-targeting modifiers for an enemy Pokemon
+        # Only include player moves from THIS battle (mon_idx), not previous battles
+        # because player moves that lower enemy stats only affect the specific enemy mon they were used against
         
         # Check all moves for the current Pokemon (all moves, not just before current move_idx)
         if mon_idx < len(self._move_setup_usage):
@@ -1434,7 +1717,8 @@ class BattleSummaryController:
                             
                             count = setup_usage[cur_move_idx]
                             if count > 0:
-                                stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
+                                # Get stat mods filtered by target
+                                stat_mods = current_gen_info().move_db().get_stat_mod_for_target(move_name, target_self=target_self)
                                 if stat_mods:
                                     # Apply the stat mods count times
                                     # For Gen 1, apply_stat_mod handles badge boosts correctly
@@ -1465,7 +1749,8 @@ class BattleSummaryController:
         result = FieldStatus()
 
         for cur_move in move_list:
-            result = result.apply_move(current_gen_info().move_db().get_move(cur_move))
+            if cur_move:  # Only process non-empty moves
+                result = result.apply_move(cur_move)
         
         return result
     

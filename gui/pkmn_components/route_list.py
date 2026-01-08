@@ -253,7 +253,11 @@ class RouteList(custom_components.CustomGridview):
 
     def refresh(self, *args, **kwargs):
         # Save current focus widget before refreshing to preserve text field focus
-        focused_widget = self.focus_get()
+        # Handle case where focus_get() might fail if a dropdown is open
+        try:
+            focused_widget = self.focus_get()
+        except (KeyError, tk.TclError):
+            focused_widget = None
         # Also check the main window's stored reference
         try:
             root = self.winfo_toplevel()

@@ -554,7 +554,12 @@ class MainWindow(tk.Tk):
     def _on_route_change(self, *args, **kwargs):
         """Handle route change event - refresh event list and show route controls."""
         # Use stored reference to focused text field if available, otherwise get current focus
-        focused_widget = self._focused_text_field if self._focused_text_field is not None else self.focus_get()
+        # Handle case where focus_get() might fail if a dropdown is open
+        try:
+            focused_widget = self._focused_text_field if self._focused_text_field is not None else self.focus_get()
+        except (KeyError, tk.TclError):
+            # If focus_get() fails (e.g., dropdown is open), just use stored reference or None
+            focused_widget = self._focused_text_field
         
         self.event_list.refresh()
         

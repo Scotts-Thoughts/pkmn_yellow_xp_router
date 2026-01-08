@@ -322,4 +322,30 @@ class MoveDB:
     
     def get_stat_mod(self, move_name) -> List[Tuple[str, int]]:
         return self.stat_mod_moves.get(sanitize_string(move_name), [])
+    
+    def get_stat_mod_for_target(self, move_name, target_self:bool=True) -> List[Tuple[str, int]]:
+        """Get stat modifiers for a move, filtering by target (self vs enemy/foe).
+        
+        Args:
+            move_name: Name of the move
+            target_self: If True, return modifiers that target self. If False, return modifiers that target enemy/foe.
+        
+        Returns:
+            List of (stat_name, modifier_value) tuples
+        """
+        move = self.get_move(move_name)
+        if move is None:
+            return []
+        
+        result = []
+        for cur_effect in move.effects:
+            if const.STAT_KEY in cur_effect and const.MODIFIER_KEY in cur_effect:
+                # Check if this effect targets the correct target
+                effect_target = cur_effect.get(const.TARGET_KEY, "self")
+                # Normalize target values: "self", "target_self" -> True; "enemy", "foe", "target_single_enemy", etc. -> False
+                targets_self = effect_target in ["self", "target_self"]
+                if targets_self == target_self:
+                    result.append((cur_effect[const.STAT_KEY], cur_effect[const.MODIFIER_KEY]))
+        
+        return result
 
