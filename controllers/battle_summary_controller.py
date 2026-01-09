@@ -206,10 +206,14 @@ class BattleSummaryController:
                 do_select=False
             )
         else:
-            self._main_controller.update_existing_event(
-                prev_event.group_id,
-                EventDefinition(rare_candy=RareCandyEventDefinition(amount=num_candies)),
-            )
+            # If num_candies is 0, delete the existing candy event
+            if num_candies <= 0:
+                self._main_controller.delete_events([prev_event.group_id])
+            else:
+                self._main_controller.update_existing_event(
+                    prev_event.group_id,
+                    EventDefinition(rare_candy=RareCandyEventDefinition(amount=num_candies)),
+                )
         
         self._full_refresh()
 
@@ -1762,7 +1766,7 @@ class BattleSummaryController:
             return 0
         
         prev_event = self._main_controller.get_previous_event(self._event_group_id, enabled_only=True)
-        if prev_event is None or prev_event.event_definition.rare_candy is None:
+        if prev_event is None or prev_event.event_definition is None or prev_event.event_definition.rare_candy is None:
             return 0
         
         return prev_event.event_definition.rare_candy.amount
