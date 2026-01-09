@@ -229,21 +229,21 @@ class Constants:
 
         self.ROUTE_EVENT_TYPES = [
             self.TASK_TRAINER_BATTLE,
-            self.TASK_FIGHT_WILD_PKMN,
             self.TASK_LEARN_MOVE_LEVELUP,
-            self.TASK_LEARN_MOVE_TM,
+            self.TASK_SELL_ITEM,
+            self.TASK_NOTES_ONLY,
             self.TASK_HOLD_ITEM,
             self.TASK_RARE_CANDY,
-            self.TASK_VITAMIN,
+            self.TASK_FIGHT_WILD_PKMN,
             self.TASK_GET_FREE_ITEM,
             self.TASK_PURCHASE_ITEM,
             self.TASK_USE_ITEM,
-            self.TASK_SELL_ITEM,
+            self.TASK_VITAMIN,
             self.TASK_SAVE,
             self.TASK_HEAL,
             self.TASK_BLACKOUT,
             self.TASK_EVOLUTION,
-            self.TASK_NOTES_ONLY,
+            self.TASK_LEARN_MOVE_TM,
             # NOTE: not a full type, but we only use this list for populating the search component
             self.ERROR_SEARCH,
         ]
