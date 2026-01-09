@@ -379,6 +379,91 @@ class MainController:
         self._on_route_change()
 
     @handle_exceptions
+    def split_folder_at_current_event(self, event_id):
+        """Split the folder containing the current event at the current event position.
+        
+        Creates a new folder and moves all events from the current event to the end of the
+        current folder into the new folder. The new folder is named based on the old folder.
+        """
+        # Get the event object
+        event_obj = self.get_event_by_id(event_id)
+        if event_obj is None:
+            return
+        
+        # Don't allow splitting if the selected item is itself a folder
+        if isinstance(event_obj, EventFolder):
+            return
+        
+        # Check if the event is inside a folder (not root)
+        parent_folder = event_obj.parent
+        if parent_folder is None or parent_folder.name == const.ROOT_FOLDER_NAME:
+            # Event is not inside a folder, cannot split
+            return
+        
+        # Find the index of the current event in the parent folder's children
+        try:
+            event_index = parent_folder.children.index(event_obj)
+        except ValueError:
+            # Event not found in parent's children (shouldn't happen, but handle gracefully)
+            return
+        
+        # Get all events from the current event to the end of the folder
+        events_to_move = parent_folder.children[event_index:]
+        if len(events_to_move) == 0:
+            # No events to move
+            return
+        
+        # Generate a unique folder name based on the old folder name
+        old_folder_name = parent_folder.name
+        new_folder_name = self._generate_unique_folder_name(old_folder_name)
+        
+        # Save state BEFORE the operation
+        self._undo_manager.save_state(self._data, is_post_operation=False)
+        
+        # Create the new folder right after the old folder
+        # Create the new folder
+        new_folder_id = self._data.add_event_object(
+            new_folder_name=new_folder_name,
+            insert_after=parent_folder.group_id,
+            dest_folder_name=parent_folder.parent.name,
+            recalc=False
+        )
+        
+        # Move all events from the current event to the end into the new folder
+        event_ids_to_move = [event.group_id for event in events_to_move]
+        self._data.transfer_events(event_ids_to_move, new_folder_name)
+        
+        # Save state AFTER the operation
+        self._undo_manager.save_state(self._data, is_post_operation=True)
+        self._on_route_change()
+        
+        # Select the new folder
+        self.select_new_events([new_folder_id])
+    
+    def _generate_unique_folder_name(self, base_name):
+        """Generate a unique folder name based on the base name."""
+        all_folder_names = set(self.get_all_folder_names())
+        
+        # Try simple variations first
+        variations = [
+            f"{base_name} (Part 2)",
+            f"{base_name} (2)",
+            f"{base_name} - Split",
+        ]
+        
+        for variation in variations:
+            if variation not in all_folder_names:
+                return variation
+        
+        # If all simple variations are taken, try numbered versions
+        counter = 2
+        while True:
+            candidate = f"{base_name} (Part {counter})"
+            if candidate not in all_folder_names:
+                return candidate
+            counter += 1
+
+    @handle_exceptions
     def new_event(self, event_def:EventDefinition, insert_after:int=None, insert_before:int=None, dest_folder_name=const.ROOT_FOLDER_NAME, do_select=True):
         # Save state BEFORE the operation (adds pre-op state to stack)
         self._undo_manager.save_state(self._data, is_post_operation=False)

@@ -103,6 +103,7 @@ class MainWindow(tk.Tk):
         self.event_menu.add_command(label="Move Event Down", accelerator="Ctrl+D", command=self.move_group_down)
         self.event_menu.add_command(label="Move Event Up To Next Folder", accelerator="Ctrl+Shift+E", command=self.move_group_to_adjacent_folder_up)
         self.event_menu.add_command(label="Move Event Down To Next Folder", accelerator="Ctrl+Shift+D", command=self.move_group_to_adjacent_folder_down)
+        self.event_menu.add_command(label="Split folder at current event", accelerator="Alt+X", command=self.split_folder_at_current_event)
         self.event_menu.add_command(label="Enable/Disable", accelerator="Ctrl+C", command=self.toggle_enable_disable)
         self.event_menu.add_command(label="Toggle Highlight", accelerator="Ctrl+V", command=self.toggle_event_highlight)
         self.event_menu.add_command(label="Transfer Event", accelerator="Ctrl+R", command=self.open_transfer_event_window)
@@ -451,6 +452,8 @@ class MainWindow(tk.Tk):
         self.bind('<F10>', self.toggle_enemy_highlight_strategy)
         # Event actions
         self.bind('<Control-e>', self.move_group_up)
+        self.bind('<Alt-x>', self.split_folder_at_current_event)
+        self.bind('<Alt-X>', self.split_folder_at_current_event)
         # Gym leader shortcuts (1-8 keys) - disabled when text fields have focus
         for i in range(1, 9):
             self.bind(f'<Key-{i}>', lambda event, gym_idx=i-1: self.select_gym_leader(gym_idx))
@@ -828,6 +831,28 @@ class MainWindow(tk.Tk):
             self.event_menu.entryconfig(undo_index, state="normal")
         else:
             self.event_menu.entryconfig(undo_index, state="disabled")
+        
+        # Update "Split folder at current event" menu item state
+        try:
+            split_index = self.event_menu.index("Split folder at current event")
+            event_id = self._controller.get_single_selected_event_id(allow_event_items=False)
+            if event_id is not None:
+                event_obj = self._controller.get_event_by_id(event_id)
+                # Enable if event is inside a folder (not root) and is not itself a folder
+                from routing.route_events import EventFolder
+                from utils.constants import const
+                if (event_obj is not None and 
+                    not isinstance(event_obj, EventFolder) and
+                    event_obj.parent is not None and 
+                    event_obj.parent.name != const.ROOT_FOLDER_NAME):
+                    self.event_menu.entryconfig(split_index, state="normal")
+                else:
+                    self.event_menu.entryconfig(split_index, state="disabled")
+            else:
+                self.event_menu.entryconfig(split_index, state="disabled")
+        except (ValueError, Exception):
+            # Menu item might not exist or other error, just skip
+            pass
         
         # Update the checkbox state
         self.highlight_branched_mandatory_var.set(config.get_highlight_branched_mandatory())
@@ -1422,6 +1447,14 @@ class MainWindow(tk.Tk):
             [x for x in self._controller.get_all_folder_names() if x not in invalid_folders],
             all_event_ids
         )
+
+    def split_folder_at_current_event(self, event=None):
+        """Split the current folder at the selected event, moving all events from the current event to the end into a new folder."""
+        event_id = self._controller.get_single_selected_event_id(allow_event_items=False)
+        if event_id is None:
+            return
+        
+        self._controller.split_folder_at_current_event(event_id)
 
     def scroll_to_top(self, event=None):
         """Scroll to the top of the event list."""
