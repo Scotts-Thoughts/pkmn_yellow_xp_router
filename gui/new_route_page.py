@@ -246,7 +246,22 @@ class NewRoutePage(ttk.Frame):
                     gen_num = gen_obj.get_generation()
                     gen = f"Generation {gen_num}"
                     platform = "Custom"
-                    recorder = "Unknown"
+                    
+                    # Determine recorder status based on base version
+                    base_version = gen_obj.base_version_name()
+                    if base_version and base_version in self.GAME_INFO:
+                        # Use the recorder status from the base version
+                        _, _, recorder = self.GAME_INFO[base_version]
+                    else:
+                        # Try to determine if recorder is available by checking if get_recorder_client would work
+                        # We can't actually call it without a real controller, but we can check the base version logic
+                        # For now, default to checking if the version itself has a recorder
+                        if game_name in self.GAME_INFO:
+                            _, _, recorder = self.GAME_INFO[game_name]
+                        else:
+                            # Check if get_recorder_client would raise NotImplementedError
+                            # We'll infer from the base version name if available
+                            recorder = "Unknown"
                 except:
                     gen = "Unknown"
                     platform = "Unknown"
@@ -338,6 +353,26 @@ class NewRoutePage(ttk.Frame):
                     self._selected_game = new_game
                     # Cache the gen object to avoid repeated lookups
                     self._selected_gen_obj = gen_factory.get_specific_version(self._selected_game)
+                    # If custom gen not loaded yet, try to load it now
+                    if self._selected_gen_obj is None:
+                        try:
+                            gen_factory.reload_all_custom_gens(retry_skipped=True)
+                            self._selected_gen_obj = gen_factory.get_specific_version(self._selected_game)
+                        except Exception as e:
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.warning(f"Could not load custom gen {self._selected_game}: {e}")
+                    
+                    if self._selected_gen_obj is None:
+                        # Still couldn't load it - show error and don't proceed
+                        import tkinter.messagebox as messagebox
+                        messagebox.showerror(
+                            "Error",
+                            f"Could not load game version '{self._selected_game}'. "
+                            "The base generation may not be available yet."
+                        )
+                        return
+                    
                     new_gen_num = self._selected_gen_obj.get_generation()
                     
                     # Only update DV frame if generation changed
@@ -524,6 +559,16 @@ class NewRoutePage(ttk.Frame):
     
     def refresh_game_list(self):
         """Refresh the game list - useful after background loading completes."""
+        # Try to reload custom gens in case any were skipped during initial load
+        # This ensures custom gens appear if their base gen is now available
+        try:
+            gen_factory.reload_all_custom_gens(retry_skipped=True)
+        except Exception as e:
+            # Log but don't crash - custom gens will still appear from filesystem check
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not reload some custom gens: {e}")
+        
         # Remember the currently selected game
         current_selection = None
         selection = self.game_treeview.selection()

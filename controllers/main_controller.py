@@ -524,11 +524,13 @@ class MainController:
     
     @handle_exceptions
     def load_all_custom_versions(self):
-        gen_factory._gen_factory.reload_all_custom_gens()
+        gen_factory._gen_factory.reload_all_custom_gens(retry_skipped=True)
     
     @handle_exceptions
     def create_custom_version(self, base_version, custom_version):
         gen_factory._gen_factory.get_specific_version(base_version).create_new_custom_gen(custom_version)
+        # Reload custom gens to include the newly created one
+        gen_factory._gen_factory.reload_all_custom_gens(retry_skipped=True)
     
     def send_message(self, message):
         self._on_info_message(message)

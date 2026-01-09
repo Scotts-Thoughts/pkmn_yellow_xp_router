@@ -50,23 +50,42 @@ class GenFactory:
         if real_gens:
             result.extend([x for x in self._all_gens.keys()])
         if custom_gens:
+            # Include loaded custom gens
             result.extend([x for x in self._custom_gens.keys()])
+            # Also include custom gens from filesystem that haven't been loaded yet
+            # This ensures custom gens appear in UI even if their base gen wasn't ready during initial load
+            all_custom_gen_info = self.get_all_custom_gen_info()
+            for _, _, cur_custom_gen_name in all_custom_gen_info:
+                if cur_custom_gen_name not in result:
+                    result.append(cur_custom_gen_name)
 
         return result
     
-    def reload_all_custom_gens(self):
+    def reload_all_custom_gens(self, retry_skipped=False):
         # NOTE: assumes all base versions have been registered already
         invalid_custom_gens = []
-        self._custom_gens = {}
-        for cur_path, cur_base_version, cur_custom_gen_name in self.get_all_custom_gen_info():
+        skipped_custom_gens = []
+        # Get list of all custom gen names that should exist
+        all_custom_gen_info = self.get_all_custom_gen_info()
+        expected_custom_gen_names = {cur_custom_gen_name for _, _, cur_custom_gen_name in all_custom_gen_info}
+        
+        # Build new dict, preserving existing custom gens whose base gen isn't ready yet
+        new_custom_gens = {}
+        for cur_path, cur_base_version, cur_custom_gen_name in all_custom_gen_info:
             try:
                 base_gen = self._all_gens.get(cur_base_version)
                 if base_gen == None:
-                    # Base gen not loaded yet - skip this custom gen for now
+                    # Base gen not loaded yet - preserve existing custom gen if it exists
                     # This can happen during startup when generations are loading in background
-                    logger.info(f"Skipping custom gen {cur_custom_gen_name}: base gen {cur_base_version} not loaded yet")
+                    if cur_custom_gen_name in self._custom_gens:
+                        logger.info(f"Preserving existing custom gen {cur_custom_gen_name}: base gen {cur_base_version} not loaded yet")
+                        new_custom_gens[cur_custom_gen_name] = self._custom_gens[cur_custom_gen_name]
+                    else:
+                        logger.info(f"Skipping custom gen {cur_custom_gen_name}: base gen {cur_base_version} not loaded yet")
+                        if retry_skipped:
+                            skipped_custom_gens.append((cur_path, cur_base_version, cur_custom_gen_name))
                     continue
-                self._custom_gens[cur_custom_gen_name] = base_gen.load_custom_gen(
+                new_custom_gens[cur_custom_gen_name] = base_gen.load_custom_gen(
                     cur_custom_gen_name,
                     cur_path
                 )
@@ -75,6 +94,27 @@ class GenFactory:
                 logger.error(f"Failed to load custom gen with path: {cur_path}")
                 logger.exception(e)
                 invalid_custom_gens.append((cur_custom_gen_name, str(e)))
+        
+        # Update _custom_gens with the new dict
+        # (custom gens not in expected_custom_gen_names are automatically excluded since they're not in new_custom_gens)
+        self._custom_gens = new_custom_gens
+        
+        # If retrying skipped gens and we have some, try loading them again
+        if retry_skipped and len(skipped_custom_gens) > 0:
+            logger.info(f"Retrying {len(skipped_custom_gens)} skipped custom gens")
+            for cur_path, cur_base_version, cur_custom_gen_name in skipped_custom_gens:
+                try:
+                    base_gen = self._all_gens.get(cur_base_version)
+                    if base_gen is not None:
+                        logger.info(f"Retrying load of custom gen {cur_custom_gen_name}")
+                        self._custom_gens[cur_custom_gen_name] = base_gen.load_custom_gen(
+                            cur_custom_gen_name,
+                            cur_path
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to load custom gen with path: {cur_path} on retry")
+                    logger.exception(e)
+                    invalid_custom_gens.append((cur_custom_gen_name, str(e)))
         
         if len(invalid_custom_gens) > 0:
             err_msg = "\n".join([f"Custom gen: {x[0]}, error: {x[1]}" for x in invalid_custom_gens])
