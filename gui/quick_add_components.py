@@ -8,7 +8,7 @@ from gui import custom_components
 from pkmn.universal_data_objects import Trainer
 from pkmn import universal_utils
 from routing.route_events import \
-    EventDefinition, EventItem, EvolutionEventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, \
+    EventDefinition, EventFolder, EventItem, EvolutionEventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, \
     RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition, \
     SaveEventDefinition, HealEventDefinition, BlackoutEventDefinition
 
@@ -175,11 +175,36 @@ class QuickTrainerAdd(ttk.LabelFrame):
             self._controller.new_event(temp, insert_after=self._controller.get_single_selected_event_id())
             self.toggle_multi()
         else:
-            temp = EventDefinition(trainer_def=TrainerEventDefinition(self._get_trainer_name()))
-            if current_gen_info().trainer_db().get_trainer(self._get_trainer_name()).double_battle:
+            trainer_name = self._get_trainer_name()
+            temp = EventDefinition(trainer_def=TrainerEventDefinition(trainer_name))
+            trainer_obj = current_gen_info().trainer_db().get_trainer(trainer_name)
+            if trainer_obj.double_battle:
                 temp.trainer_def.exp_split = [2 for _ in range(len(temp.get_pokemon_list()))]
 
-            self._controller.new_event(temp, insert_after=self._controller.get_single_selected_event_id())
+            # Check if a folder is selected - if so, create a new folder and place trainer inside it
+            selected_id = self._controller.get_single_selected_event_id()
+            selected_obj = self._controller.get_single_selected_event_obj() if selected_id else None
+            
+            if isinstance(selected_obj, EventFolder):
+                # Get trainer location to use as folder name (similar to route recording behavior)
+                folder_base_name = trainer_obj.location if (trainer_obj.location and trainer_obj.location.strip()) else "New Folder"
+                
+                # Generate unique folder name (similar to add_area logic)
+                all_folder_names = set(self._controller.get_all_folder_names())
+                folder_name = folder_base_name
+                count = 1
+                while folder_name in all_folder_names:
+                    count += 1
+                    folder_name = f"{folder_base_name} Trip:{count}"
+                
+                # Create the folder after the selected folder
+                self._controller.finalize_new_folder(folder_name, insert_after=selected_id)
+                
+                # Add trainer event inside the new folder
+                self._controller.new_event(temp, dest_folder_name=folder_name)
+            else:
+                # Normal behavior: insert after selected event
+                self._controller.new_event(temp, insert_after=selected_id)
     
     def add_area(self, *args, **kwargs):
         insert_after = self._controller.get_single_selected_event_id()
