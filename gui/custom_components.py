@@ -6,6 +6,7 @@ from PIL import Image, ImageTk
 
 from utils.constants import const
 from utils.config_manager import config
+from utils import io_utils
 
 # These three checkbox icons were isolated from Checkbox States.svg (https://commons.wikimedia.org/wiki/File:Checkbox_States.svg?uselang=en)
 IM_UNCHECKED = os.path.join(const.ASSETS_PATH, "theme", "dark", "circle-hover.gif")
@@ -554,6 +555,184 @@ class AutoClearingLabel(ttk.Label):
             return
 
         self.config(text="")
+
+
+class NotificationPopup:
+    """A non-intrusive notification popup that appears in the bottom-right corner.
+    Fades in and out automatically, does not take focus."""
+    
+    def __init__(self, parent_window):
+        self.parent_window = parent_window
+        self.current_popup = None
+        self.fade_id = None
+    
+    def show(self, message, duration=5000, folder_path=None):
+        """Show a notification message that fades in and out.
+        
+        Args:
+            message: The message to display
+            duration: How long the notification should last in milliseconds (default: 5000)
+            folder_path: Optional path to a folder. If provided, adds an "Open Folder" button.
+        """
+        # Remove any existing popup
+        if self.current_popup is not None:
+            self._destroy_popup()
+        
+        # Create a toplevel window
+        popup = tk.Toplevel(self.parent_window)
+        popup.overrideredirect(True)  # Remove window decorations
+        popup.attributes('-topmost', True)  # Keep on top
+        popup.attributes('-alpha', 0.0)  # Start fully transparent
+        
+        # Make it non-focusable (doesn't steal focus)
+        popup.focus_set = lambda: None  # Override focus_set to do nothing
+        
+        # Create frame with green background
+        frame = tk.Frame(popup, bg='#4CAF50', relief=tk.RAISED, borderwidth=2)
+        frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        
+        # Create content frame to hold message and button
+        content_frame = tk.Frame(frame, bg='#4CAF50')
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=15)
+        
+        # Create label with message
+        label = tk.Label(
+            content_frame,
+            text=message,
+            bg='#4CAF50',
+            fg='white',
+            font=('Arial', 11, 'bold'),
+            justify=tk.LEFT,
+            wraplength=400
+        )
+        label.pack(anchor=tk.W)
+        
+        # Add button if folder_path is provided
+        if folder_path:
+            button_frame = tk.Frame(content_frame, bg='#4CAF50')
+            button_frame.pack(anchor=tk.E, pady=(10, 0))
+            
+            def open_folder():
+                io_utils.open_explorer(folder_path)
+                # Optionally close the notification when button is clicked
+                self._destroy_popup()
+            
+            open_button = tk.Button(
+                button_frame,
+                text="Open Folder",
+                command=open_folder,
+                bg='#66BB6A',
+                fg='white',
+                font=('Arial', 10, 'bold'),
+                relief=tk.RAISED,
+                borderwidth=2,
+                padx=15,
+                pady=5,
+                cursor='hand2'
+            )
+            open_button.pack()
+            
+            # Style the button on hover
+            def on_enter(e):
+                open_button.config(bg='#81C784')
+            
+            def on_leave(e):
+                open_button.config(bg='#66BB6A')
+            
+            open_button.bind("<Enter>", on_enter)
+            open_button.bind("<Leave>", on_leave)
+        
+        # Update to get proper size
+        popup.update_idletasks()
+        
+        # Position in bottom-right corner
+        try:
+            parent_width = max(200, self.parent_window.winfo_width())
+            parent_height = max(200, self.parent_window.winfo_height())
+            parent_x = self.parent_window.winfo_x()
+            parent_y = self.parent_window.winfo_y()
+        except tk.TclError:
+            # Fallback if window info not available
+            parent_width = 800
+            parent_height = 600
+            parent_x = 0
+            parent_y = 0
+        
+        popup_width = popup.winfo_width()
+        popup_height = popup.winfo_height()
+        
+        # Offset from edges
+        margin = 20
+        x = parent_x + parent_width - popup_width - margin
+        y = parent_y + parent_height - popup_height - margin
+        
+        # Ensure popup is on screen (handle negative coordinates)
+        screen_width = popup.winfo_screenwidth()
+        screen_height = popup.winfo_screenheight()
+        x = min(x, screen_width - popup_width - 10)
+        y = min(y, screen_height - popup_height - 10)
+        x = max(10, x)
+        y = max(10, y)
+        
+        popup.geometry(f'{popup_width}x{popup_height}+{x}+{y}')
+        
+        self.current_popup = popup
+        
+        # Fade in over 0.2 seconds, then fade out to complete within total duration
+        self._fade_in(popup, duration)
+    
+    def _fade_in(self, popup, total_duration, step=0, steps=20):
+        """Fade in the popup over 0.2 seconds (20 steps * 10ms)."""
+        if popup != self.current_popup or not popup.winfo_exists():
+            return
+        
+        alpha = min(1.0, (step + 1) / steps)
+        try:
+            popup.attributes('-alpha', alpha)
+        except tk.TclError:
+            return  # Window was destroyed
+        
+        if step < steps - 1:
+            # Continue fading in
+            self.fade_id = popup.after(10, lambda: self._fade_in(popup, total_duration, step + 1, steps))
+        else:
+            # Fade in complete, schedule fade out
+            # Calculate remaining time: total_duration - fade_in_time (200ms) - fade_out_time (200ms)
+            # So we show it for (total_duration - 400ms) before starting fade out
+            fade_out_delay = max(0, total_duration - 400)
+            popup.after(fade_out_delay, lambda: self._fade_out(popup, total_duration))
+    
+    def _fade_out(self, popup, total_duration, step=0, steps=20):
+        """Fade out the popup over 0.2 seconds (20 steps * 10ms)."""
+        if popup != self.current_popup or not popup.winfo_exists():
+            return
+        
+        alpha = max(0.0, 1.0 - (step + 1) / steps)
+        try:
+            popup.attributes('-alpha', alpha)
+        except tk.TclError:
+            return  # Window was destroyed
+        
+        if step < steps - 1:
+            # Continue fading out
+            self.fade_id = popup.after(10, lambda: self._fade_out(popup, total_duration, step + 1, steps))
+        else:
+            # Fade out complete, destroy popup
+            self._destroy_popup()
+    
+    def _destroy_popup(self):
+        """Destroy the current popup if it exists."""
+        if self.current_popup is not None:
+            try:
+                if self.fade_id is not None:
+                    self.current_popup.after_cancel(self.fade_id)
+                if self.current_popup.winfo_exists():
+                    self.current_popup.destroy()
+            except tk.TclError:
+                pass
+            finally:
+                self.current_popup = None
+                self.fade_id = None
 
 
 class ScrollableFrame(ttk.Frame):

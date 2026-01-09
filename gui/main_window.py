@@ -252,6 +252,9 @@ class MainWindow(tk.Tk):
 
         self.message_label = custom_components.AutoClearingLabel(self.top_row, width=100, justify=tk.LEFT, anchor=tk.W)
         self.message_label.grid(row=0, column=7, sticky=tk.E)
+        
+        # Create notification popup for save/screenshot messages
+        self.notification_popup = custom_components.NotificationPopup(self)
 
         self.top_left_controls = ttk.Frame(self.left_info_panel)
         self.top_left_controls.pack(fill=tk.X, anchor=tk.CENTER)
@@ -569,7 +572,30 @@ class MainWindow(tk.Tk):
         self._controller.set_custom_image_path(self.image_path.get())
     
     def _on_route_message(self, *args, **kwargs):
-        self.message_label.set_message(self._controller.get_next_message_info())
+        message = self._controller.get_next_message_info()
+        if message is None:
+            return
+        
+        # Check if this is a save or screenshot success message - show popup for these
+        if message.startswith("Successfully saved route:") or message.startswith("Saved screenshot to:"):
+            folder_path = None
+            # Extract a shorter, user-friendly message
+            if message.startswith("Successfully saved route:"):
+                short_message = message.replace("Successfully saved route: ", "Route saved: ")
+            else:  # Saved screenshot to:
+                # Extract the full path from the message
+                full_path = message.replace("Saved screenshot to: ", "")
+                # Get the directory part of the path
+                folder_path = os.path.dirname(os.path.normpath(full_path))
+                # Only use folder_path if it's a valid directory
+                if not folder_path or not os.path.isdir(folder_path):
+                    folder_path = None
+                short_message = "Screenshot saved"
+            
+            self.notification_popup.show(short_message, duration=5000, folder_path=folder_path)
+        else:
+            # For other messages, use the existing label
+            self.message_label.set_message(message)
     
     def _on_route_change(self, *args, **kwargs):
         """Handle route change event - refresh event list and show route controls."""
