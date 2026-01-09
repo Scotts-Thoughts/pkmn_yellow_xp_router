@@ -141,6 +141,7 @@ class MainWindow(tk.Tk):
         self.fade_moves_without_highlight_var = tk.BooleanVar(value=config.get_fade_moves_without_highlight())
         self.battle_summary_menu.add_checkbutton(
             label="Fade Moves Without a Highlight",
+            accelerator="Shift+F3",
             variable=self.fade_moves_without_highlight_var,
             command=self._toggle_fade_moves_without_highlight
         )
@@ -409,6 +410,8 @@ class MainWindow(tk.Tk):
         self.bind('<F2>', self.toggle_auto_load_most_recent_route)
         # move highlights toggle
         self.bind('<Shift-F2>', self._toggle_move_highlights)
+        # fade moves without highlight toggle
+        self.bind('<Shift-F3>', self._toggle_fade_moves_without_highlight)
         # tab switching
         self.bind('<grave>', self._toggle_event_tabs)
         # Run Summary shortcut
@@ -748,6 +751,11 @@ class MainWindow(tk.Tk):
             # Revert the toggle if Show Move Highlights is disabled
             self.fade_moves_without_highlight_var.set(config.get_fade_moves_without_highlight())
             return
+        
+        # If called from keyboard shortcut, toggle the variable first
+        if event is not None:
+            new_value = not config.get_fade_moves_without_highlight()
+            self.fade_moves_without_highlight_var.set(new_value)
         
         config.set_fade_moves_without_highlight(self.fade_moves_without_highlight_var.get())
         # Refresh battle summary if it exists
