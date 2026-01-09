@@ -3,6 +3,7 @@ import os
 import logging
 import sys
 from typing import List, Tuple
+from datetime import datetime
 import tkinter
 from PIL import ImageGrab, Image
 if sys.platform == 'win32':
@@ -565,9 +566,12 @@ class MainController:
             if self.is_empty():
                 return
             
+            # Get current date/time in format YYYYMMDDHHMMSS
+            date_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
+            
             out_path = io_utils.get_safe_path_no_collision(
                 config.get_images_dir(),
-                f"{self.get_current_route_name()}_{image_name}",
+                f"{date_prefix}-{self.get_current_route_name()}_{image_name}",
                 ext=".png",
             )
             
