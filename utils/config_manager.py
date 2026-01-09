@@ -34,6 +34,17 @@ class Config:
     DEFAULT_FADE_MOVES_WITHOUT_HIGHLIGHT = False
     DEFAULT_HIGHLIGHT_BRANCHED_MANDATORY = False
     DEFAULT_TEST_MOVES_ENABLED = False
+    # Default highlight colors - diverse dark colors that don't conflict with existing UI colors
+    # Designed to work well on dark backgrounds and be easily distinguishable
+    DEFAULT_HIGHLIGHT_COLOR_1 = "#5a3a7a"  # Dark Purple
+    DEFAULT_HIGHLIGHT_COLOR_2 = "#8b4513"  # Dark Orange/Brown
+    DEFAULT_HIGHLIGHT_COLOR_3 = "#1e4a72"  # Dark Blue
+    DEFAULT_HIGHLIGHT_COLOR_4 = "#2d5a3d"  # Dark Green
+    DEFAULT_HIGHLIGHT_COLOR_5 = "#8b1a1a"  # Dark Red
+    DEFAULT_HIGHLIGHT_COLOR_6 = "#6b5a1a"  # Dark Yellow/Amber
+    DEFAULT_HIGHLIGHT_COLOR_7 = "#1a5a5a"  # Dark Turquoise
+    DEFAULT_HIGHLIGHT_COLOR_8 = "#6b3a8b"  # Dark Violet (distinct from purple)
+    DEFAULT_HIGHLIGHT_COLOR_9 = "#1a4a4a"  # Dark Teal
 
     def __init__(self):
         self.reload()
@@ -92,6 +103,17 @@ class Config:
         self._fade_moves_without_highlight = raw.get(const.FADE_MOVES_WITHOUT_HIGHLIGHT, self.DEFAULT_FADE_MOVES_WITHOUT_HIGHLIGHT)
         self._highlight_branched_mandatory = raw.get(const.HIGHLIGHT_BRANCHED_MANDATORY, self.DEFAULT_HIGHLIGHT_BRANCHED_MANDATORY)
         self._test_moves_enabled = raw.get(const.TEST_MOVES_ENABLED, self.DEFAULT_TEST_MOVES_ENABLED)
+        
+        # Load highlight colors
+        self._highlight_color_1 = raw.get(const.HIGHLIGHT_COLOR_1_KEY, self.DEFAULT_HIGHLIGHT_COLOR_1)
+        self._highlight_color_2 = raw.get(const.HIGHLIGHT_COLOR_2_KEY, self.DEFAULT_HIGHLIGHT_COLOR_2)
+        self._highlight_color_3 = raw.get(const.HIGHLIGHT_COLOR_3_KEY, self.DEFAULT_HIGHLIGHT_COLOR_3)
+        self._highlight_color_4 = raw.get(const.HIGHLIGHT_COLOR_4_KEY, self.DEFAULT_HIGHLIGHT_COLOR_4)
+        self._highlight_color_5 = raw.get(const.HIGHLIGHT_COLOR_5_KEY, self.DEFAULT_HIGHLIGHT_COLOR_5)
+        self._highlight_color_6 = raw.get(const.HIGHLIGHT_COLOR_6_KEY, self.DEFAULT_HIGHLIGHT_COLOR_6)
+        self._highlight_color_7 = raw.get(const.HIGHLIGHT_COLOR_7_KEY, self.DEFAULT_HIGHLIGHT_COLOR_7)
+        self._highlight_color_8 = raw.get(const.HIGHLIGHT_COLOR_8_KEY, self.DEFAULT_HIGHLIGHT_COLOR_8)
+        self._highlight_color_9 = raw.get(const.HIGHLIGHT_COLOR_9_KEY, self.DEFAULT_HIGHLIGHT_COLOR_9)
     
     def _save(self):
         if not os.path.exists(const.GLOBAL_CONFIG_DIR):
@@ -130,6 +152,15 @@ class Config:
                 const.FADE_MOVES_WITHOUT_HIGHLIGHT: self._fade_moves_without_highlight,
                 const.HIGHLIGHT_BRANCHED_MANDATORY: self._highlight_branched_mandatory,
                 const.TEST_MOVES_ENABLED: self._test_moves_enabled,
+                const.HIGHLIGHT_COLOR_1_KEY: self._highlight_color_1,
+                const.HIGHLIGHT_COLOR_2_KEY: self._highlight_color_2,
+                const.HIGHLIGHT_COLOR_3_KEY: self._highlight_color_3,
+                const.HIGHLIGHT_COLOR_4_KEY: self._highlight_color_4,
+                const.HIGHLIGHT_COLOR_5_KEY: self._highlight_color_5,
+                const.HIGHLIGHT_COLOR_6_KEY: self._highlight_color_6,
+                const.HIGHLIGHT_COLOR_7_KEY: self._highlight_color_7,
+                const.HIGHLIGHT_COLOR_8_KEY: self._highlight_color_8,
+                const.HIGHLIGHT_COLOR_9_KEY: self._highlight_color_9,
             }, f, indent=4)
     
     def set_window_geometry(self, new_geometry):
@@ -378,6 +409,21 @@ class Config:
     
     def get_highlight_branched_mandatory(self):
         return self._highlight_branched_mandatory
+    
+    def set_highlight_color(self, highlight_num, color):
+        """Set highlight color for highlight number 1-9."""
+        if highlight_num < 1 or highlight_num > 9:
+            raise ValueError("Highlight number must be between 1 and 9")
+        attr_name = f"_highlight_color_{highlight_num}"
+        setattr(self, attr_name, color)
+        self._save()
+    
+    def get_highlight_color(self, highlight_num):
+        """Get highlight color for highlight number 1-9."""
+        if highlight_num < 1 or highlight_num > 9:
+            raise ValueError("Highlight number must be between 1 and 9")
+        attr_name = f"_highlight_color_{highlight_num}"
+        return getattr(self, attr_name)
     
     def reset_all_colors(self):
         self._success_color = self.DEFAULT_SUCCESS

@@ -496,6 +496,14 @@ class MainController:
             self._data.toggle_event_highlight(cur_event)
         
         self._on_route_change()
+    
+    @handle_exceptions
+    def set_event_highlight(self, event_ids, highlight_num):
+        """Set a specific highlight type (1-9) or None to remove all highlights."""
+        for cur_event in event_ids:
+            self._data.set_event_highlight(cur_event, highlight_num)
+        
+        self._on_route_change()
 
     @handle_exceptions
     def set_record_mode(self, new_record_mode):

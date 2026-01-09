@@ -274,6 +274,26 @@ class Constants:
         self.TAGS_KEY = "Tags"
 
         self.HIGHLIGHT_LABEL = "highlight"
+        self.HIGHLIGHT_LABEL_1 = "highlight1"
+        self.HIGHLIGHT_LABEL_2 = "highlight2"
+        self.HIGHLIGHT_LABEL_3 = "highlight3"
+        self.HIGHLIGHT_LABEL_4 = "highlight4"
+        self.HIGHLIGHT_LABEL_5 = "highlight5"
+        self.HIGHLIGHT_LABEL_6 = "highlight6"
+        self.HIGHLIGHT_LABEL_7 = "highlight7"
+        self.HIGHLIGHT_LABEL_8 = "highlight8"
+        self.HIGHLIGHT_LABEL_9 = "highlight9"
+        self.ALL_HIGHLIGHT_LABELS = [
+            self.HIGHLIGHT_LABEL_1,
+            self.HIGHLIGHT_LABEL_2,
+            self.HIGHLIGHT_LABEL_3,
+            self.HIGHLIGHT_LABEL_4,
+            self.HIGHLIGHT_LABEL_5,
+            self.HIGHLIGHT_LABEL_6,
+            self.HIGHLIGHT_LABEL_7,
+            self.HIGHLIGHT_LABEL_8,
+            self.HIGHLIGHT_LABEL_9,
+        ]
 
         self.IS_KEY_ITEM = "key_item"
         self.PURCHASE_PRICE = "purchase_price"
@@ -317,6 +337,15 @@ class Constants:
         self.SHOW_MOVE_HIGHLIGHTS = "show_move_highlights"
         self.FADE_MOVES_WITHOUT_HIGHLIGHT = "fade_moves_without_highlight"
         self.HIGHLIGHT_BRANCHED_MANDATORY = "highlight_branched_mandatory"
+        self.HIGHLIGHT_COLOR_1_KEY = "highlight_color_1"
+        self.HIGHLIGHT_COLOR_2_KEY = "highlight_color_2"
+        self.HIGHLIGHT_COLOR_3_KEY = "highlight_color_3"
+        self.HIGHLIGHT_COLOR_4_KEY = "highlight_color_4"
+        self.HIGHLIGHT_COLOR_5_KEY = "highlight_color_5"
+        self.HIGHLIGHT_COLOR_6_KEY = "highlight_color_6"
+        self.HIGHLIGHT_COLOR_7_KEY = "highlight_color_7"
+        self.HIGHLIGHT_COLOR_8_KEY = "highlight_color_8"
+        self.HIGHLIGHT_COLOR_9_KEY = "highlight_color_9"
         self.TEST_MOVES_ENABLED = "test_moves_enabled"
 
         self.CUSTOM_FONT_NAME_KEY = "custom_font_name"

@@ -613,7 +613,24 @@ class EventDefinition:
         return f"Notes: {self.notes}"
     
     def is_highlighted(self):
-        return const.HIGHLIGHT_LABEL in self.tags
+        """Check if event has any highlight (old highlight label or new highlight1-9)."""
+        if const.HIGHLIGHT_LABEL in self.tags:
+            return True
+        for highlight_label in const.ALL_HIGHLIGHT_LABELS:
+            if highlight_label in self.tags:
+                return True
+        return False
+    
+    def get_highlight_type(self):
+        """Get the current highlight type (1-9) or None if not highlighted."""
+        # Check for new highlight types first
+        for idx, highlight_label in enumerate(const.ALL_HIGHLIGHT_LABELS, 1):
+            if highlight_label in self.tags:
+                return idx
+        # Check for old highlight label (backward compatibility)
+        if const.HIGHLIGHT_LABEL in self.tags:
+            return 1  # Default to highlight1 for backward compatibility
+        return None
     
     def experience_per_second(self):
         if self.trainer_def is None:
@@ -640,10 +657,29 @@ class EventDefinition:
         return True
     
     def toggle_highlight(self):
+        """Toggle old-style highlight (for backward compatibility)."""
         if const.HIGHLIGHT_LABEL in self.tags:
             self.tags.remove(const.HIGHLIGHT_LABEL)
         else:
+            # Remove any new-style highlights first
+            for highlight_label in const.ALL_HIGHLIGHT_LABELS:
+                if highlight_label in self.tags:
+                    self.tags.remove(highlight_label)
             self.tags.append(const.HIGHLIGHT_LABEL)
+    
+    def set_highlight(self, highlight_num):
+        """Set a specific highlight type (1-9) or None to remove all highlights."""
+        # Remove all existing highlights first
+        if const.HIGHLIGHT_LABEL in self.tags:
+            self.tags.remove(const.HIGHLIGHT_LABEL)
+        for highlight_label in const.ALL_HIGHLIGHT_LABELS:
+            if highlight_label in self.tags:
+                self.tags.remove(highlight_label)
+        
+        # Add the new highlight if specified
+        if highlight_num is not None and 1 <= highlight_num <= 9:
+            highlight_label = const.ALL_HIGHLIGHT_LABELS[highlight_num - 1]
+            self.tags.append(highlight_label)
     
     def __str__(self):
         return self.get_label()
@@ -1078,8 +1114,15 @@ class EventGroup:
         if self.has_errors():
             return [const.EVENT_TAG_ERRORS]
         
-        if self.event_definition.is_highlighted():
-            return [const.HIGHLIGHT_LABEL]
+        # Check for highlight type (1-9) or old highlight label
+        highlight_type = self.event_definition.get_highlight_type()
+        if highlight_type is not None:
+            # Use the specific highlight label for the type (includes old highlight converted to 1)
+            if 1 <= highlight_type <= 9:
+                return [const.ALL_HIGHLIGHT_LABELS[highlight_type - 1]]
+            # This fallback should never be reached, but keep for safety
+            elif const.HIGHLIGHT_LABEL in self.event_definition.tags:
+                return [const.HIGHLIGHT_LABEL]
 
         if self.is_major_fight():
             return [const.EVENT_TAG_IMPORTANT]
@@ -1250,8 +1293,16 @@ class EventFolder:
 
         result = []
         for cur_group in self.children:
-            if const.HIGHLIGHT_LABEL in cur_group.get_tags():
+            tags = cur_group.get_tags()
+            # Check for any highlight tag (new or old)
+            if const.HIGHLIGHT_LABEL in tags:
                 result.append(const.HIGHLIGHT_LABEL)
+                break
+            for highlight_label in const.ALL_HIGHLIGHT_LABELS:
+                if highlight_label in tags:
+                    result.append(highlight_label)
+                    break
+            if result:
                 break
         
         return result

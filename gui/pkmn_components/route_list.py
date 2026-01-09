@@ -40,8 +40,12 @@ class RouteList(custom_components.CustomGridview):
         # TODO: connect these to the actual style somehow
         self.tag_configure(const.EVENT_TAG_ERRORS, background="#61520f")
         self.tag_configure(const.EVENT_TAG_IMPORTANT, background="#1f1f1f")
-        self.tag_configure(const.HIGHLIGHT_LABEL, background="#156152")
+        self.tag_configure(const.HIGHLIGHT_LABEL, background="#156152")  # Old highlight, keep for backward compatibility
         self.tag_configure(const.EVENT_TAG_BRANCHED_MANDATORY, background="#5a5142")  # Brown color
+        
+        # Configure highlight colors from config
+        from utils.config_manager import config
+        self._update_highlight_colors()
 
         self.bind("<<TreeviewOpen>>", self._treeview_opened_callback)
         self.bind("<<TreeviewClose>>", self._treeview_closed_callback)
@@ -52,7 +56,16 @@ class RouteList(custom_components.CustomGridview):
         self.bind("<Button-3>", self._on_event_list_right_click, True)
         # Prevent treeview from taking focus during programmatic selection changes
         self.bind("<FocusIn>", self._on_treeview_focus_in)
-
+        # Note: Shift+1 through Shift+9 bindings are handled at the main window level
+        # (see MainWindow._handle_shift_highlight_global) to ensure they work properly
+    
+    def _update_highlight_colors(self):
+        """Update highlight color tags from config."""
+        from utils.config_manager import config
+        for idx, highlight_label in enumerate(const.ALL_HIGHLIGHT_LABELS, 1):
+            highlight_color = config.get_highlight_color(idx)
+            self.tag_configure(highlight_label, background=highlight_color)
+    
     def general_checkbox_callback_fn(self):
         self._controller.get_raw_route()._recalc()
         self.refresh()
@@ -78,7 +91,7 @@ class RouteList(custom_components.CustomGridview):
             self.refresh()
     
     def _on_event_list_click(self, event):
-        """Handle clicks on the event list to unregister text field focus."""
+        """Handle clicks on the event list to unregister text field focus and ensure event list has focus."""
         # Unregister text field focus when clicking on the event list
         try:
             root = self.winfo_toplevel()
@@ -86,6 +99,10 @@ class RouteList(custom_components.CustomGridview):
                 root.unregister_text_field_focus()
         except Exception:
             pass
+        
+        # Ensure the event list has focus so keyboard shortcuts work
+        # Use after_idle to set focus after the click event is processed
+        self.after_idle(lambda: self.focus_set() if self.winfo_exists() else None)
 
     def _on_event_list_right_click(self, event):
         """

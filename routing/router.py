@@ -437,6 +437,17 @@ class Router:
             logger.exception(e)
             raise ValueError(f"Failed to find event object with id: {event_id}")
     
+    def set_event_highlight(self, event_id, highlight_num):
+        """Set a specific highlight type (1-9) or None to remove all highlights."""
+        try:
+            obj_to_highlight = self.get_event_obj(event_id)
+            if isinstance(obj_to_highlight, route_events.EventGroup):
+                obj_to_highlight.event_definition.set_highlight(highlight_num)
+        except Exception as e:
+            logger.error(f"Failed to set highlight for event: {event_id}")
+            logger.exception(e)
+            raise ValueError(f"Failed to find event object with id: {event_id}")
+    
     def get_invalid_folder_transfers(self, event_id):
         # NOTE: EventGroup objects will always have an empty result list
         # this is intentional, EventGroups can be transferred anywhere

@@ -19,6 +19,7 @@ from gui.popups.new_folder_popup import NewFolderWindow
 from gui.popups.new_route_popup import NewRouteWindow
 from gui.popups.transfer_event_popup import TransferEventWindow
 from gui.popups.custom_gen_popup import CustomGenWindow
+from gui.popups.highlight_color_config_popup import HighlightColorConfigWindow
 from gui.recorder_status import RecorderStatus
 from gui.route_search_component import RouteSearch
 from gui.setup_summary_window import SetupSummaryWindow
@@ -116,6 +117,17 @@ class MainWindow(tk.Tk):
             command=self._toggle_highlight_branched_mandatory
         )
 
+        self.highlight_menu = tk.Menu(self.top_menu_bar, tearoff=0)
+        for i in range(1, 10):
+            # Use default parameter to capture loop variable correctly
+            self.highlight_menu.add_command(
+                label=f"Highlight {i}",
+                accelerator=f"Shift+{i}",
+                command=lambda idx=i: self.set_event_highlight(idx, None)
+            )
+        self.highlight_menu.add_separator()
+        self.highlight_menu.add_command(label="Configure Colors", command=self.open_highlight_color_config_window)
+
         self.folder_menu = tk.Menu(self.top_menu_bar, tearoff=0)
         self.folder_menu.add_command(label="New Folder", command=self.open_new_folder_window)
         self.folder_menu.add_command(label="Rename Cur Folder", command=self.rename_folder)
@@ -181,6 +193,7 @@ class MainWindow(tk.Tk):
 
         self.top_menu_bar.add_cascade(label="File", menu=self.file_menu)
         self.top_menu_bar.add_cascade(label="Events", menu=self.event_menu)
+        self.top_menu_bar.add_cascade(label="Highlight", menu=self.highlight_menu)
         self.top_menu_bar.add_cascade(label="Folders", menu=self.folder_menu)
         self.top_menu_bar.add_cascade(label="Recording", menu=self.recording_menu)
         self.top_menu_bar.add_cascade(label="Battle Summary", menu=self.battle_summary_menu)
@@ -457,11 +470,16 @@ class MainWindow(tk.Tk):
         # Gym leader shortcuts (1-8 keys) - disabled when text fields have focus
         for i in range(1, 9):
             self.bind(f'<Key-{i}>', lambda event, gym_idx=i-1: self.select_gym_leader(gym_idx))
-            self.bind(f'<Shift-Key-{i}>', lambda event, gym_idx=i-1: self.select_gym_leader(gym_idx))
         # Elite Four and Champion shortcuts (Control+1 through Control+6)
         # Control+1-4: Elite Four, Control+5: Champion, Control+6: Red (Gen2/HGSS only)
         for i in range(1, 7):
             self.bind(f'<Control-Key-{i}>', lambda event, e4_idx=i-1: self.select_elite_four_or_champion(e4_idx))
+        # Shift+1 through Shift+9 for highlights (bound globally, but checked if event list has focus)
+        # Shift+number keys produce symbols: Shift+1=!, Shift+2=@, Shift+3=#, Shift+4=$, Shift+5=%, Shift+6=^, Shift+7=&, Shift+8=*, Shift+9=(
+        shift_symbols = ['!', '@', '#', '$', '%', '^', '&', '*', '(']
+        for i, symbol in enumerate(shift_symbols, 1):
+            # Use default parameter to capture loop variable correctly
+            self.bind_all(f'<Key-{symbol}>', lambda event, idx=i: self._handle_shift_highlight_global(event, idx))
         # detail update function
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<<TreeviewSelect>>", self._report_new_selection)
@@ -1404,6 +1422,98 @@ class MainWindow(tk.Tk):
 
     def toggle_event_highlight(self, event=None):
         self._controller.toggle_event_highlight(self.event_list.get_all_selected_event_ids(allow_event_items=False))
+    
+    def set_event_highlight(self, highlight_num, event=None):
+        """Set highlight type (1-9) for selected events. If event already has this highlight, remove it."""
+        selected_event_ids = self.event_list.get_all_selected_event_ids(allow_event_items=False)
+        if not selected_event_ids:
+            return
+        
+        # Toggle: if all selected events already have this highlight, remove it; otherwise, set it
+        all_have_highlight = True
+        for event_id in selected_event_ids:
+            event_obj = self._controller.get_event_by_id(event_id)
+            if event_obj and hasattr(event_obj, 'event_definition'):
+                current_highlight = event_obj.event_definition.get_highlight_type()
+                if current_highlight != highlight_num:
+                    all_have_highlight = False
+                    break
+        
+        # If all already have this highlight, remove it; otherwise, set it
+        if all_have_highlight:
+            highlight_num = None
+        
+        self._controller.set_event_highlight(selected_event_ids, highlight_num)
+    
+    def open_highlight_color_config_window(self, *args, **kwargs):
+        HighlightColorConfigWindow(self)
+    
+    def _handle_shift_highlight_global(self, event, highlight_num):
+        """Handle Shift+number key press (via symbol keys !@#$%^&*() for highlight commands - check if event list should handle it."""
+        # Check if Shift is actually being held (safety check)
+        try:
+            state = event.state if hasattr(event, 'state') else 0
+            # Check if Shift is in the state (bit 0 is Shift in Tkinter)
+            shift_pressed = (state & 0x1) != 0
+            if not shift_pressed:
+                # Shift not pressed, don't handle (shouldn't happen with symbol bindings, but safety check)
+                return None
+        except Exception:
+            pass  # If we can't check state, proceed anyway
+        
+        # Check if a text field has focus - if so, don't handle
+        if self._text_field_has_focus:
+            return None
+        
+        # Check if the event list widget has focus or if the focused widget is the event list or its descendant
+        try:
+            focused_widget = self.focus_get()
+            
+            # If no widget has focus, check if we should allow it (e.g., if event list was just clicked)
+            if focused_widget is None:
+                # If event list exists and has selection, allow it
+                if hasattr(self, 'event_list') and self.event_list.selection():
+                    # Ensure event list has focus
+                    self.event_list.focus_set()
+                    self.set_event_highlight(highlight_num, event)
+                    return "break"
+                return None
+            
+            # Check if the focused widget is the event list or a descendant
+            widget = focused_widget
+            event_list_has_focus = False
+            while widget:
+                if widget == self.event_list:
+                    event_list_has_focus = True
+                    break
+                try:
+                    widget = widget.master
+                except (AttributeError, tk.TclError):
+                    break
+            
+            # Also check if event list has a selection even if it doesn't have explicit focus
+            # (sometimes treeview selection happens without focus)
+            if not event_list_has_focus:
+                if hasattr(self, 'event_list') and self.event_list.selection():
+                    # Event list has selection, treat it as if it should handle this
+                    event_list_has_focus = True
+            
+            # Only handle if event list has focus or has selection
+            if not event_list_has_focus:
+                return None
+            
+            # Ensure event list has focus for future key presses
+            if hasattr(self, 'event_list'):
+                self.event_list.focus_set()
+            
+            # Call set_event_highlight
+            self.set_event_highlight(highlight_num, event)
+            return "break"  # Prevent default behavior
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in _handle_shift_highlight_global: {e}")
+        return None
 
     def toggle_enable_disable(self, event=None):
         self.event_list.trigger_checkbox()
