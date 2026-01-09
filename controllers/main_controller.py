@@ -47,6 +47,7 @@ class MainController:
         self._route_filter_types = []
         self._route_search = ""
         self._unsaved_changes = False
+        self._custom_image_path = None
 
         self._name_change_events = []
         self._version_change_events = []
@@ -403,6 +404,19 @@ class MainController:
 
     def get_current_route_name(self) -> str:
         return self._route_name
+    
+    def set_custom_image_path(self, path: str):
+        """Set the custom image path for screenshots. Set to None or empty string to use default."""
+        if path and path.strip():
+            # Strip quotes from the beginning and end of the path
+            cleaned_path = path.strip().strip('"').strip("'")
+            self._custom_image_path = cleaned_path if cleaned_path else None
+        else:
+            self._custom_image_path = None
+    
+    def get_custom_image_path(self) -> str:
+        """Get the custom image path for screenshots. Returns None if using default."""
+        return self._custom_image_path
 
     def get_preview_event(self):
         return self._current_preview_event
@@ -561,7 +575,7 @@ class MainController:
         out_path = self._data.export_notes(route_name)
         self.send_message(f"Exported notes to: {out_path}")
     
-    def take_screenshot(self, image_name, bbox):
+    def take_screenshot(self, image_name, bbox, custom_path=None):
         try:
             if self.is_empty():
                 return
@@ -569,8 +583,34 @@ class MainController:
             # Get current date/time in format YYYYMMDDHHMMSS
             date_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
             
+            # Determine which directory to use
+            # Use custom_path parameter if provided, otherwise use stored custom path, otherwise use default
+            path_to_use = custom_path if custom_path is not None else self._custom_image_path
+            
+            if path_to_use and path_to_use.strip():
+                # Strip quotes and whitespace, then normalize the path
+                path_to_use = path_to_use.strip().strip('"').strip("'")
+                path_to_use = os.path.normpath(path_to_use)
+                if os.path.isdir(path_to_use):
+                    # Path exists and is a directory, use it
+                    save_dir = path_to_use
+                else:
+                    # Path doesn't exist, try to create it
+                    try:
+                        os.makedirs(path_to_use, exist_ok=True)
+                        if os.path.isdir(path_to_use):
+                            save_dir = path_to_use
+                        else:
+                            logger.warning(f"Could not create custom image directory {path_to_use}, using default")
+                            save_dir = config.get_images_dir()
+                    except Exception as e:
+                        logger.warning(f"Could not create custom image directory {path_to_use}: {e}, using default")
+                        save_dir = config.get_images_dir()
+            else:
+                save_dir = config.get_images_dir()
+            
             out_path = io_utils.get_safe_path_no_collision(
-                config.get_images_dir(),
+                save_dir,
                 f"{date_prefix}-{self.get_current_route_name()}_{image_name}",
                 ext=".png",
             )

@@ -88,6 +88,7 @@ class MainWindow(tk.Tk):
         self.file_menu.add_command(label="Screenshot Battle Summary", accelerator="F6", command=self.screenshot_battle_summary)
         self.file_menu.add_command(label="Screenshot Player Ranges:", accelerator="F7", command=self.export_player_ranges)
         self.file_menu.add_command(label="Screenshot Enemy Ranges", accelerator="F8", command=self.export_enemy_ranges)
+        self.file_menu.add_command(label="Open Image Folder", accelerator="F12", command=self.open_image_folder)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Config Font", accelerator="Ctrl+Shift+D", command=self.open_config_window)
         self.file_menu.add_command(label="Custom Gens", accelerator="Ctrl+Shift+E", command=self.open_custom_gens_window)
@@ -239,8 +240,15 @@ class MainWindow(tk.Tk):
         self.route_name.grid(row=0, column=4)
         self.route_name.config(width=30)
 
+        self.image_path_label = ttk.Label(self.top_row, text="Image Path: ")
+        self.image_path_label.grid(row=0, column=5)
+
+        self.image_path = custom_components.SimpleEntry(self.top_row, callback=self._user_set_image_path)
+        self.image_path.grid(row=0, column=6)
+        self.image_path.config(width=40)
+
         self.message_label = custom_components.AutoClearingLabel(self.top_row, width=100, justify=tk.LEFT, anchor=tk.W)
-        self.message_label.grid(row=0, column=5, sticky=tk.E)
+        self.message_label.grid(row=0, column=7, sticky=tk.E)
 
         self.top_left_controls = ttk.Frame(self.left_info_panel)
         self.top_left_controls.pack(fill=tk.X, anchor=tk.CENTER)
@@ -421,6 +429,7 @@ class MainWindow(tk.Tk):
         self.bind('<F6>', self.screenshot_battle_summary)
         self.bind('<F7>', self.export_player_ranges)
         self.bind('<F8>', self.export_enemy_ranges)
+        self.bind('<F12>', self.open_image_folder)
         # Pre-fight rare candy shortcuts
         self.bind('<F4>', self.increment_prefight_candies)
         self.bind('<F3>', self.decrement_prefight_candies)
@@ -548,6 +557,10 @@ class MainWindow(tk.Tk):
         if not self._loading_route_name:
             self._controller.set_current_route_name(self.route_name.get())
     
+    def _user_set_image_path(self, *args, **kwargs):
+        """Update the controller's custom image path when the field changes."""
+        self._controller.set_custom_image_path(self.image_path.get())
+    
     def _on_route_message(self, *args, **kwargs):
         self.message_label.set_message(self._controller.get_next_message_info())
     
@@ -599,7 +612,13 @@ class MainWindow(tk.Tk):
         
         # Take screenshot of the event list only (excluding scrollbar)
         bbox = tk_utils.get_bounding_box(self.event_list)
-        self._controller.take_screenshot("event_list", bbox)
+        path_value = self.image_path.get().strip() if self.image_path.get() else ""
+        if path_value:
+            # Strip quotes from the path
+            custom_path = path_value.strip('"').strip("'")
+        else:
+            custom_path = None
+        self._controller.take_screenshot("event_list", bbox, custom_path=custom_path)
         
         # Restore selection
         self.event_list.set_all_selected_event_ids(current_selection)
@@ -1276,6 +1295,9 @@ class MainWindow(tk.Tk):
 
     def open_data_location(self, *args, **kwargs):
         io_utils.open_explorer(config.get_user_data_dir())
+
+    def open_image_folder(self, *args, **kwargs):
+        io_utils.open_explorer(config.get_images_dir())
 
     def open_summary_window(self, *args, **kwargs):
         if self.summary_window is None or not tk.Toplevel.winfo_exists(self.summary_window):
