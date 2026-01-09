@@ -36,6 +36,47 @@ class Router:
         self.defeated_trainers = set()
         self.test_moves = ["", "", "", ""]
     
+    def restore_events_from_state(self, state: dict):
+        """Restore events from a serialized state (for undo functionality)."""
+        # Reset events first
+        self._reset_events()
+        
+        # Restore defeated trainers
+        self.defeated_trainers = set(state.get('defeated_trainers', []))
+        
+        # Restore level up move definitions
+        level_up_move_defs = state.get('level_up_move_defs', {})
+        self.level_up_move_defs = {}
+        for key, serialized_move in level_up_move_defs.items():
+            # The key is a tuple (mon_name, level, move_name)
+            # We need to deserialize the move definition
+            try:
+                if isinstance(key, tuple) and len(key) >= 1:
+                    mon_name = key[0]
+                elif isinstance(key, str):
+                    # Try to parse tuple string
+                    import ast
+                    parsed = ast.literal_eval(key)
+                    mon_name = parsed[0] if isinstance(parsed, tuple) and len(parsed) >= 1 else None
+                else:
+                    mon_name = None
+                
+                if mon_name:
+                    move_def = route_events.LearnMoveEventDefinition.deserialize(serialized_move, mon_default=mon_name)
+                    # Use the proper key from the deserialized move
+                    move_key = move_def.get_level_up_key()
+                    self.level_up_move_defs[move_key] = move_def
+            except Exception as e:
+                logger.warning(f"Failed to restore level up move {key}: {e}")
+        
+        # Restore events
+        serialized_events = state.get('events', {})
+        if serialized_events:
+            self._load_events_recursive(self.root_folder, serialized_events)
+        
+        # Recalculate everything
+        self._recalc()
+    
     def _change_version(self, new_version):
         self.pkmn_version = new_version
         change_version(self.pkmn_version)

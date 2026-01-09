@@ -16,6 +16,7 @@ from utils import io_utils
 from routing.route_events import EventDefinition, EventFolder, EventGroup, EventItem, TrainerEventDefinition
 import routing.router
 from pkmn import gen_factory
+from controllers.undo_manager import UndoManager
 
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,9 @@ class MainController:
         self._exception_events = []
 
         self._pre_save_hooks = []
+        
+        # Undo manager for event list changes
+        self._undo_manager = UndoManager(max_steps=15)
     
     def get_next_exception_info(self):
         if not len(self._exception_info):
@@ -209,12 +213,20 @@ class MainController:
     def update_existing_event(self, event_group_id:int, new_event:EventDefinition):
         if new_event.learn_move is not None and new_event.learn_move.source == const.MOVE_SOURCE_LEVELUP:
             return self.update_levelup_move(new_event.learn_move)
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         self._data.replace_event_group(event_group_id, new_event)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_event_change()
 
     @handle_exceptions
     def update_levelup_move(self, new_learn_move_event):
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         self._data.replace_levelup_move_event(new_learn_move_event)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_event_change()
     
     @handle_exceptions
@@ -242,6 +254,10 @@ class MainController:
             self._data.new_route("Abra")
             raise e
         finally:
+            self._undo_manager.clear()
+            # Save initial state after route is created
+            if self._data.init_route_state is not None:
+                self._undo_manager.save_state(self._data)
             self._on_name_change()
             self._on_version_change()
             self._on_event_selection()
@@ -264,6 +280,10 @@ class MainController:
             self._data.new_route("Abra")
             raise e
         finally:
+            self._undo_manager.clear()
+            # Save initial state after route is loaded
+            if self._data.init_route_state is not None:
+                self._undo_manager.save_state(self._data)
             self._on_name_change()
             self._on_version_change()
             self._on_event_selection()
@@ -277,32 +297,52 @@ class MainController:
 
     @handle_exceptions
     def move_groups_up(self, event_ids):
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         for cur_event in event_ids:
             self._data.move_event_object(cur_event, True)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 
     @handle_exceptions
     def move_groups_down(self, event_ids):
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         for cur_event in event_ids:
             self._data.move_event_object(cur_event, False)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 
     @handle_exceptions
     def move_groups_to_adjacent_folder_up(self, event_ids):
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         for cur_event in event_ids:
             self._data.move_event_to_adjacent_folder(cur_event, True)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 
     @handle_exceptions
     def move_groups_to_adjacent_folder_down(self, event_ids):
         # NOTE: list is already reversed in main_window before being passed here
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         for cur_event in event_ids:
             self._data.move_event_to_adjacent_folder(cur_event, False)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 
     @handle_exceptions
     def delete_events(self, event_ids):
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         self._data.batch_remove_events(event_ids)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
 
         selection_changed = False
         for cur_event_id in event_ids:
@@ -331,12 +371,20 @@ class MainController:
     
     @handle_exceptions
     def transfer_to_folder(self, event_ids, new_folder_name):
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         self._data.transfer_events(event_ids, new_folder_name)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 
     @handle_exceptions
     def new_event(self, event_def:EventDefinition, insert_after:int=None, insert_before:int=None, dest_folder_name=const.ROOT_FOLDER_NAME, do_select=True):
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         result = self._data.add_event_object(event_def=event_def, insert_after=insert_after, insert_before=insert_before, dest_folder_name=dest_folder_name)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
         if do_select:
             self.select_new_events([result])
@@ -344,12 +392,16 @@ class MainController:
 
     @handle_exceptions
     def finalize_new_folder(self, new_folder_name, prev_folder_name=None, insert_after=None):
+        # Save state BEFORE the operation (adds pre-op state to stack)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         if prev_folder_name is None and insert_after is None:
             self._data.add_event_object(new_folder_name=new_folder_name)
         elif prev_folder_name is None:
             self._data.add_event_object(new_folder_name=new_folder_name, insert_after=insert_after)
         else:
             self._data.rename_event_folder(prev_folder_name, new_folder_name)
+        # Save state AFTER the operation (updates current state)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
 
         self._on_route_change()
 
@@ -492,6 +544,38 @@ class MainController:
 
     def has_unsaved_changes(self) -> routing.router.Router:
         return self._unsaved_changes
+    
+    def can_undo(self) -> bool:
+        """Check if undo is available."""
+        return self._undo_manager.can_undo()
+    
+    @handle_exceptions
+    def undo(self):
+        """Undo the last event list change."""
+        if not self.can_undo():
+            return
+        
+        # Get the previous state
+        previous_state = self._undo_manager.get_undo_state()
+        if previous_state is None:
+            return
+        
+        # Temporarily disable saving state to avoid creating a new undo entry
+        # We'll restore the current state after undoing
+        current_state = self._undo_manager._current_state
+        
+        # Restore the state (this will trigger route change)
+        self._data.restore_events_from_state(previous_state)
+        
+        # Restore the current state pointer (the state we just restored becomes current)
+        self._undo_manager._current_state = previous_state
+        
+        # Clear selection since event IDs may have changed
+        self._selected_ids = []
+        
+        # Trigger updates
+        self._on_event_selection()
+        self._on_route_change()
     
     def get_all_selected_ids(self, allow_event_items=True):
         if allow_event_items:

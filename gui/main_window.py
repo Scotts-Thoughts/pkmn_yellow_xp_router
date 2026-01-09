@@ -92,10 +92,13 @@ class MainWindow(tk.Tk):
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Config Font", accelerator="Ctrl+Shift+D", command=self.open_config_window)
         self.file_menu.add_command(label="Custom Gens", accelerator="Ctrl+Shift+E", command=self.open_custom_gens_window)
-        self.file_menu.add_command(label="App Config", accelerator="Ctrl+Shift+Z", command=self.open_app_config_window)
+        self.file_menu.add_command(label="App Config", accelerator="Ctrl+Shift+A", command=self.open_app_config_window)
         self.file_menu.add_command(label="Open Data Folder", accelerator="Ctrl+Shift+O", command=self.open_data_location)
+        # Note: App Config shortcut is Ctrl+Shift+A (changed from Ctrl+Shift+Z to free up Ctrl+Z for undo)
 
         self.event_menu = tk.Menu(self.top_menu_bar, tearoff=0, postcommand=self._update_event_menu_state)
+        self.event_menu.add_command(label="Undo", accelerator="Ctrl+Z", command=self.undo_event_list)
+        self.event_menu.add_separator()
         self.event_menu.add_command(label="Move Event Up", accelerator="Ctrl+E", command=self.move_group_up)
         self.event_menu.add_command(label="Move Event Down", accelerator="Ctrl+D", command=self.move_group_down)
         self.event_menu.add_command(label="Move Event Up To Next Folder", accelerator="Ctrl+Shift+E", command=self.move_group_to_adjacent_folder_up)
@@ -414,7 +417,9 @@ class MainWindow(tk.Tk):
         # folder actions (keyboard shortcuts removed - now used for export)
         # config integrations
         self.bind('<Control-D>', self.open_config_window)
-        self.bind('<Control-Z>', self.open_app_config_window)
+        # Note: Control+Z is now used for undo, App Config moved to Ctrl+Shift+Z (see below)
+        self.bind('<Control-z>', self.undo_event_list)
+        self.bind('<Control-Z>', self.undo_event_list)
         # Event filter shortcuts
         # Note: Control+r was previously used for Transfer Event, but is now overridden for filter toggle
         # Transfer Event can still be accessed via menu (Event > Transfer Event) or the button
@@ -781,6 +786,13 @@ class MainWindow(tk.Tk):
     
     def _update_event_menu_state(self):
         """Update Event menu state (called when menu opens)."""
+        # Update undo menu item state
+        undo_index = self.event_menu.index("Undo")
+        if self._controller.can_undo():
+            self.event_menu.entryconfig(undo_index, state="normal")
+        else:
+            self.event_menu.entryconfig(undo_index, state="disabled")
+        
         # Update the checkbox state
         self.highlight_branched_mandatory_var.set(config.get_highlight_branched_mandatory())
         
@@ -1450,6 +1462,19 @@ class MainWindow(tk.Tk):
         except Exception as e:
             logger.error(f"Error toggling Vitamin filter: {e}")
         return "break"
+    
+    def undo_event_list(self, event=None):
+        """Undo the last event list change."""
+        # Don't execute if a text field has focus
+        if self._text_field_has_focus:
+            return
+        
+        if self._controller.can_undo():
+            self._controller.undo()
+        
+        # Return "break" to prevent default behavior when called from keyboard
+        if event is not None:
+            return "break"
     
     def cancel_and_quit(self, *args, **kwargs):
         self.destroy()
