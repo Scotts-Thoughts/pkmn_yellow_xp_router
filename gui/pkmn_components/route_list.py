@@ -306,6 +306,8 @@ class RouteList(custom_components.CustomGridview):
     def _refresh_recursively(self, parent_id, event_list, to_delete_ids:set):
         cur_search = self._controller.get_route_search_string()
         cur_filter = self._controller.get_route_filter_types()
+        # Track the actual position in the treeview, accounting for inserted level up moves
+        actual_pos = 0
         for event_idx, event_obj in enumerate(event_list):
             semantic_id = self._get_attr_helper(event_obj, self._semantic_id_attr)
 
@@ -330,15 +332,49 @@ class RouteList(custom_components.CustomGridview):
                 # when first creating the event, make sure it is defined with a checkbox
                 cur_event_id = self.custom_upsert(event_obj, parent=parent_id, force_open=force_open, update_checkbox=True)
 
-            if self.index(cur_event_id) != event_idx or self.parent(cur_event_id) != parent_id:
-                self.move(cur_event_id, parent_id, event_idx)
+            if self.index(cur_event_id) != actual_pos or self.parent(cur_event_id) != parent_id:
+                self.move(cur_event_id, parent_id, actual_pos)
+            
+            # Increment position for the EventGroup/Folder itself
+            actual_pos += 1
 
             if is_folder:
                 self._refresh_recursively(cur_event_id, event_obj.children, to_delete_ids)
 
             elif isinstance(event_obj, route_events.EventGroup):
                 if len(event_obj.event_items) > 1:
-                    for item_idx, item_obj in enumerate(event_obj.event_items):
+                    # Separate level up moves from other event items
+                    level_up_moves = []
+                    other_items = []
+                    for item_obj in event_obj.event_items:
+                        # Check if this is a level up move
+                        is_level_up = (
+                            item_obj.event_definition.learn_move is not None and
+                            item_obj.event_definition.learn_move.source == const.MOVE_SOURCE_LEVELUP
+                        )
+                        if is_level_up:
+                            level_up_moves.append(item_obj)
+                        else:
+                            other_items.append(item_obj)
+                    
+                    # Render level up moves as siblings of the EventGroup (always visible)
+                    # They appear right after the EventGroup in the parent's children
+                    for level_up_item in level_up_moves:
+                        item_semantic_id = self._get_attr_helper(level_up_item, self._semantic_id_attr)
+                        if item_semantic_id in to_delete_ids:
+                            item_id = self._treeview_id_lookup[item_semantic_id]
+                            to_delete_ids.remove(item_semantic_id)
+                            self.custom_upsert(level_up_item, parent=parent_id)
+                        else:
+                            item_id = self.custom_upsert(level_up_item, parent=parent_id)
+                        
+                        # Position level up moves right after the EventGroup
+                        if self.index(item_id) != actual_pos or self.parent(item_id) != parent_id:
+                            self.move(item_id, parent_id, actual_pos)
+                        actual_pos += 1
+                    
+                    # Render other items as children of the EventGroup (can be hidden when collapsed)
+                    for item_idx, item_obj in enumerate(other_items):
                         item_semantic_id = self._get_attr_helper(item_obj, self._semantic_id_attr)
                         if item_semantic_id in to_delete_ids:
                             item_id = self._treeview_id_lookup[item_semantic_id]
@@ -347,5 +383,5 @@ class RouteList(custom_components.CustomGridview):
                         else:
                             item_id = self.custom_upsert(item_obj, parent=cur_event_id)
 
-                        if self.index(cur_event_id) != item_idx or self.parent(cur_event_id) != cur_event_id:
+                        if self.index(item_id) != item_idx or self.parent(item_id) != cur_event_id:
                             self.move(item_id, cur_event_id, item_idx)
