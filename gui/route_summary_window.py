@@ -37,6 +37,7 @@ class RouteSummaryWindow(tk.Toplevel):
         self.config(menu=self._top_menu_bar)
 
         self._controller = controller
+        self._main_window = main_window
         self._cur_data = []
     
         self._main_frame = ttk.Frame(self)
@@ -53,6 +54,8 @@ class RouteSummaryWindow(tk.Toplevel):
 
         self.bind(self._controller.register_route_change(self), self._refresh)
         self.bind('<Control-p>', self._export_screen_shot)
+        # Run Summary toggle shortcut - works when this window has focus
+        self.bind('<Control-grave>', lambda e: self._main_window.open_summary_window())
         self._refresh()
     
     def _export_screen_shot(self, *args, **kwargs):

@@ -1314,9 +1314,15 @@ class MainWindow(tk.Tk):
         io_utils.open_explorer(config.get_images_dir())
 
     def open_summary_window(self, *args, **kwargs):
-        if self.summary_window is None or not tk.Toplevel.winfo_exists(self.summary_window):
+        # Check if window exists and is visible
+        if self.summary_window is not None and tk.Toplevel.winfo_exists(self.summary_window):
+            # Window is open, close it
+            self.summary_window.destroy()
+            self.summary_window = None
+        else:
+            # Window doesn't exist or isn't visible, open it
             self.summary_window = RouteSummaryWindow(self, self._controller)
-        self.summary_window.focus()
+            self.summary_window.focus()
 
     def open_setup_summary_window(self, *args, **kwargs):
         if self.setup_summary_window is None or not tk.Toplevel.winfo_exists(self.setup_summary_window):
