@@ -383,7 +383,6 @@ class MainWindow(tk.Tk):
         # main route actions
         self.bind('<Control-x>', self.open_customize_dvs_window)
         self.bind('<Control-n>', self.open_new_route_window)
-        self.bind('<Control-a>', self.open_load_route_window)
         self.bind('<Control-s>', self.save_route)
         self.bind('<Control-C>', self.close_route)  # Ctrl+Shift+C
         self.bind('<Control-W>', self.export_notes)
@@ -428,7 +427,10 @@ class MainWindow(tk.Tk):
         self.bind_all('<Control-r>', self.toggle_rare_candy_filter)  # Overrides Transfer Event shortcut
         self.bind_all('<Control-t>', self.toggle_tm_hm_filter)
         self.bind_all('<Control-g>', self.toggle_vitamin_filter)
-        self.bind('<Control-A>', self.open_data_location)
+        self.bind_all('<Control-w>', self.toggle_fight_wild_pkmn_filter)
+        self.bind_all('<Control-a>', self.toggle_common_filters)
+        self.bind_all('<Control-Shift-R>', self.reset_all_filters)
+        self.bind('<Control-Shift-O>', self.open_data_location)  # Matches menu accelerator "Ctrl+Shift+O"
         # Screenshot shortcuts
         self.bind('<F5>', self.screenshot_event_list)
         self.bind('<F6>', self.screenshot_battle_summary)
@@ -1461,6 +1463,44 @@ class MainWindow(tk.Tk):
                 self.route_search.toggle_filter_by_type(const.TASK_VITAMIN)
         except Exception as e:
             logger.error(f"Error toggling Vitamin filter: {e}")
+        return "break"
+    
+    def toggle_fight_wild_pkmn_filter(self, event=None):
+        """Toggle the Fight Wild Pokemon event filter."""
+        try:
+            if hasattr(self, 'route_search') and self.route_search:
+                self.route_search.toggle_filter_by_type(const.TASK_FIGHT_WILD_PKMN)
+        except Exception as e:
+            logger.error(f"Error toggling Fight Wild Pokemon filter: {e}")
+        return "break"
+    
+    def toggle_common_filters(self, event=None):
+        """Toggle Fight Trainer, Use Rare Candy, and Use Vitamin filters."""
+        try:
+            if hasattr(self, 'route_search') and self.route_search:
+                # Check if all three filters are currently on
+                trainer_checked = self.route_search.is_filter_checked(const.TASK_TRAINER_BATTLE)
+                rare_candy_checked = self.route_search.is_filter_checked(const.TASK_RARE_CANDY)
+                vitamin_checked = self.route_search.is_filter_checked(const.TASK_VITAMIN)
+                
+                # If all three are on, turn them all off. Otherwise, turn all three on.
+                all_on = trainer_checked and rare_candy_checked and vitamin_checked
+                new_state = not all_on
+                
+                self.route_search.set_filter_by_type(const.TASK_TRAINER_BATTLE, new_state)
+                self.route_search.set_filter_by_type(const.TASK_RARE_CANDY, new_state)
+                self.route_search.set_filter_by_type(const.TASK_VITAMIN, new_state)
+        except Exception as e:
+            logger.error(f"Error toggling common filters: {e}")
+        return "break"
+    
+    def reset_all_filters(self, event=None):
+        """Reset all filters and clear search."""
+        try:
+            if hasattr(self, 'route_search') and self.route_search:
+                self.route_search.reset_all_filters()
+        except Exception as e:
+            logger.error(f"Error resetting all filters: {e}")
         return "break"
     
     def undo_event_list(self, event=None):

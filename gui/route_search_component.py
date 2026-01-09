@@ -84,3 +84,19 @@ class RouteSearch(ttk.Frame):
             if checkbox._text_label.cget("text") == event_type:
                 checkbox.toggle_checked()
                 return
+    
+    def set_filter_by_type(self, event_type, checked):
+        """Set a filter to a specific checked state by event type name."""
+        # Find the checkbox for this event type
+        for checkbox in self._filter_components:
+            if checkbox._text_label.cget("text") == event_type:
+                checkbox.set_checked(checked)
+                return
+    
+    def is_filter_checked(self, event_type):
+        """Check if a filter is currently checked by event type name."""
+        # Find the checkbox for this event type
+        for checkbox in self._filter_components:
+            if checkbox._text_label.cget("text") == event_type:
+                return checkbox.is_checked()
+        return False
