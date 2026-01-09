@@ -43,22 +43,30 @@ class EventDetails(ttk.Frame):
         # Notebook fills entire space - content area extends full width
         self.tabbed_states.grid(row=0, column=0, sticky=tk.NSEW)
         
-        # Place checkbox beside the tabs using place() - positioned after tabs
+        # Place checkbox inline with tabs on the right side
         self.auto_change_tab_checkbox = custom_components.CheckboxLabel(self.notebook_holder, text="Switch tabs automatically", flip=True, toggle_command=self._handle_auto_switch_toggle)
         self.auto_change_tab_checkbox.set_checked(config.do_auto_switch())
         
-        # Function to position checkbox beside tabs
+        # Function to position checkbox inline with tab text on the right
         def position_checkbox():
             try:
-                # Calculate approximate tab width: "Pre-event State" + "Battle Summary" ≈ 250-300px
-                # Position checkbox right after tabs with some padding
-                tab_width = 280  # Approximate width of both tabs
-                self.auto_change_tab_checkbox.place(x=tab_width, y=2)
+                # Get the width of the notebook holder to position at the right end
+                notebook_width = self.notebook_holder.winfo_width()
+                checkbox_width = self.auto_change_tab_checkbox.winfo_reqwidth()
+                # Position at the right end with some padding
+                x_position = notebook_width - checkbox_width - 5  # 5px padding from right edge
+                # Align with tab text baseline - tabs render their text centered vertically
+                # The tab area has padding, and text is typically around 6-8px from top
+                # Use negative offset to move up into the tab area to align with text
+                # Position it so it doesn't cover the notebook border line below tabs
+                tab_text_y = -2  # Negative value moves up to align with tab text, but not too much to preserve border
+                self.auto_change_tab_checkbox.place(x=x_position, y=tab_text_y)
             except:
                 pass  # Ignore errors during initialization
         
         # Update position after widget is mapped and when tabs change
         self.notebook_holder.bind('<Map>', lambda e: self.after_idle(position_checkbox))
+        self.notebook_holder.bind('<Configure>', lambda e: self.after_idle(position_checkbox))
         self.tabbed_states.bind('<<NotebookTabChanged>>', lambda e: self.after_idle(position_checkbox))
         # Also call after initial setup
         self.after_idle(position_checkbox)

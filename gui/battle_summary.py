@@ -112,13 +112,13 @@ class BattleSummary(ttk.Frame):
         self._top_bar.columnconfigure(0, weight=1)
 
         self.setup_moves = SetupMovesSummary(self._setup_half, callback=self._player_setup_move_callback)
-        self.setup_moves.grid(row=0, column=0, pady=(0, 2))
+        self.setup_moves.grid(row=0, column=0, pady=(0, 2), sticky=tk.W)
 
         self.transform_checkbox = custom_components.CheckboxLabel(self._setup_half, text="Transform:", toggle_command=self._player_transform_callback, flip=True)
         self.transform_checkbox.grid(row=0, column=1, sticky=tk.EW)
 
         self.enemy_setup_moves = SetupMovesSummary(self._setup_half, callback=self._enemy_setup_move_callback, is_player=False)
-        self.enemy_setup_moves.grid(row=1, column=0, sticky=tk.EW)
+        self.enemy_setup_moves.grid(row=1, column=0, sticky=tk.W)
 
         self.config_button = custom_components.SimpleButton(self._weather_half, text="Configure/Help", command=self._launch_config_popup)
         self.config_button.grid(row=0, column=0, sticky=tk.EW, padx=10, pady=(0, 2))
@@ -417,7 +417,7 @@ class SetupMovesSummary(ttk.Frame):
         self._move_list = []
 
         self.reset_button = custom_components.SimpleButton(self, text="Reset Setup", command=self._reset)
-        self.reset_button.grid(row=0, column=0, padx=2)
+        self.reset_button.grid(row=0, column=0, padx=2, sticky=tk.W)
 
         self.setup_label = ttk.Label(self, text="Move:")
         self.setup_label.grid(row=0, column=1, padx=2)
