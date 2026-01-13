@@ -307,7 +307,11 @@ class BattleState(WatchForResetState):
         self._battle_started = True
         self._init_held_item = self.machine._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MON_HELD_ITEM).value
         self._is_double_battle = self.machine._gamehook_client.get(gh_gen_three_const.KEY_DOUBLE_BATTLE_FLAG).value
-        self._is_tutorial_battle = self.machine._gamehook_client.get(gh_gen_three_const.KEY_TUTORIAL_BATTLE_FLAG).value
+        # Handle KEY_TUTORIAL_BATTLE_FLAG - it doesn't exist in FireRed
+        if hasattr(gh_gen_three_const, 'KEY_TUTORIAL_BATTLE_FLAG'):
+            self._is_tutorial_battle = self.machine._gamehook_client.get(gh_gen_three_const.KEY_TUTORIAL_BATTLE_FLAG).value
+        else:
+            self._is_tutorial_battle = False
         self.is_trainer_battle = self.machine._gamehook_client.get(gh_gen_three_const.KEY_TRAINER_BATTLE_FLAG).value
         self._delayed_levelup.configure_level(self.machine._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MON_LEVEL).value)
 
