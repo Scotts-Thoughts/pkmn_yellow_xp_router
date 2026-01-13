@@ -112,6 +112,11 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_TMHM_QUANTITY = [f"bag.tmhm.{i}.quantity" for i in range(0, 99)]
         self._define_derived_constant()
 
+    def configure_for_heartgold(self):
+        # For now, HeartGold/SoulSilver use the same constants as Platinum
+        # If differences are discovered, they can be added here
+        self.configure_for_platinum()
+
     def _define_derived_constant(self, is_hgss=False):
         self.ALL_KEYS_ALL_ITEM_FIELDS = set([])
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_ITEM_TYPE)
@@ -185,7 +190,8 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_TO_REGISTER.append(self.META_STATE)
 
 class GameHookConstantConverter:
-    def __init__(self):
+    def __init__(self, is_hgss=False):
+        self._is_hgss = is_hgss
         self._game_vitamins = [
             sanitize_string("HP Up"),
             sanitize_string("Protein"),
@@ -265,8 +271,16 @@ class GameHookConstantConverter:
             return "HM03 Surf"
         elif gh_move_name == "Strength":
             return "HM04 Strength"
-        elif gh_move_name == "Defog": #Likely will need code to switch to Whirlpool for HGSS
+        elif gh_move_name == "Defog":
+            # Platinum uses Defog as HM05, but HeartGold/SoulSilver use Whirlpool
+            if self._is_hgss:
+                return None  # Defog is not an HM in HGSS
             return "HM05 Defog"
+        elif gh_move_name == "Whirlpool":
+            # HeartGold/SoulSilver use Whirlpool as HM05 instead of Defog
+            if self._is_hgss:
+                return "HM05 Whirlpool"
+            return None  # Whirlpool is not an HM in Platinum
         elif gh_move_name == "Rock Smash":
             return "HM06 Rock Smash"
         elif gh_move_name == "Waterfall":

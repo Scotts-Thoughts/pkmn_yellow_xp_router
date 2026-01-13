@@ -20,7 +20,7 @@ class PlatinumRecorder(route_recording.recorder.RecorderGameHookClient):
         else:
             gh_gen_four_const.configure_for_platinum()
 
-        self._machine = Machine(controller, self, GameHookConstantConverter(), is_hgss=is_hgss)
+        self._machine = Machine(controller, self, GameHookConstantConverter(is_hgss=is_hgss), is_hgss=is_hgss)
 
         """
         self._machine.register(platinum_states.WatchState(self._machine))
