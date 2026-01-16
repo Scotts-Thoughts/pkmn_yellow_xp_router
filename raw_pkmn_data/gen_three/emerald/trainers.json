@@ -26562,6 +26562,7 @@
             "is_double_battle": false,
             "is_female_trainer": false,
             "money": 300,
+            "refightable": true,
             "pokemon": [
                 {
                     "name": "Carvanha",
