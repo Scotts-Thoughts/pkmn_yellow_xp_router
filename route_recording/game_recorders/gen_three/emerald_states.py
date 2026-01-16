@@ -173,6 +173,11 @@ class BattleState(WatchForResetState):
 
     class DelayedBattleItemsUpdate(DelayedUpdate):
         def _update_helper(self):
+            # Skip item updates during tutorial battles to avoid recording fake events
+            if hasattr(gh_gen_three_const, 'KEY_TUTORIAL_BATTLE_FLAG'):
+                if self.machine._gamehook_client.get(gh_gen_three_const.KEY_TUTORIAL_BATTLE_FLAG).value:
+                    logger.info("Skipping item cache update during tutorial battle")
+                    return
             self.machine._item_cache_update()
 
     class DelayedHeldItemUpdate(DelayedUpdate):
@@ -307,7 +312,7 @@ class BattleState(WatchForResetState):
         self._battle_started = True
         self._init_held_item = self.machine._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MON_HELD_ITEM).value
         self._is_double_battle = self.machine._gamehook_client.get(gh_gen_three_const.KEY_DOUBLE_BATTLE_FLAG).value
-        # Handle KEY_TUTORIAL_BATTLE_FLAG - it doesn't exist in FireRed
+        # Check for tutorial battle flag (exists in both Emerald and FireRed)
         if hasattr(gh_gen_three_const, 'KEY_TUTORIAL_BATTLE_FLAG'):
             self._is_tutorial_battle = self.machine._gamehook_client.get(gh_gen_three_const.KEY_TUTORIAL_BATTLE_FLAG).value
         else:

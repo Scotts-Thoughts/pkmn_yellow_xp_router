@@ -144,6 +144,7 @@ class Gen3GameHookConstants:
         self.KEY_BATTLE_FLAG = "battle.type.is_battle"
         self.KEY_TRAINER_BATTLE_FLAG = "battle.type.trainer"
         self.KEY_DOUBLE_BATTLE_FLAG = "battle.type.double"
+        self.KEY_TUTORIAL_BATTLE_FLAG = "battle.type.old_man_tutorial"
         self.KEY_BATTLE_OUTCOME = "battle.outcome"
         self.KEY_BATTLE_BACKGROUND_TILES = "battle.turnInfo.battleBackgroundTiles"
         self.KEY_BATTLE_PLAYER_MON_PARTY_POS = "battle.yourPokemon.partyPos"
@@ -189,8 +190,7 @@ class Gen3GameHookConstants:
         # truly vile and horrific code
         if hasattr(self, "KEY_TWO_OPPONENTS_BATTLE_FLAG"):
             delattr(self, "KEY_TWO_OPPONENTS_BATTLE_FLAG")
-        if hasattr(self, "KEY_TUTORIAL_BATTLE_FLAG"):
-            delattr(self, "KEY_TUTORIAL_BATTLE_FLAG")
+        # Keep KEY_TUTORIAL_BATTLE_FLAG for FireRed to detect tutorial battles
         if hasattr(self, "KEY_BATTLE_TRAINER_B_NUMBER"):
             delattr(self, "KEY_BATTLE_TRAINER_B_NUMBER")
         self._define_derived_constant()
@@ -234,6 +234,10 @@ class Gen3GameHookConstants:
             self.KEY_TRAINER_BATTLE_FLAG,
             self.KEY_DOUBLE_BATTLE_FLAG,
             self.KEY_BATTLE_OUTCOME,
+        ]
+        if hasattr(self, "KEY_TUTORIAL_BATTLE_FLAG"):
+            self.ALL_KEYS_TO_REGISTER.append(self.KEY_TUTORIAL_BATTLE_FLAG)
+        self.ALL_KEYS_TO_REGISTER.extend([
             self.KEY_BATTLE_BACKGROUND_TILES,
             self.KEY_BATTLE_TRAINER_A_NUMBER,
             self.KEY_BATTLE_PLAYER_MON_HP,
@@ -250,7 +254,7 @@ class Gen3GameHookConstants:
             self.KEY_BATTLE_SECOND_ENEMY_PARTY_POS,
             self.KEY_AUDIO_SOUND_EFFECT_1,
             self.KEY_AUDIO_SOUND_EFFECT_2,
-        ]
+        ])
         if is_frlg:
             self.ALL_KEYS_TO_REGISTER.append(self.KEY_TWO_OPPONENTS_BATTLE_FLAG)
             self.ALL_KEYS_TO_REGISTER.append(self.KEY_BATTLE_TRAINER_B_NUMBER)

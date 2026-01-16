@@ -603,6 +603,11 @@ class Machine:
                             continue
 
                     elif None is not cur_event.item_event_def:
+                        # Skip item events during tutorial battles
+                        if hasattr(gh_gen_three_const, 'KEY_TUTORIAL_BATTLE_FLAG'):
+                            if self._gamehook_client.get(gh_gen_three_const.KEY_TUTORIAL_BATTLE_FLAG).value:
+                                logger.info(f"Skipping item event during tutorial battle: {cur_event.item_event_def}")
+                                continue
                         logger.info(f"getting item from {cur_event.item_event_def.item_name}")
                         item = current_gen_info().item_db().get_item(cur_event.item_event_def.item_name)
                         if item is None:
