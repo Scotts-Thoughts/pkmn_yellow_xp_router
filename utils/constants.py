@@ -302,6 +302,7 @@ class Constants:
         self.EVENT_TAG_IMPORTANT = "important"
         self.EVENT_TAG_ERRORS = "errors"
         self.EVENT_TAG_BRANCHED_MANDATORY = "branched_mandatory"
+        self.EVENT_TAG_FOLDER = "folder"
 
         self.MOVE_KEY = "move"
         self.MOVE_DEST_KEY = "destination_slot"

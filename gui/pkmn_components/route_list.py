@@ -42,6 +42,8 @@ class RouteList(custom_components.CustomGridview):
         self.tag_configure(const.EVENT_TAG_IMPORTANT, background="#1f1f1f")
         self.tag_configure(const.HIGHLIGHT_LABEL, background="#156152")  # Old highlight, keep for backward compatibility
         self.tag_configure(const.EVENT_TAG_BRANCHED_MANDATORY, background="#5a5142")  # Brown color
+        # Configure folder text to be darker grey for better visual distinction
+        self.tag_configure(const.EVENT_TAG_FOLDER, foreground="#666666")  # Dark grey for folder text
         
         # Configure highlight colors from config
         from utils.config_manager import config
@@ -65,6 +67,7 @@ class RouteList(custom_components.CustomGridview):
         for idx, highlight_label in enumerate(const.ALL_HIGHLIGHT_LABELS, 1):
             highlight_color = config.get_highlight_color(idx)
             self.tag_configure(highlight_label, background=highlight_color)
+    
     
     def general_checkbox_callback_fn(self):
         self._controller.get_raw_route()._recalc()

@@ -1285,13 +1285,18 @@ class EventFolder:
         return False
     
     def get_tags(self):
+        result = []
+        
+        # Always include folder tag for styling
+        result.append(const.EVENT_TAG_FOLDER)
+        
         if self.has_errors():
-            return [const.EVENT_TAG_ERRORS]
+            result.append(const.EVENT_TAG_ERRORS)
+            return result
         
         if self.expanded:
-            return []
+            return result
 
-        result = []
         for cur_group in self.children:
             tags = cur_group.get_tags()
             # Check for any highlight tag (new or old)
@@ -1302,7 +1307,7 @@ class EventFolder:
                 if highlight_label in tags:
                     result.append(highlight_label)
                     break
-            if result:
+            if len(result) > 1:  # More than just the folder tag
                 break
         
         return result
