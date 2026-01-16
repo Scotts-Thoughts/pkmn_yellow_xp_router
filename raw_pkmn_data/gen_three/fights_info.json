@@ -101,7 +101,17 @@
         "Elite Four Bruno",
         "Elite Four Agatha",
         "Elite Four Lance",
-        "Champion Terry"
+        "Champion Terry",
+
+        "Elite Four Lorelei 2",
+        "Elite Four Bruno 2",
+        "Elite Four Agatha 2",
+        "Elite Four Lance 2",
+        "Champion Terry 2",
+
+        "Champion Squirtle Rematch",
+        "Champion Bulbasaur Rematch",
+        "Champion Charmander Rematch"
     ],
     "fight_rewards": {
         "Leader Roxanne": "TM39 Rock Tomb",
