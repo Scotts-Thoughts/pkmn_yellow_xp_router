@@ -18199,6 +18199,7 @@
             "trainer_name": "Elite Four Aaron",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -18373,6 +18374,7 @@
             "trainer_name": "Elite Four Bertha",
             "trainer_gender": "female",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -18547,6 +18549,7 @@
             "trainer_name": "Elite Four Flint",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -18721,6 +18724,7 @@
             "trainer_name": "Elite Four Lucian",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"

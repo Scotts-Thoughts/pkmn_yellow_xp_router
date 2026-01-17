@@ -33516,6 +33516,7 @@
             "is_double_battle": false,
             "is_female_trainer": false,
             "money": 640,
+            "refightable": true,
             "pokemon": [
                 {
                     "name": "Taillow",
@@ -33716,6 +33717,7 @@
             "is_double_battle": false,
             "is_female_trainer": true,
             "money": 680,
+            "refightable": true,
             "pokemon": [
                 {
                     "name": "Roselia",
@@ -42884,6 +42886,7 @@
             "is_double_battle": false,
             "is_female_trainer": true,
             "money": 600,
+            "refightable": true,
             "pokemon": [
                 {
                     "name": "Marill",

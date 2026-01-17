@@ -20022,6 +20022,7 @@
             "trainer_name": "Champion Lance",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore",
@@ -20231,6 +20232,7 @@
             "trainer_name": "Elite Four Will",
             "trainer_gender": "female",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -20407,6 +20409,7 @@
             "trainer_name": "Elite Four Karen",
             "trainer_gender": "female",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -20583,6 +20586,7 @@
             "trainer_name": "Elite Four Koga",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -37014,6 +37018,7 @@
             "trainer_name": "Elite Four Bruno",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -61735,6 +61740,7 @@
             "trainer_name": "Champion Lance Rematch 2",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore",
@@ -61944,6 +61950,7 @@
             "trainer_name": "Elite Four Will Rematch 2",
             "trainer_gender": "female",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -62151,6 +62158,7 @@
             "trainer_name": "Elite Four Koga Rematch 2",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -62358,6 +62366,7 @@
             "trainer_name": "Elite Four Bruno Rematch 2",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -62565,6 +62574,7 @@
             "trainer_name": "Elite Four Karen Rematch 2",
             "trainer_gender": "female",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
@@ -66819,6 +66829,7 @@
             "trainer_name": "Champion Lance Rematch 3",
             "trainer_gender": "male",
             "battle_type": "Singles",
+            "refightable": true,
             "items": [
                 "Full Restore",
                 "Full Restore"
