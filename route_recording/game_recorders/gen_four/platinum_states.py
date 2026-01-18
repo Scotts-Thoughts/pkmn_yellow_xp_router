@@ -1290,6 +1290,17 @@ class OverworldState(WatchForResetState):
     def _on_enter(self, prev_state: State):
         self.machine._money_cache_update()
         self.machine.update_team_cache()
+        # Check for moves that were learned during evolution
+        # This must happen after update_team_cache so move data is current
+        if self.machine._pending_evolution_level_check is not None:
+            # Update move cache to get accurate post-evolution moves
+            self.machine._move_cache_update(generate_events=False)
+            # Now check level-up moves with accurate move data
+            pre_moves = self.machine._pre_evolution_moves if self.machine._pre_evolution_moves is not None else set()
+            self.machine._solo_mon_levelup(self.machine._pending_evolution_level_check, pre_evolution_moves=pre_moves)
+            self.machine._pending_evolution_level_check = None
+            self.machine._pre_evolution_moves = None
+            self.machine._pre_evolution_move_list = None
         self._waiting_for_registration = False
         self._register_delay = self.BASE_DELAY
         self._waiting_for_new_file = False

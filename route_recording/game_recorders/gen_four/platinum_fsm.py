@@ -108,6 +108,11 @@ class Machine:
         self._blackout_trainer_name = ""
         self._blackout_initial_map = None
 
+        # Track evolution for delayed move checking
+        self._pending_evolution_level_check = None
+        self._pre_evolution_moves = None  # Cache moves before evolution to detect learned moves (set)
+        self._pre_evolution_move_list = None  # Cache moves before evolution to detect learned moves (list)
+
         self._cur_state:State = None
         self._registered_states:Dict[StateType, State] = {}
         self._events_to_generate:List[EventDefinition] = []
@@ -266,6 +271,22 @@ class Machine:
             else:
                 self._move_cache_update(generate_events=False)
         
+        # Check for moves learned during evolution if we're in overworld
+        # This handles the case where evolution happens while already in overworld
+        # (in which case _on_enter won't be called again)
+        # Only check if we're generating events (to avoid duplicate checks in _on_enter)
+        if self._pending_evolution_level_check is not None and generate_events:
+            cur_state_type = self._controller.get_game_state()
+            if cur_state_type == StateType.OVERWORLD:
+                # Update move cache to get accurate post-evolution moves
+                self._move_cache_update(generate_events=False)
+                # Now check level-up moves with accurate move data
+                pre_moves = self._pre_evolution_moves if self._pre_evolution_moves is not None else set()
+                self._solo_mon_levelup(self._pending_evolution_level_check, pre_evolution_moves=pre_moves)
+                self._pending_evolution_level_check = None
+                self._pre_evolution_moves = None
+                self._pre_evolution_move_list = None
+        
         logger.info(f"after team cache update, valid_solo_mon: {self.valid_solo_mon}")
         self._cached_team = new_cache
     
@@ -278,22 +299,63 @@ class Machine:
             f"{self._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value}"
         )
     
-    def _solo_mon_levelup(self, new_level):
+    def _solo_mon_levelup(self, new_level, pre_evolution_moves=None):
         logger.info(f"levelup detected. {self._solo_mon_key.species} leveling up to {new_level}")
+        # Get current moves to check if any level-up moves were actually taught
+        current_moves = set([x for x in self._cached_moves if x is not None])
+        pre_moves = pre_evolution_moves if pre_evolution_moves is not None else set()
+        
+        # Also get the actual move lists (not just sets) to determine slot placement
+        # Pre-evolution move list - reconstruct from cached moves at evolution time
+        # For now, we'll use None for pre_move_list if not provided, and detect slot from current
+        current_move_list = [x for x in self._cached_moves]
+        
         for move_name in self._level_up_moves.get((self._solo_mon_key.species, new_level), []):
-            logger.info(f"queueing up ignore event of move: {move_name}")
-            self._queue_new_event(
-                EventDefinition(learn_move=LearnMoveEventDefinition(move_name, None, const.MOVE_SOURCE_LEVELUP, level=new_level, mon=self._solo_mon_key.species))
-            )
+            if move_name in current_moves:
+                # Move is in current moves - check if it was newly learned during evolution
+                if move_name not in pre_moves:
+                    # Move was learned during evolution - create a learn event
+                    logger.info(f"move {move_name} was learned during evolution/level-up, creating learn event")
+                    # Find which move was replaced by comparing pre and post evolution move lists
+                    replaced_move = None
+                    if hasattr(self, '_pre_evolution_move_list') and self._pre_evolution_move_list:
+                        pre_move_list = self._pre_evolution_move_list
+                        # Find moves that were in pre-evolution but not in post-evolution at the same slot
+                        for idx in range(4):
+                            if idx < len(pre_move_list) and idx < len(current_move_list):
+                                pre_move = pre_move_list[idx]
+                                post_move = current_move_list[idx]
+                                if pre_move != post_move and post_move == move_name:
+                                    # This slot changed from pre_move to move_name (Crunch)
+                                    replaced_move = pre_move
+                                    break
+                    self._queue_new_event(
+                        EventDefinition(learn_move=LearnMoveEventDefinition(move_name, replaced_move, const.MOVE_SOURCE_LEVELUP, level=new_level, mon=self._solo_mon_key.species))
+                    )
+                else:
+                    # Move was already learned before evolution, skip
+                    logger.info(f"move {move_name} was already learned before evolution, skipping")
+            else:
+                # Move is not in current moves - create ignore event
+                logger.info(f"queueing up ignore event of move: {move_name}")
+                self._queue_new_event(
+                    EventDefinition(learn_move=LearnMoveEventDefinition(move_name, None, const.MOVE_SOURCE_LEVELUP, level=new_level, mon=self._solo_mon_key.species))
+                )
     
     def _trigger_evolution(self, new_mon_key:_MonKey):
         logger.info(f"Evolving into: {new_mon_key.species}")
+        # Capture moves before evolution to detect newly learned moves (both set and list for comparison)
+        self._pre_evolution_moves = set([x for x in self._cached_moves if x is not None])
+        self._pre_evolution_move_list = [x for x in self._cached_moves]  # Keep the full list to determine replacements
         self._solo_mon_key = new_mon_key
         self._load_level_up_moves()
+        # Don't check moves here - party data may not be updated yet
+        # Instead, flag that we need to check moves when returning to overworld
+        self._pending_evolution_level_check = new_mon_key.level
         self._queue_new_event(
             EventDefinition(evolution=EvolutionEventDefinition(new_mon_key.species))
         )
-        self._solo_mon_levelup(new_mon_key.level)
+        # Don't call _solo_mon_levelup here - moves will be checked when entering overworld
     
     def _money_cache_update(self):
         new_cache = self._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MONEY).value
@@ -737,7 +799,11 @@ class Machine:
                                 continue
                     elif None is not cur_event.learn_move:
                         to_learn = current_gen_info().move_db().get_move(cur_event.learn_move.move_to_learn)
-                        to_forget = current_gen_info().move_db().get_move(cur_event.learn_move.destination)
+                        # destination can be either a move name (string) or a slot number (int)
+                        to_forget = None
+                        if cur_event.learn_move.destination is not None:
+                            if isinstance(cur_event.learn_move.destination, str):
+                                to_forget = current_gen_info().move_db().get_move(cur_event.learn_move.destination)
                         if cur_event.learn_move.move_to_learn is not None and to_learn is None:
                             msg = f"Failed to find move from GameHook: {cur_event.learn_move.move_to_learn} for event {cur_event}"
                             logger.error(msg)
@@ -745,7 +811,7 @@ class Machine:
                                 EventDefinition(notes=const.RECORDING_ERROR_FRAGMENT + msg)
                             )
                             continue
-                        elif cur_event.learn_move.destination is not None and to_forget is None:
+                        elif cur_event.learn_move.destination is not None and isinstance(cur_event.learn_move.destination, str) and to_forget is None:
                             msg = f"Failed to find move from GameHook: {cur_event.learn_move.destination} for event {cur_event}"
                             logger.error(msg)
                             self._controller.add_event(
