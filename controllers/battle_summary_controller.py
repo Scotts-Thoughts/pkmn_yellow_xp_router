@@ -1020,30 +1020,6 @@ class BattleSummaryController:
         if move is None:
             logger.error(f"invalid move encountered during battle summary calculations: {move_name}")
             return None
-        
-        # If the current move is a damage-dealing move with stat changes that affect the defending Pokemon,
-        # we need to include those stat changes in the defending stage modifiers for this move's damage calculation
-        # This ensures that moves like Psychic (which lowers special defense) do more damage when they hit
-        if move_idx is not None:
-            is_damage_dealing = move.base_power and move.base_power > 0
-            
-            if is_damage_dealing:
-                # Check if this move has stat changes that affect the defending Pokemon
-                # For damage-dealing moves, stat changes always affect the target (defending Pokemon)
-                stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
-                
-                if stat_mods:
-                    # Get the setup usage count for this move
-                    key = const.PLAYER_KEY if is_player_mon else const.ENEMY_KEY
-                    if mon_idx < len(self._move_setup_usage) and key in self._move_setup_usage[mon_idx]:
-                        setup_usage = self._move_setup_usage[mon_idx][key]
-                        count = setup_usage.get(move_idx, 0)
-                        
-                        if count > 0:
-                            # Apply the stat mods count times to the defending stage modifiers
-                            # This affects the damage calculation for this specific move
-                            for _ in range(count):
-                                defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod(stat_mods)
         if move.name == const.HIDDEN_POWER_MOVE_NAME:
             hidden_power_type, hidden_power_base_power = current_gen_info().get_hidden_power(attacking_mon.dvs)
             move_display_name = f"{move.name} ({hidden_power_type}: {hidden_power_base_power})"
@@ -1695,9 +1671,14 @@ class BattleSummaryController:
         # - Self-targeting modifiers (target_self=True): always check previous battles
         # - Enemy-targeting modifiers for player (is_player_mon=True, target_self=False, calculating_for_enemy=False): check previous battles (enemy moves affect all player moves)
         # - Enemy-targeting modifiers for enemy (is_player_mon=True, target_self=False, calculating_for_enemy=True): DON'T check previous battles (player moves only affect specific enemy)
-        # - Enemy enemy-targeting modifiers (is_player_mon=False, target_self=False): check previous battles
-        #   because enemy moves that lower player stats affect all subsequent player moves (for all generations)
-        should_check_previous = target_self or (is_player_mon and not target_self and not calculating_for_enemy) or (not is_player_mon and not target_self)
+        # - Enemy enemy-targeting modifiers (is_player_mon=False, target_self=False): In Gen 1, check previous battles if damage-dealing
+        #   because enemy damage-dealing moves that lower player stats affect all subsequent player moves
+        should_check_previous = target_self or (is_player_mon and not target_self and not calculating_for_enemy)
+        
+        # Special case for Gen 1: enemy enemy-targeting modifiers (enemy moves that affect player) should check previous battles
+        # because they affect the player for the rest of the battle
+        if current_gen_info().get_generation() == 1 and not is_player_mon and not target_self:
+            should_check_previous = True
         
         # For Gen 1: Find the first Pokemon index where the solo Pokemon leveled up
         # This is needed to determine which moves should have badge boosts cleared
@@ -1747,18 +1728,18 @@ class BattleSummaryController:
                                 move_obj = current_gen_info().move_db().get_move(move_name)
                                 is_damage_dealing = move_obj and move_obj.base_power and move_obj.base_power > 0
                                 
-                                # Damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
+                                # In Gen 1, damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
                                 # So when looking for self-targeting modifiers (target_self=True), skip damage-dealing moves
-                                if target_self and is_damage_dealing:
+                                if current_gen_info().get_generation() == 1 and target_self and is_damage_dealing:
                                     # This is a damage-dealing move, its stat modifiers apply to the target, not the user
                                     continue
                                 
                                 # Get stat mods filtered by target
                                 stat_mods = current_gen_info().move_db().get_stat_mod_for_target(move_name, target_self=target_self)
                                 
-                                # When looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
+                                # In Gen 1, when looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
                                 # because damage-dealing moves always apply their stat modifiers to the target, regardless of effect target field
-                                if not target_self and is_damage_dealing and not stat_mods:
+                                if current_gen_info().get_generation() == 1 and not target_self and is_damage_dealing and not stat_mods:
                                     # Try getting all stat mods (without target filter) for damage-dealing moves
                                     stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
                                 
@@ -1819,18 +1800,18 @@ class BattleSummaryController:
                                     move_obj = current_gen_info().move_db().get_move(move_name)
                                     is_damage_dealing = move_obj and move_obj.base_power and move_obj.base_power > 0
                                     
-                                    # Damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
+                                    # In Gen 1, damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
                                     # So when looking for self-targeting modifiers (target_self=True), skip damage-dealing moves
-                                    if target_self and is_damage_dealing:
+                                    if current_gen_info().get_generation() == 1 and target_self and is_damage_dealing:
                                         # This is a damage-dealing move, its stat modifiers apply to the target, not the user
                                         continue
                                     
                                     # Get stat mods filtered by target
                                     stat_mods = current_gen_info().move_db().get_stat_mod_for_target(move_name, target_self=target_self)
                                     
-                                    # When looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
+                                    # In Gen 1, when looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
                                     # because damage-dealing moves always apply their stat modifiers to the target, regardless of effect target field
-                                    if not target_self and is_damage_dealing and not stat_mods:
+                                    if current_gen_info().get_generation() == 1 and not target_self and is_damage_dealing and not stat_mods:
                                         # Try getting all stat mods (without target filter) for damage-dealing moves
                                         stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
                                     
@@ -1879,18 +1860,18 @@ class BattleSummaryController:
                                 move_obj = current_gen_info().move_db().get_move(move_name)
                                 is_damage_dealing = move_obj and move_obj.base_power and move_obj.base_power > 0
                                 
-                                # Damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
+                                # In Gen 1, damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
                                 # So when looking for self-targeting modifiers (target_self=True), skip damage-dealing moves
-                                if target_self and is_damage_dealing:
+                                if current_gen_info().get_generation() == 1 and target_self and is_damage_dealing:
                                     # This is a damage-dealing move, its stat modifiers apply to the target, not the user
                                     continue
                                 
                                 # Get stat mods filtered by target
                                 stat_mods = current_gen_info().move_db().get_stat_mod_for_target(move_name, target_self=target_self)
                                 
-                                # When looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
+                                # In Gen 1, when looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
                                 # because damage-dealing moves always apply their stat modifiers to the target, regardless of effect target field
-                                if not target_self and is_damage_dealing and not stat_mods:
+                                if current_gen_info().get_generation() == 1 and not target_self and is_damage_dealing and not stat_mods:
                                     # Try getting all stat mods (without target filter) for damage-dealing moves
                                     stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
                                 
