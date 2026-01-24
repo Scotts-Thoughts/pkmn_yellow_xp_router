@@ -715,7 +715,7 @@ class BattleSummaryController:
             # Note: defending_mon is the enemy Pokemon, so we use is_player_mon=False
             # Include: 1) enemy's own self-targeting modifiers, 2) player's enemy-targeting modifiers
             enemy_self_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, False, target_self=True)
-            player_enemy_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, True, target_self=False, calculating_for_enemy=True)
+            player_enemy_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, True, target_self=False)
             # Combine both sources of modifiers
             accumulated_defending_modifiers = StageModifiers()
             if current_gen_info().get_generation() == 1:
@@ -798,25 +798,18 @@ class BattleSummaryController:
             player_enemy_modifiers = self._calc_accumulated_setup_modifiers(mon_idx, move_idx if move_idx is not None else 0, True, target_self=False, calculating_for_enemy=True)
             # Combine both sources of modifiers
             if current_gen_info().get_generation() == 1:
-                # In Gen 1, enemy enemy-targeting modifiers (like Psychic) should NOT affect the enemy's attacking stats
-                # They only affect the defending player's stats. So we only use enemy_self_modifiers for special stats
-                # (enemy's self-targeting modifiers like Amnesia), not enemy enemy-targeting modifiers.
                 accumulated_modifiers = StageModifiers(
                     attack=max(min(enemy_self_modifiers.attack_stage + player_enemy_modifiers.attack_stage, 6), -6),
                     defense=max(min(enemy_self_modifiers.defense_stage + player_enemy_modifiers.defense_stage, 6), -6),
                     speed=max(min(enemy_self_modifiers.speed_stage + player_enemy_modifiers.speed_stage, 6), -6),
-                    # For Gen 1 special stats: only use enemy_self_modifiers (self-targeting like Amnesia)
-                    # Do NOT include player_enemy_modifiers for special attack, as enemy enemy-targeting moves
-                    # (like Psychic) should only affect defending stats, not attacking stats
-                    special_attack=max(min(enemy_self_modifiers.special_attack_stage, 6), -6),
-                    special_defense=max(min(enemy_self_modifiers.special_defense_stage, 6), -6),
+                    special_attack=max(min(enemy_self_modifiers.special_attack_stage + player_enemy_modifiers.special_attack_stage, 6), -6),
+                    special_defense=max(min(enemy_self_modifiers.special_defense_stage + player_enemy_modifiers.special_defense_stage, 6), -6),
                     accuracy=max(min(enemy_self_modifiers.accuracy_stage + player_enemy_modifiers.accuracy_stage, 6), -6),
                     evasion=max(min(enemy_self_modifiers.evasion_stage + player_enemy_modifiers.evasion_stage, 6), -6),
                     attack_bb=enemy_self_modifiers.attack_badge_boosts + player_enemy_modifiers.attack_badge_boosts,
                     defense_bb=enemy_self_modifiers.defense_badge_boosts + player_enemy_modifiers.defense_badge_boosts,
                     speed_bb=enemy_self_modifiers.speed_badge_boosts + player_enemy_modifiers.speed_badge_boosts,
-                    # For Gen 1 special badge boosts: only use enemy_self_modifiers
-                    special_bb=enemy_self_modifiers.special_badge_boosts,
+                    special_bb=enemy_self_modifiers.special_badge_boosts + player_enemy_modifiers.special_badge_boosts,
                 )
             else:
                 accumulated_modifiers = enemy_self_modifiers
@@ -842,25 +835,18 @@ class BattleSummaryController:
                 # Combine stage modifiers and badge boosts separately
                 # Badge boosts from accumulated modifiers are the ones we care about (from per-move setup usage)
                 # Base modifier badge boosts are from the old setup move system (top dropdown), which we preserve
-                # IMPORTANT: In Gen 1, base_modifier may include enemy-targeting moves (like Psychic) from the top dropdown.
-                # These should NOT affect the enemy's attacking special stats - they only affect defending player stats.
-                # So for special stats, we only use accumulated_modifiers (which only includes self-targeting moves).
                 attacking_stage_modifiers = StageModifiers(
                     attack=max(min(base_modifier.attack_stage + accumulated_modifiers.attack_stage, 6), -6),
                     defense=max(min(base_modifier.defense_stage + accumulated_modifiers.defense_stage, 6), -6),
                     speed=max(min(base_modifier.speed_stage + accumulated_modifiers.speed_stage, 6), -6),
-                    # For Gen 1 special stats: only use accumulated_modifiers (self-targeting moves like Amnesia)
-                    # Do NOT include base_modifier special stats, as they may include enemy-targeting moves (like Psychic)
-                    # which should only affect defending stats, not attacking stats
-                    special_attack=max(min(accumulated_modifiers.special_attack_stage, 6), -6),
-                    special_defense=max(min(accumulated_modifiers.special_defense_stage, 6), -6),
+                    special_attack=max(min(base_modifier.special_attack_stage + accumulated_modifiers.special_attack_stage, 6), -6),
+                    special_defense=max(min(base_modifier.special_defense_stage + accumulated_modifiers.special_defense_stage, 6), -6),
                     accuracy=max(min(base_modifier.accuracy_stage + accumulated_modifiers.accuracy_stage, 6), -6),
                     evasion=max(min(base_modifier.evasion_stage + accumulated_modifiers.evasion_stage, 6), -6),
                     attack_bb=base_modifier.attack_badge_boosts + accumulated_modifiers.attack_badge_boosts,
                     defense_bb=base_modifier.defense_badge_boosts + accumulated_modifiers.defense_badge_boosts,
                     speed_bb=base_modifier.speed_badge_boosts + accumulated_modifiers.speed_badge_boosts,
-                    # For Gen 1 special badge boosts: only use accumulated_modifiers
-                    special_bb=accumulated_modifiers.special_badge_boosts,
+                    special_bb=base_modifier.special_badge_boosts + accumulated_modifiers.special_badge_boosts,
                 )
             else:
                 # For non-Gen 1, combine stage modifiers normally
@@ -1658,14 +1644,7 @@ class BattleSummaryController:
         # - Self-targeting modifiers (target_self=True): always check previous battles
         # - Enemy-targeting modifiers for player (is_player_mon=True, target_self=False, calculating_for_enemy=False): check previous battles (enemy moves affect all player moves)
         # - Enemy-targeting modifiers for enemy (is_player_mon=True, target_self=False, calculating_for_enemy=True): DON'T check previous battles (player moves only affect specific enemy)
-        # - Enemy enemy-targeting modifiers (is_player_mon=False, target_self=False): In Gen 1, check previous battles if damage-dealing
-        #   because enemy damage-dealing moves that lower player stats affect all subsequent player moves
         should_check_previous = target_self or (is_player_mon and not target_self and not calculating_for_enemy)
-        
-        # Special case for Gen 1: enemy enemy-targeting modifiers (enemy moves that affect player) should check previous battles
-        # because they affect the player for the rest of the battle
-        if current_gen_info().get_generation() == 1 and not is_player_mon and not target_self:
-            should_check_previous = True
         
         if should_check_previous:
             # Check all previous Pokemon (mon_idx 0 to mon_idx-1)
@@ -1703,86 +1682,13 @@ class BattleSummaryController:
                             
                             count = setup_usage[prev_move_idx]
                             if count > 0:
-                                move_obj = current_gen_info().move_db().get_move(move_name)
-                                is_damage_dealing = move_obj and move_obj.base_power and move_obj.base_power > 0
-                                
-                                # In Gen 1, damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
-                                # So when looking for self-targeting modifiers (target_self=True), skip damage-dealing moves
-                                if current_gen_info().get_generation() == 1 and target_self and is_damage_dealing:
-                                    # This is a damage-dealing move, its stat modifiers apply to the target, not the user
-                                    continue
-                                
                                 # Get stat mods filtered by target
                                 stat_mods = current_gen_info().move_db().get_stat_mod_for_target(move_name, target_self=target_self)
-                                
-                                # In Gen 1, when looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
-                                # because damage-dealing moves always apply their stat modifiers to the target, regardless of effect target field
-                                if current_gen_info().get_generation() == 1 and not target_self and is_damage_dealing and not stat_mods:
-                                    # Try getting all stat mods (without target filter) for damage-dealing moves
-                                    stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
-                                
                                 if stat_mods:
                                     # Apply the stat mods count times
                                     # For Gen 1, apply_stat_mod handles badge boosts correctly
                                     for _ in range(count):
                                         result = result.apply_stat_mod(stat_mods)
-            
-            # Also check the current battle (mon_idx) when should_check_previous is True
-            # This is needed because enemy moves that lower player stats affect all subsequent player moves
-            if should_check_previous and mon_idx < len(self._move_setup_usage):
-                if key not in self._move_setup_usage[mon_idx]:
-                    pass  # No moves to check
-                else:
-                    # Get the current Pokemon's move list
-                    if is_player_mon:
-                        if self._is_player_transformed:
-                            cur_mon = self._transformed_mon_list[mon_idx]
-                        else:
-                            cur_mon = self._original_player_mon_list[mon_idx]
-                    else:
-                        cur_mon = self._original_enemy_mon_list[mon_idx]
-                    
-                    # Check moves for the current Pokemon
-                    # For self-targeting modifiers or enemy-targeting modifiers for player, check all moves
-                    # (they accumulate across the battle)
-                    setup_usage = self._move_setup_usage[mon_idx][key]
-                    for cur_move_idx in range(4):  # Check all 4 move slots
-                        if cur_move_idx < len(cur_mon.move_list) and cur_move_idx in setup_usage:
-                            move_name = cur_mon.move_list[cur_move_idx]
-                            if move_name:
-                                # Handle Mimic special case
-                                if move_name == const.MIMIC_MOVE_NAME:
-                                    if self._mimic_selection:
-                                        move_name = self._mimic_selection
-                                    else:
-                                        continue
-                                
-                                count = setup_usage[cur_move_idx]
-                                if count > 0:
-                                    move_obj = current_gen_info().move_db().get_move(move_name)
-                                    is_damage_dealing = move_obj and move_obj.base_power and move_obj.base_power > 0
-                                    
-                                    # In Gen 1, damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
-                                    # So when looking for self-targeting modifiers (target_self=True), skip damage-dealing moves
-                                    if current_gen_info().get_generation() == 1 and target_self and is_damage_dealing:
-                                        # This is a damage-dealing move, its stat modifiers apply to the target, not the user
-                                        continue
-                                    
-                                    # Get stat mods filtered by target
-                                    stat_mods = current_gen_info().move_db().get_stat_mod_for_target(move_name, target_self=target_self)
-                                    
-                                    # In Gen 1, when looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
-                                    # because damage-dealing moves always apply their stat modifiers to the target, regardless of effect target field
-                                    if current_gen_info().get_generation() == 1 and not target_self and is_damage_dealing and not stat_mods:
-                                        # Try getting all stat mods (without target filter) for damage-dealing moves
-                                        stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
-                                    
-                                    if stat_mods:
-                                        # Apply the stat mods count times
-                                        # For Gen 1, apply_stat_mod handles badge boosts correctly
-                                        for _ in range(count):
-                                            result = result.apply_stat_mod(stat_mods)
-        
         # else: target_self=False and is_player_mon=False
         # This means we're calculating enemy-targeting modifiers for an enemy Pokemon
         # Only include player moves from THIS battle (mon_idx), not previous battles
@@ -1815,24 +1721,8 @@ class BattleSummaryController:
                             
                             count = setup_usage[cur_move_idx]
                             if count > 0:
-                                move_obj = current_gen_info().move_db().get_move(move_name)
-                                is_damage_dealing = move_obj and move_obj.base_power and move_obj.base_power > 0
-                                
-                                # In Gen 1, damage-dealing moves (base_power > 0) with stat modifiers apply their effect to the TARGET, not the USER
-                                # So when looking for self-targeting modifiers (target_self=True), skip damage-dealing moves
-                                if current_gen_info().get_generation() == 1 and target_self and is_damage_dealing:
-                                    # This is a damage-dealing move, its stat modifiers apply to the target, not the user
-                                    continue
-                                
                                 # Get stat mods filtered by target
                                 stat_mods = current_gen_info().move_db().get_stat_mod_for_target(move_name, target_self=target_self)
-                                
-                                # In Gen 1, when looking for enemy-targeting modifiers (target_self=False), also include damage-dealing moves
-                                # because damage-dealing moves always apply their stat modifiers to the target, regardless of effect target field
-                                if current_gen_info().get_generation() == 1 and not target_self and is_damage_dealing and not stat_mods:
-                                    # Try getting all stat mods (without target filter) for damage-dealing moves
-                                    stat_mods = current_gen_info().move_db().get_stat_mod(move_name)
-                                
                                 if stat_mods:
                                     # Apply the stat mods count times
                                     # For Gen 1, apply_stat_mod handles badge boosts correctly
