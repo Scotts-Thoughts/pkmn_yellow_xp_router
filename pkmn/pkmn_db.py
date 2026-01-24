@@ -348,4 +348,87 @@ class MoveDB:
                     result.append((cur_effect[const.STAT_KEY], cur_effect[const.MODIFIER_KEY]))
         
         return result
+    
+    def get_stat_stage_info(self, move_name) -> dict:
+        """Get information about a move's stat stage modification capabilities.
+        
+        Returns a dict with:
+            - 'has_stat_effect': bool - whether this move can modify stats
+            - 'is_guaranteed': bool - whether the effect is guaranteed (100% chance)
+            - 'targets_self': bool - True if targets user, False if targets opponent
+            - 'is_damaging': bool - whether the move deals damage
+            - 'max_applications': int - maximum times this move can be applied (based on stage limits)
+            - 'stage_change': int - the amount of stage change per application
+        """
+        move = self.get_move(move_name)
+        if move is None:
+            return {'has_stat_effect': False}
+        
+        # Find stat-modifying effects
+        stat_effects = []
+        for cur_effect in move.effects:
+            if const.STAT_KEY in cur_effect and const.MODIFIER_KEY in cur_effect:
+                stat_effects.append(cur_effect)
+        
+        if not stat_effects:
+            return {'has_stat_effect': False}
+        
+        # Determine properties based on the first stat effect
+        # (most moves only have one stat effect, or they all share the same properties)
+        first_effect = stat_effects[0]
+        
+        effect_target = first_effect.get(const.TARGET_KEY, const.EFFECT_TARGET_SELF)
+        targets_self = effect_target in [const.EFFECT_TARGET_SELF, "target_self"]
+        
+        modifier = first_effect.get(const.MODIFIER_KEY, 0)
+        chance = first_effect.get("chance", 100)
+        is_guaranteed = chance >= 100
+        
+        is_damaging = move.base_power > 0
+        
+        # Calculate max applications based on stage limits (+6 or -6 max)
+        if modifier == 0:
+            max_applications = 0
+        else:
+            max_applications = 6 // abs(modifier)
+        
+        return {
+            'has_stat_effect': True,
+            'is_guaranteed': is_guaranteed,
+            'targets_self': targets_self,
+            'is_damaging': is_damaging,
+            'max_applications': max_applications,
+            'stage_change': modifier
+        }
+    
+    def get_stat_stage_dropdown_options(self, move_name) -> List[str]:
+        """Get the dropdown options for stat stage setup for a move.
+        
+        Returns a list of strings representing how many times the move can be applied,
+        or None if this move shouldn't have a stat stage dropdown.
+        
+        For status moves (non-damaging), only guaranteed (100% chance) effects get dropdowns.
+        For damage-dealing moves with stat effects (like Psychic's 10% SpDef drop),
+        we also show dropdowns so users can simulate scenarios where the effect activates.
+        """
+        info = self.get_stat_stage_info(move_name)
+        
+        if not info.get('has_stat_effect', False):
+            return None
+        
+        is_guaranteed = info.get('is_guaranteed', False)
+        is_damaging = info.get('is_damaging', False)
+        
+        # Show dropdown for:
+        # 1. Guaranteed effects (status moves like Swords Dance, Growl)
+        # 2. Damage-dealing moves with chance-based stat effects (like Psychic, Mud-Slap)
+        if not is_guaranteed and not is_damaging:
+            return None
+        
+        max_apps = info.get('max_applications', 0)
+        if max_apps <= 0:
+            return None
+        
+        # Return options from 0 (default/no setup) to max_applications
+        return [str(i) for i in range(max_apps + 1)]
 

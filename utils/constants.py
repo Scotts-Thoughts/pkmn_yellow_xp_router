@@ -471,6 +471,24 @@ class Constants:
             self.MULTI_HIT_5,
         ]
 
+        # Stat stage setup constants for per-move stat modifications
+        # These represent how many times a stat-altering move is applied
+        self.STAT_STAGE_DEFAULT = "0"  # No setup
+        self.STAT_STAGE_1 = "1"
+        self.STAT_STAGE_2 = "2"
+        self.STAT_STAGE_3 = "3"
+        self.STAT_STAGE_4 = "4"
+        self.STAT_STAGE_5 = "5"
+        self.STAT_STAGE_6 = "6"
+        
+        # Key for storing per-move stat stage setup in TrainerEventDefinition
+        self.STAT_STAGE_SETUP_KEY = "stat_stage_setup"
+        
+        # Move effect targets
+        self.EFFECT_TARGET_SELF = "self"
+        self.EFFECT_TARGET_ENEMY = "enemy"
+        self.EFFECT_TARGET_FOE = "foe"
+
         self.DOUBLE_HIT_FLAVOR = "two_hit"
         self.FLAVOR_MULTI_HIT = "multi_hit"
         self.FLAVOR_HIGH_CRIT = "high_crit"

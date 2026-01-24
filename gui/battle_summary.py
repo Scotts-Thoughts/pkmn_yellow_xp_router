@@ -1004,6 +1004,10 @@ class DamageSummary(ttk.Frame):
         self.custom_data_dropdown = custom_components.SimpleOptionMenu(self.header, [""], callback=self._custom_data_callback, width=14)
         # Also bind to <<ComboboxSelected>> event as a backup to ensure callback fires
         self.custom_data_dropdown.bind("<<ComboboxSelected>>", self._custom_data_callback)
+        
+        # Stat stage dropdown for moves that can modify stats (Swords Dance, Growl, etc.)
+        self.stat_stage_dropdown = custom_components.SimpleOptionMenu(self.header, ["0"], callback=self._stat_stage_callback, width=3)
+        self.stat_stage_dropdown.bind("<<ComboboxSelected>>", self._stat_stage_callback)
 
         self.range_frame = ttk.Frame(self, style="Contrast.TFrame")
         self.range_frame.grid(row=self.row_idx, column=0, sticky=tk.NSEW, padx=self.padx, pady=self.pady)
@@ -1047,6 +1051,13 @@ class DamageSummary(ttk.Frame):
             self._controller.update_mimic_selection(self.custom_data_dropdown.get())
         else:
             self._controller.update_custom_move_data(self._mon_idx, self._move_idx, self._is_player_mon, self.custom_data_dropdown.get())
+    
+    def _stat_stage_callback(self, *args, **kwargs):
+        """Called when user changes the stat stage dropdown"""
+        if self._is_loading:
+            return
+        new_value = self.stat_stage_dropdown.get()
+        self._controller.update_stat_stage_setup(self._mon_idx, self._move_idx, self._is_player_mon, new_value)
     
     def _on_test_move_changed(self, *args, **kwargs):
         """Called when user selects a test move from the dropdown"""
@@ -1279,6 +1290,18 @@ class DamageSummary(ttk.Frame):
             custom_data_options = move.mimic_options
             custom_data_selection = move.mimic_data
 
+        # Get stat stage dropdown options for this move
+        stat_stage_options = None
+        stat_stage_selection = "0"
+        # Only show stat stage dropdown if global setup is NOT being used for this side
+        has_global_setup_for_this_side = (
+            (self._is_player_mon and self._controller.get_player_setup_moves()) or
+            (not self._is_player_mon and self._controller.get_enemy_setup_moves())
+        )
+        if move is not None and not has_global_setup_for_this_side:
+            stat_stage_options = move.stat_stage_options
+            stat_stage_selection = move.stat_stage_selection if move.stat_stage_selection else "0"
+
         # Layout header components
         # For test moves, show dropdown for first Pokemon only, label for others
         if self._is_test_move:
@@ -1300,25 +1323,46 @@ class DamageSummary(ttk.Frame):
                 else:
                     # For other Pokemon, just show the selected move as a label
                     self.move_name_label.configure(text=current_test_move if current_test_move else "")
-                    self.move_name_label.grid(row=0, column=0, columnspan=2)
+                    self.move_name_label.grid(row=0, column=0, columnspan=3)
                     if hasattr(self, 'test_move_dropdown'):
                         self.test_move_dropdown.grid_forget()
             
             self.custom_data_dropdown.grid_forget()
+            self.stat_stage_dropdown.grid_forget()
+        elif custom_data_options and stat_stage_options:
+            # Both custom data (like multi-hit) and stat stage options
+            if hasattr(self, 'test_move_dropdown'):
+                self.test_move_dropdown.grid_forget()
+            self.move_name_label.grid_forget()
+            self.move_name_label.grid(row=0, column=0)
+            self.custom_data_dropdown.grid(row=0, column=1)
+            self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
+            self.stat_stage_dropdown.grid(row=0, column=2)
+            self.stat_stage_dropdown.new_values(stat_stage_options, default_val=stat_stage_selection)
         elif custom_data_options:
             if hasattr(self, 'test_move_dropdown'):
                 self.test_move_dropdown.grid_forget()
             self.move_name_label.grid_forget()
             self.move_name_label.grid(row=0, column=0)
-            col = 1
             self.custom_data_dropdown.grid(row=0, column=1)
             self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
+            self.stat_stage_dropdown.grid_forget()
+        elif stat_stage_options:
+            # Only stat stage options (like Swords Dance, Growl)
+            if hasattr(self, 'test_move_dropdown'):
+                self.test_move_dropdown.grid_forget()
+            self.move_name_label.grid_forget()
+            self.move_name_label.grid(row=0, column=0)
+            self.custom_data_dropdown.grid_forget()
+            self.stat_stage_dropdown.grid(row=0, column=1)
+            self.stat_stage_dropdown.new_values(stat_stage_options, default_val=stat_stage_selection)
         else:
             if hasattr(self, 'test_move_dropdown'):
                 self.test_move_dropdown.grid_forget()
             self.move_name_label.grid_forget()
-            self.move_name_label.grid(row=0, column=0, columnspan=2)
+            self.move_name_label.grid(row=0, column=0, columnspan=3)
             self.custom_data_dropdown.grid_forget()
+            self.stat_stage_dropdown.grid_forget()
 
 
         if move is None:

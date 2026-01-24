@@ -29,6 +29,11 @@ class MoveRenderInfo:
     custom_data_options:List[str]
     custom_data_selection:str
     is_best_move:bool=False
+    # Stat stage dropdown options (None if this move doesn't have stat effects)
+    stat_stage_options:List[str]=None
+    stat_stage_selection:str="0"
+    # Info about the stat effect for UI/logic purposes
+    stat_stage_info:dict=None
 
 @dataclass
 class PkmnRenderInfo:
@@ -78,6 +83,11 @@ class BattleSummaryController:
         self._cached_definition_order = []
         self._weather = None
         self._double_battle_flag = False
+        
+        # Per-move stat stage setup: tracks how many times each stat-altering move is applied
+        # Structure: List[Dict[player/enemy, Dict[move_name, count_str]]]
+        # where count_str is "0", "1", "2", etc.
+        self._stat_stage_setup:List[Dict[str, Dict[str, str]]] = []
 
         # NOTE: all of the state above this comment is considered the "true" state
         # The below state is all calculated based on values from the above state
@@ -85,6 +95,10 @@ class BattleSummaryController:
         self._enemy_stage_modifier:StageModifiers = None
         self._player_field_status:FieldStatus = None
         self._enemy_field_status:FieldStatus = None
+        
+        # Per-matchup stage modifiers (calculated from per-move stat stage setup)
+        self._per_matchup_player_modifiers:List[StageModifiers] = []
+        self._per_matchup_enemy_modifiers:List[StageModifiers] = []
 
         # NOTE: and finally, the actual display information
         # first idx: idx of pkmn in team
@@ -169,17 +183,88 @@ class BattleSummaryController:
         except Exception as e:
             logger.error(f"encountered error updating custom move data: {pkmn_idx, move_idx, is_player_mon, new_value}")
 
+    def _get_stat_stage_selection(self, pkmn_idx:int, is_player_mon:bool, move_name:str) -> str:
+        """Get the current stat stage selection for a move."""
+        if pkmn_idx < 0 or pkmn_idx >= len(self._stat_stage_setup):
+            return "0"
+        
+        lookup_key = const.PLAYER_KEY if is_player_mon else const.ENEMY_KEY
+        return self._stat_stage_setup[pkmn_idx].get(lookup_key, {}).get(move_name, "0")
+    
+    def update_stat_stage_setup(self, pkmn_idx:int, move_idx:int, is_player_mon:bool, new_value:str):
+        """Update the stat stage setup for a specific move.
+        
+        This triggers a recalculation of damage for this matchup and potentially
+        subsequent matchups depending on the move's targeting.
+        """
+        try:
+            if is_player_mon:
+                move_data = self._player_move_data
+                lookup_key = const.PLAYER_KEY
+            else:
+                move_data = self._enemy_move_data
+                lookup_key = const.ENEMY_KEY
+            
+            if pkmn_idx < 0 or pkmn_idx >= len(move_data) or move_idx < 0 or move_idx >= len(move_data[pkmn_idx]):
+                return
+            
+            move_info = move_data[pkmn_idx][move_idx]
+            if move_info is None:
+                return
+            
+            move_name = move_info.name
+            
+            # Ensure stat_stage_setup structure exists
+            while len(self._stat_stage_setup) <= pkmn_idx:
+                self._stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+            
+            if lookup_key not in self._stat_stage_setup[pkmn_idx]:
+                self._stat_stage_setup[pkmn_idx][lookup_key] = {}
+            
+            self._stat_stage_setup[pkmn_idx][lookup_key][move_name] = new_value
+            
+            # Determine the scope of recalculation based on move properties
+            # For now, we do a full refresh to ensure correctness
+            # TODO: Optimize to only recalculate affected matchups
+            self._full_refresh()
+        except Exception as e:
+            logger.error(f"encountered error updating stat stage setup: {pkmn_idx, move_idx, is_player_mon, new_value}")
+            logger.exception(e)
+    
+    def has_global_setup(self) -> bool:
+        """Check if any global setup moves are configured (player or enemy)."""
+        return len(self._player_setup_move_list) > 0 or len(self._enemy_setup_move_list) > 0
+    
+    def clear_per_move_stat_setup(self):
+        """Clear all per-move stat stage setup selections."""
+        for pkmn_setup in self._stat_stage_setup:
+            pkmn_setup[const.PLAYER_KEY] = {}
+            pkmn_setup[const.ENEMY_KEY] = {}
+
     def update_weather(self, new_weather):
         self._weather = new_weather
         self._full_refresh()
 
     def update_enemy_setup_moves(self, new_setup_moves):
         self._enemy_setup_move_list = new_setup_moves
+        # Clear per-move stat setup for enemy when global setup is used
+        if new_setup_moves:
+            self._clear_per_move_stat_setup_for_side(is_player=False)
         self._full_refresh()
 
     def update_player_setup_moves(self, new_setup_moves):
         self._player_setup_move_list = new_setup_moves
+        # Clear per-move stat setup for player when global setup is used
+        if new_setup_moves:
+            self._clear_per_move_stat_setup_for_side(is_player=True)
         self._full_refresh()
+    
+    def _clear_per_move_stat_setup_for_side(self, is_player:bool):
+        """Clear per-move stat stage setup for one side (player or enemy)."""
+        lookup_key = const.PLAYER_KEY if is_player else const.ENEMY_KEY
+        for pkmn_setup in self._stat_stage_setup:
+            if lookup_key in pkmn_setup:
+                pkmn_setup[lookup_key] = {}
 
     def update_player_transform(self, is_transformed):
         self._is_player_transformed = is_transformed
@@ -379,10 +464,27 @@ class BattleSummaryController:
 
     def _full_refresh(self, is_load=False):
         # Once the "true" state of the current battle has been updated, recalculate all the derived properties
+        
+        # Check if we're using global setup (which overrides per-move setup)
+        using_global_player_setup = len(self._player_setup_move_list) > 0
+        using_global_enemy_setup = len(self._enemy_setup_move_list) > 0
+        
+        # Calculate global stage modifiers (used when global setup is enabled)
         self._player_stage_modifier = self._calc_stage_modifier(self._player_setup_move_list)
         self._player_field_status = self._calc_field_status(self._player_setup_move_list)
         self._enemy_stage_modifier = self._calc_stage_modifier(self._enemy_setup_move_list)
         self._enemy_field_status = self._calc_field_status(self._enemy_setup_move_list)
+        
+        # For Gen 2+, calculate per-matchup stage modifiers based on stat_stage_setup
+        # This is separate from global setup - if global setup is used, per-move setup is disabled
+        self._per_matchup_player_modifiers = []
+        self._per_matchup_enemy_modifiers = []
+        
+        # Skip per-move stat stage logic for Gen 1 (will be implemented separately)
+        gen = current_gen_info().get_generation()
+        if gen >= 2 and not using_global_player_setup and not using_global_enemy_setup:
+            self._per_matchup_player_modifiers, self._per_matchup_enemy_modifiers = self._calc_per_matchup_stage_modifiers()
+        
         self._player_pkmn_matchup_data = []
         self._enemy_pkmn_matchup_data = []
         self._player_move_data = []
@@ -391,15 +493,26 @@ class BattleSummaryController:
 
         can_mimic_yet = False
         for mon_idx in range(len(self._original_player_mon_list)):
+            # Determine which stage modifiers to use for this matchup
+            if mon_idx < len(self._per_matchup_player_modifiers):
+                cur_player_stage_mod = self._per_matchup_player_modifiers[mon_idx]
+            else:
+                cur_player_stage_mod = self._player_stage_modifier
+            
+            if mon_idx < len(self._per_matchup_enemy_modifiers):
+                cur_enemy_stage_mod = self._per_matchup_enemy_modifiers[mon_idx]
+            else:
+                cur_enemy_stage_mod = self._enemy_stage_modifier
+            
             if self._is_player_transformed:
                 player_mon = self._transformed_mon_list[mon_idx]
                 player_stats = player_mon.cur_stats
             else:
                 player_mon = self._original_player_mon_list[mon_idx]
-                player_stats = player_mon.get_battle_stats(self._player_stage_modifier)
+                player_stats = player_mon.get_battle_stats(cur_player_stage_mod)
 
             enemy_mon = self._original_enemy_mon_list[mon_idx]
-            enemy_stats = enemy_mon.get_battle_stats(self._enemy_stage_modifier)
+            enemy_stats = enemy_mon.get_battle_stats(cur_enemy_stage_mod)
 
             self._player_pkmn_matchup_data.append(
                 PkmnRenderInfo(player_mon.name, player_mon.level, player_stats.speed, enemy_mon.name, enemy_mon.level, enemy_stats.speed, enemy_mon.cur_stats.hp)
@@ -504,8 +617,10 @@ class BattleSummaryController:
                     crit_mon_stats = attacking_mon_stats
 
                     if attacking_mon.level > self._transformed_mon_list[0].level:
-                        attacking_mon_stats = self._original_player_mon_list[mon_idx].get_battle_stats(self._player_stage_modifier)
-                        crit_mon_stats = self._original_player_mon_list[mon_idx].get_battle_stats(self._player_stage_modifier, is_crit=True)
+                        # Use per-matchup modifiers if available
+                        player_stage_mod = self._per_matchup_player_modifiers[mon_idx] if mon_idx < len(self._per_matchup_player_modifiers) else self._player_stage_modifier
+                        attacking_mon_stats = self._original_player_mon_list[mon_idx].get_battle_stats(player_stage_mod)
+                        crit_mon_stats = self._original_player_mon_list[mon_idx].get_battle_stats(player_stage_mod, is_crit=True)
                 else:
                     crit_mon = attacking_mon
                     crit_mon_stats = attacking_mon_stats
@@ -514,11 +629,19 @@ class BattleSummaryController:
                 attacking_mon_stats = None
                 crit_mon = attacking_mon
                 crit_mon_stats = attacking_mon_stats
-            attacking_stage_modifiers = self._player_stage_modifier
+            
+            # Use per-matchup modifiers if available, otherwise use global modifiers
+            if mon_idx < len(self._per_matchup_player_modifiers):
+                attacking_stage_modifiers = self._per_matchup_player_modifiers[mon_idx]
+            else:
+                attacking_stage_modifiers = self._player_stage_modifier
             attacking_field_status = self._player_field_status
             defending_mon = self._original_enemy_mon_list[mon_idx]
             defending_mon_stats = None
-            defending_stage_modifiers = self._enemy_stage_modifier
+            if mon_idx < len(self._per_matchup_enemy_modifiers):
+                defending_stage_modifiers = self._per_matchup_enemy_modifiers[mon_idx]
+            else:
+                defending_stage_modifiers = self._enemy_stage_modifier
             defending_field_status = self._enemy_field_status
             custom_lookup_key = const.PLAYER_KEY
         else:
@@ -526,7 +649,11 @@ class BattleSummaryController:
             attacking_mon_stats = None
             crit_mon = attacking_mon
             crit_mon_stats = attacking_mon_stats
-            attacking_stage_modifiers = self._enemy_stage_modifier
+            # Use per-matchup modifiers if available
+            if mon_idx < len(self._per_matchup_enemy_modifiers):
+                attacking_stage_modifiers = self._per_matchup_enemy_modifiers[mon_idx]
+            else:
+                attacking_stage_modifiers = self._enemy_stage_modifier
             attacking_field_status = self._enemy_field_status
             if self._is_player_transformed:
                 defending_mon = self._transformed_mon_list[mon_idx]
@@ -534,7 +661,10 @@ class BattleSummaryController:
             else:
                 defending_mon = self._original_player_mon_list[mon_idx]
                 defending_mon_stats = None
-            defending_stage_modifiers = self._player_stage_modifier
+            if mon_idx < len(self._per_matchup_player_modifiers):
+                defending_stage_modifiers = self._per_matchup_player_modifiers[mon_idx]
+            else:
+                defending_stage_modifiers = self._player_stage_modifier
             defending_field_status = self._player_field_status
             custom_lookup_key = const.ENEMY_KEY
 
@@ -619,6 +749,15 @@ class BattleSummaryController:
         else:
             kill_ranges = []
 
+        # Get stat stage dropdown options for this move
+        stat_stage_options = current_gen_info().move_db().get_stat_stage_dropdown_options(move.name)
+        stat_stage_info = current_gen_info().move_db().get_stat_stage_info(move.name)
+        
+        # Get the current stat stage selection for this move
+        stat_stage_selection = "0"
+        if stat_stage_options is not None:
+            stat_stage_selection = self._get_stat_stage_selection(mon_idx, is_player_mon, move.name)
+        
         return MoveRenderInfo(
             move_display_name,
             move.attack_flavor,
@@ -629,7 +768,10 @@ class BattleSummaryController:
             self._mimic_selection,
             self._mimic_options,
             custom_data_options,
-            custom_data_selection
+            custom_data_selection,
+            stat_stage_options=stat_stage_options,
+            stat_stage_selection=stat_stage_selection,
+            stat_stage_info=stat_stage_info,
         )
 
     def load_from_event(self, event_group:EventGroup):
@@ -683,6 +825,24 @@ class BattleSummaryController:
             for _ in range(len(event_group.event_definition.get_pokemon_list())):
                 self._move_highlights.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
 
+        # Load per-move stat stage setup (backward compatible - handle missing data)
+        if trainer_def.stat_stage_setup:
+            self._stat_stage_setup = []
+            num_pokemon = len(event_group.event_definition.get_pokemon_list())
+            for display_idx in range(num_pokemon):
+                if display_idx < len(self._cached_definition_order):
+                    def_idx = self._cached_definition_order[display_idx]
+                    if def_idx < len(trainer_def.stat_stage_setup):
+                        self._stat_stage_setup.append(copy.deepcopy(trainer_def.stat_stage_setup[def_idx]))
+                    else:
+                        self._stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+                else:
+                    self._stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+        else:
+            self._stat_stage_setup = []
+            for _ in range(len(event_group.event_definition.get_pokemon_list())):
+                self._stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+
         self._original_player_mon_list = []
         self._transformed_mon_list = []
         self._original_enemy_mon_list = []
@@ -730,10 +890,12 @@ class BattleSummaryController:
         self._enemy_setup_move_list = []
         self._custom_move_data = []
         self._move_highlights = []
+        self._stat_stage_setup = []
         self._cached_definition_order = list(range(len(enemy_mons)))
         for _ in range(len(enemy_mons)):
             self._custom_move_data.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
             self._move_highlights.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+            self._stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
 
         self._original_player_mon_list = []
         self._original_enemy_mon_list = []
@@ -770,6 +932,7 @@ class BattleSummaryController:
         self._enemy_setup_move_list = []
         self._custom_move_data = []
         self._move_highlights = []
+        self._stat_stage_setup = []
         self._show_move_highlights = False
         self._original_player_mon_list = []
         self._transformed_mon_list = []
@@ -834,6 +997,37 @@ class BattleSummaryController:
         else:
             final_move_highlights = None
 
+        # Check if stat_stage_setup is present
+        is_stat_stage_setup_present = False
+        if self._stat_stage_setup:
+            for cur_test in self._stat_stage_setup:
+                if len(cur_test.get(const.PLAYER_KEY, {})) > 0 or len(cur_test.get(const.ENEMY_KEY, {})) > 0:
+                    for key in [const.PLAYER_KEY, const.ENEMY_KEY]:
+                        for move_name, stage in cur_test.get(key, {}).items():
+                            if stage != "0":
+                                is_stat_stage_setup_present = True
+                                break
+                        if is_stat_stage_setup_present:
+                            break
+                    if is_stat_stage_setup_present:
+                        break
+        
+        if is_stat_stage_setup_present:
+            # Convert from display order back to definition order
+            def_to_display = {}
+            for display_idx, def_idx in enumerate(self._cached_definition_order):
+                def_to_display[def_idx] = display_idx
+            
+            final_stat_stage_setup = []
+            for def_idx in sorted(def_to_display.keys()):
+                display_idx = def_to_display[def_idx]
+                if display_idx < len(self._stat_stage_setup):
+                    final_stat_stage_setup.append(copy.deepcopy(self._stat_stage_setup[display_idx]))
+                else:
+                    final_stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+        else:
+            final_stat_stage_setup = None
+
         return TrainerEventDefinition(
             self._trainer_name,
             second_trainer_name=self._second_trainer_name,
@@ -844,6 +1038,7 @@ class BattleSummaryController:
             weather=self._weather,
             transformed=self._is_player_transformed,
             move_highlights=final_move_highlights,
+            stat_stage_setup=final_stat_stage_setup,
         )
 
     def get_pkmn_info(self, pkmn_idx, is_player_mon) -> PkmnRenderInfo:
@@ -1029,6 +1224,149 @@ class BattleSummaryController:
                 result = result.apply_move(cur_move)
         
         return result
+    
+    def _calc_per_matchup_stage_modifiers(self) -> Tuple[List[StageModifiers], List[StageModifiers]]:
+        """Calculate stage modifiers for each matchup based on per-move stat stage setup.
+        
+        Returns:
+            Tuple of (player_modifiers, enemy_modifiers) where each is a list of StageModifiers,
+            one per matchup.
+        
+        The logic is:
+        - Player self-targeting moves: persist for rest of battle
+        - Player opponent-targeting moves: apply to current matchup only
+        - Enemy self-targeting moves: apply to current matchup only  
+        - Enemy opponent-targeting moves: persist for rest of battle (affects player)
+        - Damage-dealing moves with stat effects: apply order matters for current matchup
+        
+        Order: Player stage modifiers are applied before opponent stage modifiers.
+        """
+        num_matchups = len(self._original_player_mon_list)
+        player_modifiers = []
+        enemy_modifiers = []
+        
+        # Track persistent modifiers that carry across matchups
+        # For player: self-targeting moves persist
+        # For enemy (affecting player): enemy's opponent-targeting moves persist
+        persistent_player_modifier = StageModifiers()
+        
+        move_db = current_gen_info().move_db()
+        
+        for mon_idx in range(num_matchups):
+            # Check if player leveled up (need to reset badge boosts in Gen 1, but for Gen 2+ just continue)
+            # For now, Gen 1 is skipped entirely, so we don't need to handle this here
+            
+            # Start with persistent modifier from previous matchups
+            cur_player_modifier = persistent_player_modifier._copy_constructor()
+            cur_enemy_modifier = StageModifiers()
+            
+            # Get stat stage setup for this matchup
+            if mon_idx < len(self._stat_stage_setup):
+                matchup_setup = self._stat_stage_setup[mon_idx]
+            else:
+                matchup_setup = {const.PLAYER_KEY: {}, const.ENEMY_KEY: {}}
+            
+            player_setup = matchup_setup.get(const.PLAYER_KEY, {})
+            enemy_setup = matchup_setup.get(const.ENEMY_KEY, {})
+            
+            # Step 1: Apply player's stage modifiers FIRST (order matters)
+            # Player self-targeting moves persist for rest of battle
+            if mon_idx < len(self._original_player_mon_list):
+                player_mon = self._original_player_mon_list[mon_idx]
+                for move_name in player_mon.move_list:
+                    if not move_name:
+                        continue
+                    
+                    count_str = player_setup.get(move_name, "0")
+                    try:
+                        count = int(count_str)
+                    except ValueError:
+                        count = 0
+                    
+                    if count <= 0:
+                        continue
+                    
+                    stat_info = move_db.get_stat_stage_info(move_name)
+                    if not stat_info.get('has_stat_effect', False):
+                        continue
+                    
+                    is_guaranteed = stat_info.get('is_guaranteed', False)
+                    targets_self = stat_info.get('targets_self', True)
+                    is_damaging = stat_info.get('is_damaging', False)
+                    
+                    # Skip non-guaranteed effects for non-damaging moves
+                    # But allow damage-dealing moves with chance-based effects (Category 3)
+                    if not is_guaranteed and not is_damaging:
+                        continue
+                    
+                    if targets_self and not is_damaging:
+                        # Category 1: Self-targeting status move - apply to player, persists
+                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=True)
+                        for _ in range(count):
+                            persistent_player_modifier = persistent_player_modifier.apply_stat_mod(stat_mods)
+                            cur_player_modifier = cur_player_modifier.apply_stat_mod(stat_mods)
+                    elif not targets_self and not is_damaging:
+                        # Category 2: Opponent-targeting status move - apply to enemy, current matchup only
+                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)
+                        for _ in range(count):
+                            cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(stat_mods)
+                    elif is_damaging:
+                        # Category 3: Damage-dealing move with stat effect - apply to enemy, current matchup
+                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)
+                        for _ in range(count):
+                            cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(stat_mods)
+            
+            # Step 2: Apply enemy's stage modifiers AFTER player's
+            if mon_idx < len(self._original_enemy_mon_list):
+                enemy_mon = self._original_enemy_mon_list[mon_idx]
+                for move_name in enemy_mon.move_list:
+                    if not move_name:
+                        continue
+                    
+                    count_str = enemy_setup.get(move_name, "0")
+                    try:
+                        count = int(count_str)
+                    except ValueError:
+                        count = 0
+                    
+                    if count <= 0:
+                        continue
+                    
+                    stat_info = move_db.get_stat_stage_info(move_name)
+                    if not stat_info.get('has_stat_effect', False):
+                        continue
+                    
+                    is_guaranteed = stat_info.get('is_guaranteed', False)
+                    targets_self = stat_info.get('targets_self', True)
+                    is_damaging = stat_info.get('is_damaging', False)
+                    
+                    # Skip non-guaranteed effects for non-damaging moves
+                    # But allow damage-dealing moves with chance-based effects
+                    if not is_guaranteed and not is_damaging:
+                        continue
+                    
+                    if targets_self and not is_damaging:
+                        # Enemy self-targeting: only affects current matchup
+                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=True)
+                        for _ in range(count):
+                            cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(stat_mods)
+                    elif not targets_self and not is_damaging:
+                        # Enemy opponent-targeting: affects player, persists for rest of battle
+                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)
+                        for _ in range(count):
+                            persistent_player_modifier = persistent_player_modifier.apply_stat_mod(stat_mods)
+                            cur_player_modifier = cur_player_modifier.apply_stat_mod(stat_mods)
+                    elif is_damaging:
+                        # Enemy damage-dealing with stat effect: affects player, persists
+                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)
+                        for _ in range(count):
+                            persistent_player_modifier = persistent_player_modifier.apply_stat_mod(stat_mods)
+                            cur_player_modifier = cur_player_modifier.apply_stat_mod(stat_mods)
+            
+            player_modifiers.append(cur_player_modifier)
+            enemy_modifiers.append(cur_enemy_modifier)
+        
+        return player_modifiers, enemy_modifiers
     
     def can_support_prefight_candies(self):
         return self._event_group_id is not None

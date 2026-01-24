@@ -213,6 +213,7 @@ class TrainerEventDefinition:
             mon_order=None,
             transformed=False,
             move_highlights=None,
+            stat_stage_setup=None,
         ):
         self.trainer_name = trainer_name
         self.second_trainer_name = second_trainer_name
@@ -245,6 +246,9 @@ class TrainerEventDefinition:
         if move_highlights is None:
             move_highlights = []
         self.move_highlights:List[Dict[str, Dict[str, int]]] = move_highlights
+        if stat_stage_setup is None:
+            stat_stage_setup = []
+        self.stat_stage_setup:List[Dict[str, Dict[str, str]]] = stat_stage_setup
 
     def serialize(self):
         return {
@@ -263,6 +267,7 @@ class TrainerEventDefinition:
             const.MON_ORDER: self.mon_order,
             const.TRANSFORMED: self.transformed,
             const.MOVE_HIGHLIGHTS: self.move_highlights if self.move_highlights else None,
+            const.STAT_STAGE_SETUP_KEY: self.stat_stage_setup if self.stat_stage_setup else None,
         }
     
     @staticmethod
@@ -296,6 +301,7 @@ class TrainerEventDefinition:
             second_trainer_name=raw_val.get(const.SECOND_TRAINER_NAME, ""),
             transformed=raw_val.get(const.TRANSFORMED, False),
             move_highlights=raw_val.get(const.MOVE_HIGHLIGHTS),
+            stat_stage_setup=raw_val.get(const.STAT_STAGE_SETUP_KEY),
         )
     
     def __str__(self):
