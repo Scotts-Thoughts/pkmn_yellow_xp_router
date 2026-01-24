@@ -654,30 +654,43 @@ class BattleSummaryController:
             # For Gen 1, we need to preserve badge boosts from accumulated modifiers
             # For other gens, just combine stage modifiers
             if current_gen_info().get_generation() == 1:
-                # Check if the solo Pokemon leveled up before or during this Pokemon's battle
-                level_up_mon_idx = None
-                for idx in range(len(self._leveled_up_pokemon)):
-                    if self._leveled_up_pokemon[idx]:
-                        level_up_mon_idx = idx
-                        break
-                
-                # If a level-up occurred, clear badge boosts from base_modifier for Pokemon AFTER the level-up
-                # (level-up removes all erroneously applied badge boosts)
-                # Note: Badge boosts still apply to the Pokemon where the level-up occurs
-                base_attack_bb = 0
-                base_defense_bb = 0
-                base_speed_bb = 0
-                base_special_bb = 0
-                if level_up_mon_idx is None or mon_idx <= level_up_mon_idx:
-                    # No level-up yet, or calculating for Pokemon up to and including the level-up - preserve base badge boosts
+                # If global setup is active, always preserve badge boosts from base_modifier
+                # (level-up clearing only applies when using per-move setup)
+                if self._player_setup_move_list:
+                    # Global setup is active - preserve all badge boosts
                     base_attack_bb = base_modifier.attack_badge_boosts
                     base_defense_bb = base_modifier.defense_badge_boosts
                     base_speed_bb = base_modifier.speed_badge_boosts
                     base_special_bb = base_modifier.special_badge_boosts
+                else:
+                    # Per-move setup is active - apply level-up clearing logic
+                    # Check if the solo Pokemon leveled up before or during this Pokemon's battle
+                    level_up_mon_idx = None
+                    for idx in range(len(self._leveled_up_pokemon)):
+                        if self._leveled_up_pokemon[idx]:
+                            level_up_mon_idx = idx
+                            break
+                    
+                    # If a level-up occurred, clear badge boosts from base_modifier for Pokemon AFTER the level-up
+                    # (level-up removes all erroneously applied badge boosts)
+                    # Note: Badge boosts still apply to the Pokemon where the level-up occurs
+                    base_attack_bb = 0
+                    base_defense_bb = 0
+                    base_speed_bb = 0
+                    base_special_bb = 0
+                    if level_up_mon_idx is None or mon_idx <= level_up_mon_idx:
+                        # No level-up yet, or calculating for Pokemon up to and including the level-up - preserve base badge boosts
+                        base_attack_bb = base_modifier.attack_badge_boosts
+                        base_defense_bb = base_modifier.defense_badge_boosts
+                        base_speed_bb = base_modifier.speed_badge_boosts
+                        base_special_bb = base_modifier.special_badge_boosts
                 
                 # Combine stage modifiers and badge boosts separately
-                # Badge boosts from accumulated modifiers are the ones we care about (from per-move setup usage)
-                # Base modifier badge boosts are from the old setup move system (top dropdown), which we preserve only if no level-up occurred
+                # Use the same logic for both global and per-move setup
+                # When using global setup, base_modifier has the modifiers and badge boosts
+                # When using per-move setup, base_modifier should be empty (all zeros) and accumulated_modifiers has everything
+                # The level-up clearing logic (above) handles resetting base_modifier badge boosts for per-move setup
+                # We always combine them the same way - when per-move setup is active, base_modifier is empty so it adds nothing
                 attacking_stage_modifiers = StageModifiers(
                     attack=max(min(base_modifier.attack_stage + accumulated_modifiers.attack_stage, 6), -6),
                     defense=max(min(base_modifier.defense_stage + accumulated_modifiers.defense_stage, 6), -6),
@@ -1667,6 +1680,15 @@ class BattleSummaryController:
         if current_gen_info().get_generation() == 1 and not is_player_mon and not target_self:
             should_check_previous = True
         
+        # For Gen 1: Find the first Pokemon index where the solo Pokemon leveled up
+        # This is needed to determine which moves should have badge boosts cleared
+        level_up_mon_idx = None
+        if current_gen_info().get_generation() == 1 and is_player_mon:
+            for idx in range(len(self._leveled_up_pokemon)):
+                if self._leveled_up_pokemon[idx]:
+                    level_up_mon_idx = idx
+                    break
+        
         if should_check_previous:
             # Check all previous Pokemon (mon_idx 0 to mon_idx-1)
             # This applies to:
@@ -1727,6 +1749,19 @@ class BattleSummaryController:
                                     for _ in range(count):
                                         result = result.apply_stat_mod(stat_mods)
             
+            # For Gen 1: If a level-up occurred and we're using per-move setup (not global setup),
+            # clear badge boosts from moves used BEFORE the level-up, so moves AFTER can re-accumulate
+            if current_gen_info().get_generation() == 1 and is_player_mon and not self._player_setup_move_list:
+                level_up_mon_idx = None
+                for idx in range(len(self._leveled_up_pokemon)):
+                    if self._leveled_up_pokemon[idx]:
+                        level_up_mon_idx = idx
+                        break
+                
+                # Clear badge boosts from previous battles (before level-up), so current battle can re-accumulate
+                if level_up_mon_idx is not None and mon_idx > level_up_mon_idx:
+                    result = result.clear_badge_boosts()
+            
             # Also check the current battle (mon_idx) when should_check_previous is True
             # This is needed because enemy moves that lower player stats affect all subsequent player moves
             if should_check_previous and mon_idx < len(self._move_setup_usage):
@@ -1743,10 +1778,13 @@ class BattleSummaryController:
                         cur_mon = self._original_enemy_mon_list[mon_idx]
                     
                     # Check moves for the current Pokemon
-                    # For self-targeting modifiers or enemy-targeting modifiers for player, check all moves
-                    # (they accumulate across the battle)
+                    # For per-move setup, only include moves before the current move_idx
+                    # (moves accumulate across the battle, but we only want moves used before this one)
                     setup_usage = self._move_setup_usage[mon_idx][key]
                     for cur_move_idx in range(4):  # Check all 4 move slots
+                        # Only process moves before the current move_idx (for per-move setup)
+                        if cur_move_idx >= move_idx:
+                            continue
                         if cur_move_idx < len(cur_mon.move_list) and cur_move_idx in setup_usage:
                             move_name = cur_mon.move_list[cur_move_idx]
                             if move_name:
@@ -1788,8 +1826,8 @@ class BattleSummaryController:
         # Only include player moves from THIS battle (mon_idx), not previous battles
         # because player moves that lower enemy stats only affect the specific enemy mon they were used against
         
-        # Check all moves for the current Pokemon (all moves, not just before current move_idx)
-        if mon_idx < len(self._move_setup_usage):
+        # Only process current battle here if we didn't already process it above (when should_check_previous was True)
+        if not should_check_previous and mon_idx < len(self._move_setup_usage):
             if key in self._move_setup_usage[mon_idx]:
                 # Get the current Pokemon's move list
                 if is_player_mon:
@@ -1801,8 +1839,12 @@ class BattleSummaryController:
                     cur_mon = self._original_enemy_mon_list[mon_idx]
                 
                 # Check all moves for the current Pokemon
+                # For per-move setup, only include moves before the current move_idx
                 setup_usage = self._move_setup_usage[mon_idx][key]
                 for cur_move_idx in range(4):  # Check all 4 move slots
+                    # Only process moves before the current move_idx (for per-move setup)
+                    if cur_move_idx >= move_idx:
+                        continue
                     if cur_move_idx < len(cur_mon.move_list) and cur_move_idx in setup_usage:
                         move_name = cur_mon.move_list[cur_move_idx]
                         if move_name:
@@ -1839,10 +1881,10 @@ class BattleSummaryController:
                                     for _ in range(count):
                                         result = result.apply_stat_mod(stat_mods)
         
-        # For Gen 1: If the solo Pokemon leveled up, clear all badge boosts from setup moves
-        # used before the level-up for Pokemon AFTER the level-up
-        # (keep only the original intended badge boosts, which are 0 after clearing)
-        if current_gen_info().get_generation() == 1 and is_player_mon:
+        # For Gen 1: If a level-up occurred and we're using per-move setup (not global setup),
+        # clear badge boosts from moves used BEFORE the level-up, but allow compounding to continue after
+        # Note: Only apply this if there's no global setup (top dropdown), otherwise global setup takes precedence
+        if current_gen_info().get_generation() == 1 and is_player_mon and not self._player_setup_move_list:
             # Find the first Pokemon index where the solo Pokemon leveled up
             level_up_mon_idx = None
             for idx in range(len(self._leveled_up_pokemon)):
@@ -1850,13 +1892,11 @@ class BattleSummaryController:
                     level_up_mon_idx = idx
                     break
             
-            # If a level-up occurred and we're calculating for a Pokemon AFTER the level-up,
-            # clear all badge boosts (they were reset when the Pokemon leveled up)
-            # Note: Badge boosts still apply to the Pokemon where the level-up occurs
-            if level_up_mon_idx is not None and mon_idx > level_up_mon_idx:
-                result = result.clear_badge_boosts()
-        
         return result
+    
+    def has_global_setup(self) -> bool:
+        """Check if there's any global setup (top dropdown) active"""
+        return len(self._player_setup_move_list) > 0
 
     @staticmethod
     def _calc_field_status(move_list) -> FieldStatus:

@@ -1200,6 +1200,11 @@ class DamageSummary(ttk.Frame):
                         else:
                             self.setup_move_dropdown.grid(row=0, column=1)
                         self.setup_move_dropdown.new_values(setup_options, default_val="0")  # Use "0" as default, update async
+                        # Disable per-move dropdown if global setup (top dropdown) is active
+                        if self._is_player_mon and self._controller.has_global_setup():
+                            self.setup_move_dropdown.disable()
+                        else:
+                            self.setup_move_dropdown.enable()
                     
                     # Do the database lookup in the background and update if needed
                     def update_setup_dropdown():
@@ -1235,6 +1240,11 @@ class DamageSummary(ttk.Frame):
                                 else:
                                     setup_options = [str(i) for i in range(7)]  # Keep 0-6
                                 self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+                                # Disable per-move dropdown if global setup (top dropdown) is active
+                                if self._is_player_mon and self._controller.has_global_setup():
+                                    self.setup_move_dropdown.disable()
+                                else:
+                                    self.setup_move_dropdown.enable()
                             else:
                                 # Not a setup move - hide the dropdown
                                 if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
@@ -1258,6 +1268,11 @@ class DamageSummary(ttk.Frame):
                 else:
                     self.setup_move_dropdown.grid(row=0, column=1)
                 self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+                # Disable per-move dropdown if global setup (top dropdown) is active
+                if self._is_player_mon and self._controller.has_global_setup():
+                    self.setup_move_dropdown.disable()
+                else:
+                    self.setup_move_dropdown.enable()
         except Exception:
             pass
     
@@ -1510,6 +1525,11 @@ class DamageSummary(ttk.Frame):
                 setup_options = [str(i) for i in range(max_setup_count + 1)]
                 self.setup_move_dropdown.grid(row=0, column=col)
                 self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+                # Disable per-move dropdown if global setup (top dropdown) is active
+                if self._is_player_mon and self._controller.has_global_setup():
+                    self.setup_move_dropdown.disable()
+                else:
+                    self.setup_move_dropdown.enable()
             else:
                 self.setup_move_dropdown.grid_forget()
         else:
@@ -1521,6 +1541,11 @@ class DamageSummary(ttk.Frame):
                 setup_options = [str(i) for i in range(max_setup_count + 1)]
                 self.setup_move_dropdown.grid(row=0, column=1)
                 self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
+                # Disable per-move dropdown if global setup (top dropdown) is active
+                if self._is_player_mon and self._controller.has_global_setup():
+                    self.setup_move_dropdown.disable()
+                else:
+                    self.setup_move_dropdown.enable()
             else:
                 self.move_name_label.grid(row=0, column=0, columnspan=2)
                 self.setup_move_dropdown.grid_forget()

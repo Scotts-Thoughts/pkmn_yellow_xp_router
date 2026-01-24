@@ -152,47 +152,48 @@ class StageModifiers:
         result.special_badge_boosts += 1
 
         for stat_mod in all_stat_mods:
-            # NOTE: a litle bit of implementation jank: attempt to apply boost as defined,
-            # but if the boost would have no effect, then revert to returning self
+            # NOTE: Badge boosts are always incremented (done above), even if the stat stage doesn't change.
+            # If the stat stage doesn't change, we don't reset the badge boost for that stat (since it wasn't actually modified).
+            # If the stat stage does change, we reset the badge boost for that stat to 0.
             if stat_mod[0] == const.ATK:
                 result.attack_stage = max(min(self.attack_stage + stat_mod[1], 6), -6)
                 if result.attack_stage == self.attack_stage:
-                    result = self
+                    # Stat stage didn't change, so don't reset the badge boost for this stat
                     continue
                 result.attack_badge_boosts = 0
             elif stat_mod[0] == const.DEF:
                 result.defense_stage = max(min(self.defense_stage + stat_mod[1], 6), -6)
                 if result.defense_stage == self.defense_stage:
-                    result = self
+                    # Stat stage didn't change, so don't reset the badge boost for this stat
                     continue
                 result.defense_badge_boosts = 0
             elif stat_mod[0] == const.SPE:
                 result.speed_stage = max(min(self.speed_stage + stat_mod[1], 6), -6)
                 if result.speed_stage == self.speed_stage:
-                    result = self
+                    # Stat stage didn't change, so don't reset the badge boost for this stat
                     continue
                 result.speed_badge_boosts = 0
             elif stat_mod[0] == const.SPA:
                 result.special_attack_stage = max(min(self.special_attack_stage + stat_mod[1], 6), -6)
                 if result.special_attack_stage == self.special_attack_stage:
-                    result = self
+                    # Stat stage didn't change, so don't reset the badge boost for this stat
                     continue
                 result.special_badge_boosts = 0
             elif stat_mod[0] == const.SPD:
                 result.special_defense_stage = max(min(self.special_defense_stage + stat_mod[1], 6), -6)
                 if result.special_defense_stage == self.special_defense_stage:
-                    result = self
+                    # Stat stage didn't change, so don't reset the badge boost for this stat
                     continue
                 result.special_badge_boosts = 0
             elif stat_mod[0] == const.ACC:
                 result.accuracy_stage = max(min(self.accuracy_stage + stat_mod[1], 6), -6)
                 if result.accuracy_stage == self.accuracy_stage:
-                    result = self
+                    # Stat stage didn't change, continue to next stat mod
                     continue
             elif stat_mod[0] == const.EV:
                 result.evasion_stage = max(min(self.evasion_stage + stat_mod[1], 6), -6)
                 if result.evasion_stage == self.evasion_stage:
-                    result = self
+                    # Stat stage didn't change, continue to next stat mod
                     continue
 
         return result
