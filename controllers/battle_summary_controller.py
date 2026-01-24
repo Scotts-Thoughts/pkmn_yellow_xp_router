@@ -99,6 +99,9 @@ class BattleSummaryController:
         # Per-matchup stage modifiers (calculated from per-move stat stage setup)
         self._per_matchup_player_modifiers:List[StageModifiers] = []
         self._per_matchup_enemy_modifiers:List[StageModifiers] = []
+        
+        # Flag to track if global setup is being used (hides per-move dropdowns when True)
+        self._using_global_setup:bool = False
 
         # NOTE: and finally, the actual display information
         # first idx: idx of pkmn in team
@@ -466,8 +469,10 @@ class BattleSummaryController:
         # Once the "true" state of the current battle has been updated, recalculate all the derived properties
         
         # Check if we're using global setup (which overrides per-move setup)
-        using_global_player_setup = len(self._player_setup_move_list) > 0
-        using_global_enemy_setup = len(self._enemy_setup_move_list) > 0
+        # If ANY global setup is used on either side, disable per-move dropdowns for BOTH sides
+        using_global_player_setup = len(self._player_setup_move_list) > 0 and any(m for m in self._player_setup_move_list)
+        using_global_enemy_setup = len(self._enemy_setup_move_list) > 0 and any(m for m in self._enemy_setup_move_list)
+        self._using_global_setup = using_global_player_setup or using_global_enemy_setup
         
         # Calculate global stage modifiers (used when global setup is enabled)
         self._player_stage_modifier = self._calc_stage_modifier(self._player_setup_move_list)
@@ -482,7 +487,7 @@ class BattleSummaryController:
         
         # Calculate per-move stat stage modifiers for all generations
         # Gen 1 badge boost bug is already handled by StageModifiers.apply_stat_mod()
-        if not using_global_player_setup and not using_global_enemy_setup:
+        if not self._using_global_setup:
             self._per_matchup_player_modifiers, self._per_matchup_enemy_modifiers = self._calc_per_matchup_stage_modifiers()
         
         self._player_pkmn_matchup_data = []
@@ -752,13 +757,19 @@ class BattleSummaryController:
             kill_ranges = []
 
         # Get stat stage dropdown options for this move
-        stat_stage_options = current_gen_info().move_db().get_stat_stage_dropdown_options(move.name)
-        stat_stage_info = current_gen_info().move_db().get_stat_stage_info(move.name)
-        
-        # Get the current stat stage selection for this move
-        stat_stage_selection = "0"
-        if stat_stage_options is not None:
-            stat_stage_selection = self._get_stat_stage_selection(mon_idx, is_player_mon, move.name)
+        # Hide dropdowns when global setup is being used (on either side)
+        if self._using_global_setup:
+            stat_stage_options = None
+            stat_stage_info = {'has_stat_effect': False}
+            stat_stage_selection = "0"
+        else:
+            stat_stage_options = current_gen_info().move_db().get_stat_stage_dropdown_options(move.name)
+            stat_stage_info = current_gen_info().move_db().get_stat_stage_info(move.name)
+            
+            # Get the current stat stage selection for this move
+            stat_stage_selection = "0"
+            if stat_stage_options is not None:
+                stat_stage_selection = self._get_stat_stage_selection(mon_idx, is_player_mon, move.name)
         
         return MoveRenderInfo(
             move_display_name,
