@@ -184,6 +184,16 @@ class StageModifiers:
                     result = self
                     continue
                 result.special_badge_boosts = 0
+            elif stat_mod[0] == const.SPC:
+                # Gen 1 unified special stat - affects both special attack and special defense
+                new_spa_stage = max(min(self.special_attack_stage + stat_mod[1], 6), -6)
+                new_spd_stage = max(min(self.special_defense_stage + stat_mod[1], 6), -6)
+                if new_spa_stage == self.special_attack_stage and new_spd_stage == self.special_defense_stage:
+                    result = self
+                    continue
+                result.special_attack_stage = new_spa_stage
+                result.special_defense_stage = new_spd_stage
+                result.special_badge_boosts = 0
             elif stat_mod[0] == const.ACC:
                 result.accuracy_stage = max(min(self.accuracy_stage + stat_mod[1], 6), -6)
                 if result.accuracy_stage == self.accuracy_stage:

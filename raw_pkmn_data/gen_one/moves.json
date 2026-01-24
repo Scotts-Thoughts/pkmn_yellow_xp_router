@@ -952,13 +952,7 @@
                 {
                     "chance": 100,
                     "modifier": 1,
-                    "stat": "spd",
-                    "target": "self"
-                },
-                {
-                    "chance": 100,
-                    "modifier": 1,
-                    "stat": "spa",
+                    "stat": "spc",
                     "target": "self"
                 }
             ],
@@ -1230,16 +1224,10 @@
             "type": "Psychic",
             "effects": [
                 {
-                    "chance": 100,
+                    "chance": 33,
                     "modifier": -1,
-                    "stat": "spa",
-                    "target": "self"
-                },
-                {
-                    "chance": 100,
-                    "modifier": -1,
-                    "stat": "spd",
-                    "target": "self"
+                    "stat": "spc",
+                    "target": "enemy"
                 }
             ],
             "attack_flavor": [],
@@ -1787,13 +1775,7 @@
                 {
                     "chance": 100,
                     "modifier": 2,
-                    "stat": "spa",
-                    "target": "self"
-                },
-                {
-                    "chance": 100,
-                    "modifier": 2,
-                    "stat": "spd",
+                    "stat": "spc",
                     "target": "self"
                 }
             ],

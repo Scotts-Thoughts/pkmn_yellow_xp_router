@@ -475,14 +475,14 @@ class BattleSummaryController:
         self._enemy_stage_modifier = self._calc_stage_modifier(self._enemy_setup_move_list)
         self._enemy_field_status = self._calc_field_status(self._enemy_setup_move_list)
         
-        # For Gen 2+, calculate per-matchup stage modifiers based on stat_stage_setup
+        # Calculate per-matchup stage modifiers based on stat_stage_setup
         # This is separate from global setup - if global setup is used, per-move setup is disabled
         self._per_matchup_player_modifiers = []
         self._per_matchup_enemy_modifiers = []
         
-        # Skip per-move stat stage logic for Gen 1 (will be implemented separately)
-        gen = current_gen_info().get_generation()
-        if gen >= 2 and not using_global_player_setup and not using_global_enemy_setup:
+        # Calculate per-move stat stage modifiers for all generations
+        # Gen 1 badge boost bug is already handled by StageModifiers.apply_stat_mod()
+        if not using_global_player_setup and not using_global_enemy_setup:
             self._per_matchup_player_modifiers, self._per_matchup_enemy_modifiers = self._calc_per_matchup_stage_modifiers()
         
         self._player_pkmn_matchup_data = []
@@ -603,7 +603,9 @@ class BattleSummaryController:
                 if current_gen_info().get_generation() == 1:
                     if attacking_mon.level > self._transformed_mon_list[0].level:
                         attacking_mon.badges = copy.deepcopy(self._original_player_mon_list[0].badges)
-                        attacking_mon_stats = attacking_mon.get_battle_stats(StageModifiers())
+                        # Use per-matchup modifiers for Gen 1 transform case
+                        player_stage_mod = self._per_matchup_player_modifiers[mon_idx] if mon_idx < len(self._per_matchup_player_modifiers) else self._player_stage_modifier
+                        attacking_mon_stats = attacking_mon.get_battle_stats(player_stage_mod)
                     orig_player_mon = self._original_player_mon_list[mon_idx]
                     crit_mon = copy.deepcopy(attacking_mon)
                     crit_mon.level = orig_player_mon.level
@@ -1240,6 +1242,10 @@ class BattleSummaryController:
         - Damage-dealing moves with stat effects: apply order matters for current matchup
         
         Order: Player stage modifiers are applied before opponent stage modifiers.
+        
+        Gen 1 specific:
+        - Badge boost bug is handled by StageModifiers.apply_stat_mod()
+        - Badge boosts reset when the player levels up between matchups
         """
         num_matchups = len(self._original_player_mon_list)
         player_modifiers = []
@@ -1251,10 +1257,18 @@ class BattleSummaryController:
         persistent_player_modifier = StageModifiers()
         
         move_db = current_gen_info().move_db()
+        gen = current_gen_info().get_generation()
+        prev_player_level = None
         
         for mon_idx in range(num_matchups):
-            # Check if player leveled up (need to reset badge boosts in Gen 1, but for Gen 2+ just continue)
-            # For now, Gen 1 is skipped entirely, so we don't need to handle this here
+            # Gen 1 specific: Check if player leveled up - if so, reset badge boosts
+            # Badge boost counters reset when the Pokemon levels up
+            if gen == 1 and mon_idx < len(self._original_player_mon_list):
+                cur_player_level = self._original_player_mon_list[mon_idx].level
+                if prev_player_level is not None and cur_player_level > prev_player_level:
+                    # Player leveled up - reset badge boosts but keep stage modifiers
+                    persistent_player_modifier = persistent_player_modifier.clear_badge_boosts()
+                prev_player_level = cur_player_level
             
             # Start with persistent modifier from previous matchups
             cur_player_modifier = persistent_player_modifier._copy_constructor()

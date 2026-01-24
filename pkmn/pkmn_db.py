@@ -384,7 +384,7 @@ class MoveDB:
         chance = first_effect.get("chance", 100)
         is_guaranteed = chance >= 100
         
-        is_damaging = move.base_power > 0
+        is_damaging = move.base_power is not None and move.base_power > 0
         
         # Calculate max applications based on stage limits (+6 or -6 max)
         if modifier == 0:
