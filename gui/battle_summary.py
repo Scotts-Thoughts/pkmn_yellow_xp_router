@@ -955,7 +955,6 @@ class DamageSummary(ttk.Frame):
         self._is_test_move = is_test_move
         self._move_name = None
         self._is_loading = False
-        self._setup_move_cache = {}  # Cache for setup move info: {move_name: (is_setup, max_count)}
 
         self.columnconfigure(0, weight=1)
 
@@ -1005,15 +1004,6 @@ class DamageSummary(ttk.Frame):
         self.custom_data_dropdown = custom_components.SimpleOptionMenu(self.header, [""], callback=self._custom_data_callback, width=14)
         # Also bind to <<ComboboxSelected>> event as a backup to ensure callback fires
         self.custom_data_dropdown.bind("<<ComboboxSelected>>", self._custom_data_callback)
-        
-        # Setup move dropdown (for moves that modify stats)
-        self.setup_move_dropdown = custom_components.SimpleOptionMenu(self.header, ["0"], callback=self._setup_move_callback, width=8)
-        self.setup_move_dropdown.bind("<<ComboboxSelected>>", self._setup_move_callback)
-        # Add keyboard navigation: up/down arrows increment/decrement value when dropdown is closed
-        self.setup_move_dropdown.bind("<Key-Up>", self._on_setup_move_arrow_key)
-        self.setup_move_dropdown.bind("<Key-Down>", self._on_setup_move_arrow_key)
-        # Prevent default behavior when dropdown is closed
-        self.setup_move_dropdown.bind("<KeyPress>", self._on_setup_move_key_press, add="+")
 
         self.range_frame = ttk.Frame(self, style="Contrast.TFrame")
         self.range_frame.grid(row=self.row_idx, column=0, sticky=tk.NSEW, padx=self.padx, pady=self.pady)
@@ -1057,71 +1047,6 @@ class DamageSummary(ttk.Frame):
             self._controller.update_mimic_selection(self.custom_data_dropdown.get())
         else:
             self._controller.update_custom_move_data(self._mon_idx, self._move_idx, self._is_player_mon, self.custom_data_dropdown.get())
-    
-    def _setup_move_callback(self, *args, **kwargs):
-        if self._is_loading:
-            return
-        count = int(self.setup_move_dropdown.get())
-        self._controller.update_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon, count)
-    
-    def _on_setup_move_key_press(self, event):
-        """Handle key press to prevent default arrow key behavior when dropdown is closed"""
-        if event.keysym in ['Up', 'Down']:
-            # Check if dropdown is currently open (combobox state is 'readonly' when closed)
-            try:
-                # If the combobox is in readonly state and has focus, prevent default behavior
-                # The actual navigation will be handled by _on_setup_move_arrow_key
-                if self.setup_move_dropdown['state'] == 'readonly':
-                    # Let our handler deal with it
-                    pass
-            except Exception:
-                pass
-    
-    def _on_setup_move_arrow_key(self, event):
-        """Handle up/down arrow keys to increment/decrement setup move count when dropdown is closed"""
-        if self._is_loading:
-            return
-        
-        # Only handle if dropdown is closed (readonly state)
-        try:
-            if self.setup_move_dropdown['state'] != 'readonly':
-                # Dropdown is open, let default behavior handle it
-                return
-        except Exception:
-            return
-        
-        # Get current value and options
-        current_val = self.setup_move_dropdown.get()
-        try:
-            current_count = int(current_val)
-        except ValueError:
-            current_count = 0
-        
-        options = self.setup_move_dropdown.cur_options
-        if not options:
-            return
-        
-        # Find current index
-        try:
-            current_idx = options.index(current_val)
-        except ValueError:
-            current_idx = 0
-        
-        # Increment or decrement based on key
-        if event.keysym == 'Up':
-            new_idx = min(current_idx + 1, len(options) - 1)
-        else:  # Down
-            new_idx = max(current_idx - 1, 0)
-        
-        # Update value if changed
-        if new_idx != current_idx:
-            new_val = options[new_idx]
-            self.setup_move_dropdown.set(new_val)
-            # Trigger callback to update the controller
-            self._setup_move_callback()
-        
-        # Prevent default behavior (reopening dropdown)
-        return "break"
     
     def _on_test_move_changed(self, *args, **kwargs):
         """Called when user selects a test move from the dropdown"""
@@ -1174,90 +1099,10 @@ class DamageSummary(ttk.Frame):
                 custom_data_selection = move.mimic_data
             
             # Restore custom_data_dropdown immediately if it exists
-            col = 1
             if custom_data_options:
                 if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
-                    self.custom_data_dropdown.grid(row=0, column=col)
+                    self.custom_data_dropdown.grid(row=0, column=1)
                     self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
-                col += 1
-            
-            # Check if this is a setup move (use cache to avoid repeated database lookups)
-            is_setup_move = False
-            max_setup_count = 0
-            if move is not None and self._move_name:
-                # Check cache first
-                if self._move_name in self._setup_move_cache:
-                    is_setup_move, max_setup_count = self._setup_move_cache[self._move_name]
-                else:
-                    # Cache miss - show dropdown IMMEDIATELY with default, don't wait for anything
-                    # Show it first, then get the current value and update async
-                    if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
-                        # Show dropdown immediately with default max count (6) and default value (0)
-                        # Don't call get_move_setup_usage() here - it might be slow
-                        setup_options = [str(i) for i in range(7)]  # 0-6
-                        if custom_data_options:
-                            self.setup_move_dropdown.grid(row=0, column=col)
-                        else:
-                            self.setup_move_dropdown.grid(row=0, column=1)
-                        self.setup_move_dropdown.new_values(setup_options, default_val="0")  # Use "0" as default, update async
-                    
-                    # Do the database lookup in the background and update if needed
-                    def update_setup_dropdown():
-                        try:
-                            stat_mods = current_gen_info().move_db().get_stat_mod(self._move_name)
-                            if stat_mods:
-                                is_setup = True
-                                max_stage_change = 0
-                                for stat_mod in stat_mods:
-                                    # stat_mod is a tuple (stat_name, stage_change)
-                                    stage_change = abs(stat_mod[1]) if isinstance(stat_mod, tuple) else abs(stat_mod)
-                                    if stage_change > max_stage_change:
-                                        max_stage_change = stage_change
-                                if max_stage_change >= 2:
-                                    max_count = 3
-                                elif max_stage_change == 1:
-                                    max_count = 6
-                                else:
-                                    max_count = 0
-                            else:
-                                is_setup = False
-                                max_count = 0
-                            
-                            # Cache the result
-                            self._setup_move_cache[self._move_name] = (is_setup, max_count)
-                            
-                            # Update dropdown if it's actually a setup move
-                            if is_setup and hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
-                                # Get current setup count and update dropdown
-                                current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
-                                if max_count != 6:  # Update options if different from default
-                                    setup_options = [str(i) for i in range(max_count + 1)]
-                                else:
-                                    setup_options = [str(i) for i in range(7)]  # Keep 0-6
-                                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
-                            else:
-                                # Not a setup move - hide the dropdown
-                                if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
-                                    self.setup_move_dropdown.grid_remove()
-                        except Exception:
-                            pass
-                    
-                    # Schedule the lookup to run asynchronously (non-blocking)
-                    # Use after(0) to run as soon as possible, but don't block UI
-                    self.after(0, update_setup_dropdown)
-                    return  # Return early, dropdown is already shown
-            
-            # Get current setup usage count
-            current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
-            
-            # Restore setup_move_dropdown if it's a setup move
-            if is_setup_move and hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
-                setup_options = [str(i) for i in range(max_setup_count + 1)]
-                if custom_data_options:
-                    self.setup_move_dropdown.grid(row=0, column=col)
-                else:
-                    self.setup_move_dropdown.grid(row=0, column=1)
-                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
         except Exception:
             pass
     
@@ -1341,9 +1186,7 @@ class DamageSummary(ttk.Frame):
                 faded_secondary_fg = _blend_color(secondary_fg, secondary_bg, 0.1)
                 self.num_to_kill.configure(foreground=faded_secondary_fg)
             
-            # Hide dropdowns when faded (setup_move_dropdown, custom_data_dropdown)
-            if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
-                self.setup_move_dropdown.grid_remove()
+            # Hide dropdowns when faded
             if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
                 self.custom_data_dropdown.grid_remove()
             if hasattr(self, 'test_move_dropdown') and self.test_move_dropdown.winfo_exists():
@@ -1374,10 +1217,6 @@ class DamageSummary(ttk.Frame):
                 self.num_to_kill.configure(foreground=secondary_fg)
             
             # Show and re-enable dropdowns
-            if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
-                # Restore grid position if it was previously shown
-                # The grid position will be restored in update_rendering when needed
-                pass
             if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
                 # Restore grid position if it was previously shown
                 # The grid position will be restored in update_rendering when needed
@@ -1440,36 +1279,6 @@ class DamageSummary(ttk.Frame):
             custom_data_options = move.mimic_options
             custom_data_selection = move.mimic_data
 
-        # Check if this is a setup move (stat modifier move)
-        is_setup_move = False
-        max_setup_count = 0
-        if move is not None and self._move_name:
-            # Check cache first to avoid repeated database lookups
-            if self._move_name in self._setup_move_cache:
-                is_setup_move, max_setup_count = self._setup_move_cache[self._move_name]
-            else:
-                # Cache miss - do database lookup and cache the result
-                stat_mods = current_gen_info().move_db().get_stat_mod(self._move_name)
-                if stat_mods:
-                    is_setup_move = True
-                    # Determine max count based on stat stage changes
-                    # Find the maximum absolute value of stat changes
-                    max_stage_change = 0
-                    for stat_mod in stat_mods:
-                        max_stage_change = max(max_stage_change, abs(stat_mod[1]))
-                    
-                    # +2 stages: max 3 uses (to reach +6)
-                    # +1 stages: max 6 uses (to reach +6)
-                    if max_stage_change >= 2:
-                        max_setup_count = 3
-                    elif max_stage_change == 1:
-                        max_setup_count = 6
-                # Cache the result for future use
-                self._setup_move_cache[self._move_name] = (is_setup_move, max_setup_count)
-        
-        # Get current setup usage count
-        current_setup_count = self._controller.get_move_setup_usage(self._mon_idx, self._move_idx, self._is_player_mon)
-        
         # Layout header components
         # For test moves, show dropdown for first Pokemon only, label for others
         if self._is_test_move:
@@ -1496,34 +1305,19 @@ class DamageSummary(ttk.Frame):
                         self.test_move_dropdown.grid_forget()
             
             self.custom_data_dropdown.grid_forget()
-            self.setup_move_dropdown.grid_forget()
         elif custom_data_options:
             if hasattr(self, 'test_move_dropdown'):
                 self.test_move_dropdown.grid_forget()
             self.move_name_label.grid_forget()
             self.move_name_label.grid(row=0, column=0)
             col = 1
-            self.custom_data_dropdown.grid(row=0, column=col)
+            self.custom_data_dropdown.grid(row=0, column=1)
             self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
-            col += 1
-            if is_setup_move:
-                setup_options = [str(i) for i in range(max_setup_count + 1)]
-                self.setup_move_dropdown.grid(row=0, column=col)
-                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
-            else:
-                self.setup_move_dropdown.grid_forget()
         else:
             if hasattr(self, 'test_move_dropdown'):
                 self.test_move_dropdown.grid_forget()
             self.move_name_label.grid_forget()
-            if is_setup_move:
-                self.move_name_label.grid(row=0, column=0)
-                setup_options = [str(i) for i in range(max_setup_count + 1)]
-                self.setup_move_dropdown.grid(row=0, column=1)
-                self.setup_move_dropdown.new_values(setup_options, default_val=str(current_setup_count))
-            else:
-                self.move_name_label.grid(row=0, column=0, columnspan=2)
-                self.setup_move_dropdown.grid_forget()
+            self.move_name_label.grid(row=0, column=0, columnspan=2)
             self.custom_data_dropdown.grid_forget()
 
 
@@ -1594,13 +1388,6 @@ class DamageSummary(ttk.Frame):
                             
                             # Hide dropdowns when faded (only if they were previously shown)
                             # Check if they should be visible based on move properties
-                            if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
-                                # Only hide if it was previously shown (grid_info exists)
-                                try:
-                                    if self.setup_move_dropdown.grid_info():
-                                        self.setup_move_dropdown.grid_remove()
-                                except Exception:
-                                    pass
                             if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
                                 # Only hide if it was previously shown (grid_info exists)
                                 try:
@@ -1748,8 +1535,6 @@ class DamageSummary(ttk.Frame):
                         if default_fg_str and default_bg_str:
                             faded_fg = _blend_color(default_fg_str, default_bg_str, 0.1)
                             
-                            if hasattr(self, 'setup_move_dropdown') and self.setup_move_dropdown.winfo_exists():
-                                self.setup_move_dropdown.grid_remove()
                             if hasattr(self, 'custom_data_dropdown') and self.custom_data_dropdown.winfo_exists():
                                 self.custom_data_dropdown.grid_remove()
                             if hasattr(self, 'test_move_dropdown') and self.test_move_dropdown.winfo_exists():
