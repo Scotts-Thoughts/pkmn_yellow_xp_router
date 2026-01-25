@@ -91,6 +91,20 @@ class RouteSummaryWindow(tk.Toplevel):
             "Leader Blaine",
             "Leader Janine"
         }
+        # Trainers to exclude from Run Summary for HeartGold/SoulSilver routes
+        heartgold_excluded_trainers = {
+            "Leader Brock",
+            "Leader Misty",
+            "Leader Lt.Surge",
+            "Leader Erika",
+            "Leader Sabrina",
+            "Leader Blaine",
+            "Leader Janine",
+            "Elite Four Will Rematch 2",
+            "Elite Four Koga Rematch 2",
+            "Elite Four Bruno Rematch 2",
+            "Elite Four Karen Rematch 2",
+        }
         cur_event = self._controller.get_next_event()
         while cur_event is not None:
             if (
@@ -108,6 +122,12 @@ class RouteSummaryWindow(tk.Toplevel):
                 # For Crystal routes, exclude specific Kanto gym leaders
                 if (current_gen_info().version_name() == const.CRYSTAL_VERSION and 
                     trainer_name in crystal_excluded_trainers):
+                    cur_event = self._controller.get_next_event(cur_event.group_id)
+                    continue
+
+                # For Crystal routes, exclude specific Kanto gym leaders
+                if (current_gen_info().version_name() == const.HEART_GOLD_VERSION and 
+                    trainer_name in heartgold_excluded_trainers):
                     cur_event = self._controller.get_next_event(cur_event.group_id)
                     continue
                 

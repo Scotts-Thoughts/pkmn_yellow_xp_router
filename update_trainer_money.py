@@ -12,7 +12,7 @@ from pathlib import Path
 
 # File paths
 SCRIPT_DIR = Path(__file__).parent
-TRAINERS_FILE = SCRIPT_DIR / "raw_pkmn_data" / "gen_four" / "platinum" / "trainers.json"
+TRAINERS_FILE = SCRIPT_DIR / "raw_pkmn_data" / "gen_four" / "heartgold_soulsilver" / "trainers.json"
 PRIZE_LOOKUP_FILE = SCRIPT_DIR / "raw_pkmn_data" / "gen_four" / "trainer_prize_lookup.json"
 
 

@@ -3114,6 +3114,76 @@
             "key_item": true,
             "pocket": "Key Items",
             "name": "Secret Key"
+        },
+        {
+            "rom_id": 467,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Secret Key"
+        },
+        {
+            "rom_id": 492,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Fast Ball"
+        },
+        {
+            "rom_id": 493,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Level Ball"
+        },
+        {
+            "rom_id": 494,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Lure Ball"
+        },
+        {
+            "rom_id": 495,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Heavy Ball"
+        },
+        {
+            "rom_id": 496,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Love Ball"
+        },
+        {
+            "rom_id": 497,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Friend Ball"
+        },
+        {
+            "rom_id": 498,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Moon Ball"
+        },
+        {
+            "rom_id": 499,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Sport Ball"
+        },
+        {
+            "rom_id": 500,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Park Ball"
         }
     ]
 }

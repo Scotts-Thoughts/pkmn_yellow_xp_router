@@ -46,8 +46,6 @@
         "Leader Pryce",
         "Leader Clair",
 
-        "Leader Blue",
-
         "Galactic Boss Cyrus Rematch 3",
         "Rival Chimchar 7",
         "Rival Piplup 7",
@@ -64,6 +62,22 @@
         "Elite Four Bruno",
         "Elite Four Karen",
         "Champion Lance",
+
+        "Leader Brock",
+        "Leader Misty",
+        "Leader Lt.Surge",
+        "Leader Erika",
+        "Leader Janine",
+        "Leader Sabrina",
+        "Leader Blaine",
+        "Leader Blue",
+
+        "Elite Four Will Rematch 2",
+        "Elite Four Koga Rematch 2",
+        "Elite Four Bruno Rematch 2",
+        "Elite Four Karen Rematch 2",
+        "Champion Lance Rematch 2",
+
         "Pokemon Trainer Red"
     ],
     "fight_rewards": {
