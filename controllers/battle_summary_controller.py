@@ -568,15 +568,18 @@ class BattleSummaryController:
                 self._enemy_move_data[mon_idx].append(cur_enemy_move_data)
 
             #####
-            # Add test moves (player moves 5-8) if enabled
+            # Add test moves (player moves 5-8) - always calculate if any test moves are defined
+            # so data is ready when display is enabled
             #####
-            if config.get_test_moves_enabled():
-                test_moves = self._main_controller.get_raw_route().test_moves
+            test_moves = self._main_controller.get_raw_route().test_moves
+            # Check if any test moves are defined
+            has_test_moves = any(test_moves[i] and test_moves[i].strip() for i in range(min(4, len(test_moves))))
+            if has_test_moves or config.get_test_moves_enabled():
                 for test_idx in range(4):
                     # Only process if test move is defined (not empty or None)
                     if test_idx < len(test_moves) and test_moves[test_idx] and test_moves[test_idx].strip():
                         test_move_name = test_moves[test_idx].strip()
-                        test_move_data = self._recalculate_single_move(mon_idx, True, test_move_name, move_idx=4 + test_idx)
+                        test_move_data = self._recalculate_single_move(mon_idx, True, test_move_name)
                         self._player_move_data[mon_idx].append(test_move_data)
                     else:
                         self._player_move_data[mon_idx].append(None)
@@ -1074,10 +1077,13 @@ class BattleSummaryController:
         if pkmn_idx < 0 or pkmn_idx >= len(cur_move_data) or move_idx < 0:
             return None
         
-        # For player moves, allow indices 0-7 when test moves are enabled (0-3 regular, 4-7 test)
+        # For player moves, allow indices 0-7 when test moves exist or display is enabled (0-3 regular, 4-7 test)
         # For enemy moves, only allow 0-3
         if is_player_mon:
-            max_idx = 7 if config.get_test_moves_enabled() else 3
+            # Check if any test moves are defined
+            test_moves = self._main_controller.get_raw_route().test_moves
+            has_test_moves = any(test_moves[i] and test_moves[i].strip() for i in range(min(4, len(test_moves))))
+            max_idx = 7 if (has_test_moves or config.get_test_moves_enabled()) else 3
         else:
             max_idx = 3
         

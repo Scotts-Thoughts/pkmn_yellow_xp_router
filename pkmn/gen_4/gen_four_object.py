@@ -254,14 +254,14 @@ class GenFour(CurrentGen):
                 self._major_fights[30],  # Champion Lance
                 self._major_fights[31],  # Pokemon Trainer Red
             ]
-        # Diamond/Pearl/Platinum: Elite Four at indices 21-24, Champion at index 25
+        # Diamond/Pearl/Platinum: Elite Four at indices 20-23, Champion at index 24
         else:
             return [
-                self._major_fights[21],  # Elite Four Aaron
-                self._major_fights[22],  # Elite Four Bertha
-                self._major_fights[23],  # Elite Four Flint
-                self._major_fights[24],  # Elite Four Lucian
-                self._major_fights[25],  # Champion Cynthia
+                self._major_fights[20],  # Elite Four Aaron
+                self._major_fights[21],  # Elite Four Bertha
+                self._major_fights[22],  # Elite Four Flint
+                self._major_fights[23],  # Elite Four Lucian
+                self._major_fights[24],  # Champion Cynthia
             ]
     
     def get_move_custom_data(self, move_name, attacking_pkmn=None, move=None) -> List[str]:
