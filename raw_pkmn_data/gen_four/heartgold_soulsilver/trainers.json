@@ -799,7 +799,7 @@
             "is_double_battle": false,
             "trainer_class": "Kimono Girl",
             "trainer_name": "Kimono Girl Mickey",
-            "trainer_gender": "male",
+            "trainer_gender": "female",
             "battle_type": "Singles",
             "items": [],
             "pokemon": [
@@ -13206,9 +13206,10 @@
             "is_double_battle": false,
             "trainer_class": "Kimono Girl",
             "trainer_name": "Kimono Girl Naoko",
-            "trainer_gender": "male",
+            "trainer_gender": "female",
             "battle_type": "Singles",
             "items": [],
+            "refightable": true,
             "pokemon": [
                 {
                     "species": "Espeon",
@@ -13255,9 +13256,10 @@
             "is_double_battle": false,
             "trainer_class": "Kimono Girl",
             "trainer_name": "Kimono Girl Sayo",
-            "trainer_gender": "male",
+            "trainer_gender": "female",
             "battle_type": "Singles",
             "items": [],
+            "refightable": true,
             "pokemon": [
                 {
                     "species": "Jolteon",
@@ -13304,9 +13306,10 @@
             "is_double_battle": false,
             "trainer_class": "Kimono Girl",
             "trainer_name": "Kimono Girl Zuki",
-            "trainer_gender": "male",
+            "trainer_gender": "female",
             "battle_type": "Singles",
             "items": [],
+            "refightable": true,
             "pokemon": [
                 {
                     "species": "Umbreon",
@@ -13353,9 +13356,10 @@
             "is_double_battle": false,
             "trainer_class": "Kimono Girl",
             "trainer_name": "Kimono Girl Kuni",
-            "trainer_gender": "male",
+            "trainer_gender": "female",
             "battle_type": "Singles",
             "items": [],
+            "refightable": false,
             "pokemon": [
                 {
                     "species": "Vaporeon",
@@ -13405,6 +13409,7 @@
             "trainer_gender": "male",
             "battle_type": "Singles",
             "items": [],
+            "refightable": true,
             "pokemon": [
                 {
                     "species": "Flareon",
