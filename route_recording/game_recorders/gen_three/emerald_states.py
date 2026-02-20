@@ -903,16 +903,12 @@ class OverworldState(WatchForResetState):
         elif new_prop.path in gh_gen_three_const.ALL_KEYS_STAT_EXP:
             if not self._waiting_for_registration and not self._wrong_mon_in_slot_1:
                 return StateType.VITAMIN
-        elif new_prop.path == gh_gen_three_const.KEY_AUDIO_SOUND_EFFECT_1:
-            # NOTE: this points to the currently loaded sound effect. If a single sound effect gets played multiple times in a row
-            # then this won't change. Theoretically, there's another field, soundEffect1Played that we could hook into, to allow us to detect
-            # when the actual changes occur. However, this is gets left on by default, and flickers between off/on so quickly that it sometimes gets
-            # missed by gamehook. In practice, this approximation should cover all known edge cases
-            if new_prop.value == gh_gen_three_const.SAVE_SOUND_EFFECT_VALUE:
+        elif new_prop.path == gh_gen_three_const.KEY_SSTP_TRACKING:
+            # Track saves and heals using the unified sStpTracking property
+            # Value will be "SAVE" when the player is saving, "HEAL" when healing
+            if new_prop.value == "SAVE":
                 self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get(gh_gen_three_const.KEY_OVERWORLD_MAP).value)))
-        elif new_prop.path == gh_gen_three_const.KEY_AUDIO_SOUND_EFFECT_2:
-            # NOTE: same limitations as above
-            if new_prop.value == gh_gen_three_const.HEAL_SOUND_EFFECT_VALUE:
+            elif new_prop.value == "HEAL":
                 self.machine._queue_new_event(EventDefinition(heal=HealEventDefinition(location=self.machine._gamehook_client.get(gh_gen_three_const.KEY_OVERWORLD_MAP).value)))
         elif new_prop.path == gh_gen_three_const.KEY_GAMETIME_SECONDS:
             if self._waiting_for_registration:
