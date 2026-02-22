@@ -476,7 +476,7 @@ def calculate_gen_three_damage(
         except ValueError:
             num_rollout_turns = 6
         
-        move_modifier = math.pow(2, num_rollout_turns)
+        move_modifier = math.pow(2, num_rollout_turns - 1)
     elif move.name == gen_three_const.FURY_CUTTER_MOVE_NAME:
         move_modifier = math.pow(2, int(custom_move_data))
     elif move.name == gen_three_const.RAGE_MOVE_NAME:
@@ -494,7 +494,6 @@ def calculate_gen_three_damage(
         gen_three_const.SURF_MOVE_NAME,
         gen_three_const.WHIRLPOOL_MOVE_NAME,
         gen_three_const.EARTHQUAKE_MOVE_NAME,
-        gen_three_const.MAGNITUDE_MOVE_NAME,
         gen_three_const.PURSUIT_MOVE_NAME,
         gen_three_const.STOMP_MOVE_NAME,
         gen_three_const.EXTRASENSORY_MOVE_NAME,
@@ -505,6 +504,8 @@ def calculate_gen_three_damage(
         gen_three_const.REVENGE_MOVE_NAME,
     ]:
         double_damage = custom_move_data and (gen_three_const.NO_BONUS not in custom_move_data)
+    elif move.name == gen_three_const.MAGNITUDE_MOVE_NAME:
+        double_damage = (gen_three_const.DIG_BONUS in custom_move_data)
     else:
         double_damage = False
 
