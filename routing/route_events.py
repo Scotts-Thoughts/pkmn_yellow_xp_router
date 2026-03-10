@@ -16,20 +16,25 @@ event_id_counter = 0
 
 
 class InventoryEventDefinition:
-    def __init__(self, item_name, item_amount, is_acquire, with_money):
+    def __init__(self, item_name, item_amount, is_acquire, with_money, custom_price=None):
         self.item_name = item_name
         self.item_amount = item_amount
         self.is_acquire = is_acquire
         self.with_money = with_money
-    
+        self.custom_price = custom_price
+
     def serialize(self):
-        return [self.item_name, self.item_amount, self.is_acquire, self.with_money]
-    
+        result = [self.item_name, self.item_amount, self.is_acquire, self.with_money]
+        if self.custom_price is not None:
+            result.append(self.custom_price)
+        return result
+
     @staticmethod
     def deserialize(raw_val):
         if not raw_val:
             return None
-        return InventoryEventDefinition(raw_val[0], raw_val[1], raw_val[2], raw_val[3])
+        custom_price = raw_val[4] if len(raw_val) > 4 else None
+        return InventoryEventDefinition(raw_val[0], raw_val[1], raw_val[2], raw_val[3], custom_price)
     
     def __str__(self):
         if self.is_acquire and self.with_money:
@@ -41,7 +46,10 @@ class InventoryEventDefinition:
         else:
             action = "Use/Drop"
         
-        return f"{action} {self.item_name} x{self.item_amount}"
+        result = f"{action} {self.item_name} x{self.item_amount}"
+        if self.custom_price is not None and self.is_acquire and self.with_money:
+            result += f" @${self.custom_price}"
+        return result
 
 
 class HoldItemEventDefinition:
@@ -788,6 +796,7 @@ class EventItem:
                     self.event_definition.item_event_def.item_name,
                     self.event_definition.item_event_def.item_amount,
                     self.event_definition.item_event_def.with_money,
+                    custom_price=self.event_definition.item_event_def.custom_price,
                 )
             else:
                 self.final_state, self.error_message = cur_state.remove_item(

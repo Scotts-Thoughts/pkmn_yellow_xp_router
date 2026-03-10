@@ -318,42 +318,28 @@ class SimpleEntry(ttk.Entry):
         super().__init__(*args, **kwargs, textvariable=self._value)
         if callback is not None:
             self._value.trace_add("write", callback)
-        
+
         # Register focus events to disable keyboard shortcuts during text entry
         self.bind('<FocusIn>', self._on_focus_in)
-        self.bind('<FocusOut>', self._on_focus_out)
         self.bind('<Button-1>', self._on_click)
-    
+
     def _on_focus_in(self, event):
         """Register that this text field has gained focus."""
         self._register_focus()
-    
-    def _on_focus_out(self, event):
-        """Register that this text field has lost focus."""
-        self._unregister_focus()
-    
+
     def _on_click(self, event):
         """Handle click to ensure focus is set."""
         self.focus_set()
         self._register_focus()
         # Don't prevent default click behavior
         return None
-    
+
     def _register_focus(self):
         """Register focus with main window if available."""
         try:
             root = self.winfo_toplevel()
             if hasattr(root, 'register_text_field_focus'):
                 root.register_text_field_focus(self)
-        except Exception:
-            pass  # Main window might not exist yet
-    
-    def _unregister_focus(self):
-        """Unregister focus with main window if available."""
-        try:
-            root = self.winfo_toplevel()
-            if hasattr(root, 'unregister_text_field_focus'):
-                root.unregister_text_field_focus()
         except Exception:
             pass  # Main window might not exist yet
     
@@ -480,7 +466,6 @@ class SimpleText(tk.Text):
         
         # Register focus events to disable keyboard shortcuts during text entry
         self.bind('<FocusIn>', self._on_focus_in)
-        self.bind('<FocusOut>', self._on_focus_out)
         self.bind('<Button-1>', self._on_click)
 
     def _proxy(self, command, *args):
@@ -495,33 +480,20 @@ class SimpleText(tk.Text):
     def _on_focus_in(self, event):
         """Register that this text field has gained focus."""
         self._register_focus()
-    
-    def _on_focus_out(self, event):
-        """Register that this text field has lost focus."""
-        self._unregister_focus()
-    
+
     def _on_click(self, event):
         """Handle click to ensure focus is set."""
         self.focus_set()
         self._register_focus()
         # Don't prevent default click behavior
         return None
-    
+
     def _register_focus(self):
         """Register focus with main window if available."""
         try:
             root = self.winfo_toplevel()
             if hasattr(root, 'register_text_field_focus'):
                 root.register_text_field_focus(self)
-        except Exception:
-            pass  # Main window might not exist yet
-    
-    def _unregister_focus(self):
-        """Unregister focus with main window if available."""
-        try:
-            root = self.winfo_toplevel()
-            if hasattr(root, 'unregister_text_field_focus'):
-                root.unregister_text_field_focus()
         except Exception:
             pass  # Main window might not exist yet
 

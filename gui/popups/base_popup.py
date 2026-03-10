@@ -10,6 +10,10 @@ class Popup(tk.Toplevel):
         if sys.platform == "win32":
             self._main_window.attributes('-disabled', True)
 
+        # Suppress all keyboard shortcuts while popup is open
+        if hasattr(self._main_window, '_popup_open'):
+            self._main_window._popup_open = True
+
         # Center the dialog on the main window
         self.update_idletasks()
         self._center_on_main_window()
@@ -50,4 +54,6 @@ class Popup(tk.Toplevel):
     def close(self, event=None):
         if sys.platform == "win32":
             self._main_window.attributes('-disabled', False)
+        if hasattr(self._main_window, '_popup_open'):
+            self._main_window._popup_open = False
         self.destroy()

@@ -337,6 +337,7 @@ class Constants:
         self.SHOW_MOVE_HIGHLIGHTS = "show_move_highlights"
         self.FADE_MOVES_WITHOUT_HIGHLIGHT = "fade_moves_without_highlight"
         self.HIGHLIGHT_BRANCHED_MANDATORY = "highlight_branched_mandatory"
+        self.FADE_FOLDER_TEXT = "fade_folder_text"
         self.HIGHLIGHT_COLOR_1_KEY = "highlight_color_1"
         self.HIGHLIGHT_COLOR_2_KEY = "highlight_color_2"
         self.HIGHLIGHT_COLOR_3_KEY = "highlight_color_3"

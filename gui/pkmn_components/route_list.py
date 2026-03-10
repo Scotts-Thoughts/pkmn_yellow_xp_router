@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 class RouteList(custom_components.CustomGridview):
     def __init__(self, controller:MainController, *args, **kwargs):
         self._controller = controller
-        self._suppress_focus_changes = False  # Flag to prevent focus changes during programmatic updates
         super().__init__(
             *args,
             custom_col_data=[
@@ -42,11 +41,11 @@ class RouteList(custom_components.CustomGridview):
         self.tag_configure(const.EVENT_TAG_IMPORTANT, background="#1f1f1f")
         self.tag_configure(const.HIGHLIGHT_LABEL, background="#156152")  # Old highlight, keep for backward compatibility
         self.tag_configure(const.EVENT_TAG_BRANCHED_MANDATORY, background="#5a5142")  # Brown color
-        # Configure folder text to be darker grey for better visual distinction
-        self.tag_configure(const.EVENT_TAG_FOLDER, foreground="#666666")  # Dark grey for folder text
-        
-        # Configure highlight colors from config
+        # Configure folder text style based on config
         from utils.config_manager import config
+        self.update_folder_text_style()
+
+        # Configure highlight colors from config
         self._update_highlight_colors()
 
         self.bind("<<TreeviewOpen>>", self._treeview_opened_callback)
@@ -56,11 +55,17 @@ class RouteList(custom_components.CustomGridview):
         self.bind("<Button-1>", self._on_event_list_click, True)
         # Right-click toggles enable/disable without changing current selection
         self.bind("<Button-3>", self._on_event_list_right_click, True)
-        # Prevent treeview from taking focus during programmatic selection changes
-        self.bind("<FocusIn>", self._on_treeview_focus_in)
         # Note: Shift+1 through Shift+9 bindings are handled at the main window level
         # (see MainWindow._handle_shift_highlight_global) to ensure they work properly
     
+    def update_folder_text_style(self):
+        """Update folder text tag based on the Fade Folder Text config setting."""
+        from utils.config_manager import config
+        if config.get_fade_folder_text():
+            self.tag_configure(const.EVENT_TAG_FOLDER, foreground="#666666")
+        else:
+            self.tag_configure(const.EVENT_TAG_FOLDER, foreground="")
+
     def _update_highlight_colors(self):
         """Update highlight color tags from config."""
         from utils.config_manager import config
@@ -125,20 +130,6 @@ class RouteList(custom_components.CustomGridview):
         self.selection_set(current_selection)
         return "break"
     
-    def _on_treeview_focus_in(self, event):
-        """Prevent treeview from taking focus during programmatic updates."""
-        if self._suppress_focus_changes:
-            # If we're suppressing focus changes, restore focus to the text field
-            try:
-                root = self.winfo_toplevel()
-                if hasattr(root, '_focused_text_field') and root._focused_text_field is not None:
-                    focused_widget = root._focused_text_field
-                    if focused_widget.winfo_exists():
-                        focused_widget.focus_set()
-                        return "break"
-            except Exception:
-                pass
-
     def _box_click(self, event):
         """
         Override CheckboxTreeview checkbox click behavior so checkbox clicks also unregister
@@ -169,52 +160,13 @@ class RouteList(custom_components.CustomGridview):
     def set_all_selected_event_ids(self, event_ids):
         new_selection = []
         try:
-            # Save current focus widget before updating selection
-            focused_widget = self.focus_get()
-            # Also check the main window's stored reference
-            try:
-                root = self.winfo_toplevel()
-                if hasattr(root, '_focused_text_field') and root._focused_text_field is not None:
-                    focused_widget = root._focused_text_field
-            except Exception:
-                pass
-            
             for cur_event_id in event_ids:
                 new_selection.append(self._treeview_id_lookup[cur_event_id])
-            
-            # Temporarily suppress focus changes to prevent treeview from taking focus
-            self._suppress_focus_changes = True
-            
-            # Update selection
             self.selection_set(new_selection)
-            
-            # Immediately restore focus if it was on a text field
-            if focused_widget is not None:
-                try:
-                    # Check if the focused widget is a text entry field
-                    if isinstance(focused_widget, (tk.Text, ttk.Entry)) or (hasattr(focused_widget, 'winfo_class') and focused_widget.winfo_class() in ('Text', 'TEntry')):
-                        # Restore focus immediately
-                        if focused_widget.winfo_exists():
-                            focused_widget.focus_set()
-                except (tk.TclError, AttributeError):
-                    pass  # Widget might have been destroyed
-            
-            # Re-enable focus changes
-            self._suppress_focus_changes = False
         except Exception as e:
-            # Re-enable focus changes even if there was an error
-            self._suppress_focus_changes = False
             # This *should* only happen in the case that events are selected which are currently hidden by filters
             # So, just ignore and carry on
             pass
-    
-    def _restore_text_field_focus(self, widget):
-        """Restore focus to a text field widget."""
-        try:
-            if widget.winfo_exists():
-                widget.focus_set()
-        except (tk.TclError, AttributeError):
-            pass  # Widget might have been destroyed
     
     def scroll_to_selected_events(self):
         try:
@@ -272,23 +224,6 @@ class RouteList(custom_components.CustomGridview):
         return result
 
     def refresh(self, *args, **kwargs):
-        # Save current focus widget before refreshing to preserve text field focus
-        # Handle case where focus_get() might fail if a dropdown is open
-        try:
-            focused_widget = self.focus_get()
-        except (KeyError, tk.TclError):
-            focused_widget = None
-        # Also check the main window's stored reference
-        try:
-            root = self.winfo_toplevel()
-            if hasattr(root, '_focused_text_field') and root._focused_text_field is not None:
-                focused_widget = root._focused_text_field
-        except Exception:
-            pass
-        
-        # Temporarily suppress focus changes to prevent treeview from taking focus during refresh
-        self._suppress_focus_changes = True
-        
         # begin keeping track of the stuff we already know we're displaying
         # so we can eventually delete stuff that has been removed
         to_delete_ids = set(self._treeview_id_lookup.keys())
@@ -307,21 +242,6 @@ class RouteList(custom_components.CustomGridview):
             del self._treeview_id_lookup[cur_del_id]
 
         self.event_generate(const.ROUTE_LIST_REFRESH_EVENT)
-        
-        # Restore focus to the widget that had it (if it was a text field)
-        # Do this immediately, not with after_idle, to prevent focus loss
-        if focused_widget is not None:
-            try:
-                # Check if the focused widget is a text entry field
-                if isinstance(focused_widget, (tk.Text, ttk.Entry)) or (hasattr(focused_widget, 'winfo_class') and focused_widget.winfo_class() in ('Text', 'TEntry')):
-                    # Restore focus immediately
-                    if focused_widget.winfo_exists():
-                        focused_widget.focus_set()
-            except (tk.TclError, AttributeError):
-                pass  # Widget might have been destroyed
-        
-        # Re-enable focus changes
-        self._suppress_focus_changes = False
     
     def _refresh_recursively(self, parent_id, event_list, to_delete_ids:set):
         cur_search = self._controller.get_route_search_string()

@@ -42,10 +42,11 @@ class Inventory:
     def _copy(self):
         return Inventory(cur_money=self.cur_money, cur_items=self.cur_items, bag_limit=self._bag_limit)
     
-    def add_item(self, base_item:pkmn.universal_data_objects.BaseItem, num, is_purchase=False, force=False):
+    def add_item(self, base_item:pkmn.universal_data_objects.BaseItem, num, is_purchase=False, force=False, custom_price=None):
         result = self._copy()
         if is_purchase:
-            total_cost = num * base_item.purchase_price
+            unit_price = custom_price if custom_price is not None else base_item.purchase_price
+            total_cost = num * unit_price
             if total_cost > result.cur_money and not force:
                 raise ValueError(f"Cannot purchase {num} {base_item.name} for {total_cost} with only {result.cur_money} money")
             # when forcing, allow money to go negative, so you can get a sense for the rest of the money management of the route

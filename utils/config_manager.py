@@ -33,6 +33,7 @@ class Config:
     DEFAULT_SHOW_MOVE_HIGHLIGHTS = True
     DEFAULT_FADE_MOVES_WITHOUT_HIGHLIGHT = False
     DEFAULT_HIGHLIGHT_BRANCHED_MANDATORY = False
+    DEFAULT_FADE_FOLDER_TEXT = True
     DEFAULT_TEST_MOVES_ENABLED = False
     # Default highlight colors - diverse dark colors that don't conflict with existing UI colors
     # Designed to work well on dark backgrounds and be easily distinguishable
@@ -102,6 +103,7 @@ class Config:
         self._show_move_highlights = raw.get(const.SHOW_MOVE_HIGHLIGHTS, self.DEFAULT_SHOW_MOVE_HIGHLIGHTS)
         self._fade_moves_without_highlight = raw.get(const.FADE_MOVES_WITHOUT_HIGHLIGHT, self.DEFAULT_FADE_MOVES_WITHOUT_HIGHLIGHT)
         self._highlight_branched_mandatory = raw.get(const.HIGHLIGHT_BRANCHED_MANDATORY, self.DEFAULT_HIGHLIGHT_BRANCHED_MANDATORY)
+        self._fade_folder_text = raw.get(const.FADE_FOLDER_TEXT, self.DEFAULT_FADE_FOLDER_TEXT)
         self._test_moves_enabled = raw.get(const.TEST_MOVES_ENABLED, self.DEFAULT_TEST_MOVES_ENABLED)
         
         # Load highlight colors
@@ -151,6 +153,7 @@ class Config:
                 const.SHOW_MOVE_HIGHLIGHTS: self._show_move_highlights,
                 const.FADE_MOVES_WITHOUT_HIGHLIGHT: self._fade_moves_without_highlight,
                 const.HIGHLIGHT_BRANCHED_MANDATORY: self._highlight_branched_mandatory,
+                const.FADE_FOLDER_TEXT: self._fade_folder_text,
                 const.TEST_MOVES_ENABLED: self._test_moves_enabled,
                 const.HIGHLIGHT_COLOR_1_KEY: self._highlight_color_1,
                 const.HIGHLIGHT_COLOR_2_KEY: self._highlight_color_2,
@@ -406,9 +409,16 @@ class Config:
     def set_highlight_branched_mandatory(self, highlight):
         self._highlight_branched_mandatory = highlight
         self._save()
-    
+
     def get_highlight_branched_mandatory(self):
         return self._highlight_branched_mandatory
+
+    def set_fade_folder_text(self, fade):
+        self._fade_folder_text = fade
+        self._save()
+
+    def get_fade_folder_text(self):
+        return self._fade_folder_text
     
     def set_highlight_color(self, highlight_num, color):
         """Set highlight color for highlight number 1-9."""

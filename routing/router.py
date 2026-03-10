@@ -493,6 +493,11 @@ class Router:
         if event_group_obj is None:
             raise ValueError(f"Cannot find any event with id: {event_group_id}")
 
+        # Preserve highlight tags from the old event definition
+        old_tags = event_group_obj.event_definition.tags
+        if old_tags and not new_event_def.tags:
+            new_event_def.tags = list(old_tags)
+
         if isinstance(event_group_obj, route_events.EventFolder):
             if new_event_def.get_event_type() != const.TASK_NOTES_ONLY:
                 raise ValueError(f"Can only assign notes to EventFolders")
@@ -504,7 +509,7 @@ class Router:
             # TODO: being replaced is actually an item, not a group
             if event_group_obj.event_definition.get_event_type() != const.TASK_LEARN_MOVE_LEVELUP:
                 raise ValueError(f"Can only update event items for level up moves, currentlty")
-            
+
             # just replace the lookup definition
             level_up_key = new_event_def.learn_move.get_level_up_key()
             if level_up_key in self.level_up_move_defs:
@@ -516,10 +521,10 @@ class Router:
             if event_group_obj.event_definition.trainer_def is not None:
                 if event_group_obj.event_definition.trainer_def.trainer_name in self.defeated_trainers:
                     self.defeated_trainers.remove(event_group_obj.event_definition.trainer_def.trainer_name)
-            
+
             if new_event_def.trainer_def is not None and not current_gen_info().trainer_db().get_trainer(new_event_def.trainer_def.trainer_name).refightable:
                 self.defeated_trainers.add(new_event_def.trainer_def.trainer_name)
-            
+
             event_group_obj.event_definition = new_event_def
 
         self._recalc()

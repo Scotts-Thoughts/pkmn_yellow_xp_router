@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import py_compile; py_compile.compile\\('routing/route_events.py', doraise=True\\); py_compile.compile\\('routing/full_route_state.py', doraise=True\\); py_compile.compile\\('routing/state_objects.py', doraise=True\\); py_compile.compile\\('route_recording/game_recorders/gen_four/platinum_fsm.py', doraise=True\\); print\\('All files compile OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('utils/constants.py', doraise=True\\); py_compile.compile\\('utils/config_manager.py', doraise=True\\); py_compile.compile\\('gui/main_window.py', doraise=True\\); py_compile.compile\\('gui/pkmn_components/route_list.py', doraise=True\\); print\\('All files compile OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('gui/popups/base_popup.py', doraise=True\\); py_compile.compile\\('gui/main_window.py', doraise=True\\); print\\('All files compile OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('gui/main_window.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('routing/router.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('gui/pkmn_components/route_list.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(python -m py_compile gui/custom_components.py 2>&1 && echo \"OK\")",
+      "Bash(python -m py_compile gui/battle_summary.py 2>&1 && echo \"OK\")",
+      "Bash(python -m py_compile gui/pkmn_components/route_list.py 2>&1 && echo \"OK\")",
+      "Bash(python -m py_compile gui/main_window.py 2>&1 && echo \"OK\")"
+    ]
+  }
+}

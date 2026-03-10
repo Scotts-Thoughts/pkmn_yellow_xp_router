@@ -45,6 +45,10 @@ class MainWindow(tk.Tk):
         self._text_field_has_focus = False
         # Store reference to currently focused text field to preserve focus during route changes
         self._focused_text_field = None
+        # Track whether a popup dialog is open to suppress all shortcuts
+        self._popup_open = False
+        # Track mouse clicks to allow focus changes during user interaction
+        self._user_clicking = False
 
         geometry = config.get_window_geometry()
         if not geometry:
@@ -116,6 +120,12 @@ class MainWindow(tk.Tk):
             variable=self.highlight_branched_mandatory_var,
             command=self._toggle_highlight_branched_mandatory
         )
+        self.fade_folder_text_var = tk.BooleanVar(value=config.get_fade_folder_text())
+        self.event_menu.add_checkbutton(
+            label="Fade Folder Text",
+            variable=self.fade_folder_text_var,
+            command=self._toggle_fade_folder_text
+        )
 
         self.highlight_menu = tk.Menu(self.top_menu_bar, tearoff=0)
         for i in range(1, 10):
@@ -130,7 +140,7 @@ class MainWindow(tk.Tk):
 
         self.folder_menu = tk.Menu(self.top_menu_bar, tearoff=0)
         self.folder_menu.add_command(label="New Folder", command=self.open_new_folder_window)
-        self.folder_menu.add_command(label="Rename Cur Folder", command=self.rename_folder)
+        self.folder_menu.add_command(label="Rename Cur Folder", accelerator="Ctrl+Shift+F", command=self.rename_selected_folder)
 
         self.recording_menu = tk.Menu(self.top_menu_bar, tearoff=0)
         self.recording_menu.add_command(label="Enable/Disable Recording", accelerator="F1", command=self.record_button_clicked)
@@ -415,8 +425,8 @@ class MainWindow(tk.Tk):
         self.bind('<Control-b>', self.delete_group)
         self.bind('<Delete>', self.delete_group)
         # recording actions
-        self.bind_all('<KeyPress-F1>', self.record_button_clicked)
-        self.bind_all('<F1>', self.record_button_clicked)
+        self.bind_all('<KeyPress-F1>', self._popup_guard(self.record_button_clicked))
+        self.bind_all('<F1>', self._popup_guard(self.record_button_clicked))
         # test moves toggle
         self.bind('<Shift-F1>', self._toggle_test_moves)
         # auto-load toggle - bind to window only, not all widgets, to avoid interfering with text entry
@@ -443,14 +453,15 @@ class MainWindow(tk.Tk):
         # Note: Control+r was previously used for Transfer Event, but is now overridden for filter toggle
         # Transfer Event can still be accessed via menu (Event > Transfer Event) or the button
         # Use bind_all to ensure shortcuts work even when other widgets have focus
-        self.bind_all('<Control-f>', self.toggle_fight_trainer_filter)
-        self.bind_all('<Control-r>', self.toggle_rare_candy_filter)  # Overrides Transfer Event shortcut
-        self.bind_all('<Control-t>', self.toggle_tm_hm_filter)
-        self.bind_all('<Control-g>', self.toggle_vitamin_filter)
-        self.bind_all('<Control-w>', self.toggle_fight_wild_pkmn_filter)
-        self.bind_all('<Control-a>', self.toggle_common_filters)
-        self.bind_all('<Control-Shift-R>', self.reset_all_filters)
+        self.bind_all('<Control-f>', self._popup_guard(self.toggle_fight_trainer_filter))
+        self.bind_all('<Control-r>', self._popup_guard(self.toggle_rare_candy_filter))  # Overrides Transfer Event shortcut
+        self.bind_all('<Control-t>', self._popup_guard(self.toggle_tm_hm_filter))
+        self.bind_all('<Control-g>', self._popup_guard(self.toggle_vitamin_filter))
+        self.bind_all('<Control-w>', self._popup_guard(self.toggle_fight_wild_pkmn_filter))
+        self.bind_all('<Control-a>', self._popup_guard(self.toggle_common_filters))
+        self.bind_all('<Control-Shift-R>', self._popup_guard(self.reset_all_filters))
         self.bind('<Control-Shift-O>', self.open_data_location)  # Matches menu accelerator "Ctrl+Shift+O"
+        self.bind('<Control-Shift-F>', self.rename_selected_folder)
         # Screenshot shortcuts
         self.bind('<F5>', self.screenshot_event_list)
         self.bind('<F6>', self.screenshot_battle_summary)
@@ -479,7 +490,7 @@ class MainWindow(tk.Tk):
         shift_symbols = ['!', '@', '#', '$', '%', '^', '&', '*', '(']
         for i, symbol in enumerate(shift_symbols, 1):
             # Use default parameter to capture loop variable correctly
-            self.bind_all(f'<Key-{symbol}>', lambda event, idx=i: self._handle_shift_highlight_global(event, idx))
+            self.bind_all(f'<Key-{symbol}>', self._popup_guard(lambda event, idx=i: self._handle_shift_highlight_global(event, idx)))
         # detail update function
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<<TreeviewSelect>>", self._report_new_selection)
@@ -489,6 +500,11 @@ class MainWindow(tk.Tk):
         self.bind("<Button-1>", self._on_window_click)
         self.bind(const.ROUTE_LIST_REFRESH_EVENT, self.update_run_status)
         self.bind(const.FORCE_QUIT_EVENT, self.cancel_and_quit)
+        # Track mouse clicks to allow focus changes during user interaction
+        self.bind_all('<ButtonPress>', self._on_any_click_start)
+        self.bind_all('<ButtonRelease>', self._on_any_click_end)
+        # Global focus guard: prevent any widget from stealing focus away from a registered text field
+        self.bind_all('<FocusIn>', self._global_focus_guard)
 
         self.bind(self._controller.register_event_preview(self), self.trainer_preview)
         self.bind(self._controller.register_event_selection(self), self._handle_new_selection)
@@ -623,28 +639,8 @@ class MainWindow(tk.Tk):
     
     def _on_route_change(self, *args, **kwargs):
         """Handle route change event - refresh event list and show route controls."""
-        # Use stored reference to focused text field if available, otherwise get current focus
-        # Handle case where focus_get() might fail if a dropdown is open
-        try:
-            focused_widget = self._focused_text_field if self._focused_text_field is not None else self.focus_get()
-        except (KeyError, tk.TclError):
-            # If focus_get() fails (e.g., dropdown is open), just use stored reference or None
-            focused_widget = self._focused_text_field
-        
         self.event_list.refresh()
-        
-        # Restore focus to the widget that had it (if it was a text field)
-        # Do this immediately after refresh, not with after_idle, to prevent any delay
-        if focused_widget is not None:
-            try:
-                # Check if it's a text field widget
-                if isinstance(focused_widget, (tk.Text, ttk.Entry)) or (hasattr(focused_widget, 'winfo_class') and focused_widget.winfo_class() in ('Text', 'TEntry')):
-                    # Restore focus immediately
-                    if focused_widget.winfo_exists():
-                        focused_widget.focus_set()
-            except Exception:
-                pass
-        
+
         # Show route controls if we have a route loaded (has init_route_state set)
         # Check if route has been initialized (has a pokemon version)
         if self._controller.get_version() is not None:
@@ -803,6 +799,13 @@ class MainWindow(tk.Tk):
         # Refresh the event list to update highlighting
         if hasattr(self, 'event_list'):
             self.event_list.refresh()
+
+    def _toggle_fade_folder_text(self):
+        """Toggle the Fade Folder Text setting."""
+        config.set_fade_folder_text(self.fade_folder_text_var.get())
+        if hasattr(self, 'event_list'):
+            self.event_list.update_folder_text_style()
+            self.event_list.refresh()
     
     def _toggle_test_moves(self, event=None):
         """Toggle the Test Moves setting."""
@@ -879,16 +882,18 @@ class MainWindow(tk.Tk):
         try:
             from pkmn.gen_factory import current_gen_info
             has_branched_fights = current_gen_info().has_branched_mandatory_fights()
-            # Get the index of the checkbutton (it's the last item after the separator)
-            menu_index = self.event_menu.index("end")
+            menu_index = self.event_menu.index("Highlight Branched Mandatory Battles")
             if has_branched_fights:
                 self.event_menu.entryconfig(menu_index, state="normal")
             else:
                 self.event_menu.entryconfig(menu_index, state="disabled")
         except Exception:
             # If there's any issue (no route loaded, etc.), disable the option
-            menu_index = self.event_menu.index("end")
-            self.event_menu.entryconfig(menu_index, state="disabled")
+            try:
+                menu_index = self.event_menu.index("Highlight Branched Mandatory Battles")
+                self.event_menu.entryconfig(menu_index, state="disabled")
+            except Exception:
+                pass
     
     def _update_player_highlight_strategy(self):
         """Update Player Highlight Strategy setting from menu selection."""
@@ -967,17 +972,70 @@ class MainWindow(tk.Tk):
         
         return "break"  # Prevent default number key behavior
     
+    def _popup_guard(self, callback):
+        """Wrap a bind_all callback to suppress it when a popup dialog is open
+        or when a text field has focus (so typing characters like ! @ # etc.
+        doesn't trigger shortcuts)."""
+        def wrapper(event=None):
+            if self._popup_open:
+                return
+            if self._text_field_has_focus:
+                return
+            return callback(event)
+        return wrapper
+
+    def _on_any_click_start(self, event):
+        """Mark that a user click is in progress."""
+        self._user_clicking = True
+
+    def _on_any_click_end(self, event):
+        """Mark that a user click has ended."""
+        self._user_clicking = False
+
+    def _global_focus_guard(self, event):
+        """Prevent any widget from stealing focus away from a registered text field.
+
+        When a text field is registered as focused, any other non-text widget that tries
+        to take focus will have it redirected back to the registered text field.
+        Only blocks programmatic focus changes - user clicks are allowed through.
+        """
+        if self._focused_text_field is None:
+            return
+
+        # Allow focus changes during user mouse clicks (the _on_window_click
+        # and _on_event_list_click handlers will properly unregister focus)
+        if self._user_clicking:
+            return
+
+        # If the widget gaining focus IS the registered text field, allow it
+        if event.widget is self._focused_text_field:
+            return
+
+        # If the widget gaining focus is another text entry widget, allow it
+        # (user clicked on a different text field - that field's FocusIn will register it)
+        if isinstance(event.widget, (tk.Text, ttk.Entry, tk.Entry)):
+            return
+
+        # Otherwise redirect focus back to the registered text field
+        try:
+            if self._focused_text_field.winfo_exists():
+                self._focused_text_field.focus_set()
+        except (tk.TclError, AttributeError):
+            # Widget was destroyed, clear the reference
+            self._focused_text_field = None
+            self._text_field_has_focus = False
+
     def register_text_field_focus(self, widget=None):
         """Register that a text field has gained focus."""
         self._text_field_has_focus = True
         if widget is not None:
             self._focused_text_field = widget
-    
+
     def unregister_text_field_focus(self):
         """Register that a text field has lost focus."""
         self._text_field_has_focus = False
         self._focused_text_field = None
-    
+
     def is_text_field_focused(self):
         """Check if any text field currently has focus."""
         return self._text_field_has_focus
@@ -1079,29 +1137,11 @@ class MainWindow(tk.Tk):
             self._controller.select_new_events(cur_treeview_selected)
     
     def _handle_new_selection(self, *args, **kwargs):
-        # just re-use the variable temporarily
         all_event_ids = self._controller.get_all_selected_ids()
         if all_event_ids != self.event_list.get_all_selected_event_ids():
-            # Save current focus widget before updating selection
-            focused_widget = self.focus_get()
             self.event_list.set_all_selected_event_ids(all_event_ids)
-            # Restore focus to the widget that had it (if it was a text field)
-            if focused_widget is not None and isinstance(focused_widget, (tk.Text, ttk.Entry)):
-                try:
-                    # Use after_idle to ensure the focus is restored after the selection update completes
-                    self.after_idle(lambda: self._restore_text_field_focus(focused_widget))
-                except tk.TclError:
-                    pass  # Widget might have been destroyed
 
         self.event_list.scroll_to_selected_events()
-    
-    def _restore_text_field_focus(self, widget):
-        """Restore focus to a text field widget."""
-        try:
-            if widget.winfo_exists():
-                widget.focus_set()
-        except (tk.TclError, AttributeError):
-            pass  # Widget might have been destroyed
 
         # now assign it the value it will have for the rest of the function
         all_event_ids = self.event_list.get_all_selected_event_ids(allow_event_items=False)
@@ -1314,7 +1354,7 @@ class MainWindow(tk.Tk):
                     except:
                         pass
                 # Unregister text field focus
-                self._text_field_has_focus = False
+                self.unregister_text_field_focus()
     
     def _show_landing_page(self):
         """Show landing page and hide route controls."""
@@ -1580,6 +1620,29 @@ class MainWindow(tk.Tk):
             return
 
         self.open_new_folder_window(**{const.EVENT_FOLDER_NAME: self._controller.get_event_by_id(all_event_ids[0]).name})
+
+    def rename_selected_folder(self, event=None):
+        """Rename the selected folder, or the parent folder of the selected event."""
+        all_event_ids = self.event_list.get_all_selected_event_ids()
+        if len(all_event_ids) != 1:
+            return
+
+        event_obj = self._controller.get_event_by_id(all_event_ids[0])
+        if event_obj is None:
+            return
+
+        from routing.route_events import EventFolder
+        if isinstance(event_obj, EventFolder):
+            folder = event_obj
+        elif hasattr(event_obj, 'parent') and event_obj.parent is not None:
+            folder = event_obj.parent
+        else:
+            return
+
+        if folder.name == const.ROOT_FOLDER_NAME:
+            return
+
+        self.open_new_folder_window(**{const.EVENT_FOLDER_NAME: folder.name})
 
     def open_new_folder_window(self, *args, **kwargs):
         all_event_ids = self.event_list.get_all_selected_event_ids()

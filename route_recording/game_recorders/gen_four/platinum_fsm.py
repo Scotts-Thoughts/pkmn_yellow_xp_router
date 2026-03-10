@@ -16,6 +16,17 @@ from pkmn.gen_factory import current_gen_info
 
 logger = logging.getLogger(__name__)
 
+GOLDENROD_LOTTERY_MAP = "Goldenrod City - Map 12"
+GOLDENROD_LOTTERY_PRICE = 300
+GOLDENROD_LOTTERY_ITEMS = frozenset([
+    "Dragon Claw", "Shadow Claw", "Flash Cannon", "Charge Beam",
+    "Drain Punch", "Facade", "Silver Wind",
+    "Luxury Ball", "Nest Ball", "Repeat Ball", "Net Ball",
+    "Quick Ball", "Dusk Ball", "Timer Ball",
+    "Persim Berry", "Cheri Berry", "Chesto Berry", "Pecha Berry",
+    "Rawst Berry", "Aspear Berry", "Oran Berry",
+])
+
 
 class StateType(Enum):
     UNINITIALIZED = auto()
@@ -540,9 +551,29 @@ class Machine:
                     logger.info(f"Skipping purchase event for Premier Ball (will be added as free acquire)")
                     continue
 
+                # Check if this is a lottery desk purchase in Goldenrod City
+                custom_price = None
+                if purchase_expected:
+                    current_map = self._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
+                    if current_map == GOLDENROD_LOTTERY_MAP:
+                        # For TMs, check by move name (e.g. "Dragon Claw") since they come through as "TM02" etc.
+                        item_match_name = app_item_name
+                        if app_item_name.startswith("TM") or app_item_name.startswith("HM"):
+                            item_obj = current_gen_info().item_db().get_item(app_item_name)
+                            if item_obj is None:
+                                for test_name in current_gen_info().item_db().get_filtered_names(item_type=const.ITEM_TYPE_TM):
+                                    if test_name.startswith(app_item_name):
+                                        item_obj = current_gen_info().item_db().get_item(test_name)
+                                        break
+                            if item_obj is not None and item_obj.move_name is not None:
+                                item_match_name = item_obj.move_name
+                        if item_match_name in GOLDENROD_LOTTERY_ITEMS:
+                            custom_price = GOLDENROD_LOTTERY_PRICE
+                            logger.info(f"Lottery desk purchase detected: {app_item_name} at ${GOLDENROD_LOTTERY_PRICE}")
+
                 self._queue_new_event(
                     EventDefinition(
-                        item_event_def=InventoryEventDefinition(app_item_name, cur_gain_num, True, purchase_expected)
+                        item_event_def=InventoryEventDefinition(app_item_name, cur_gain_num, True, purchase_expected, custom_price=custom_price)
                     )
                 )
                 # If purchasing Pokeballs, Greatballs, or Ultraballs in quantities of 10 or greater, then add a free Premier Ball as an acquire event (not a purchase)

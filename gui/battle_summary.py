@@ -726,15 +726,6 @@ class AutocompleteEntry(ttk.Frame):
         except Exception:
             pass  # Main window might not exist yet
     
-    def _unregister_focus(self):
-        """Unregister focus with main window if available."""
-        try:
-            root = self.winfo_toplevel()
-            if hasattr(root, 'unregister_text_field_focus'):
-                root.unregister_text_field_focus()
-        except Exception:
-            pass  # Main window might not exist yet
-        
     def _on_focus_in(self, event):
         """Store original value and clear text when focused"""
         self._selecting = False  # Reset flag when gaining focus
@@ -816,8 +807,6 @@ class AutocompleteEntry(ttk.Frame):
     
     def _on_focus_out(self, event):
         """Handle focus loss"""
-        # Unregister focus with main window
-        self._unregister_focus()
         # Small delay to allow listbox click to register
         self.after(100, self._delayed_focus_out)
     
