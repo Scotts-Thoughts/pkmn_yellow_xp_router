@@ -10,7 +10,9 @@
       "Bash(python -m py_compile gui/custom_components.py 2>&1 && echo \"OK\")",
       "Bash(python -m py_compile gui/battle_summary.py 2>&1 && echo \"OK\")",
       "Bash(python -m py_compile gui/pkmn_components/route_list.py 2>&1 && echo \"OK\")",
-      "Bash(python -m py_compile gui/main_window.py 2>&1 && echo \"OK\")"
+      "Bash(python -m py_compile gui/main_window.py 2>&1 && echo \"OK\")",
+      "Bash(python -m py_compile pkmn/gen_4/gen_four_object.py 2>&1 && echo \"OK\")",
+      "Bash(grep -r \"multi\" ./route_recording/game_recorders/ --include=\"*.py\" 2>/dev/null | head -20)"
     ]
   }
 }

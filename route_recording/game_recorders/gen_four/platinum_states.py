@@ -349,12 +349,9 @@ class BattleState(WatchForResetState):
         if self.is_trainer_battle == 'Trainer':
             logger.info(f"trainer battle found")
             self._trainer_name = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_TRAINER_A_NUMBER).value
-            if self.machine.is_hgss:
+            self._second_trainer_name = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_TRAINER_B_NUMBER).value
+            if self._second_trainer_name is None:
                 self._second_trainer_name = ""
-            else:
-                self._second_trainer_name = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_TRAINER_B_NUMBER).value
-                if self._second_trainer_name is None:
-                    self._second_trainer_name = ""
 
             num_enemy_pokemon = self._get_num_enemy_trainer_pokemon()
             self._enemy_pos_lookup = self._get_enemy_pos_lookup()

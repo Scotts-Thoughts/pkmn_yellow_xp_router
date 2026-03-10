@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class GenFour(CurrentGen):
-    def __init__(self, pkmn_db_path, trainer_db_path, item_path, move_path, type_info_path, fight_info_path, min_battles_path, version_name, base_version_name=None):
+    def __init__(self, pkmn_db_path, trainer_db_path, item_path, move_path, type_info_path, fight_info_path, min_battles_path, version_name, base_version_name=None, hm_overrides=None):
         self._version_name = version_name
         self._base_version_name = base_version_name
 
@@ -45,7 +45,7 @@ class GenFour(CurrentGen):
             raise ValueError(msg)
 
         try:
-            self._item_db = ItemDB(_load_item_db(item_path))
+            self._item_db = ItemDB(_load_item_db(item_path, hm_overrides=hm_overrides))
         except Exception as e:
             msg = f"Error loading item DB: {item_path}"
             logger.exception(msg)
@@ -524,7 +524,7 @@ def _load_trainer_db(path, pkmn_db:PkmnDB):
     return result
 
 
-def _load_item_db(path):
+def _load_item_db(path, hm_overrides=None):
     result = {}
 
     with open(path, 'r') as f:
@@ -535,6 +535,9 @@ def _load_item_db(path):
         item_name:str = raw_item[const.NAME_KEY]
         move_name = None
         if item_name.startswith("TM") or item_name.startswith("HM"):
+            # Apply HM overrides (e.g. HM05 is Whirlpool in HGSS instead of Defog)
+            if hm_overrides and item_name in hm_overrides:
+                item_name = hm_overrides[item_name]
             move_name = item_name.split(" ", 1)[1]
 
         result[item_name] = universal_data_objects.BaseItem(
@@ -544,7 +547,7 @@ def _load_item_db(path):
             [],
             move_name,
         )
-    
+
     return result
 
 
@@ -604,6 +607,11 @@ gen_four_pearl = GenFour(
     const.PEARL_VERSION
 )
 
+# In HGSS, HM05 is Whirlpool instead of Defog
+_HGSS_HM_OVERRIDES = {
+    "HM05 Defog": "HM05 Whirlpool",
+}
+
 gen_four_heartgold = GenFour(
     gen_four_const.HGSS_POKEMON_PATH,
     gen_four_const.HGSS_TRAINER_DB_PATH,
@@ -612,7 +620,8 @@ gen_four_heartgold = GenFour(
     gen_four_const.TYPE_INFO_PATH,
     gen_four_const.FIGHTS_INFO_PATH,
     "",
-    const.HEART_GOLD_VERSION
+    const.HEART_GOLD_VERSION,
+    hm_overrides=_HGSS_HM_OVERRIDES,
 )
 gen_four_soulsilver = GenFour(
     gen_four_const.HGSS_POKEMON_PATH,
@@ -622,5 +631,6 @@ gen_four_soulsilver = GenFour(
     gen_four_const.TYPE_INFO_PATH,
     gen_four_const.FIGHTS_INFO_PATH,
     "",
-    const.SOUL_SILVER_VERSION
+    const.SOUL_SILVER_VERSION,
+    hm_overrides=_HGSS_HM_OVERRIDES,
 )
