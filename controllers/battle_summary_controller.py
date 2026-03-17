@@ -62,8 +62,8 @@ class PkmnRenderInfo:
 class BattleSummaryController:
     def __init__(self, main_controller:MainController):
         self._main_controller = main_controller
-        self._refresh_events = []
-        self._nonload_change_events = []
+        self._refresh_callbacks = []
+        self._nonload_change_callbacks = []
 
         # trainer object data that we don't actually use, but need to hang on to to properly re-create events
         self._trainer_name = None
@@ -110,21 +110,20 @@ class BattleSummaryController:
     # Registration methods
     #####
 
-    def register_nonload_change(self, tk_obj):
-        new_event_name = const.EVENT_BATTLE_SUMMARY_NONLOAD_CHANGE.format(len(self._nonload_change_events))
-        self._nonload_change_events.append((tk_obj, new_event_name))
-        return new_event_name
+    def register_nonload_change(self, callback):
+        self._nonload_change_callbacks.append(callback)
+        return lambda: self._nonload_change_callbacks.remove(callback)
 
-    def register_refresh(self, tk_obj):
-        new_event_name = const.EVENT_BATTLE_SUMMARY_REFRESH.format(len(self._refresh_events))
-        self._refresh_events.append((tk_obj, new_event_name))
-        return new_event_name
+    def register_refresh(self, callback):
+        self._refresh_callbacks.append(callback)
+        return lambda: self._refresh_callbacks.remove(callback)
 
     #####
     # Event callbacks
     #####
 
     def _on_refresh(self):
+<<<<<<< Updated upstream
         for tk_obj, cur_event_name in self._refresh_events:
             tk_obj.event_generate(cur_event_name, when="tail")
 
@@ -132,6 +131,22 @@ class BattleSummaryController:
         for tk_obj, cur_event_name in self._nonload_change_events:
             tk_obj.event_generate(cur_event_name, when="tail")
 
+=======
+        for callback in self._refresh_callbacks:
+            try:
+                callback()
+            except Exception as e:
+                logger.info(f"Removing refresh callback due to error: {callback}")
+                logger.exception(e)
+
+    def _on_nonload_change(self):
+        for callback in self._nonload_change_callbacks:
+            try:
+                callback()
+            except Exception:
+                logger.info(f"Removing nonload_change callback due to error: {callback}")
+    
+>>>>>>> Stashed changes
     ######
     # Methods that induce a state change
     ######

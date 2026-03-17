@@ -1,0 +1,1323 @@
+import os
+import logging
+from datetime import datetime
+from typing import List
+
+from PySide6.QtWidgets import (
+    QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
+    QFrame, QCompleter, QLineEdit,
+)
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QFont, QPixmap
+
+from controllers.battle_summary_controller import BattleSummaryController, MoveRenderInfo
+from gui_qt.components.custom_components import (
+    SimpleButton, SimpleOptionMenu, AmountEntry, CheckboxLabel,
+)
+from pkmn import universal_data_objects
+from pkmn.gen_factory import current_gen_info
+from routing import full_route_state
+from routing import route_events
+from utils.config_manager import config
+from utils.constants import const
+from utils import io_utils
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Colour utilities
+# ---------------------------------------------------------------------------
+
+def _hex_to_rgb(hex_color: str):
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) == 3:
+        hex_color = "".join(c * 2 for c in hex_color)
+    if len(hex_color) != 6:
+        return (0, 0, 0)
+    return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+
+
+def _rgb_to_hex(r, g, b):
+    return "#{:02x}{:02x}{:02x}".format(int(max(0, min(255, r))), int(max(0, min(255, g))), int(max(0, min(255, b))))
+
+
+def _blend_color(color1: str, color2: str, alpha: float) -> str:
+    """Blend *color1* over *color2* with the given *alpha* (0.0 = fully color2, 1.0 = fully color1)."""
+    c1 = str(color1) if color1 else ""
+    c2 = str(color2) if color2 else ""
+    if not c1 or not c1.startswith("#"):
+        return c2 if c2 else "#000000"
+    if not c2 or not c2.startswith("#"):
+        return c1 if c1 else "#000000"
+    try:
+        r1, g1, b1 = _hex_to_rgb(c1)
+        r2, g2, b2 = _hex_to_rgb(c2)
+        return _rgb_to_hex(
+            r1 * alpha + r2 * (1 - alpha),
+            g1 * alpha + g2 * (1 - alpha),
+            b1 * alpha + b2 * (1 - alpha),
+        )
+    except Exception:
+        return c2 if c2 else "#000000"
+
+
+# ---------------------------------------------------------------------------
+# Highlight-state colour map
+# ---------------------------------------------------------------------------
+
+_HIGHLIGHT_COLORS = {
+    1: "#006400",  # dark green
+    2: "#00008B",  # dark blue
+    3: "#FF8C00",  # dark orange
+}
+
+_HIGHLIGHT_COLORS_IMMEDIATE = {
+    1: "#165416",
+    2: "#212168",
+    3: "#69400f",
+}
+
+
+# ---------------------------------------------------------------------------
+# Helper: themed colour accessors (QSS property colours)
+# ---------------------------------------------------------------------------
+
+def _primary_bg():
+    return config.get_primary_color()
+
+def _primary_fg():
+    return config.get_text_color()
+
+def _contrast_bg():
+    return config.get_contrast_color()
+
+def _contrast_fg():
+    return config.get_text_color()
+
+def _secondary_bg():
+    return config.get_secondary_color()
+
+def _secondary_fg():
+    return config.get_text_color()
+
+def _header_bg():
+    return config.get_header_color()
+
+
+# ===================================================================
+# BattleSummary -- top-level widget
+# ===================================================================
+
+class BattleSummary(QWidget):
+    """PySide6 port of the Tkinter BattleSummary widget.
+
+    Displays per-pokemon matchup grids with damage calculations,
+    kill ranges, move highlighting, setup-move / weather / candy
+    configuration, and screenshot capability.
+    """
+
+    def __init__(self, controller: BattleSummaryController, parent=None):
+        super().__init__(parent)
+        self._controller = controller
+        self._loading = False
+
+        # ---- outer layout with scroll area --------------------------------
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        self._scroll_area = QScrollArea()
+        self._scroll_area.setWidgetResizable(True)
+        self._scroll_area.setFrameShape(QFrame.NoFrame)
+        outer_layout.addWidget(self._scroll_area)
+
+        # The scrollable content widget
+        self._base_frame = QWidget()
+        self._base_layout = QVBoxLayout(self._base_frame)
+        self._base_layout.setContentsMargins(2, 2, 2, 2)
+        self._base_layout.setSpacing(2)
+        self._scroll_area.setWidget(self._base_frame)
+
+        # ---- top bar (setup moves, weather, candy, config) ----------------
+        self._top_bar = QWidget()
+        top_bar_layout = QHBoxLayout(self._top_bar)
+        top_bar_layout.setContentsMargins(0, 0, 0, 0)
+        top_bar_layout.setSpacing(4)
+
+        # Left half: setup moves + transform
+        setup_half = QWidget()
+        setup_layout = QVBoxLayout(setup_half)
+        setup_layout.setContentsMargins(0, 0, 0, 0)
+        setup_layout.setSpacing(2)
+
+        # Player setup row
+        player_setup_row = QWidget()
+        player_setup_layout = QHBoxLayout(player_setup_row)
+        player_setup_layout.setContentsMargins(0, 0, 0, 0)
+        player_setup_layout.setSpacing(2)
+
+        self.setup_moves = SetupMovesSummary(callback=self._player_setup_move_callback, is_player=True, parent=player_setup_row)
+        player_setup_layout.addWidget(self.setup_moves)
+
+        self.transform_checkbox = CheckboxLabel(
+            text="Transform:",
+            toggle_command=self._player_transform_callback,
+            flip=True,
+            parent=player_setup_row,
+        )
+        player_setup_layout.addWidget(self.transform_checkbox)
+
+        setup_layout.addWidget(player_setup_row)
+
+        # Enemy setup row
+        self.enemy_setup_moves = SetupMovesSummary(callback=self._enemy_setup_move_callback, is_player=False, parent=setup_half)
+        setup_layout.addWidget(self.enemy_setup_moves)
+
+        top_bar_layout.addWidget(setup_half, 1)
+
+        # Right half: config button, double label, weather, candy
+        weather_half = QWidget()
+        weather_layout = QGridLayout(weather_half)
+        weather_layout.setContentsMargins(0, 0, 0, 0)
+        weather_layout.setSpacing(2)
+
+        self.config_button = SimpleButton("Configure/Help", parent=weather_half)
+        self.config_button.clicked.connect(self._launch_config_popup)
+        weather_layout.addWidget(self.config_button, 0, 0)
+
+        self.double_label = QLabel("Single Battle")
+        weather_layout.addWidget(self.double_label, 1, 0)
+
+        self.weather_status = WeatherSummary(callback=self._weather_callback, parent=weather_half)
+        weather_layout.addWidget(self.weather_status, 0, 1)
+
+        self.candy_summary = PrefightCandySummary(callback=self._candy_callback, parent=weather_half)
+        weather_layout.addWidget(self.candy_summary, 1, 1)
+
+        top_bar_layout.addWidget(weather_half, 0)
+
+        self._base_layout.addWidget(self._top_bar)
+
+        # ---- mon pair slots (up to 6) ------------------------------------
+        self._mon_pairs: List[MonPairSummary] = []
+        self._did_draw_mon_pairs: List[bool] = []
+
+        for idx in range(6):
+            mp = MonPairSummary(self._controller, idx, parent=self._base_frame)
+            mp.setVisible(False)
+            self._mon_pairs.append(mp)
+            self._base_layout.addWidget(mp)
+            self._did_draw_mon_pairs.append(False)
+
+        self._base_layout.addStretch(1)
+
+        # ---- state --------------------------------------------------------
+        self.should_render = False
+
+        # Register for refresh callbacks from the controller
+        self._unsubscribe_refresh = self._controller.register_refresh(self._on_full_refresh)
+
+        # Initial load
+        self.set_team(None)
+
+    # ------------------------------------------------------------------
+    # Public API called by main_window / event_details
+    # ------------------------------------------------------------------
+
+    def configure_weather(self, possible_weather_vals):
+        self.weather_status.configure_weather(possible_weather_vals)
+
+    def configure_setup_moves(self, possible_setup_moves):
+        self.setup_moves.configure_moves(possible_setup_moves)
+        self.enemy_setup_moves.configure_moves(possible_setup_moves)
+
+    def hide_contents(self):
+        self.should_render = False
+
+    def show_contents(self):
+        self.should_render = True
+        self._on_full_refresh()
+
+    def set_team(
+        self,
+        enemy_pkmn: List[universal_data_objects.EnemyPkmn],
+        cur_state: full_route_state.RouteState = None,
+        event_group: route_events.EventGroup = None,
+    ):
+        if event_group is not None:
+            self._controller.load_from_event(event_group)
+        elif cur_state is not None and enemy_pkmn is not None:
+            self._controller.load_from_state(cur_state, enemy_pkmn)
+        else:
+            self._controller.load_empty()
+
+    # ------------------------------------------------------------------
+    # Screenshot helpers
+    # ------------------------------------------------------------------
+
+    def _save_pixmap(self, pixmap: QPixmap, suffix: str):
+        date_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
+        save_dir = config.get_images_dir()
+        try:
+            from controllers.main_controller import MainController
+            route_name = self._controller._main_controller.get_current_route_name()
+        except Exception:
+            route_name = "battle_summary"
+        out_path = io_utils.get_safe_path_no_collision(
+            save_dir,
+            f"{date_prefix}-{route_name}_{suffix}",
+            ext=".png",
+        )
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        pixmap.save(out_path)
+        try:
+            self._controller._main_controller.send_message(f"Saved screenshot to: {out_path}")
+        except Exception:
+            pass
+
+    def take_battle_summary_screenshot(self):
+        pixmap = self._base_frame.grab()
+        self._save_pixmap(pixmap, "battle_summary")
+
+    def take_player_ranges_screenshot(self):
+        """Capture only the left (player) half of the mon-pair grids."""
+        pixmap = self._base_frame.grab()
+        # Crop to left half (approximate -- take first 50%)
+        w = pixmap.width()
+        h = pixmap.height()
+        cropped = pixmap.copy(0, 0, w // 2, h)
+        self._save_pixmap(cropped, "player_ranges")
+
+    def take_enemy_ranges_screenshot(self):
+        """Capture only the right (enemy) half of the mon-pair grids."""
+        pixmap = self._base_frame.grab()
+        w = pixmap.width()
+        h = pixmap.height()
+        cropped = pixmap.copy(w // 2, 0, w - w // 2, h)
+        self._save_pixmap(cropped, "enemy_ranges")
+
+    def _increment_prefight_candies(self):
+        self.candy_summary._increment_candy()
+
+    def _decrement_prefight_candies(self):
+        self.candy_summary._decrement_candy()
+
+    def _update_notes_visibility_in_battle_summary(self):
+        # placeholder -- notes visibility handled at main_window level in Qt
+        pass
+
+    # ------------------------------------------------------------------
+    # Internal callbacks
+    # ------------------------------------------------------------------
+
+    def _launch_config_popup(self, *args, **kwargs):
+        from gui_qt.dialogs import BattleConfigDialog
+        dlg = BattleConfigDialog(self)
+        dlg.exec()
+        self._on_full_refresh()
+
+    def _weather_callback(self, *args, **kwargs):
+        self._controller.update_weather(self.weather_status.get_weather())
+
+    def _candy_callback(self, *args, **kwargs):
+        self._controller.update_prefight_candies(self.candy_summary.get_prefight_candy_count())
+
+    def _player_setup_move_callback(self, *args, **kwargs):
+        self._controller.update_player_setup_moves(self.setup_moves._move_list.copy())
+
+    def _player_transform_callback(self, *args, **kwargs):
+        if not self._loading:
+            self._controller.update_player_transform(self.transform_checkbox.is_checked())
+
+    def _enemy_setup_move_callback(self, *args, **kwargs):
+        self._controller.update_enemy_setup_moves(self.enemy_setup_moves._move_list.copy())
+
+    # ------------------------------------------------------------------
+    # Full refresh (called by controller)
+    # ------------------------------------------------------------------
+
+    def _on_full_refresh(self, *args, **kwargs):
+        if not self.should_render:
+            return
+
+        self._loading = True
+        self.candy_summary.set_candy_count(self._controller.get_prefight_candy_count())
+        if not self._controller.can_support_prefight_candies():
+            self.candy_summary.disable()
+        else:
+            self.candy_summary.enable()
+
+        if self._controller.is_double_battle():
+            self.double_label.setText("Double Battle")
+        else:
+            self.double_label.setText("Single Battle")
+
+        self.transform_checkbox.set_checked(self._controller.is_player_transformed())
+        self.weather_status.set_weather(self._controller.get_weather())
+        self.setup_moves.set_move_list(self._controller.get_player_setup_moves())
+        self.enemy_setup_moves.set_move_list(self._controller.get_enemy_setup_moves())
+
+        for idx in range(6):
+            player_info = self._controller.get_pkmn_info(idx, True)
+            enemy_info = self._controller.get_pkmn_info(idx, False)
+
+            if player_info is None and enemy_info is None:
+                if self._did_draw_mon_pairs[idx]:
+                    self._mon_pairs[idx].setVisible(False)
+                    self._did_draw_mon_pairs[idx] = False
+            else:
+                if not self._did_draw_mon_pairs[idx]:
+                    self._mon_pairs[idx].setVisible(True)
+                    self._did_draw_mon_pairs[idx] = True
+                self._mon_pairs[idx].update_rendering()
+
+        self._loading = False
+
+    # ------------------------------------------------------------------
+    # Bounding-box helpers (used by screenshot cropping in main_window)
+    # ------------------------------------------------------------------
+
+    def get_content_bounding_box(self):
+        rect = self._base_frame.rect()
+        top_left = self._base_frame.mapToGlobal(rect.topLeft())
+        bottom_right = self._base_frame.mapToGlobal(rect.bottomRight())
+        return (top_left.x(), top_left.y(), bottom_right.x(), bottom_right.y())
+
+    def get_player_ranges_bounding_box(self):
+        rect = self._base_frame.rect()
+        top_left = self._base_frame.mapToGlobal(rect.topLeft())
+        bottom_right = self._base_frame.mapToGlobal(rect.bottomRight())
+        mid_x = (top_left.x() + bottom_right.x()) // 2
+        return (top_left.x(), top_left.y(), mid_x, bottom_right.y())
+
+    def get_enemy_ranges_bounding_box(self):
+        rect = self._base_frame.rect()
+        top_left = self._base_frame.mapToGlobal(rect.topLeft())
+        bottom_right = self._base_frame.mapToGlobal(rect.bottomRight())
+        mid_x = (top_left.x() + bottom_right.x()) // 2
+        return (mid_x, top_left.y(), bottom_right.x(), bottom_right.y())
+
+
+# ===================================================================
+# SetupMovesSummary
+# ===================================================================
+
+class SetupMovesSummary(QWidget):
+    def __init__(self, callback=None, is_player=True, parent=None):
+        super().__init__(parent)
+        self._callback = callback
+        self._move_list: List[str] = []
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        self.reset_button = SimpleButton("Reset Setup", parent=self)
+        self.reset_button.clicked.connect(self._reset)
+        layout.addWidget(self.reset_button)
+
+        self.setup_label = QLabel("Move:")
+        layout.addWidget(self.setup_label)
+
+        self.setup_moves = SimpleOptionMenu(option_list=["N/A"], parent=self)
+        layout.addWidget(self.setup_moves)
+
+        self.add_button = SimpleButton("Apply Move", parent=self)
+        self.add_button.clicked.connect(self._add_setup_move)
+        layout.addWidget(self.add_button)
+
+        label_text = "Player Setup:" if is_player else "Enemy Setup:"
+        self.extra_label = QLabel(label_text)
+        layout.addWidget(self.extra_label)
+
+        self.move_list_label = QLabel("")
+        layout.addWidget(self.move_list_label)
+
+        layout.addStretch(1)
+
+    def _reset(self, *args, **kwargs):
+        self._move_list = []
+        self._move_list_updated()
+
+    def _add_setup_move(self, *args, **kwargs):
+        self._move_list.append(self.setup_moves.get())
+        self._move_list_updated()
+
+    def configure_moves(self, new_moves):
+        self.setup_moves.new_values(new_moves)
+
+    def set_move_list(self, new_moves, trigger_update=False):
+        self._move_list = new_moves
+        self._move_list_updated(trigger_update=trigger_update)
+
+    def get_stage_modifiers(self):
+        result = universal_data_objects.StageModifiers()
+        for cur_move in self._move_list:
+            result = result.apply_stat_mod(current_gen_info().move_db().get_stat_mod(cur_move))
+        return result
+
+    def _move_list_updated(self, trigger_update=True):
+        to_display = ", ".join(self._move_list)
+        if not to_display:
+            to_display = "None"
+        self.move_list_label.setText(to_display)
+        if self._callback is not None and trigger_update:
+            self._callback()
+
+
+# ===================================================================
+# WeatherSummary
+# ===================================================================
+
+class WeatherSummary(QWidget):
+    def __init__(self, callback=None, parent=None):
+        super().__init__(parent)
+        self._outer_callback = callback
+        self._loading = False
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        self.label = QLabel("Weather:")
+        layout.addWidget(self.label)
+
+        self.weather_dropdown = SimpleOptionMenu(
+            option_list=[const.WEATHER_NONE],
+            callback=self._callback,
+            parent=self,
+        )
+        layout.addWidget(self.weather_dropdown)
+
+    def _callback(self, *args, **kwargs):
+        if self._loading:
+            return
+        if self._outer_callback is not None:
+            self._outer_callback()
+
+    def set_weather(self, new_weather):
+        self._loading = True
+        self.weather_dropdown.set(new_weather)
+        self._loading = False
+
+    def configure_weather(self, weather_vals):
+        self.weather_dropdown.new_values(weather_vals)
+
+    def get_weather(self):
+        return self.weather_dropdown.get()
+
+
+# ===================================================================
+# PrefightCandySummary
+# ===================================================================
+
+class PrefightCandySummary(QWidget):
+    def __init__(self, callback=None, parent=None):
+        super().__init__(parent)
+        self._outer_callback = callback
+        self._loading = False
+        self._candy_callback_timer = None
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        self.label = QLabel("Prefight Candies:")
+        layout.addWidget(self.label)
+
+        self.candy_count = AmountEntry(
+            callback=self._callback,
+            min_val=0,
+            init_val=0,
+            width=5,
+            parent=self,
+        )
+        layout.addWidget(self.candy_count)
+
+    def _callback(self, *args, **kwargs):
+        if self._loading:
+            return
+        # Debounce: schedule the callback after a short delay
+        if self._candy_callback_timer is not None:
+            self._candy_callback_timer.stop()
+        if self._outer_callback is not None:
+            self._candy_callback_timer = QTimer(self)
+            self._candy_callback_timer.setSingleShot(True)
+            self._candy_callback_timer.timeout.connect(self._delayed_candy_callback)
+            self._candy_callback_timer.start(300)
+
+    def _delayed_candy_callback(self):
+        self._candy_callback_timer = None
+        if self._outer_callback is not None:
+            self._outer_callback()
+
+    def _increment_candy(self, event=None):
+        if not self._loading:
+            self.candy_count._raise_amt()
+
+    def _decrement_candy(self, event=None):
+        if not self._loading:
+            self.candy_count._lower_amt()
+
+    def set_candy_count(self, new_amount):
+        self._loading = True
+        self.candy_count.set(new_amount)
+        self._loading = False
+
+    def get_prefight_candy_count(self):
+        try:
+            return int(self.candy_count.get())
+        except Exception:
+            return 0
+
+    def disable(self):
+        self.candy_count.disable()
+
+    def enable(self):
+        self.candy_count.enable()
+
+
+# ===================================================================
+# MonPairSummary -- one row per enemy pokemon matchup
+# ===================================================================
+
+class MonPairSummary(QWidget):
+    def __init__(self, controller: BattleSummaryController, mon_idx: int, parent=None):
+        super().__init__(parent)
+        self._controller = controller
+        self._mon_idx = mon_idx
+
+        main_layout = QGridLayout(self)
+        main_layout.setContentsMargins(0, 2, 0, 2)
+        main_layout.setSpacing(0)
+
+        # ---- header labels ------------------------------------------------
+        # Left header (player info) -- columns 0-3
+        self.left_mon_label_frame = QFrame()
+        self.left_mon_label_frame.setStyleSheet(
+            f"background-color: {config.get_background_color()};"
+        )
+        left_header_layout = QHBoxLayout(self.left_mon_label_frame)
+        left_header_layout.setContentsMargins(2, 2, 2, 2)
+        self.left_label = QLabel("")
+        self.left_label.setAlignment(Qt.AlignCenter)
+        self.left_label.setStyleSheet(f"color: {config.get_header_color()};")
+        left_bold = QFont()
+        left_bold.setBold(True)
+        self.left_label.setFont(left_bold)
+        left_header_layout.addWidget(self.left_label)
+        main_layout.addWidget(self.left_mon_label_frame, 0, 0, 1, 4)
+
+        # Divider -- column 4
+        self.divider = QFrame()
+        self.divider.setFixedWidth(4)
+        self.divider.setStyleSheet(f"background-color: {config.get_divider_color()};")
+        main_layout.addWidget(self.divider, 0, 4, 2, 1)
+
+        # Right header (enemy info) -- columns 5-8
+        self.right_mon_label_frame = QFrame()
+        self.right_mon_label_frame.setStyleSheet(
+            f"background-color: {config.get_background_color()};"
+        )
+        right_header_layout = QHBoxLayout(self.right_mon_label_frame)
+        right_header_layout.setContentsMargins(2, 2, 2, 2)
+        self.right_label = QLabel("")
+        self.right_label.setAlignment(Qt.AlignCenter)
+        self.right_label.setStyleSheet(f"color: {config.get_header_color()};")
+        right_bold = QFont()
+        right_bold.setBold(True)
+        self.right_label.setFont(right_bold)
+        right_header_layout.addWidget(self.right_label)
+        main_layout.addWidget(self.right_mon_label_frame, 0, 5, 1, 4)
+
+        # Configure column stretches so both halves share equal space
+        for col in range(4):
+            main_layout.setColumnStretch(col, 1)
+        main_layout.setColumnStretch(4, 0)  # divider
+        for col in range(5, 9):
+            main_layout.setColumnStretch(col, 1)
+
+        # ---- move slots ---------------------------------------------------
+        # 8 regular: 4 player (cols 0-3) + 4 enemy (cols 5-8)
+        self.move_list: List[DamageSummary] = []
+        self._did_draw: List[bool] = []
+        for cur_idx in range(8):
+            ds = DamageSummary(
+                self._controller,
+                self._mon_idx,
+                cur_idx % 4,
+                cur_idx < 4,
+                parent=self,
+            )
+            ds.setVisible(False)
+            self.move_list.append(ds)
+            self._did_draw.append(False)
+
+        # 4 test-move slots (player moves 5-8, displayed in cols 5-8)
+        self.test_move_slots: List[DamageSummary] = []
+        self._did_draw_test_moves: List[bool] = []
+        for slot_idx in range(4):
+            ds = DamageSummary(
+                self._controller,
+                self._mon_idx,
+                4 + slot_idx,
+                True,
+                parent=self,
+                is_test_move=True,
+            )
+            ds.setVisible(False)
+            self.test_move_slots.append(ds)
+            self._did_draw_test_moves.append(False)
+
+    def update_rendering(self):
+        player_rendering_info = self._controller.get_pkmn_info(self._mon_idx, True)
+        enemy_rendering_info = self._controller.get_pkmn_info(self._mon_idx, False)
+
+        self.left_label.setText(f"{player_rendering_info}")
+        self.right_label.setText(f"{enemy_rendering_info}")
+
+        test_moves_enabled = self._controller.get_test_moves_enabled()
+        grid = self.layout()
+
+        # Regular moves
+        for cur_idx, cur_move in enumerate(self.move_list):
+            column_idx = cur_idx
+            if column_idx >= 4:
+                column_idx += 1  # skip divider column
+
+            # Hide enemy moves when test moves enabled
+            if cur_idx >= 4 and test_moves_enabled:
+                if self._did_draw[cur_idx]:
+                    cur_move.setVisible(False)
+                    self._did_draw[cur_idx] = False
+            elif self._controller.get_move_info(cur_move._mon_idx, cur_move._move_idx, cur_move._is_player_mon) is not None:
+                if not self._did_draw[cur_idx]:
+                    grid.addWidget(cur_move, 1, column_idx)
+                    cur_move.setVisible(True)
+                    self._did_draw[cur_idx] = True
+                cur_move.update_rendering()
+            else:
+                if self._did_draw[cur_idx]:
+                    cur_move.setVisible(False)
+                    self._did_draw[cur_idx] = False
+
+        # Test move slots
+        if test_moves_enabled:
+            for slot_idx, test_move in enumerate(self.test_move_slots):
+                column_idx = 5 + slot_idx
+                if not self._did_draw_test_moves[slot_idx]:
+                    grid.addWidget(test_move, 1, column_idx)
+                    test_move.setVisible(True)
+                    self._did_draw_test_moves[slot_idx] = True
+                test_move.update_rendering()
+        else:
+            for slot_idx, test_move in enumerate(self.test_move_slots):
+                if self._did_draw_test_moves[slot_idx]:
+                    test_move.setVisible(False)
+                    self._did_draw_test_moves[slot_idx] = False
+
+
+# ===================================================================
+# AutocompleteEntry -- text entry with filtered listbox dropdown
+# ===================================================================
+
+class AutocompleteEntry(QWidget):
+    """A text entry with autocomplete dropdown that filters as you type."""
+
+    selection_made = Signal()
+
+    def __init__(self, values, callback=None, width=20, parent=None):
+        super().__init__(parent)
+        self._all_values = values
+        self._callback = callback
+        self._original_value = ""
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self._entry = QLineEdit()
+        self._entry.setMinimumWidth(width * 7)
+        layout.addWidget(self._entry)
+
+        # Use a QCompleter for autocomplete behaviour
+        self._completer = QCompleter(values, self)
+        self._completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self._completer.setFilterMode(Qt.MatchContains)
+        self._completer.setMaxVisibleItems(15)
+        self._completer.activated.connect(self._on_completer_activated)
+        self._entry.setCompleter(self._completer)
+
+        self._entry.editingFinished.connect(self._on_editing_finished)
+
+    def _on_completer_activated(self, text):
+        self._original_value = text
+        if self._callback:
+            self._callback()
+
+    def _on_editing_finished(self):
+        current = self._entry.text()
+        if current not in self._all_values:
+            self._entry.setText(self._original_value)
+
+    def get(self):
+        return self._entry.text()
+
+    def set(self, value):
+        self._entry.setText(value)
+        self._original_value = value
+
+    def enable(self):
+        self._entry.setEnabled(True)
+
+    def disable(self):
+        self._entry.setEnabled(False)
+
+
+# ===================================================================
+# DamageSummary -- a single move's damage info
+# ===================================================================
+
+class DamageSummary(QWidget):
+    """Renders one move slot: move name, damage range, crit range, and KO info."""
+
+    def __init__(
+        self,
+        controller: BattleSummaryController,
+        mon_idx: int,
+        move_idx: int,
+        is_player_mon: bool,
+        parent=None,
+        is_test_move: bool = False,
+    ):
+        super().__init__(parent)
+        self._controller = controller
+        self._mon_idx = mon_idx
+        self._move_idx = move_idx
+        self._is_player_mon = is_player_mon
+        self._is_test_move = is_test_move
+        self._move_name = None
+        self._is_loading = False
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(2, 0, 2, 0)
+        outer_layout.setSpacing(0)
+
+        # ---- header row (move name + optional dropdowns) ------------------
+        self.header = QFrame()
+        self.header.setStyleSheet(f"background-color: {_primary_bg()};")
+        header_layout = QHBoxLayout(self.header)
+        header_layout.setContentsMargins(2, 2, 2, 2)
+        header_layout.setSpacing(2)
+
+        # Test-move dropdown (only for first pokemon)
+        self.test_move_dropdown = None
+        if self._is_test_move and self._mon_idx == 0:
+            all_moves = current_gen_info().move_db().get_filtered_names()
+            all_moves.insert(0, "")
+            self.test_move_dropdown = AutocompleteEntry(
+                all_moves,
+                callback=self._on_test_move_changed,
+                width=18,
+                parent=self.header,
+            )
+
+        self.move_name_label = QLabel("")
+        self.move_name_label.setAlignment(Qt.AlignCenter)
+        self.move_name_label.setStyleSheet(
+            f"background-color: {_primary_bg()}; color: {_primary_fg()}; padding: 4px 0px;"
+        )
+        # Click handlers for move highlighting
+        if self._is_player_mon and not self._is_test_move:
+            self.move_name_label.mousePressEvent = self._on_move_name_mouse_press
+
+        header_layout.addWidget(self.move_name_label, 1)
+
+        self.custom_data_dropdown = SimpleOptionMenu(option_list=[""], callback=self._custom_data_callback, parent=self.header)
+        self.custom_data_dropdown.setVisible(False)
+        header_layout.addWidget(self.custom_data_dropdown)
+
+        self.stat_stage_dropdown = SimpleOptionMenu(option_list=["0"], callback=self._stat_stage_callback, parent=self.header)
+        self.stat_stage_dropdown.setVisible(False)
+        header_layout.addWidget(self.stat_stage_dropdown)
+
+        outer_layout.addWidget(self.header)
+
+        # ---- damage range rows -------------------------------------------
+        self.range_frame = QFrame()
+        self.range_frame.setStyleSheet(f"background-color: {config.get_background_color()};")
+        range_layout = QGridLayout(self.range_frame)
+        range_layout.setContentsMargins(2, 0, 2, 0)
+        range_layout.setSpacing(0)
+        range_layout.setColumnStretch(0, 1)
+        range_layout.setColumnStretch(1, 1)
+
+        self.damage_range = QLabel("")
+        self.damage_range.setStyleSheet(f"color: {config.get_contrast_color()};")
+        self.damage_range.setAlignment(Qt.AlignLeft)
+        range_layout.addWidget(self.damage_range, 0, 0)
+
+        self.pct_damage_range = QLabel("")
+        self.pct_damage_range.setStyleSheet(f"color: {config.get_contrast_color()};")
+        self.pct_damage_range.setAlignment(Qt.AlignRight)
+        range_layout.addWidget(self.pct_damage_range, 0, 1)
+
+        self.crit_damage_range = QLabel("")
+        self.crit_damage_range.setStyleSheet(f"color: {config.get_contrast_color()};")
+        self.crit_damage_range.setAlignment(Qt.AlignLeft)
+        range_layout.addWidget(self.crit_damage_range, 1, 0)
+
+        self.crit_pct_damage_range = QLabel("")
+        self.crit_pct_damage_range.setStyleSheet(f"color: {config.get_contrast_color()};")
+        self.crit_pct_damage_range.setAlignment(Qt.AlignRight)
+        range_layout.addWidget(self.crit_pct_damage_range, 1, 1)
+
+        outer_layout.addWidget(self.range_frame)
+
+        # ---- kill info row ------------------------------------------------
+        self.kill_frame = QFrame()
+        self.kill_frame.setStyleSheet(f"background-color: {config.get_background_color()};")
+        kill_layout = QVBoxLayout(self.kill_frame)
+        kill_layout.setContentsMargins(2, 0, 2, 0)
+        kill_layout.setSpacing(0)
+
+        self.num_to_kill = QLabel("")
+        self.num_to_kill.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.num_to_kill.setWordWrap(True)
+        self.num_to_kill.setStyleSheet(f"color: {config.get_secondary_color()};")
+        kill_layout.addWidget(self.num_to_kill)
+
+        outer_layout.addWidget(self.kill_frame, 1)
+
+    # ------------------------------------------------------------------
+    # Best-move highlighting (kill frame)
+    # ------------------------------------------------------------------
+
+    def flag_as_best_move(self):
+        if self._is_player_mon:
+            color = config.get_success_color()
+        else:
+            color = config.get_failure_color()
+        self.kill_frame.setStyleSheet(f"background-color: {config.get_background_color()};")
+        self.num_to_kill.setStyleSheet(f"color: {color};")
+
+    def unflag_as_best_move(self):
+        self.kill_frame.setStyleSheet(f"background-color: {config.get_background_color()};")
+        self.num_to_kill.setStyleSheet(f"color: {config.get_secondary_color()};")
+
+    # ------------------------------------------------------------------
+    # Callbacks
+    # ------------------------------------------------------------------
+
+    def _custom_data_callback(self, *args, **kwargs):
+        if self._is_loading:
+            return
+        if self._move_name == const.MIMIC_MOVE_NAME:
+            self._controller.update_mimic_selection(self.custom_data_dropdown.get())
+        else:
+            self._controller.update_custom_move_data(
+                self._mon_idx, self._move_idx, self._is_player_mon,
+                self.custom_data_dropdown.get(),
+            )
+
+    def _stat_stage_callback(self, *args, **kwargs):
+        if self._is_loading:
+            return
+        new_value = self.stat_stage_dropdown.get()
+        self._controller.update_stat_stage_setup(
+            self._mon_idx, self._move_idx, self._is_player_mon, new_value,
+        )
+
+    def _on_test_move_changed(self, *args, **kwargs):
+        if self._is_loading:
+            return
+        if self.test_move_dropdown is None:
+            return
+        selected_move = self.test_move_dropdown.get()
+        slot_idx = self._move_idx - 4
+        self._controller.update_test_move(slot_idx, selected_move)
+
+    def _on_move_name_mouse_press(self, event):
+        """Handle click on move name to cycle or reset highlight state."""
+        if not self._controller.get_show_move_highlights():
+            return
+        if not self._is_player_mon:
+            return
+        if event.button() == Qt.LeftButton:
+            self._controller.update_move_highlight(
+                self._mon_idx, self._move_idx, self._is_player_mon, reset=False,
+            )
+            self._update_highlight_colors()
+        elif event.button() == Qt.RightButton:
+            self._controller.update_move_highlight(
+                self._mon_idx, self._move_idx, self._is_player_mon, reset=True,
+            )
+            self._update_highlight_colors()
+
+    # ------------------------------------------------------------------
+    # Highlight colour helpers
+    # ------------------------------------------------------------------
+
+    def _get_highlight_state(self):
+        if not self._is_player_mon or not self._controller.get_show_move_highlights():
+            return 0
+        return self._controller.get_move_highlight_state(
+            self._mon_idx, self._move_idx, self._is_player_mon,
+        )
+
+    def _update_highlight_colors(self):
+        """Immediately update colours after a highlight click."""
+        if not self._controller.get_show_move_highlights() or not self._is_player_mon:
+            return
+        move = self._controller.get_move_info(self._mon_idx, self._move_idx, self._is_player_mon)
+        if move is None:
+            return
+
+        highlight_state = self._get_highlight_state()
+        default_bg = _primary_bg()
+        default_fg = _primary_fg()
+
+        fade_enabled = config.get_fade_moves_without_highlight() and config.get_show_move_highlights()
+        should_fade = fade_enabled and highlight_state == 0
+
+        if highlight_state in _HIGHLIGHT_COLORS_IMMEDIATE:
+            bg = _HIGHLIGHT_COLORS_IMMEDIATE[highlight_state]
+            self.header.setStyleSheet(f"background-color: {bg};")
+            self.move_name_label.setStyleSheet(f"background-color: {bg}; color: white; padding: 4px 0px;")
+            self._reset_fade_elements()
+            self._show_dropdowns_if_needed()
+        elif should_fade:
+            faded_fg = _blend_color(default_fg, default_bg, 0.1)
+            self.header.setStyleSheet(f"background-color: {default_bg};")
+            self.move_name_label.setStyleSheet(
+                f"background-color: {default_bg}; color: {faded_fg}; padding: 4px 0px;"
+            )
+            self._apply_fade_to_all_elements(faded_fg, default_bg)
+        else:
+            self.header.setStyleSheet(f"background-color: {default_bg};")
+            self.move_name_label.setStyleSheet(
+                f"background-color: {default_bg}; color: {default_fg}; padding: 4px 0px;"
+            )
+            self._reset_fade_elements()
+            self._show_dropdowns_if_needed()
+
+    def _apply_fade_to_all_elements(self, faded_fg, default_bg):
+        """Apply faded colours to damage ranges, kill text, and hide dropdowns."""
+        try:
+            contrast_fg = config.get_contrast_color()
+            contrast_bg = config.get_background_color()
+            faded_contrast = _blend_color(contrast_fg, contrast_bg, 0.1)
+            self.damage_range.setStyleSheet(f"color: {faded_contrast};")
+            self.pct_damage_range.setStyleSheet(f"color: {faded_contrast};")
+            self.crit_damage_range.setStyleSheet(f"color: {faded_contrast};")
+            self.crit_pct_damage_range.setStyleSheet(f"color: {faded_contrast};")
+
+            secondary_fg = config.get_secondary_color()
+            secondary_bg = config.get_background_color()
+            faded_secondary = _blend_color(secondary_fg, secondary_bg, 0.1)
+            self.num_to_kill.setStyleSheet(f"color: {faded_secondary};")
+
+            self.custom_data_dropdown.setVisible(False)
+            if self.test_move_dropdown is not None:
+                self.test_move_dropdown.disable()
+        except Exception:
+            pass
+
+    def _reset_fade_elements(self):
+        """Reset damage ranges and kill text to normal colours."""
+        try:
+            contrast_fg = config.get_contrast_color()
+            self.damage_range.setStyleSheet(f"color: {contrast_fg};")
+            self.pct_damage_range.setStyleSheet(f"color: {contrast_fg};")
+            self.crit_damage_range.setStyleSheet(f"color: {contrast_fg};")
+            self.crit_pct_damage_range.setStyleSheet(f"color: {contrast_fg};")
+
+            secondary_fg = config.get_secondary_color()
+            self.num_to_kill.setStyleSheet(f"color: {secondary_fg};")
+
+            if self.test_move_dropdown is not None:
+                self.test_move_dropdown.enable()
+        except Exception:
+            pass
+
+    def _show_dropdowns_if_needed(self):
+        """Restore dropdown visibility based on current move data."""
+        try:
+            move = self._controller.get_move_info(self._mon_idx, self._move_idx, self._is_player_mon)
+            if move is None:
+                return
+            custom_data_options = move.custom_data_options
+            if self._move_name == const.MIMIC_MOVE_NAME:
+                custom_data_options = move.mimic_options
+            if custom_data_options:
+                self.custom_data_dropdown.setVisible(True)
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Static formatting helper
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def format_message(kill_info):
+        kill_pct = kill_info[1]
+        if kill_pct == -1:
+            if config.do_ignore_accuracy():
+                return f"{kill_info[0]}-hit kill: 100 %"
+            else:
+                return f"{kill_info[0]}-hit kill, IGNORING ACC"
+
+        if round(kill_pct, 1) == int(kill_pct):
+            rendered_kill_pct = f"{int(kill_pct)}"
+        else:
+            rendered_kill_pct = f"{kill_pct:.1f}"
+        if config.do_ignore_accuracy():
+            return f"{kill_info[0]}-hit kill: {rendered_kill_pct} %"
+        return f"{kill_info[0]}-turn kill: {rendered_kill_pct} %"
+
+    # ------------------------------------------------------------------
+    # Main rendering method
+    # ------------------------------------------------------------------
+
+    def update_rendering(self):
+        move = self._controller.get_move_info(self._mon_idx, self._move_idx, self._is_player_mon)
+        self._move_name = None if move is None else move.name
+
+        self._is_loading = True
+
+        # ---- highlight / fade state -----------------------------------
+        fade_enabled = config.get_fade_moves_without_highlight() and config.get_show_move_highlights()
+        highlight_state = 0
+        if self._is_player_mon and self._controller.get_show_move_highlights():
+            highlight_state = self._controller.get_move_highlight_state(
+                self._mon_idx, self._move_idx, self._is_player_mon,
+            )
+
+        # Best-move flagging
+        if fade_enabled and self._is_player_mon:
+            self.unflag_as_best_move()
+        elif move is None or not move.is_best_move:
+            self.unflag_as_best_move()
+        else:
+            self.flag_as_best_move()
+
+        # ---- custom data / stat-stage dropdowns -----------------------
+        custom_data_options = None
+        custom_data_selection = None
+        if move is not None:
+            custom_data_options = move.custom_data_options
+            custom_data_selection = move.custom_data_selection
+        if self._move_name == const.MIMIC_MOVE_NAME:
+            custom_data_options = move.mimic_options
+            custom_data_selection = move.mimic_data
+
+        stat_stage_options = None
+        stat_stage_selection = "0"
+        has_global_setup_for_this_side = (
+            (self._is_player_mon and self._controller.get_player_setup_moves())
+            or (not self._is_player_mon and self._controller.get_enemy_setup_moves())
+        )
+        if move is not None and not has_global_setup_for_this_side:
+            stat_stage_options = move.stat_stage_options
+            stat_stage_selection = move.stat_stage_selection if move.stat_stage_selection else "0"
+
+        # ---- layout header components ---------------------------------
+        if self._is_test_move:
+            test_moves = self._controller.get_test_moves()
+            slot_idx = self._move_idx - 4
+            if 0 <= slot_idx < len(test_moves):
+                current_test_move = test_moves[slot_idx]
+                if self._mon_idx == 0 and self.test_move_dropdown is not None:
+                    current_val = current_test_move if current_test_move else ""
+                    if self.test_move_dropdown.get() != current_val:
+                        self.test_move_dropdown.set(current_val)
+                    self.test_move_dropdown.setVisible(True)
+                    self.move_name_label.setVisible(False)
+                else:
+                    self.move_name_label.setText(current_test_move if current_test_move else "")
+                    self.move_name_label.setVisible(True)
+                    if self.test_move_dropdown is not None:
+                        self.test_move_dropdown.setVisible(False)
+            self.custom_data_dropdown.setVisible(False)
+            self.stat_stage_dropdown.setVisible(False)
+        elif custom_data_options and stat_stage_options:
+            if self.test_move_dropdown is not None:
+                self.test_move_dropdown.setVisible(False)
+            self.move_name_label.setVisible(True)
+            self.custom_data_dropdown.setVisible(True)
+            self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
+            self.stat_stage_dropdown.setVisible(True)
+            self.stat_stage_dropdown.new_values(stat_stage_options, default_val=stat_stage_selection)
+        elif custom_data_options:
+            if self.test_move_dropdown is not None:
+                self.test_move_dropdown.setVisible(False)
+            self.move_name_label.setVisible(True)
+            self.custom_data_dropdown.setVisible(True)
+            self.custom_data_dropdown.new_values(custom_data_options, default_val=custom_data_selection)
+            self.stat_stage_dropdown.setVisible(False)
+        elif stat_stage_options:
+            if self.test_move_dropdown is not None:
+                self.test_move_dropdown.setVisible(False)
+            self.move_name_label.setVisible(True)
+            self.custom_data_dropdown.setVisible(False)
+            self.stat_stage_dropdown.setVisible(True)
+            self.stat_stage_dropdown.new_values(stat_stage_options, default_val=stat_stage_selection)
+        else:
+            if self.test_move_dropdown is not None:
+                self.test_move_dropdown.setVisible(False)
+            self.move_name_label.setVisible(True)
+            self.custom_data_dropdown.setVisible(False)
+            self.stat_stage_dropdown.setVisible(False)
+
+        # ---- populate values ------------------------------------------
+        if move is None:
+            self.move_name_label.setText("")
+            self.damage_range.setText("")
+            self.pct_damage_range.setText("")
+            self.crit_damage_range.setText("")
+            self.crit_pct_damage_range.setText("")
+            self.num_to_kill.setText("")
+        else:
+            self.move_name_label.setText(move.name)
+
+            # ---- player move highlight colouring ----------------------
+            if self._is_player_mon and self._controller.get_show_move_highlights():
+                highlight_state = self._controller.get_move_highlight_state(
+                    self._mon_idx, self._move_idx, self._is_player_mon,
+                )
+                self.move_name_label.setCursor(Qt.PointingHandCursor)
+                default_bg = _primary_bg()
+                default_fg = _primary_fg()
+
+                should_fade = fade_enabled and highlight_state == 0
+
+                if highlight_state in _HIGHLIGHT_COLORS:
+                    bg = _HIGHLIGHT_COLORS[highlight_state]
+                    self.header.setStyleSheet(f"background-color: {bg};")
+                    self.move_name_label.setStyleSheet(
+                        f"background-color: {bg}; color: white; padding: 4px 0px;"
+                    )
+                    self._reset_fade_elements()
+                elif should_fade:
+                    faded_fg = _blend_color(default_fg, default_bg, 0.1)
+                    self.header.setStyleSheet(f"background-color: {default_bg};")
+                    self.move_name_label.setStyleSheet(
+                        f"background-color: {default_bg}; color: {faded_fg}; padding: 4px 0px;"
+                    )
+                    self._apply_fade_to_all_elements(faded_fg, default_bg)
+                else:
+                    self.header.setStyleSheet(f"background-color: {default_bg};")
+                    self.move_name_label.setStyleSheet(
+                        f"background-color: {default_bg}; color: {default_fg}; padding: 4px 0px;"
+                    )
+                    self._reset_fade_elements()
+            else:
+                # Highlights disabled -- restore defaults
+                if self._is_player_mon:
+                    self.move_name_label.setCursor(Qt.ArrowCursor)
+                default_bg = _primary_bg()
+                default_fg = _primary_fg()
+                self.header.setStyleSheet(f"background-color: {default_bg};")
+                self.move_name_label.setStyleSheet(
+                    f"background-color: {default_bg}; color: {default_fg}; padding: 4px 0px;"
+                )
+                self._reset_fade_elements()
+
+            # ---- enemy-move fading ------------------------------------
+            if not self._is_player_mon and fade_enabled:
+                if move is not None and not move.is_best_move:
+                    try:
+                        default_bg = _primary_bg()
+                        default_fg = _primary_fg()
+                        faded_fg = _blend_color(default_fg, default_bg, 0.1)
+                        self.header.setStyleSheet(f"background-color: {default_bg};")
+                        self.move_name_label.setStyleSheet(
+                            f"background-color: {default_bg}; color: {faded_fg}; padding: 4px 0px;"
+                        )
+                        self._apply_fade_to_all_elements(faded_fg, default_bg)
+                        self.custom_data_dropdown.setEnabled(False)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        default_bg = _primary_bg()
+                        default_fg = _primary_fg()
+                        self.header.setStyleSheet(f"background-color: {default_bg};")
+                        self.move_name_label.setStyleSheet(
+                            f"background-color: {default_bg}; color: {default_fg}; padding: 4px 0px;"
+                        )
+                        self._reset_fade_elements()
+                        self.custom_data_dropdown.setEnabled(True)
+                    except Exception:
+                        pass
+
+            # ---- damage range text ------------------------------------
+            if move.damage_ranges is None:
+                self.damage_range.setText("")
+                self.pct_damage_range.setText("")
+                self.crit_damage_range.setText("")
+                self.crit_pct_damage_range.setText("")
+            else:
+                # Determine if we should fade the damage-range labels
+                should_fade_range = False
+                if fade_enabled:
+                    if self._is_player_mon:
+                        hl = self._controller.get_move_highlight_state(
+                            self._mon_idx, self._move_idx, self._is_player_mon,
+                        )
+                        should_fade_range = hl == 0
+                    else:
+                        should_fade_range = not move.is_best_move
+
+                contrast_fg = config.get_contrast_color()
+                contrast_bg = config.get_background_color()
+
+                if should_fade_range:
+                    faded_contrast = _blend_color(contrast_fg, contrast_bg, 0.1)
+                    range_style = f"color: {faded_contrast};"
+
+                    secondary_fg = config.get_secondary_color()
+                    faded_secondary = _blend_color(secondary_fg, contrast_bg, 0.1)
+                    self.num_to_kill.setStyleSheet(f"color: {faded_secondary};")
+
+                    self.custom_data_dropdown.setVisible(False)
+                    if self.test_move_dropdown is not None:
+                        self.test_move_dropdown.disable()
+                else:
+                    range_style = f"color: {contrast_fg};"
+
+                    secondary_fg = config.get_secondary_color()
+                    self.num_to_kill.setStyleSheet(f"color: {secondary_fg};")
+
+                    if self.test_move_dropdown is not None:
+                        self.test_move_dropdown.enable()
+
+                self.damage_range.setStyleSheet(range_style)
+                self.pct_damage_range.setStyleSheet(range_style)
+                self.crit_damage_range.setStyleSheet(range_style)
+                self.crit_pct_damage_range.setStyleSheet(range_style)
+
+                self.damage_range.setText(
+                    f"{move.damage_ranges.min_damage} - {move.damage_ranges.max_damage}"
+                )
+                pct_min = round(move.damage_ranges.min_damage / move.defending_mon_hp * 100)
+                pct_max = round(move.damage_ranges.max_damage / move.defending_mon_hp * 100)
+                self.pct_damage_range.setText(f"{pct_min} - {pct_max}%")
+
+                self.crit_damage_range.setText(
+                    f"{move.crit_damage_ranges.min_damage} - {move.crit_damage_ranges.max_damage}"
+                )
+                crit_pct_min = round(move.crit_damage_ranges.min_damage / move.defending_mon_hp * 100)
+                crit_pct_max = round(move.crit_damage_ranges.max_damage / move.defending_mon_hp * 100)
+                self.crit_pct_damage_range.setText(f"{crit_pct_min} - {crit_pct_max}%")
+
+            # ---- kill ranges ------------------------------------------
+            max_num_messages = 3
+            kill_ranges = move.kill_ranges
+            if len(kill_ranges) > max_num_messages:
+                kill_ranges = kill_ranges[: max_num_messages - 1] + [kill_ranges[-1]]
+            kill_ranges = [self.format_message(x) for x in kill_ranges]
+            self.num_to_kill.setText("\n".join(kill_ranges))
+
+        self._is_loading = False

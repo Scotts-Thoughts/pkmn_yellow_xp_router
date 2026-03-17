@@ -5,16 +5,16 @@ from utils.constants import const
 from utils import io_utils
 
 class Config:
-    DEFAULT_SUCCESS = "#abebc6"
-    DEFAULT_WARNING = "#f9e79f"
-    DEFAULT_FAILURE = "#f5b7b1"
-    DEFAULT_DIVIDER = "#b3b6b7"
-    DEFAULT_HEADER = "#f6ddcc"
-    DEFAULT_PRIMARY = "#d4e6f1"
-    DEFAULT_SECONDARY = "#f0f3f4"
-    DEFAULT_CONTRAST = "white"
-    DEFAULT_BACKGROUND = "#f0f0f0"
-    DEFAULT_TEXT_COLOR = "black"
+    DEFAULT_SUCCESS = "#4ec97a"
+    DEFAULT_WARNING = "#e8b730"
+    DEFAULT_FAILURE = "#e05555"
+    DEFAULT_DIVIDER = "#555555"
+    DEFAULT_HEADER = "#e8a850"
+    DEFAULT_PRIMARY = "#7cb8e0"
+    DEFAULT_SECONDARY = "#999999"
+    DEFAULT_CONTRAST = "#e0e0e0"
+    DEFAULT_BACKGROUND = "#1e1e1e"
+    DEFAULT_TEXT_COLOR = "#d4d4d4"
     DEFAULT_FONT_NAME = "Segoe UI"
 
     DEFAULT_PLAYER_HIGHLIGHT_STRATEGY = const.HIGHLIGHT_CONSISTENT_KILL

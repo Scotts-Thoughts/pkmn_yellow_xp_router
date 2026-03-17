@@ -1,0 +1,375 @@
+import logging
+import time
+
+from PySide6.QtWidgets import (
+    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTabWidget,
+    QSizePolicy, QGridLayout, QFrame, QScrollArea,
+)
+from PySide6.QtCore import Qt, QTimer, Signal
+
+from controllers.main_controller import MainController
+from gui_qt.event_editors import (
+    EventEditorBase, EventEditorFactory, EditorParams, NotesEditor,
+)
+from gui_qt.components.custom_components import CheckboxLabel, SimpleOptionMenu, SimpleButton
+from routing.route_events import EventDefinition, EventFolder, EventGroup, EventItem
+from utils.constants import const
+from utils.config_manager import config
+from pkmn.gen_factory import current_gen_info
+
+logger = logging.getLogger(__name__)
+
+# Late-import StateViewer to avoid circular import issues at module load time.
+# The actual import happens inside __init__; if the module hasn't been ported
+# yet we fall back to a placeholder.
+_StateViewer = None
+
+
+def _get_state_viewer_class():
+    global _StateViewer
+    if _StateViewer is None:
+        try:
+            from gui_qt.pkmn_components.state_viewer import StateViewer
+            _StateViewer = StateViewer
+        except ImportError:
+            class _Placeholder(QWidget):
+                def __init__(self, parent=None):
+                    super().__init__(parent)
+                    lay = QVBoxLayout(self)
+                    lay.addWidget(QLabel("StateViewer (not yet ported)"))
+
+                def set_state(self, state):
+                    pass
+            _StateViewer = _Placeholder
+    return _StateViewer
+
+
+class EventDetails(QWidget):
+    """Right-hand panel: tabbed pre-event state / battle summary, event editor, notes."""
+
+    STATE_SUMMARY_WIDTH = 750
+    BATTLE_SUMMARY_WIDTH = 1400
+    SAVE_DELAY = 2  # seconds
+
+    def __init__(self, controller: MainController, parent=None):
+        super().__init__(parent)
+        self._controller = controller
+        self._ignore_tab_switching = False
+        self._cur_delayed_event_id = None
+        self._cur_delayed_event_start = None
+
+        self.setMinimumWidth(self.STATE_SUMMARY_WIDTH)
+
+        # ---- main vertical layout -----------------------------------------
+        self._outer_layout = QVBoxLayout(self)
+        self._outer_layout.setContentsMargins(2, 2, 2, 2)
+        self._outer_layout.setSpacing(2)
+
+        # ---- notebook holder (tabs + auto-switch checkbox) ----------------
+        self._notebook_holder = QWidget()
+        notebook_lay = QVBoxLayout(self._notebook_holder)
+        notebook_lay.setContentsMargins(0, 0, 0, 0)
+        notebook_lay.setSpacing(0)
+
+        # Tab bar header row: tabs on left, auto-switch on right
+        tab_header = QWidget()
+        tab_header_lay = QHBoxLayout(tab_header)
+        tab_header_lay.setContentsMargins(0, 0, 0, 0)
+        tab_header_lay.setSpacing(4)
+
+        self._tabbed_states = QTabWidget()
+        tab_header_lay.addWidget(self._tabbed_states, stretch=1)
+
+        self._auto_change_tab_checkbox = CheckboxLabel(
+            text="Switch tabs automatically",
+            flip=True,
+            toggle_command=self._handle_auto_switch_toggle,
+        )
+        self._auto_change_tab_checkbox.set_checked(config.do_auto_switch())
+        tab_header_lay.addWidget(self._auto_change_tab_checkbox)
+
+        notebook_lay.addWidget(tab_header)
+        self._outer_layout.addWidget(self._notebook_holder, stretch=1)
+
+        # ---- Pre-event state tab ------------------------------------------
+        self._pre_state_frame = QWidget()
+        pre_state_lay = QVBoxLayout(self._pre_state_frame)
+        pre_state_lay.setContentsMargins(10, 10, 10, 10)
+        pre_state_lay.setSpacing(8)
+
+        # State viewer
+        StateViewerClass = _get_state_viewer_class()
+        self._state_pre_viewer = StateViewerClass()
+        pre_state_lay.addWidget(self._state_pre_viewer)
+
+        # Event editor area (will swap child widgets as selection changes)
+        self._event_details_frame = QWidget()
+        self._event_details_layout = QGridLayout(self._event_details_frame)
+        self._event_details_layout.setContentsMargins(0, 0, 0, 0)
+        self._event_details_layout.setSpacing(4)
+        pre_state_lay.addWidget(self._event_details_frame, stretch=1)
+
+        self._tabbed_states.addTab(self._pre_state_frame, "Pre-event State")
+        self._pre_state_tab_index = 0
+
+        # ---- Battle summary tab (placeholder for Phase 4) -----------------
+        self._battle_summary_frame = QWidget()
+        bs_lay = QVBoxLayout(self._battle_summary_frame)
+        bs_lay.setAlignment(Qt.AlignCenter)
+        bs_placeholder = QLabel("Battle Summary - Coming Soon")
+        bs_placeholder.setAlignment(Qt.AlignCenter)
+        bs_placeholder.setStyleSheet("font-size: 14pt; color: #888;")
+        bs_lay.addWidget(bs_placeholder)
+
+        self._tabbed_states.addTab(self._battle_summary_frame, "Battle Summary")
+        self._battle_summary_tab_index = 1
+
+        # ---- Footer: notes editor -----------------------------------------
+        self._footer_frame = QWidget()
+        footer_lay = QVBoxLayout(self._footer_frame)
+        footer_lay.setContentsMargins(5, 2, 5, 2)
+        footer_lay.setSpacing(0)
+
+        # Build editor factory and create the notes-only editor
+        self._event_editor_lookup = EventEditorFactory(self._event_details_frame)
+        self._current_event_editor: EventEditorBase | None = None
+
+        self._trainer_notes = EventEditorFactory(self._footer_frame).get_editor(
+            EditorParams(const.TASK_NOTES_ONLY, None, None),
+            save_callback=self.update_existing_event,
+            delayed_save_callback=self.update_existing_event_after_delay,
+            notes_visibility_callback=self._update_notes_visibility_in_battle_summary,
+        )
+        footer_lay.addWidget(self._trainer_notes)
+
+        self._outer_layout.addWidget(self._footer_frame, stretch=0)
+
+        # ---- Timer for delayed saves --------------------------------------
+        self._delay_timer = QTimer(self)
+        self._delay_timer.setSingleShot(True)
+        self._delay_timer.timeout.connect(self._delayed_event_update)
+
+        # ---- Tab change signal --------------------------------------------
+        self._tabbed_states.currentChanged.connect(self._tab_changed_callback)
+
+        # ---- Register with controller for events --------------------------
+        # The controller uses tkinter-style virtual events. In the Qt port we
+        # rely on a polling / callback bridge.  The controller exposes
+        # register_* helpers that return event-name strings; here we store
+        # those names and connect via the adapter installed by MainWindow.
+        # For a standalone panel the caller is expected to forward these.
+        self._event_selection_key = None
+        self._route_change_key = None
+        self._version_change_key = None
+
+        # Pre-save hook
+        self._controller.register_pre_save_hook(self.force_and_clear_event_update)
+
+        # Fire initial tab callback
+        self._tab_changed_callback(self._tabbed_states.currentIndex())
+
+    # ------------------------------------------------------------------
+    # Public API invoked by the main window's controller-event bridge
+    # ------------------------------------------------------------------
+    def handle_event_selection(self):
+        self._handle_selection()
+
+    def handle_route_change(self):
+        self._handle_route_change()
+
+    def handle_version_change(self):
+        self._handle_version_change()
+
+    def handle_record_mode_change(self):
+        self._handle_selection()
+
+    # ------------------------------------------------------------------
+    # Tab management
+    # ------------------------------------------------------------------
+    def _tab_changed_callback(self, index):
+        if index == self._battle_summary_tab_index:
+            self.setMinimumWidth(self.BATTLE_SUMMARY_WIDTH)
+            self._update_notes_visibility_in_battle_summary()
+        else:
+            self.setMinimumWidth(self.STATE_SUMMARY_WIDTH)
+            self._footer_frame.setVisible(True)
+
+    def change_tabs(self):
+        cur = self._tabbed_states.currentIndex()
+        if cur == self._battle_summary_tab_index:
+            self._tabbed_states.setCurrentIndex(self._pre_state_tab_index)
+        else:
+            self._tabbed_states.setCurrentIndex(self._battle_summary_tab_index)
+
+    # ------------------------------------------------------------------
+    # Auto-switch toggle
+    # ------------------------------------------------------------------
+    def _handle_auto_switch_toggle(self):
+        config.set_auto_switch(self._auto_change_tab_checkbox.is_checked())
+
+    # ------------------------------------------------------------------
+    # Notes visibility in battle-summary tab
+    # ------------------------------------------------------------------
+    def _update_notes_visibility_in_battle_summary(self):
+        if self._tabbed_states.currentIndex() == self._battle_summary_tab_index:
+            mode = config.get_notes_visibility_mode()
+            if mode == "never":
+                self._footer_frame.setVisible(False)
+            else:
+                self._footer_frame.setVisible(True)
+        else:
+            self._footer_frame.setVisible(True)
+
+    # ------------------------------------------------------------------
+    # Version change
+    # ------------------------------------------------------------------
+    def _handle_version_change(self):
+        # Battle summary placeholder -- will be wired in Phase 4
+        pass
+
+    # ------------------------------------------------------------------
+    # Route change
+    # ------------------------------------------------------------------
+    def _handle_route_change(self):
+        event_group = self._controller.get_single_selected_event_obj()
+        if event_group is None:
+            self._state_pre_viewer.set_state(self._controller.get_init_state())
+        else:
+            self._state_pre_viewer.set_state(event_group.init_state)
+
+    # ------------------------------------------------------------------
+    # Event selection
+    # ------------------------------------------------------------------
+    def _handle_selection(self):
+        event_group = self._controller.get_single_selected_event_obj()
+
+        if event_group is None:
+            self.show_event_details(
+                None,
+                self._controller.get_init_state(),
+                self._controller.get_final_state(),
+                allow_updates=False,
+            )
+        elif isinstance(event_group, EventFolder):
+            self.show_event_details(
+                event_group.event_definition,
+                event_group.init_state,
+                event_group.final_state,
+            )
+        else:
+            do_allow_updates = (
+                isinstance(event_group, EventGroup)
+                or event_group.event_definition.get_event_type() == const.TASK_LEARN_MOVE_LEVELUP
+            )
+            trainer_event_group = event_group
+            if isinstance(trainer_event_group, EventItem) and event_group.event_definition.learn_move is None:
+                trainer_event_group = trainer_event_group.parent
+
+            if self._ignore_tab_switching or self._auto_change_tab_checkbox.is_checked():
+                if trainer_event_group.event_definition.trainer_def is not None:
+                    self._tabbed_states.setCurrentIndex(self._battle_summary_tab_index)
+                else:
+                    self._tabbed_states.setCurrentIndex(self._pre_state_tab_index)
+
+            self.show_event_details(
+                event_group.event_definition,
+                event_group.init_state,
+                event_group.final_state,
+                do_allow_updates,
+                event_group=trainer_event_group,
+            )
+
+    # ------------------------------------------------------------------
+    # Show event details
+    # ------------------------------------------------------------------
+    def show_event_details(
+        self,
+        event_def: EventDefinition,
+        init_state,
+        final_state,
+        allow_updates=True,
+        event_group: EventGroup = None,
+    ):
+        self.force_and_clear_event_update()
+        if self._controller.is_record_mode_active():
+            allow_updates = False
+
+        self._state_pre_viewer.set_state(init_state)
+
+        # Remove the previous event editor from the details area
+        if self._current_event_editor is not None:
+            self._current_event_editor.setVisible(False)
+            self._event_details_layout.removeWidget(self._current_event_editor)
+            self._current_event_editor = None
+
+        if event_def is None:
+            self._trainer_notes.load_event(None)
+        else:
+            self._trainer_notes.load_event(event_def)
+
+            if event_def.get_event_type() != const.TASK_NOTES_ONLY:
+                self._current_event_editor = self._event_editor_lookup.get_editor(
+                    EditorParams(event_def.get_event_type(), None, init_state),
+                    save_callback=self.update_existing_event,
+                    delayed_save_callback=self.update_existing_event_after_delay,
+                    is_enabled=allow_updates,
+                )
+                self._current_event_editor.load_event(event_def)
+                self._current_event_editor.setVisible(True)
+                self._event_details_layout.addWidget(self._current_event_editor, 0, 0)
+
+    # ------------------------------------------------------------------
+    # Event update / save helpers
+    # ------------------------------------------------------------------
+    def update_existing_event(self):
+        self._event_update_helper(self._controller.get_single_selected_event_id())
+
+    def update_existing_event_after_delay(self):
+        to_save = self._controller.get_single_selected_event_id()
+        if self._cur_delayed_event_id is not None and self._cur_delayed_event_id != to_save:
+            logger.error(
+                f"Unexpected switch of event id from {self._cur_delayed_event_id} to {to_save}, something has gone wrong"
+            )
+
+        self._cur_delayed_event_id = to_save
+        self._cur_delayed_event_start = time.time() + self.SAVE_DELAY
+        self._delay_timer.start(int(self.SAVE_DELAY * 1000))
+
+    def force_and_clear_event_update(self):
+        if self._cur_delayed_event_id is None:
+            return
+        self._event_update_helper(self._cur_delayed_event_id)
+
+    def _delayed_event_update(self):
+        if self._cur_delayed_event_id is None or self._cur_delayed_event_start is None:
+            return
+        if self._cur_delayed_event_start - time.time() > 0:
+            return
+        self._event_update_helper(self._cur_delayed_event_id)
+
+    def _event_update_helper(self, event_to_update):
+        if event_to_update is None:
+            return
+
+        if self._cur_delayed_event_id is not None and self._cur_delayed_event_id != event_to_update:
+            logger.error(
+                f"Found delayed update for: {self._cur_delayed_event_id} "
+                f"which is different from the current update occurring for {event_to_update}"
+            )
+
+        self._cur_delayed_event_id = None
+        self._cur_delayed_event_start = None
+        try:
+            if self._current_event_editor is None:
+                new_event = EventDefinition()
+            else:
+                new_event = self._current_event_editor.get_event()
+
+            new_event.notes = self._trainer_notes.get_event().notes
+        except Exception as e:
+            logger.error("Exception occurred trying to update current event")
+            logger.exception(e)
+            self._controller.trigger_exception("Exception occurred trying to update current event")
+            return
+
+        self._controller.update_existing_event(event_to_update, new_event)

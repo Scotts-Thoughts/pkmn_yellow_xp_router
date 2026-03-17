@@ -1,9 +1,18 @@
 from __future__ import annotations
 import os
 import logging
+<<<<<<< Updated upstream
 from typing import Callable, List, Tuple
 import tkinter
 from PIL import ImageGrab
+=======
+import sys
+from typing import List, Tuple
+from datetime import datetime
+from PIL import ImageGrab, Image
+if sys.platform == 'win32':
+    import ctypes
+>>>>>>> Stashed changes
 
 from utils.io_utils import sanitize_string
 from utils.constants import const
@@ -51,6 +60,7 @@ class MainController:
         self._route_search = ""
         self._unsaved_changes = False
 
+<<<<<<< Updated upstream
         self._name_change_events = []
         self._version_change_events = []
         self._route_change_events = []
@@ -61,6 +71,17 @@ class MainController:
         self._sync_record_mode_change_events:List[Callable] = []
         self._message_events = []
         self._exception_events = []
+=======
+        self._name_change_callbacks = []
+        self._version_change_callbacks = []
+        self._route_change_callbacks = []
+        self._event_change_callbacks = []
+        self._event_selection_callbacks = []
+        self._event_preview_callbacks = []
+        self._record_mode_change_callbacks = []
+        self._message_callbacks = []
+        self._exception_callbacks = []
+>>>>>>> Stashed changes
 
         self._pre_save_hooks = []
     
@@ -79,6 +100,7 @@ class MainController:
     # Registration methods
     #####
 
+<<<<<<< Updated upstream
     def register_name_change(self, tk_obj):
         if self._headless:
             raise ValueError(f"Cannot register events when running in headless mode")
@@ -153,6 +175,43 @@ class MainController:
         new_event_name = const.EVENT_EXCEPTION.format(len(self._exception_events))
         self._exception_events.append((tk_obj, new_event_name))
         return new_event_name
+=======
+    def register_name_change(self, callback):
+        self._name_change_callbacks.append(callback)
+        return lambda: self._name_change_callbacks.remove(callback)
+
+    def register_version_change(self, callback):
+        self._version_change_callbacks.append(callback)
+        return lambda: self._version_change_callbacks.remove(callback)
+
+    def register_route_change(self, callback):
+        self._route_change_callbacks.append(callback)
+        return lambda: self._route_change_callbacks.remove(callback)
+
+    def register_event_update(self, callback):
+        self._event_change_callbacks.append(callback)
+        return lambda: self._event_change_callbacks.remove(callback)
+
+    def register_event_selection(self, callback):
+        self._event_selection_callbacks.append(callback)
+        return lambda: self._event_selection_callbacks.remove(callback)
+
+    def register_event_preview(self, callback):
+        self._event_preview_callbacks.append(callback)
+        return lambda: self._event_preview_callbacks.remove(callback)
+
+    def register_record_mode_change(self, callback):
+        self._record_mode_change_callbacks.append(callback)
+        return lambda: self._record_mode_change_callbacks.remove(callback)
+
+    def register_message_callback(self, callback):
+        self._message_callbacks.append(callback)
+        return lambda: self._message_callbacks.remove(callback)
+
+    def register_exception_callback(self, callback):
+        self._exception_callbacks.append(callback)
+        return lambda: self._exception_callbacks.remove(callback)
+>>>>>>> Stashed changes
 
     def register_pre_save_hook(self, fn_obj):
         if self._headless:
@@ -164,20 +223,26 @@ class MainController:
     # Event callbacks
     #####
 
+<<<<<<< Updated upstream
     def _safely_generate_events(self, event_list):
         if self._headless:
             # TODO: if we want to push events over a websocket, that will need to happen here
             return
 
+=======
+    def _safely_invoke_callbacks(self, callback_list):
+>>>>>>> Stashed changes
         to_delete = []
-        for cur_idx, (tk_obj, cur_event_name) in enumerate(event_list):
+        for cur_idx, callback in enumerate(callback_list):
             try:
-                tk_obj.event_generate(cur_event_name, when="tail")
-            except tkinter.TclError:
-                logger.info(f"Removing the following event due to TclError: {cur_event_name}")
+                callback()
+            except Exception as e:
+                logger.info(f"Removing callback due to error: {callback}")
+                logger.exception(e)
                 to_delete.append(cur_idx)
 
         for cur_idx in sorted(to_delete, reverse=True):
+<<<<<<< Updated upstream
             del event_list[cur_idx]
 
     def _on_name_change(self):
@@ -185,34 +250,52 @@ class MainController:
 
     def _on_version_change(self):
         self._safely_generate_events(self._version_change_events)
+=======
+            del callback_list[cur_idx]
+
+    def _on_name_change(self):
+        self._safely_invoke_callbacks(self._name_change_callbacks)
+
+    def _on_version_change(self):
+        self._safely_invoke_callbacks(self._version_change_callbacks)
+>>>>>>> Stashed changes
 
     def _on_route_change(self):
         self._unsaved_changes = True
-        self._safely_generate_events(self._route_change_events)
+        self._safely_invoke_callbacks(self._route_change_callbacks)
 
     def _on_event_change(self):
-        self._safely_generate_events(self._event_change_events)
+        self._safely_invoke_callbacks(self._event_change_callbacks)
         self._on_route_change()
 
     def _on_event_selection(self):
-        self._safely_generate_events(self._event_selection_events)
+        self._safely_invoke_callbacks(self._event_selection_callbacks)
 
     def _on_event_preview(self):
-        self._safely_generate_events(self._event_preview_events)
+        self._safely_invoke_callbacks(self._event_preview_callbacks)
 
     def _on_record_mode_change(self):
+<<<<<<< Updated upstream
         self._safely_generate_events(self._record_mode_change_events)
         for cur_sync_fn in self._sync_record_mode_change_events:
             cur_sync_fn(self.is_record_mode_active())
+=======
+        self._safely_invoke_callbacks(self._record_mode_change_callbacks)
+>>>>>>> Stashed changes
 
     def _on_info_message(self, info_message):
         self._message_info.append(info_message)
-        self._safely_generate_events(self._message_events)
+        self._safely_invoke_callbacks(self._message_callbacks)
 
     def _on_exception(self, exception_message):
         self._exception_info.append(exception_message)
+<<<<<<< Updated upstream
         self._safely_generate_events(self._exception_events)
 
+=======
+        self._safely_invoke_callbacks(self._exception_callbacks)
+    
+>>>>>>> Stashed changes
     def _fire_pre_save_hooks(self):
         for cur_hook in self._pre_save_hooks:
             try:
