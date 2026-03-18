@@ -41,37 +41,7 @@ class RecorderController:
         self._potential_new_folder_name = None
         self._active_area_name = None
         self._active_folder_name = const.ROOT_FOLDER_NAME
-<<<<<<< Updated upstream
 
-    def register_recorder_status_change(self, tk_obj):
-        new_event_name = const.EVENT_RECORDER_STATUS_CHANGE.format(len(self._status_events))
-        self._status_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_recorder_ready_change(self, tk_obj):
-        new_event_name = const.EVENT_RECORDER_READY_CHANGE.format(len(self._ready_events))
-        self._ready_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_recorder_game_state_change(self, tk_obj):
-        new_event_name = const.EVENT_RECORDER_GAME_STATE_CHANGE.format(len(self._game_state_events))
-        self._game_state_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def _on_status_change(self):
-        for tk_obj, cur_event_name in self._status_events:
-            tk_obj.event_generate(cur_event_name, when="tail")
-
-    def _on_ready_change(self):
-        for tk_obj, cur_event_name in self._ready_events:
-            tk_obj.event_generate(cur_event_name, when="tail")
-
-    def _on_game_state_change(self):
-        for tk_obj, cur_event_name in self._game_state_events:
-            tk_obj.event_generate(cur_event_name, when="tail")
-
-=======
-    
     def register_recorder_status_change(self, callback):
         self._status_callbacks.append(callback)
         return lambda: self._status_callbacks.remove(callback)
@@ -104,8 +74,6 @@ class RecorderController:
                 callback()
             except Exception:
                 logger.info(f"Removing game_state callback due to error: {callback}")
-    
->>>>>>> Stashed changes
     def set_status(self, new_val):
         self._status = new_val
         self._on_status_change()

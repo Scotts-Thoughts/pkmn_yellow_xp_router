@@ -84,6 +84,7 @@ class GenOne(CurrentGen):
             self._badge_rewards:Dict[str, str] = fight_info[const.BADGE_REWARDS_KEY]
             self._major_fights:List[str] = fight_info[const.MAJOR_FIGHTS_KEY]
             self._fight_rewards:Dict[str, str] = fight_info[const.FIGHT_REWARDS_KEY]
+            self._branched_mandatory_fights:List[str] = fight_info.get(const.BRANCHED_MANDATORY_FIGHTS_KEY, [])
 
             timing_info = fight_info.get(const.TRAINER_TIMING_INFO_KEY, {})
             self._trainer_timing_info = universal_data_objects.TrainerTimingStats(
@@ -206,7 +207,32 @@ class GenOne(CurrentGen):
     
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
-    
+
+    def is_branched_mandatory_fight(self, trainer_name) -> bool:
+        return trainer_name in self._branched_mandatory_fights
+
+    def has_branched_mandatory_fights(self) -> bool:
+        return len(self._branched_mandatory_fights) > 0
+
+    def get_gym_leader_names(self) -> List[str]:
+        # Gen 1 always uses the first 8 trainers (indices 0-7)
+        return self._major_fights[:8]
+
+    def get_elite_four_and_champion_names(self) -> List[str]:
+        # Gen 1: Elite Four at indices 8-11 (Agatha, Bruno, Lorelei, Lance)
+        # Champion: All Rival3 variants (there are multiple depending on rival's team)
+        elite_four = [
+            self._major_fights[8],   # Agatha 1
+            self._major_fights[9],   # Bruno 1
+            self._major_fights[10],  # Lorelei 1
+            self._major_fights[11],  # Lance 1
+        ]
+        # Find all Rival3 variants - they start at different indices
+        # Rival3 Squirtle/Bulbasaur/Charmander at indices 45-47
+        # Rival3 Jolteon/Flareon/Vaporeon at indices 62-64
+        champion_variants = [name for name in self._major_fights if "Rival3" in name]
+        return elite_four + [champion_variants]
+
     def get_move_custom_data(self, move_name) -> List[str]:
         # Gen one moves that require custom data are already handled by the rendering engine
         # Mimc, and all multi-hit moves

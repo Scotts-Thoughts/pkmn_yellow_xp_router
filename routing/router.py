@@ -25,7 +25,8 @@ class Router:
 
         self.level_up_move_defs:Dict[Tuple[str, int, str], route_events.LearnMoveEventDefinition] = {}
         self.defeated_trainers = set()
-    
+        self.test_moves:List[str] = ["", "", "", ""]
+
     def _reset_events(self):
         self.root_folder = route_events.EventFolder(None, const.ROOT_FOLDER_NAME)
         self.folder_lookup = {const.ROOT_FOLDER_NAME: self.root_folder}
@@ -33,6 +34,39 @@ class Router:
         self.event_item_lookup = {}
 
         self.defeated_trainers = set()
+        self.test_moves = ["", "", "", ""]
+
+    def restore_events_from_state(self, state: dict):
+        """Restore events from a serialized state (for undo functionality)."""
+        self._reset_events()
+
+        self.defeated_trainers = set(state.get('defeated_trainers', []))
+
+        level_up_move_defs = state.get('level_up_move_defs', {})
+        self.level_up_move_defs = {}
+        for key, serialized_move in level_up_move_defs.items():
+            try:
+                if isinstance(key, tuple) and len(key) >= 1:
+                    mon_name = key[0]
+                elif isinstance(key, str):
+                    import ast
+                    parsed = ast.literal_eval(key)
+                    mon_name = parsed[0] if isinstance(parsed, tuple) and len(parsed) >= 1 else None
+                else:
+                    mon_name = None
+
+                if mon_name:
+                    move_def = route_events.LearnMoveEventDefinition.deserialize(serialized_move, mon_default=mon_name)
+                    move_key = move_def.get_level_up_key()
+                    self.level_up_move_defs[move_key] = move_def
+            except Exception as e:
+                logger.warning(f"Failed to restore level up move {key}: {e}")
+
+        serialized_events = state.get('events', {})
+        if serialized_events:
+            self._load_events_recursive(self.root_folder, serialized_events)
+
+        self._recalc()
 
     def _change_version(self, new_version):
         self.pkmn_version = new_version
@@ -329,6 +363,73 @@ class Router:
             logger.exception(e)
             raise ValueError(f"Failed to find event object with id: {event_id}")
     
+    def set_event_highlight(self, event_id, highlight_num):
+        """Set a specific highlight type (1-9) or None to remove all highlights."""
+        try:
+            obj_to_highlight = self.get_event_obj(event_id)
+            if isinstance(obj_to_highlight, route_events.EventGroup):
+                obj_to_highlight.event_definition.set_highlight(highlight_num)
+        except Exception as e:
+            logger.error(f"Failed to set highlight for event: {event_id}")
+            logger.exception(e)
+            raise ValueError(f"Failed to find event object with id: {event_id}")
+
+    def move_event_to_adjacent_folder(self, event_id, move_up_flag):
+        """Move event to adjacent folder (up = previous folder, down = next folder)."""
+        try:
+            obj_to_move = self.get_event_obj(event_id)
+            if obj_to_move is None:
+                raise ValueError(f"Cannot find event object with id: {event_id}")
+
+            current_folder = obj_to_move.parent
+            if current_folder is None:
+                raise ValueError(f"Event {event_id} has no parent folder")
+
+            grandparent_folder = current_folder.parent
+            if grandparent_folder is None:
+                raise ValueError(f"Event {event_id} is in root folder, cannot move to adjacent folder")
+
+            try:
+                current_folder_idx = grandparent_folder.children.index(current_folder)
+            except ValueError:
+                raise ValueError(f"Current folder not found in grandparent's children")
+
+            if move_up_flag:
+                target_folder = None
+                for i in range(current_folder_idx - 1, -1, -1):
+                    sibling = grandparent_folder.children[i]
+                    if isinstance(sibling, route_events.EventFolder):
+                        target_folder = sibling
+                        break
+
+                if target_folder is None:
+                    raise ValueError(f"No previous folder found for event {event_id}")
+
+                current_folder.remove_child(obj_to_move)
+                target_folder.add_child(obj_to_move)
+            else:
+                target_folder = None
+                for i in range(current_folder_idx + 1, len(grandparent_folder.children)):
+                    sibling = grandparent_folder.children[i]
+                    if isinstance(sibling, route_events.EventFolder):
+                        target_folder = sibling
+                        break
+
+                if target_folder is None:
+                    raise ValueError(f"No next folder found for event {event_id}")
+
+                current_folder.remove_child(obj_to_move)
+                if target_folder.children:
+                    target_folder.insert_child_after(obj_to_move, before_obj=target_folder.children[0])
+                else:
+                    target_folder.add_child(obj_to_move)
+
+            self._recalc()
+        except Exception as e:
+            logger.error(f"Failed to move event object to adjacent folder: {event_id}")
+            logger.exception(e)
+            raise
+
     def get_invalid_folder_transfers(self, event_id):
         # NOTE: EventGroup objects will always have an empty result list
         # this is intentional, EventGroups can be transferred anywhere
@@ -373,6 +474,11 @@ class Router:
         event_group_obj = self.get_event_obj(event_group_id)
         if event_group_obj is None:
             raise ValueError(f"Cannot find any event with id: {event_group_id}")
+
+        # Preserve highlight tags from the old event definition
+        old_tags = event_group_obj.event_definition.tags
+        if old_tags and not new_event_def.tags:
+            new_event_def.tags = list(old_tags)
 
         if isinstance(event_group_obj, route_events.EventFolder):
             if new_event_def.get_event_type() != const.TASK_NOTES_ONLY:
@@ -439,8 +545,11 @@ class Router:
         final_path = os.path.join(const.SAVED_ROUTES_DIR, f"{name}.json")
         io_utils.backup_file_if_exists(final_path)
 
+        out_obj = self.serialize()
+        out_obj[const.TEST_MOVES_KEY] = self.test_moves
+
         with open(final_path, 'w') as f:
-            json.dump(self.serialize(), f, indent=4)
+            json.dump(out_obj, f, indent=4)
 
     def new_route(self, solo_mon, base_route_path=None, pkmn_version=const.YELLOW_VERSION, custom_dvs=None, custom_ability_idx=None, custom_nature=None):
         self._change_version(pkmn_version)
@@ -453,8 +562,10 @@ class Router:
     def load(self, route_path, load_events_only=False):
         # if we're using a template, we're going to path the full path in
         # otherwise, the name should exist in one of the two save dirs
-        with open(route_path, 'r') as f:
-            result = json.load(f)
+        try:
+            result = io_utils.read_json_file_safe(route_path)
+        except ValueError as e:
+            raise ValueError(f"Could not load route file: {e}") from e
         
         self._reset_events()
 
@@ -477,7 +588,13 @@ class Router:
                 custom_ability_idx=ability_idx,
                 custom_nature=result.get(const.NATURE_KEY),
             )
-        
+
+        # Load test moves
+        self.test_moves = result.get(const.TEST_MOVES_KEY, ["", "", "", ""])
+        while len(self.test_moves) < 4:
+            self.test_moves.append("")
+        self.test_moves = self.test_moves[:4]
+
         if len(result[const.EVENTS]) > 0:
             self._load_events_recursive(self.root_folder, result[const.EVENTS][0])
 

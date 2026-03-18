@@ -1,4 +1,24 @@
+import os
+
 from utils.config_manager import config
+
+# Compute asset paths once (Qt needs forward slashes even on Windows).
+_ASSETS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "assets",
+)
+_DARK_THEME_DIR = os.path.join(_ASSETS_DIR, "theme", "dark")
+# Checkbox images from the dark tkinter theme — reused for Qt indicators.
+_CHECK_BASIC = os.path.join(_DARK_THEME_DIR, "check-basic.gif").replace("\\", "/")
+_CHECK_HOVER = os.path.join(_DARK_THEME_DIR, "check-hover.gif").replace("\\", "/")
+_CHECK_ACCENT = os.path.join(_DARK_THEME_DIR, "check-accent.gif").replace("\\", "/")
+_BOX_BASIC = os.path.join(_DARK_THEME_DIR, "box-basic.gif").replace("\\", "/")
+_BOX_HOVER = os.path.join(_DARK_THEME_DIR, "box-hover.gif").replace("\\", "/")
+_BOX_ACCENT = os.path.join(_DARK_THEME_DIR, "box-accent.gif").replace("\\", "/")
+
+# Branch arrow images for tree expand/collapse.
+_ARROW_RIGHT = os.path.join(_DARK_THEME_DIR, "right.gif").replace("\\", "/")
+_ARROW_DOWN = os.path.join(_DARK_THEME_DIR, "down.gif").replace("\\", "/")
 
 
 def generate_stylesheet():
@@ -14,14 +34,18 @@ def generate_stylesheet():
     contrast = config.get_contrast_color()
     font_name = config.get_custom_font_name()
 
-    # Derive colors from base
-    bg_lighter = _lighten(bg, 0.08)
-    bg_darker = _darken(bg, 0.05)
-    bg_input = _lighten(bg, 0.12)
-    border_color = _lighten(bg, 0.2)
+    # Derive colors from base -- higher contrast for true dark mode
+    bg_lighter = _lighten(bg, 0.06)
+    bg_darker = _darken(bg, 0.10)
+    bg_input = _lighten(bg, 0.04)
+    border_color = _lighten(bg, 0.22)
+    border_focus = _lighten(bg, 0.35)
     accent = "#0078d4"
-    hover_bg = _lighten(bg, 0.15)
-    disabled_text = _lighten(bg, 0.35)
+    accent_hover = "#1a8ae8"
+    accent_pressed = "#005fa3"
+    hover_bg = _lighten(bg, 0.10)
+    disabled_text = _lighten(bg, 0.30)
+    subtle_border = _lighten(bg, 0.12)
 
     return f"""
 /* ===== Global ===== */
@@ -30,6 +54,7 @@ QWidget {{
     color: {text};
     font-family: "{font_name}";
     font-size: 9pt;
+    outline: none;
 }}
 QMainWindow {{
     background-color: {bg};
@@ -39,17 +64,18 @@ QMainWindow {{
 QLabel {{
     background-color: transparent;
     padding: 0px;
+    border: none;
 }}
 QLabel[class="success"] {{ color: {success}; }}
 QLabel[class="warning"] {{ color: {warning}; }}
 QLabel[class="failure"] {{ color: {failure}; }}
-QLabel[class="header"] {{ color: {header}; }}
+QLabel[class="header"] {{ color: {header}; font-weight: bold; }}
 QLabel[class="primary"] {{ color: {primary}; }}
 QLabel[class="secondary"] {{ color: {secondary}; }}
 QLabel[class="contrast"] {{ color: {contrast}; }}
 QLabel[class="divider"] {{ color: {divider}; }}
 QLabel[class="title"] {{
-    font-size: 24pt;
+    font-size: 22pt;
     font-weight: bold;
 }}
 
@@ -67,16 +93,76 @@ QPushButton:hover {{
     border-color: {accent};
 }}
 QPushButton:pressed {{
-    background-color: {accent};
+    background-color: {accent_pressed};
+    border-color: {accent};
+    color: #ffffff;
 }}
 QPushButton:disabled {{
     color: {disabled_text};
     background-color: {bg_darker};
-    border-color: {bg_darker};
+    border-color: {subtle_border};
+}}
+QPushButton:checked {{
+    background-color: {accent};
+    border-color: {accent};
+    color: #ffffff;
+}}
+QPushButton:checked:hover {{
+    background-color: {accent_hover};
+    border-color: {accent_hover};
 }}
 QPushButton[class="large"] {{
-    padding: 8px 16px;
+    padding: 6px 16px;
     font-size: 11pt;
+}}
+
+/* Amount entry +/- buttons */
+QPushButton[class="amount-btn"] {{
+    background-color: {bg_lighter};
+    border: 1px solid {border_color};
+    border-radius: 2px;
+    padding: 0px;
+    font-weight: bold;
+    font-size: 10pt;
+}}
+QPushButton[class="amount-btn"]:hover {{
+    background-color: {accent};
+    border-color: {accent};
+    color: #ffffff;
+}}
+QPushButton[class="amount-btn"]:pressed {{
+    background-color: {accent_pressed};
+}}
+QPushButton[class="amount-btn"]:disabled {{
+    color: {disabled_text};
+    background-color: {bg_darker};
+    border-color: {subtle_border};
+}}
+
+/* ===== Segmented Toggle Buttons ===== */
+QPushButton[class="seg-toggle"] {{
+    background-color: {bg_darker};
+    color: {secondary};
+    border: 1px solid {border_color};
+    border-radius: 0px;
+    padding: 4px 14px;
+    font-weight: bold;
+    min-height: 22px;
+}}
+QPushButton[class="seg-toggle"]:hover {{
+    background-color: {hover_bg};
+    color: {text};
+    border-color: {border_color};
+}}
+QPushButton[class="seg-toggle"]:checked {{
+    background-color: {bg_lighter};
+    color: #ffffff;
+    border-color: {border_color};
+    border-left: 3px solid {failure};
+}}
+QPushButton[class="seg-toggle"]:checked:hover {{
+    background-color: {hover_bg};
+    border-left: 3px solid {failure};
 }}
 
 /* ===== Line Edits ===== */
@@ -87,6 +173,7 @@ QLineEdit {{
     border-radius: 2px;
     padding: 2px 4px;
     selection-background-color: {accent};
+    selection-color: #ffffff;
 }}
 QLineEdit:focus {{
     border-color: {accent};
@@ -94,6 +181,7 @@ QLineEdit:focus {{
 QLineEdit:disabled {{
     color: {disabled_text};
     background-color: {bg_darker};
+    border-color: {subtle_border};
 }}
 
 /* ===== Text Edits ===== */
@@ -104,6 +192,7 @@ QPlainTextEdit {{
     border-radius: 2px;
     padding: 2px;
     selection-background-color: {accent};
+    selection-color: #ffffff;
 }}
 QPlainTextEdit:focus {{
     border-color: {accent};
@@ -115,39 +204,44 @@ QComboBox {{
     color: {text};
     border: 1px solid {border_color};
     border-radius: 2px;
-    padding: 2px 20px 2px 4px;
+    padding: 2px 22px 2px 6px;
     min-height: 18px;
 }}
 QComboBox:hover {{
     border-color: {accent};
 }}
+QComboBox:focus {{
+    border-color: {accent};
+}}
 QComboBox::drop-down {{
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 18px;
+    width: 20px;
     border-left: 1px solid {border_color};
-    border-top-right-radius: 2px;
-    border-bottom-right-radius: 2px;
-    background-color: {bg_lighter};
 }}
 QComboBox::down-arrow {{
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid {text};
+    image: url({_ARROW_DOWN});
 }}
 QComboBox QAbstractItemView {{
     background-color: {bg_lighter};
     color: {text};
     selection-background-color: {accent};
-    selection-color: white;
+    selection-color: #ffffff;
     border: 1px solid {border_color};
     outline: none;
+    padding: 2px;
+}}
+QComboBox QAbstractItemView::item {{
+    min-height: 20px;
+    padding: 2px 4px;
+}}
+QComboBox QAbstractItemView::item:hover {{
+    background-color: {hover_bg};
 }}
 QComboBox:disabled {{
     color: {disabled_text};
     background-color: {bg_darker};
+    border-color: {subtle_border};
 }}
 
 /* ===== Spin Boxes ===== */
@@ -168,18 +262,27 @@ QCheckBox {{
     background-color: transparent;
 }}
 QCheckBox::indicator {{
-    width: 14px;
-    height: 14px;
-    border: 1px solid {border_color};
-    border-radius: 3px;
-    background-color: {bg_input};
+    width: 16px;
+    height: 16px;
+    border: none;
 }}
 QCheckBox::indicator:checked {{
-    background-color: {accent};
-    border-color: {accent};
+    image: url({_CHECK_BASIC});
 }}
-QCheckBox::indicator:hover {{
-    border-color: {accent};
+QCheckBox::indicator:checked:hover {{
+    image: url({_CHECK_HOVER});
+}}
+QCheckBox::indicator:checked:focus {{
+    image: url({_CHECK_ACCENT});
+}}
+QCheckBox::indicator:unchecked {{
+    image: url({_BOX_BASIC});
+}}
+QCheckBox::indicator:unchecked:hover {{
+    image: url({_BOX_HOVER});
+}}
+QCheckBox::indicator:unchecked:focus {{
+    image: url({_BOX_ACCENT});
 }}
 
 /* ===== Radio Buttons ===== */
@@ -190,12 +293,15 @@ QRadioButton {{
 QRadioButton::indicator {{
     width: 14px;
     height: 14px;
-    border: 1px solid {border_color};
+    border: 1px solid {border_focus};
     border-radius: 8px;
     background-color: {bg_input};
 }}
 QRadioButton::indicator:checked {{
     background-color: {accent};
+    border-color: {accent};
+}}
+QRadioButton::indicator:hover {{
     border-color: {accent};
 }}
 
@@ -218,6 +324,7 @@ QGroupBox::title {{
 QTabWidget::pane {{
     border: 1px solid {border_color};
     background-color: {bg};
+    top: -1px;
 }}
 QTabBar::tab {{
     background-color: {bg_darker};
@@ -232,6 +339,7 @@ QTabBar::tab {{
 QTabBar::tab:selected {{
     background-color: {bg};
     border-bottom: 2px solid {accent};
+    color: #ffffff;
 }}
 QTabBar::tab:hover:!selected {{
     background-color: {hover_bg};
@@ -239,10 +347,9 @@ QTabBar::tab:hover:!selected {{
 
 /* ===== Tree View ===== */
 QTreeView {{
-    background-color: {bg_input};
+    background-color: {bg_lighter};
     color: {text};
     border: 1px solid {border_color};
-    alternate-background-color: {bg_lighter};
     selection-background-color: {accent};
     outline: none;
 }}
@@ -252,13 +359,41 @@ QTreeView::item {{
 }}
 QTreeView::item:selected {{
     background-color: {accent};
-    color: white;
+    color: #ffffff;
 }}
 QTreeView::item:hover:!selected {{
     background-color: {hover_bg};
 }}
-QTreeView::branch {{
-    background-color: transparent;
+QTreeView::branch:selected {{
+    background-color: {accent};
+}}
+QTreeView::branch:hover:!selected {{
+    background-color: {hover_bg};
+}}
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings {{
+    image: url({_ARROW_RIGHT});
+}}
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings {{
+    image: url({_ARROW_DOWN});
+}}
+QTreeView::indicator {{
+    width: 16px;
+    height: 16px;
+    border: none;
+}}
+QTreeView::indicator:checked {{
+    image: url({_CHECK_BASIC});
+}}
+QTreeView::indicator:checked:hover {{
+    image: url({_CHECK_HOVER});
+}}
+QTreeView::indicator:unchecked {{
+    image: url({_BOX_BASIC});
+}}
+QTreeView::indicator:unchecked:hover {{
+    image: url({_BOX_HOVER});
 }}
 QHeaderView::section {{
     background-color: {bg_darker};
@@ -273,6 +408,7 @@ QScrollBar:vertical {{
     background-color: {bg};
     width: 10px;
     margin: 0;
+    border: none;
 }}
 QScrollBar::handle:vertical {{
     background-color: {border_color};
@@ -285,11 +421,17 @@ QScrollBar::handle:vertical:hover {{
 }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
     height: 0;
+    border: none;
+    background: none;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+    background: none;
 }}
 QScrollBar:horizontal {{
     background-color: {bg};
     height: 10px;
     margin: 0;
+    border: none;
 }}
 QScrollBar::handle:horizontal {{
     background-color: {border_color};
@@ -302,6 +444,11 @@ QScrollBar::handle:horizontal:hover {{
 }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     width: 0;
+    border: none;
+    background: none;
+}}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+    background: none;
 }}
 QScrollArea {{
     border: none;
@@ -325,13 +472,14 @@ QMenu {{
     background-color: {bg_lighter};
     color: {text};
     border: 1px solid {border_color};
+    padding: 2px 0px;
 }}
 QMenu::item {{
     padding: 3px 24px 3px 8px;
 }}
 QMenu::item:selected {{
     background-color: {accent};
-    color: white;
+    color: #ffffff;
 }}
 QMenu::item:disabled {{
     color: {disabled_text};
@@ -342,16 +490,16 @@ QMenu::separator {{
     margin: 2px 6px;
 }}
 QMenu::indicator {{
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     margin-left: 4px;
-    border: 1px solid {border_color};
-    border-radius: 3px;
-    background-color: {bg_input};
+    border: none;
 }}
 QMenu::indicator:checked {{
-    background-color: {accent};
-    border-color: {accent};
+    image: url({_CHECK_BASIC});
+}}
+QMenu::indicator:unchecked {{
+    image: url({_BOX_BASIC});
 }}
 
 /* ===== Dialogs ===== */
@@ -369,12 +517,18 @@ QSplitter::handle:horizontal {{
 QSplitter::handle:vertical {{
     height: 3px;
 }}
+QSplitter::handle:hover {{
+    background-color: {accent};
+}}
 
 /* ===== Status Bar ===== */
 QStatusBar {{
     background-color: {bg_darker};
     color: {secondary};
     border-top: 1px solid {border_color};
+}}
+QStatusBar::item {{
+    border: none;
 }}
 
 /* ===== Progress Bar ===== */
@@ -395,7 +549,7 @@ QToolTip {{
     background-color: {bg_lighter};
     color: {text};
     border: 1px solid {border_color};
-    padding: 3px;
+    padding: 3px 6px;
 }}
 
 /* ===== QTreeWidget (game selection tables) ===== */
@@ -404,7 +558,7 @@ QTreeWidget {{
     color: {text};
     border: 1px solid {border_color};
     selection-background-color: {accent};
-    selection-color: white;
+    selection-color: #ffffff;
     outline: none;
 }}
 QTreeWidget::item {{
@@ -412,10 +566,20 @@ QTreeWidget::item {{
 }}
 QTreeWidget::item:selected {{
     background-color: {accent};
-    color: white;
+    color: #ffffff;
 }}
 QTreeWidget::item:hover:!selected {{
     background-color: {hover_bg};
+}}
+
+/* ===== QFrame separators ===== */
+QFrame[frameShape="4"] {{
+    color: {border_color};
+    max-height: 1px;
+}}
+QFrame[frameShape="5"] {{
+    color: {border_color};
+    max-width: 1px;
 }}
 """
 

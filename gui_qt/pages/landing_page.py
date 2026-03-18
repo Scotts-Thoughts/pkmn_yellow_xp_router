@@ -5,7 +5,7 @@ from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QTreeWidget,
-    QTreeWidgetItem, QCheckBox, QRadioButton, QButtonGroup, QComboBox,
+    QTreeWidgetItem, QCheckBox, QButtonGroup, QComboBox,
     QLineEdit, QHeaderView, QAbstractItemView, QSizePolicy,
 )
 from PySide6.QtCore import Qt, QTimer
@@ -131,35 +131,30 @@ class LandingPage(QWidget):
         routes_title.setAlignment(Qt.AlignCenter)
         routes_layout.addWidget(routes_title)
 
-        # Sort controls
+        # Sort controls — segmented toggle
         sort_row = QHBoxLayout()
-        sort_row.setSpacing(6)
-
-        sort_label = QLabel("Sort by:")
-        sort_row.addWidget(sort_label)
+        sort_row.setSpacing(0)
 
         self._sort_group = QButtonGroup(self)
         self._sort_group.setExclusive(True)
 
-        self._radio_recent = QRadioButton("Most Recent")
-        self._radio_alpha = QRadioButton("Alphabetical")
-        self._radio_game = QRadioButton("Game")
+        self._btn_recent = QPushButton("Most Recent")
+        self._btn_alpha = QPushButton("Alphabetical")
+        self._btn_game = QPushButton("Game")
 
-        self._sort_group.addButton(self._radio_recent)
-        self._sort_group.addButton(self._radio_alpha)
-        self._sort_group.addButton(self._radio_game)
-
-        sort_row.addWidget(self._radio_recent)
-        sort_row.addWidget(self._radio_alpha)
-        sort_row.addWidget(self._radio_game)
+        for btn in (self._btn_recent, self._btn_alpha, self._btn_game):
+            btn.setCheckable(True)
+            btn.setProperty("class", "seg-toggle")
+            self._sort_group.addButton(btn)
+            sort_row.addWidget(btn)
 
         # Set initial checked state
         if self._current_sort == self.SORT_ALPHABETICAL:
-            self._radio_alpha.setChecked(True)
+            self._btn_alpha.setChecked(True)
         elif self._current_sort == self.SORT_GAME:
-            self._radio_game.setChecked(True)
+            self._btn_game.setChecked(True)
         else:
-            self._radio_recent.setChecked(True)
+            self._btn_recent.setChecked(True)
 
         # Game filter dropdown
         self.game_filter_dropdown = QComboBox()
@@ -167,6 +162,7 @@ class LandingPage(QWidget):
         self._populate_game_filter_dropdown()
         self.game_filter_dropdown.setVisible(self._current_sort == self.SORT_GAME)
         self.game_filter_dropdown.currentTextChanged.connect(self._on_game_filter_changed)
+        sort_row.addSpacing(8)
         sort_row.addWidget(self.game_filter_dropdown)
 
         sort_row.addStretch()
@@ -293,11 +289,11 @@ class LandingPage(QWidget):
             self.load_button.setEnabled(False)
 
     def _on_sort_changed(self, button):
-        if button is self._radio_recent:
+        if button is self._btn_recent:
             self._current_sort = self.SORT_MOST_RECENT
-        elif button is self._radio_alpha:
+        elif button is self._btn_alpha:
             self._current_sort = self.SORT_ALPHABETICAL
-        elif button is self._radio_game:
+        elif button is self._btn_game:
             self._current_sort = self.SORT_GAME
         config.set_landing_page_sort(self._current_sort)
 
@@ -354,13 +350,11 @@ class LandingPage(QWidget):
         game_version = "Unknown"
         species_name = "Unknown"
         try:
-            route_data = io_utils.read_json_file_safe(route_path, max_wait_seconds=0.5)
+            import json
+            with open(route_path, 'r') as f:
+                route_data = json.load(f)
             game_version = route_data.get(const.PKMN_VERSION_KEY, "Unknown")
             species_name = route_data.get(const.NAME_KEY, "Unknown")
-        except ValueError:
-            if io_utils.is_likely_cloud_placeholder(route_path):
-                game_version = "(Sync pending)"
-                species_name = "(Sync pending)"
         except Exception:
             pass
 

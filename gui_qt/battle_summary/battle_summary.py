@@ -5,7 +5,7 @@ from typing import List
 
 from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
-    QFrame, QCompleter, QLineEdit,
+    QFrame, QCompleter, QLineEdit, QSizePolicy,
 )
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QPixmap
@@ -62,6 +62,18 @@ def _blend_color(color1: str, color2: str, alpha: float) -> str:
         return c2 if c2 else "#000000"
 
 
+def _darken(hex_color: str, amount: float) -> str:
+    """Darken a hex colour by the given amount (0.0 = no change, 1.0 = black)."""
+    try:
+        r, g, b = _hex_to_rgb(hex_color)
+        r = max(0, r * (1 - amount))
+        g = max(0, g * (1 - amount))
+        b = max(0, b * (1 - amount))
+        return _rgb_to_hex(r, g, b)
+    except Exception:
+        return hex_color
+
+
 # ---------------------------------------------------------------------------
 # Highlight-state colour map
 # ---------------------------------------------------------------------------
@@ -84,25 +96,36 @@ _HIGHLIGHT_COLORS_IMMEDIATE = {
 # ---------------------------------------------------------------------------
 
 def _primary_bg():
-    return config.get_primary_color()
+    """Move name header background - slightly lighter than app background."""
+    return _lighten_color(config.get_background_color(), 0.12)
 
 def _primary_fg():
     return config.get_text_color()
 
 def _contrast_bg():
-    return config.get_contrast_color()
+    """Damage range area background - slightly lighter than app background."""
+    return _lighten_color(config.get_background_color(), 0.06)
 
 def _contrast_fg():
     return config.get_text_color()
 
 def _secondary_bg():
-    return config.get_secondary_color()
+    """Kill info area background - same as app background."""
+    return config.get_background_color()
 
 def _secondary_fg():
     return config.get_text_color()
 
 def _header_bg():
-    return config.get_header_color()
+    """Mon pair header background - slightly lighter than app background."""
+    return _lighten_color(config.get_background_color(), 0.15)
+
+def _lighten_color(hex_color, amount):
+    r, g, b = _hex_to_rgb(hex_color)
+    r = min(255, r + (255 - r) * amount)
+    g = min(255, g + (255 - g) * amount)
+    b = min(255, b + (255 - b) * amount)
+    return _rgb_to_hex(r, g, b)
 
 
 # ===================================================================
@@ -280,13 +303,33 @@ class BattleSummary(QWidget):
         pixmap = self._base_frame.grab()
         self._save_pixmap(pixmap, "battle_summary")
 
+    def _get_divider_x_in_base_frame(self):
+        """Return (left_edge_x, right_edge_x) of the divider relative to _base_frame.
+
+        Uses the first visible MonPairSummary's divider widget to determine the
+        actual split point.  Returns None if no visible mon-pair is found.
+        """
+        for idx, mp in enumerate(self._mon_pairs):
+            if self._did_draw_mon_pairs[idx] and mp.isVisible():
+                divider = mp.divider
+                # mapTo gives the position of the divider's top-left corner
+                # relative to _base_frame
+                pos = divider.mapTo(self._base_frame, divider.rect().topLeft())
+                left_x = pos.x()
+                right_x = left_x + divider.width()
+                return (left_x, right_x)
+        return None
+
     def take_player_ranges_screenshot(self):
         """Capture only the left (player) half of the mon-pair grids."""
         pixmap = self._base_frame.grab()
-        # Crop to left half (approximate -- take first 50%)
-        w = pixmap.width()
         h = pixmap.height()
-        cropped = pixmap.copy(0, 0, w // 2, h)
+        divider_pos = self._get_divider_x_in_base_frame()
+        if divider_pos is not None:
+            split_x = divider_pos[0]  # left edge of divider
+        else:
+            split_x = pixmap.width() // 2
+        cropped = pixmap.copy(0, 0, split_x, h)
         self._save_pixmap(cropped, "player_ranges")
 
     def take_enemy_ranges_screenshot(self):
@@ -294,7 +337,12 @@ class BattleSummary(QWidget):
         pixmap = self._base_frame.grab()
         w = pixmap.width()
         h = pixmap.height()
-        cropped = pixmap.copy(w // 2, 0, w - w // 2, h)
+        divider_pos = self._get_divider_x_in_base_frame()
+        if divider_pos is not None:
+            split_x = divider_pos[1]  # right edge of divider
+        else:
+            split_x = w // 2
+        cropped = pixmap.copy(split_x, 0, w - split_x, h)
         self._save_pixmap(cropped, "enemy_ranges")
 
     def _increment_prefight_candies(self):
@@ -388,6 +436,10 @@ class BattleSummary(QWidget):
         rect = self._base_frame.rect()
         top_left = self._base_frame.mapToGlobal(rect.topLeft())
         bottom_right = self._base_frame.mapToGlobal(rect.bottomRight())
+        # Use actual divider position when available
+        divider_x = self._get_divider_global_x()
+        if divider_x is not None:
+            return (top_left.x(), top_left.y(), divider_x[0], bottom_right.y())
         mid_x = (top_left.x() + bottom_right.x()) // 2
         return (top_left.x(), top_left.y(), mid_x, bottom_right.y())
 
@@ -395,8 +447,26 @@ class BattleSummary(QWidget):
         rect = self._base_frame.rect()
         top_left = self._base_frame.mapToGlobal(rect.topLeft())
         bottom_right = self._base_frame.mapToGlobal(rect.bottomRight())
+        # Use actual divider position when available
+        divider_x = self._get_divider_global_x()
+        if divider_x is not None:
+            return (divider_x[1], top_left.y(), bottom_right.x(), bottom_right.y())
         mid_x = (top_left.x() + bottom_right.x()) // 2
         return (mid_x, top_left.y(), bottom_right.x(), bottom_right.y())
+
+    def _get_divider_global_x(self):
+        """Return (left_edge_global_x, right_edge_global_x) of the divider in global coords.
+
+        Uses the first visible MonPairSummary's divider widget.
+        Returns None if no visible mon-pair is found.
+        """
+        for idx, mp in enumerate(self._mon_pairs):
+            if self._did_draw_mon_pairs[idx] and mp.isVisible():
+                divider = mp.divider
+                top_left = divider.mapToGlobal(divider.rect().topLeft())
+                top_right = divider.mapToGlobal(divider.rect().topRight())
+                return (top_left.x(), top_right.x())
+        return None
 
 
 # ===================================================================
@@ -578,6 +648,7 @@ class PrefightCandySummary(QWidget):
         self.candy_count.enable()
 
 
+
 # ===================================================================
 # MonPairSummary -- one row per enemy pokemon matchup
 # ===================================================================
@@ -587,56 +658,45 @@ class MonPairSummary(QWidget):
         super().__init__(parent)
         self._controller = controller
         self._mon_idx = mon_idx
+        self._expanded = True
 
-        main_layout = QGridLayout(self)
-        main_layout.setContentsMargins(0, 2, 0, 2)
-        main_layout.setSpacing(0)
-
-        # ---- header labels ------------------------------------------------
-        # Left header (player info) -- columns 0-3
-        self.left_mon_label_frame = QFrame()
-        self.left_mon_label_frame.setStyleSheet(
-            f"background-color: {config.get_background_color()};"
+        # Outer frame with a subtle border to separate each matchup visually
+        self.setStyleSheet(
+            f"MonPairSummary {{ border: 1px solid {_darken(config.get_divider_color(), 0.3)}; border-radius: 3px; }}"
         )
-        left_header_layout = QHBoxLayout(self.left_mon_label_frame)
-        left_header_layout.setContentsMargins(2, 2, 2, 2)
-        self.left_label = QLabel("")
-        self.left_label.setAlignment(Qt.AlignCenter)
-        self.left_label.setStyleSheet(f"color: {config.get_header_color()};")
-        left_bold = QFont()
-        left_bold.setBold(True)
-        self.left_label.setFont(left_bold)
-        left_header_layout.addWidget(self.left_label)
-        main_layout.addWidget(self.left_mon_label_frame, 0, 0, 1, 4)
 
-        # Divider -- column 4
-        self.divider = QFrame()
-        self.divider.setFixedWidth(4)
-        self.divider.setStyleSheet(f"background-color: {config.get_divider_color()};")
-        main_layout.addWidget(self.divider, 0, 4, 2, 1)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
 
-        # Right header (enemy info) -- columns 5-8
-        self.right_mon_label_frame = QFrame()
-        self.right_mon_label_frame.setStyleSheet(
-            f"background-color: {config.get_background_color()};"
+        # ---- clickable header row -----------------------------------------
+        self._header = QLabel("")
+        self._header.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self._header.setStyleSheet(
+            "QLabel { padding: 3px 6px; font-weight: bold; border: none; }"
         )
-        right_header_layout = QHBoxLayout(self.right_mon_label_frame)
-        right_header_layout.setContentsMargins(2, 2, 2, 2)
-        self.right_label = QLabel("")
-        self.right_label.setAlignment(Qt.AlignCenter)
-        self.right_label.setStyleSheet(f"color: {config.get_header_color()};")
-        right_bold = QFont()
-        right_bold.setBold(True)
-        self.right_label.setFont(right_bold)
-        right_header_layout.addWidget(self.right_label)
-        main_layout.addWidget(self.right_mon_label_frame, 0, 5, 1, 4)
+        header_font = QFont()
+        header_font.setBold(True)
+        self._header.setFont(header_font)
+        self._header.setCursor(Qt.PointingHandCursor)
+        self._header.mousePressEvent = lambda e: self._toggle_expanded()
+        outer_layout.addWidget(self._header)
+
+        # ---- collapsible content area -------------------------------------
+        self._content = QWidget()
+        content_layout = QGridLayout(self._content)
+        content_layout.setContentsMargins(1, 1, 1, 1)
+        content_layout.setSpacing(0)
 
         # Configure column stretches so both halves share equal space
         for col in range(4):
-            main_layout.setColumnStretch(col, 1)
-        main_layout.setColumnStretch(4, 0)  # divider
+            content_layout.setColumnStretch(col, 1)
+        content_layout.setColumnStretch(4, 0)  # spacer
+        content_layout.setColumnMinimumWidth(4, 12)
         for col in range(5, 9):
-            main_layout.setColumnStretch(col, 1)
+            content_layout.setColumnStretch(col, 1)
+
+        outer_layout.addWidget(self._content)
 
         # ---- move slots ---------------------------------------------------
         # 8 regular: 4 player (cols 0-3) + 4 enemy (cols 5-8)
@@ -648,7 +708,7 @@ class MonPairSummary(QWidget):
                 self._mon_idx,
                 cur_idx % 4,
                 cur_idx < 4,
-                parent=self,
+                parent=self._content,
             )
             ds.setVisible(False)
             self.move_list.append(ds)
@@ -663,24 +723,54 @@ class MonPairSummary(QWidget):
                 self._mon_idx,
                 4 + slot_idx,
                 True,
-                parent=self,
+                parent=self._content,
                 is_test_move=True,
             )
             ds.setVisible(False)
             self.test_move_slots.append(ds)
             self._did_draw_test_moves.append(False)
 
+    def _toggle_expanded(self):
+        self._expanded = not self._expanded
+        self._content.setVisible(self._expanded)
+        # Re-render header to update the expand/collapse indicator
+        self._update_header_text()
+
+    def _update_header_text(self):
+        player_info = self._controller.get_pkmn_info(self._mon_idx, True)
+        enemy_info = self._controller.get_pkmn_info(self._mon_idx, False)
+
+        if player_info is None or enemy_info is None:
+            self._header.setText("")
+            return
+
+        arrow = "\u25bc" if self._expanded else "\u25b6"  # ▼ or ▶
+
+        player_text = f"{player_info.attacking_mon_name} Lv{player_info.attacking_mon_level}"
+        enemy_text = f"{enemy_info.attacking_mon_name} Lv{enemy_info.attacking_mon_level}"
+
+        # Color matchup text based on speed comparison
+        if player_info.attacking_mon_speed > player_info.defending_mon_speed:
+            text_color = "#3498db"  # Blue - player outspeeds
+        elif player_info.attacking_mon_speed == player_info.defending_mon_speed:
+            text_color = "#f1c40f"  # Yellow - speed tie
+        else:
+            text_color = "#e74c3c"  # Red - player underspeeds
+
+        self._header.setText(
+            f'{arrow}  <span style="color:{text_color}">{player_text} vs. {enemy_text}</span>'
+        )
+        self._header.setTextFormat(Qt.RichText)
+
     def update_rendering(self):
-        player_rendering_info = self._controller.get_pkmn_info(self._mon_idx, True)
-        enemy_rendering_info = self._controller.get_pkmn_info(self._mon_idx, False)
+        self._update_header_text()
 
-        self.left_label.setText(f"{player_rendering_info}")
-        self.right_label.setText(f"{enemy_rendering_info}")
+        test_moves_enabled = False
+        if hasattr(self._controller, 'get_test_moves_enabled'):
+            test_moves_enabled = self._controller.get_test_moves_enabled()
+        grid = self._content.layout()
 
-        test_moves_enabled = self._controller.get_test_moves_enabled()
-        grid = self.layout()
-
-        # Regular moves
+        # Regular moves: player cols 0-3, enemy cols 5-8
         for cur_idx, cur_move in enumerate(self.move_list):
             column_idx = cur_idx
             if column_idx >= 4:
@@ -693,7 +783,7 @@ class MonPairSummary(QWidget):
                     self._did_draw[cur_idx] = False
             elif self._controller.get_move_info(cur_move._mon_idx, cur_move._move_idx, cur_move._is_player_mon) is not None:
                 if not self._did_draw[cur_idx]:
-                    grid.addWidget(cur_move, 1, column_idx)
+                    grid.addWidget(cur_move, 0, column_idx)
                     cur_move.setVisible(True)
                     self._did_draw[cur_idx] = True
                 cur_move.update_rendering()
@@ -702,12 +792,12 @@ class MonPairSummary(QWidget):
                     cur_move.setVisible(False)
                     self._did_draw[cur_idx] = False
 
-        # Test move slots
+        # Test move slots: cols 5-8
         if test_moves_enabled:
             for slot_idx, test_move in enumerate(self.test_move_slots):
                 column_idx = 5 + slot_idx
                 if not self._did_draw_test_moves[slot_idx]:
-                    grid.addWidget(test_move, 1, column_idx)
+                    grid.addWidget(test_move, 0, column_idx)
                     test_move.setVisible(True)
                     self._did_draw_test_moves[slot_idx] = True
                 test_move.update_rendering()
@@ -780,7 +870,14 @@ class AutocompleteEntry(QWidget):
 # ===================================================================
 
 class DamageSummary(QWidget):
-    """Renders one move slot: move name, damage range, crit range, and KO info."""
+    """Renders one move slot: move name, damage range, crit range, and KO info.
+
+    Styled to match the original Tkinter version with coloured section
+    backgrounds:
+      - Header (move name): primary colour background
+      - Damage ranges: contrast-tinted background
+      - Kill info: secondary-tinted background
+    """
 
     def __init__(
         self,
@@ -800,15 +897,31 @@ class DamageSummary(QWidget):
         self._move_name = None
         self._is_loading = False
 
+        # Use Ignored horizontal policy so column stretch factors control widths
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(2, 0, 2, 0)
+        outer_layout.setContentsMargins(2, 0, 2, 2)
         outer_layout.setSpacing(0)
+
+        # Precompute section colours
+        primary_bg = _primary_bg()
+        primary_fg = _primary_fg()
+        contrast_color = config.get_contrast_color()
+        secondary_color = config.get_secondary_color()
+        base_bg = config.get_background_color()
+
+        # Tinted backgrounds for range and kill sections (like original Tkinter)
+        range_bg = _blend_color(contrast_color, base_bg, 0.10)
+        kill_bg = _blend_color(secondary_color, base_bg, 0.08)
 
         # ---- header row (move name + optional dropdowns) ------------------
         self.header = QFrame()
-        self.header.setStyleSheet(f"background-color: {_primary_bg()};")
+        self.header.setStyleSheet(
+            f"QFrame {{ background-color: {primary_bg}; border: none; border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+        )
         header_layout = QHBoxLayout(self.header)
-        header_layout.setContentsMargins(2, 2, 2, 2)
+        header_layout.setContentsMargins(3, 2, 3, 2)
         header_layout.setSpacing(2)
 
         # Test-move dropdown (only for first pokemon)
@@ -825,8 +938,11 @@ class DamageSummary(QWidget):
 
         self.move_name_label = QLabel("")
         self.move_name_label.setAlignment(Qt.AlignCenter)
+        move_name_font = QFont()
+        move_name_font.setBold(True)
+        self.move_name_label.setFont(move_name_font)
         self.move_name_label.setStyleSheet(
-            f"background-color: {_primary_bg()}; color: {_primary_fg()}; padding: 4px 0px;"
+            f"background-color: {primary_bg}; color: {primary_fg}; padding: 2px 4px; border: none;"
         )
         # Click handlers for move highlighting
         if self._is_player_mon and not self._is_test_move:
@@ -846,30 +962,34 @@ class DamageSummary(QWidget):
 
         # ---- damage range rows -------------------------------------------
         self.range_frame = QFrame()
-        self.range_frame.setStyleSheet(f"background-color: {config.get_background_color()};")
+        self.range_frame.setStyleSheet(
+            f"QFrame {{ background-color: {range_bg}; border: none; }}"
+        )
         range_layout = QGridLayout(self.range_frame)
-        range_layout.setContentsMargins(2, 0, 2, 0)
+        range_layout.setContentsMargins(4, 1, 4, 1)
         range_layout.setSpacing(0)
         range_layout.setColumnStretch(0, 1)
         range_layout.setColumnStretch(1, 1)
 
+        range_label_style = f"color: {contrast_color}; background: transparent; border: none;"
+
         self.damage_range = QLabel("")
-        self.damage_range.setStyleSheet(f"color: {config.get_contrast_color()};")
+        self.damage_range.setStyleSheet(range_label_style)
         self.damage_range.setAlignment(Qt.AlignLeft)
         range_layout.addWidget(self.damage_range, 0, 0)
 
         self.pct_damage_range = QLabel("")
-        self.pct_damage_range.setStyleSheet(f"color: {config.get_contrast_color()};")
+        self.pct_damage_range.setStyleSheet(range_label_style)
         self.pct_damage_range.setAlignment(Qt.AlignRight)
         range_layout.addWidget(self.pct_damage_range, 0, 1)
 
         self.crit_damage_range = QLabel("")
-        self.crit_damage_range.setStyleSheet(f"color: {config.get_contrast_color()};")
+        self.crit_damage_range.setStyleSheet(range_label_style)
         self.crit_damage_range.setAlignment(Qt.AlignLeft)
         range_layout.addWidget(self.crit_damage_range, 1, 0)
 
         self.crit_pct_damage_range = QLabel("")
-        self.crit_pct_damage_range.setStyleSheet(f"color: {config.get_contrast_color()};")
+        self.crit_pct_damage_range.setStyleSheet(range_label_style)
         self.crit_pct_damage_range.setAlignment(Qt.AlignRight)
         range_layout.addWidget(self.crit_pct_damage_range, 1, 1)
 
@@ -877,16 +997,23 @@ class DamageSummary(QWidget):
 
         # ---- kill info row ------------------------------------------------
         self.kill_frame = QFrame()
-        self.kill_frame.setStyleSheet(f"background-color: {config.get_background_color()};")
-        kill_layout = QVBoxLayout(self.kill_frame)
-        kill_layout.setContentsMargins(2, 0, 2, 0)
+        self.kill_frame.setStyleSheet(
+            f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+        )
+        kill_layout = QHBoxLayout(self.kill_frame)
+        kill_layout.setContentsMargins(4, 1, 4, 2)
         kill_layout.setSpacing(0)
 
+        kill_label_style = f"color: {secondary_color}; background: transparent; border: none;"
         self.num_to_kill = QLabel("")
         self.num_to_kill.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.num_to_kill.setWordWrap(True)
-        self.num_to_kill.setStyleSheet(f"color: {config.get_secondary_color()};")
+        self.num_to_kill.setStyleSheet(kill_label_style)
         kill_layout.addWidget(self.num_to_kill)
+
+        self.kill_pct = QLabel("")
+        self.kill_pct.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        self.kill_pct.setStyleSheet(kill_label_style)
+        kill_layout.addWidget(self.kill_pct)
 
         outer_layout.addWidget(self.kill_frame, 1)
 
@@ -896,15 +1023,26 @@ class DamageSummary(QWidget):
 
     def flag_as_best_move(self):
         if self._is_player_mon:
-            color = config.get_success_color()
+            flag_color = config.get_success_color()
         else:
-            color = config.get_failure_color()
-        self.kill_frame.setStyleSheet(f"background-color: {config.get_background_color()};")
-        self.num_to_kill.setStyleSheet(f"color: {color};")
+            flag_color = config.get_failure_color()
+        flag_bg = _blend_color(flag_color, config.get_background_color(), 0.20)
+        self.kill_frame.setStyleSheet(
+            f"QFrame {{ background-color: {flag_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+        )
+        kill_style = f"color: {flag_color}; background: transparent; border: none; font-weight: bold;"
+        self.num_to_kill.setStyleSheet(kill_style)
+        self.kill_pct.setStyleSheet(kill_style)
 
     def unflag_as_best_move(self):
-        self.kill_frame.setStyleSheet(f"background-color: {config.get_background_color()};")
-        self.num_to_kill.setStyleSheet(f"color: {config.get_secondary_color()};")
+        secondary_color = config.get_secondary_color()
+        kill_bg = _blend_color(secondary_color, config.get_background_color(), 0.08)
+        self.kill_frame.setStyleSheet(
+            f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+        )
+        kill_style = f"color: {secondary_color}; background: transparent; border: none;"
+        self.num_to_kill.setStyleSheet(kill_style)
+        self.kill_pct.setStyleSheet(kill_style)
 
     # ------------------------------------------------------------------
     # Callbacks
@@ -948,12 +1086,10 @@ class DamageSummary(QWidget):
             self._controller.update_move_highlight(
                 self._mon_idx, self._move_idx, self._is_player_mon, reset=False,
             )
-            self._update_highlight_colors()
         elif event.button() == Qt.RightButton:
             self._controller.update_move_highlight(
                 self._mon_idx, self._move_idx, self._is_player_mon, reset=True,
             )
-            self._update_highlight_colors()
 
     # ------------------------------------------------------------------
     # Highlight colour helpers
@@ -983,21 +1119,29 @@ class DamageSummary(QWidget):
 
         if highlight_state in _HIGHLIGHT_COLORS_IMMEDIATE:
             bg = _HIGHLIGHT_COLORS_IMMEDIATE[highlight_state]
-            self.header.setStyleSheet(f"background-color: {bg};")
-            self.move_name_label.setStyleSheet(f"background-color: {bg}; color: white; padding: 4px 0px;")
+            self.header.setStyleSheet(
+                f"QFrame {{ background-color: {bg}; border: none; border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+            )
+            self.move_name_label.setStyleSheet(
+                f"background-color: {bg}; color: white; padding: 2px 4px; border: none; font-weight: bold;"
+            )
             self._reset_fade_elements()
             self._show_dropdowns_if_needed()
         elif should_fade:
             faded_fg = _blend_color(default_fg, default_bg, 0.1)
-            self.header.setStyleSheet(f"background-color: {default_bg};")
+            self.header.setStyleSheet(
+                f"QFrame {{ background-color: {default_bg}; border: none; border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+            )
             self.move_name_label.setStyleSheet(
-                f"background-color: {default_bg}; color: {faded_fg}; padding: 4px 0px;"
+                f"background-color: {default_bg}; color: {faded_fg}; padding: 2px 4px; border: none;"
             )
             self._apply_fade_to_all_elements(faded_fg, default_bg)
         else:
-            self.header.setStyleSheet(f"background-color: {default_bg};")
+            self.header.setStyleSheet(
+                f"QFrame {{ background-color: {default_bg}; border: none; border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+            )
             self.move_name_label.setStyleSheet(
-                f"background-color: {default_bg}; color: {default_fg}; padding: 4px 0px;"
+                f"background-color: {default_bg}; color: {default_fg}; padding: 2px 4px; border: none; font-weight: bold;"
             )
             self._reset_fade_elements()
             self._show_dropdowns_if_needed()
@@ -1008,15 +1152,29 @@ class DamageSummary(QWidget):
             contrast_fg = config.get_contrast_color()
             contrast_bg = config.get_background_color()
             faded_contrast = _blend_color(contrast_fg, contrast_bg, 0.1)
-            self.damage_range.setStyleSheet(f"color: {faded_contrast};")
-            self.pct_damage_range.setStyleSheet(f"color: {faded_contrast};")
-            self.crit_damage_range.setStyleSheet(f"color: {faded_contrast};")
-            self.crit_pct_damage_range.setStyleSheet(f"color: {faded_contrast};")
+            faded_range_style = f"color: {faded_contrast}; background: transparent; border: none;"
+            self.damage_range.setStyleSheet(faded_range_style)
+            self.pct_damage_range.setStyleSheet(faded_range_style)
+            self.crit_damage_range.setStyleSheet(faded_range_style)
+            self.crit_pct_damage_range.setStyleSheet(faded_range_style)
+
+            # Fade the range frame background too
+            faded_range_bg = _blend_color(contrast_fg, contrast_bg, 0.04)
+            self.range_frame.setStyleSheet(
+                f"QFrame {{ background-color: {faded_range_bg}; border: none; }}"
+            )
 
             secondary_fg = config.get_secondary_color()
             secondary_bg = config.get_background_color()
             faded_secondary = _blend_color(secondary_fg, secondary_bg, 0.1)
-            self.num_to_kill.setStyleSheet(f"color: {faded_secondary};")
+            faded_kill_style = f"color: {faded_secondary}; background: transparent; border: none;"
+            self.num_to_kill.setStyleSheet(faded_kill_style)
+            self.kill_pct.setStyleSheet(faded_kill_style)
+
+            faded_kill_bg = _blend_color(secondary_fg, secondary_bg, 0.03)
+            self.kill_frame.setStyleSheet(
+                f"QFrame {{ background-color: {faded_kill_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+            )
 
             self.custom_data_dropdown.setVisible(False)
             if self.test_move_dropdown is not None:
@@ -1028,13 +1186,27 @@ class DamageSummary(QWidget):
         """Reset damage ranges and kill text to normal colours."""
         try:
             contrast_fg = config.get_contrast_color()
-            self.damage_range.setStyleSheet(f"color: {contrast_fg};")
-            self.pct_damage_range.setStyleSheet(f"color: {contrast_fg};")
-            self.crit_damage_range.setStyleSheet(f"color: {contrast_fg};")
-            self.crit_pct_damage_range.setStyleSheet(f"color: {contrast_fg};")
+            base_bg = config.get_background_color()
+            range_label_style = f"color: {contrast_fg}; background: transparent; border: none;"
+            self.damage_range.setStyleSheet(range_label_style)
+            self.pct_damage_range.setStyleSheet(range_label_style)
+            self.crit_damage_range.setStyleSheet(range_label_style)
+            self.crit_pct_damage_range.setStyleSheet(range_label_style)
+
+            range_bg = _blend_color(contrast_fg, base_bg, 0.10)
+            self.range_frame.setStyleSheet(
+                f"QFrame {{ background-color: {range_bg}; border: none; }}"
+            )
 
             secondary_fg = config.get_secondary_color()
-            self.num_to_kill.setStyleSheet(f"color: {secondary_fg};")
+            kill_style = f"color: {secondary_fg}; background: transparent; border: none;"
+            self.num_to_kill.setStyleSheet(kill_style)
+            self.kill_pct.setStyleSheet(kill_style)
+
+            kill_bg = _blend_color(secondary_fg, base_bg, 0.08)
+            self.kill_frame.setStyleSheet(
+                f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+            )
 
             if self.test_move_dropdown is not None:
                 self.test_move_dropdown.enable()
@@ -1061,20 +1233,21 @@ class DamageSummary(QWidget):
 
     @staticmethod
     def format_message(kill_info):
+        """Return (description, percentage) tuple for a kill range entry."""
         kill_pct = kill_info[1]
         if kill_pct == -1:
             if config.do_ignore_accuracy():
-                return f"{kill_info[0]}-hit kill: 100 %"
+                return (f"{kill_info[0]}-hit kill:", "100 %")
             else:
-                return f"{kill_info[0]}-hit kill, IGNORING ACC"
+                return (f"{kill_info[0]}-hit kill, IGNORING ACC", "")
 
         if round(kill_pct, 1) == int(kill_pct):
             rendered_kill_pct = f"{int(kill_pct)}"
         else:
             rendered_kill_pct = f"{kill_pct:.1f}"
         if config.do_ignore_accuracy():
-            return f"{kill_info[0]}-hit kill: {rendered_kill_pct} %"
-        return f"{kill_info[0]}-turn kill: {rendered_kill_pct} %"
+            return (f"{kill_info[0]}-hit kill:", f"{rendered_kill_pct} %")
+        return (f"{kill_info[0]}-turn kill:", f"{rendered_kill_pct} %")
 
     # ------------------------------------------------------------------
     # Main rendering method
@@ -1094,13 +1267,7 @@ class DamageSummary(QWidget):
                 self._mon_idx, self._move_idx, self._is_player_mon,
             )
 
-        # Best-move flagging
-        if fade_enabled and self._is_player_mon:
-            self.unflag_as_best_move()
-        elif move is None or not move.is_best_move:
-            self.unflag_as_best_move()
-        else:
-            self.flag_as_best_move()
+        # Best-move flagging is applied later, after damage range styling
 
         # ---- custom data / stat-stage dropdowns -----------------------
         custom_data_options = None
@@ -1124,7 +1291,7 @@ class DamageSummary(QWidget):
 
         # ---- layout header components ---------------------------------
         if self._is_test_move:
-            test_moves = self._controller.get_test_moves()
+            test_moves = self._controller.get_test_moves() if hasattr(self._controller, 'get_test_moves') else []
             slot_idx = self._move_idx - 4
             if 0 <= slot_idx < len(test_moves):
                 current_test_move = test_moves[slot_idx]
@@ -1178,8 +1345,20 @@ class DamageSummary(QWidget):
             self.crit_damage_range.setText("")
             self.crit_pct_damage_range.setText("")
             self.num_to_kill.setText("")
+            self.kill_pct.setText("")
         else:
             self.move_name_label.setText(move.name)
+
+            default_bg = _primary_bg()
+            default_fg = _primary_fg()
+            header_frame_style = (
+                f"QFrame {{ background-color: {default_bg}; border: none;"
+                f" border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+            )
+            move_label_style = (
+                f"background-color: {default_bg}; color: {default_fg};"
+                f" padding: 2px 4px; border: none; font-weight: bold;"
+            )
 
             # ---- player move highlight colouring ----------------------
             if self._is_player_mon and self._controller.get_show_move_highlights():
@@ -1187,73 +1366,69 @@ class DamageSummary(QWidget):
                     self._mon_idx, self._move_idx, self._is_player_mon,
                 )
                 self.move_name_label.setCursor(Qt.PointingHandCursor)
-                default_bg = _primary_bg()
-                default_fg = _primary_fg()
 
                 should_fade = fade_enabled and highlight_state == 0
 
                 if highlight_state in _HIGHLIGHT_COLORS:
                     bg = _HIGHLIGHT_COLORS[highlight_state]
-                    self.header.setStyleSheet(f"background-color: {bg};")
-                    self.move_name_label.setStyleSheet(
-                        f"background-color: {bg}; color: white; padding: 4px 0px;"
+                    header_frame_style = (
+                        f"QFrame {{ background-color: {bg}; border: none;"
+                        f" border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
                     )
+                    move_label_style = (
+                        f"background-color: {bg}; color: white;"
+                        f" padding: 2px 4px; border: none; font-weight: bold;"
+                    )
+                    self.header.setStyleSheet(header_frame_style)
+                    self.move_name_label.setStyleSheet(move_label_style)
                     self._reset_fade_elements()
                 elif should_fade:
                     faded_fg = _blend_color(default_fg, default_bg, 0.1)
-                    self.header.setStyleSheet(f"background-color: {default_bg};")
-                    self.move_name_label.setStyleSheet(
-                        f"background-color: {default_bg}; color: {faded_fg}; padding: 4px 0px;"
+                    move_label_style = (
+                        f"background-color: {default_bg}; color: {faded_fg};"
+                        f" padding: 2px 4px; border: none;"
                     )
+                    self.header.setStyleSheet(header_frame_style)
+                    self.move_name_label.setStyleSheet(move_label_style)
                     self._apply_fade_to_all_elements(faded_fg, default_bg)
                 else:
-                    self.header.setStyleSheet(f"background-color: {default_bg};")
-                    self.move_name_label.setStyleSheet(
-                        f"background-color: {default_bg}; color: {default_fg}; padding: 4px 0px;"
-                    )
+                    self.header.setStyleSheet(header_frame_style)
+                    self.move_name_label.setStyleSheet(move_label_style)
                     self._reset_fade_elements()
             else:
                 # Highlights disabled -- restore defaults
                 if self._is_player_mon:
                     self.move_name_label.setCursor(Qt.ArrowCursor)
-                default_bg = _primary_bg()
-                default_fg = _primary_fg()
-                self.header.setStyleSheet(f"background-color: {default_bg};")
-                self.move_name_label.setStyleSheet(
-                    f"background-color: {default_bg}; color: {default_fg}; padding: 4px 0px;"
-                )
+                self.header.setStyleSheet(header_frame_style)
+                self.move_name_label.setStyleSheet(move_label_style)
                 self._reset_fade_elements()
 
             # ---- enemy-move fading ------------------------------------
             if not self._is_player_mon and fade_enabled:
                 if move is not None and not move.is_best_move:
                     try:
-                        default_bg = _primary_bg()
-                        default_fg = _primary_fg()
                         faded_fg = _blend_color(default_fg, default_bg, 0.1)
-                        self.header.setStyleSheet(f"background-color: {default_bg};")
-                        self.move_name_label.setStyleSheet(
-                            f"background-color: {default_bg}; color: {faded_fg}; padding: 4px 0px;"
+                        faded_label_style = (
+                            f"background-color: {default_bg}; color: {faded_fg};"
+                            f" padding: 2px 4px; border: none;"
                         )
+                        self.header.setStyleSheet(header_frame_style)
+                        self.move_name_label.setStyleSheet(faded_label_style)
                         self._apply_fade_to_all_elements(faded_fg, default_bg)
                         self.custom_data_dropdown.setEnabled(False)
                     except Exception:
                         pass
                 else:
                     try:
-                        default_bg = _primary_bg()
-                        default_fg = _primary_fg()
-                        self.header.setStyleSheet(f"background-color: {default_bg};")
-                        self.move_name_label.setStyleSheet(
-                            f"background-color: {default_bg}; color: {default_fg}; padding: 4px 0px;"
-                        )
+                        self.header.setStyleSheet(header_frame_style)
+                        self.move_name_label.setStyleSheet(move_label_style)
                         self._reset_fade_elements()
                         self.custom_data_dropdown.setEnabled(True)
                     except Exception:
                         pass
 
             # ---- damage range text ------------------------------------
-            if move.damage_ranges is None:
+            if move.min_damage == -1:
                 self.damage_range.setText("")
                 self.pct_damage_range.setText("")
                 self.crit_damage_range.setText("")
@@ -1275,20 +1450,44 @@ class DamageSummary(QWidget):
 
                 if should_fade_range:
                     faded_contrast = _blend_color(contrast_fg, contrast_bg, 0.1)
-                    range_style = f"color: {faded_contrast};"
+                    range_style = f"color: {faded_contrast}; background: transparent; border: none;"
+
+                    faded_range_bg = _blend_color(contrast_fg, contrast_bg, 0.04)
+                    self.range_frame.setStyleSheet(
+                        f"QFrame {{ background-color: {faded_range_bg}; border: none; }}"
+                    )
 
                     secondary_fg = config.get_secondary_color()
                     faded_secondary = _blend_color(secondary_fg, contrast_bg, 0.1)
-                    self.num_to_kill.setStyleSheet(f"color: {faded_secondary};")
+                    faded_kill_style = f"color: {faded_secondary}; background: transparent; border: none;"
+                    self.num_to_kill.setStyleSheet(faded_kill_style)
+                    self.kill_pct.setStyleSheet(faded_kill_style)
+                    faded_kill_bg = _blend_color(secondary_fg, contrast_bg, 0.03)
+                    self.kill_frame.setStyleSheet(
+                        f"QFrame {{ background-color: {faded_kill_bg}; border: none;"
+                        f" border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+                    )
 
                     self.custom_data_dropdown.setVisible(False)
                     if self.test_move_dropdown is not None:
                         self.test_move_dropdown.disable()
                 else:
-                    range_style = f"color: {contrast_fg};"
+                    range_style = f"color: {contrast_fg}; background: transparent; border: none;"
+
+                    range_bg = _blend_color(contrast_fg, contrast_bg, 0.10)
+                    self.range_frame.setStyleSheet(
+                        f"QFrame {{ background-color: {range_bg}; border: none; }}"
+                    )
 
                     secondary_fg = config.get_secondary_color()
-                    self.num_to_kill.setStyleSheet(f"color: {secondary_fg};")
+                    kill_style = f"color: {secondary_fg}; background: transparent; border: none;"
+                    self.num_to_kill.setStyleSheet(kill_style)
+                    self.kill_pct.setStyleSheet(kill_style)
+                    kill_bg = _blend_color(secondary_fg, contrast_bg, 0.08)
+                    self.kill_frame.setStyleSheet(
+                        f"QFrame {{ background-color: {kill_bg}; border: none;"
+                        f" border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+                    )
 
                     if self.test_move_dropdown is not None:
                         self.test_move_dropdown.enable()
@@ -1299,17 +1498,17 @@ class DamageSummary(QWidget):
                 self.crit_pct_damage_range.setStyleSheet(range_style)
 
                 self.damage_range.setText(
-                    f"{move.damage_ranges.min_damage} - {move.damage_ranges.max_damage}"
+                    f"{move.min_damage} - {move.max_damage}"
                 )
-                pct_min = round(move.damage_ranges.min_damage / move.defending_mon_hp * 100)
-                pct_max = round(move.damage_ranges.max_damage / move.defending_mon_hp * 100)
+                pct_min = round(move.min_damage / move.defending_mon_hp * 100)
+                pct_max = round(move.max_damage / move.defending_mon_hp * 100)
                 self.pct_damage_range.setText(f"{pct_min} - {pct_max}%")
 
                 self.crit_damage_range.setText(
-                    f"{move.crit_damage_ranges.min_damage} - {move.crit_damage_ranges.max_damage}"
+                    f"{move.crit_min_damage} - {move.crit_max_damage}"
                 )
-                crit_pct_min = round(move.crit_damage_ranges.min_damage / move.defending_mon_hp * 100)
-                crit_pct_max = round(move.crit_damage_ranges.max_damage / move.defending_mon_hp * 100)
+                crit_pct_min = round(move.crit_min_damage / move.defending_mon_hp * 100)
+                crit_pct_max = round(move.crit_max_damage / move.defending_mon_hp * 100)
                 self.crit_pct_damage_range.setText(f"{crit_pct_min} - {crit_pct_max}%")
 
             # ---- kill ranges ------------------------------------------
@@ -1317,7 +1516,17 @@ class DamageSummary(QWidget):
             kill_ranges = move.kill_ranges
             if len(kill_ranges) > max_num_messages:
                 kill_ranges = kill_ranges[: max_num_messages - 1] + [kill_ranges[-1]]
-            kill_ranges = [self.format_message(x) for x in kill_ranges]
-            self.num_to_kill.setText("\n".join(kill_ranges))
+            formatted = [self.format_message(x) for x in kill_ranges]
+            self.num_to_kill.setText("\n".join(desc for desc, _ in formatted))
+            self.kill_pct.setText("\n".join(pct for _, pct in formatted))
+
+        # Best-move flagging — must come AFTER damage range styling
+        # so that it overrides the neutral kill_frame colors
+        if fade_enabled and self._is_player_mon:
+            self.unflag_as_best_move()
+        elif move is None or not move.is_best_move:
+            self.unflag_as_best_move()
+        else:
+            self.flag_as_best_move()
 
         self._is_loading = False

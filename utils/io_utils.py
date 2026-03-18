@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 import shutil
 import re
 import logging
@@ -7,6 +8,66 @@ import logging
 from utils.constants import const
 
 logger = logging.getLogger(__name__)
+
+
+def is_likely_cloud_placeholder(file_path: str) -> bool:
+    """Check if a file might be a cloud storage placeholder (Dropbox, iCloud, etc.)."""
+    try:
+        if not os.path.exists(file_path):
+            return False
+
+        stat_result = os.stat(file_path)
+        reported_size = stat_result.st_size
+
+        if reported_size == 0:
+            return False
+
+        with open(file_path, 'r') as f:
+            content = f.read()
+
+        if reported_size > 0 and len(content) == 0:
+            return True
+
+        return False
+    except Exception:
+        return False
+
+
+def read_json_file_safe(file_path: str, max_wait_seconds: float = 2.0) -> dict:
+    """Read a JSON file, handling cloud storage placeholder files."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    stat_result = os.stat(file_path)
+    reported_size = stat_result.st_size
+
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    if content:
+        return json.loads(content)
+
+    if reported_size > 0:
+        import time
+        wait_time = 0.0
+        wait_interval = 0.25
+
+        while wait_time < max_wait_seconds:
+            time.sleep(wait_interval)
+            wait_time += wait_interval
+
+            with open(file_path, 'r') as f:
+                content = f.read()
+
+            if content:
+                return json.loads(content)
+
+        raise ValueError(
+            f"File appears to be a cloud storage placeholder that hasn't been downloaded: {file_path}\n"
+            f"If using Dropbox/iCloud/OneDrive, please ensure the file is set to 'Available offline' or has finished syncing."
+        )
+
+    raise ValueError(f"File is empty: {file_path}")
 
 
 def sanitize_string(string:str):

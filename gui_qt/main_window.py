@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QTreeView, QScrollBar, QMenuBar, QMenu, QCheckBox, QMessageBox,
     QSizePolicy, QFrame, QPlainTextEdit, QApplication,
 )
-from PySide6.QtCore import Qt, QTimer, QByteArray, Signal, Slot
+from PySide6.QtCore import Qt, QObject, QTimer, QByteArray, Signal, Slot
 from PySide6.QtGui import QAction, QKeySequence, QShortcut, QFont
 
 from controllers.main_controller import MainController
@@ -75,15 +75,11 @@ except ImportError:
 try:
     from gui_qt.components.recorder_status import RecorderStatus
 except ImportError:
-    class RecorderStatus(QWidget):
-        def __init__(self, main_controller, recorder_controller, parent=None):
+    class RecorderStatus(QObject):
+        def __init__(self, main_controller, recorder_controller, client_status_label, reconnect_button, parent=None):
             super().__init__(parent)
-            self._main_controller = main_controller
-            self._recorder_controller = recorder_controller
-            lbl = QLabel("RecorderStatus (placeholder)", self)
-            lay = QVBoxLayout(self)
-            lay.setContentsMargins(2, 2, 2, 2)
-            lay.addWidget(lbl)
+        def on_recording_mode_changed(self):
+            pass
 
 try:
     from gui_qt.pages.landing_page import LandingPage
@@ -169,6 +165,12 @@ class MainWindow(QMainWindow):
         # ---- Build UI ------------------------------------------------
         self._build_menu_bar()
         self._build_central_widget()
+        self._build_status_bar()
+        self.recorder_status = RecorderStatus(
+            self._controller, self._recorder_controller,
+            self._sb_client_status, self._sb_reconnect_btn,
+            parent=self,
+        )
         self._build_shortcuts()
         self._register_controller_callbacks()
 
@@ -373,6 +375,7 @@ class MainWindow(QMainWindow):
         self._act_toggle_highlight.triggered.connect(self.toggle_event_highlight)
 
         self._act_transfer_event = self.event_menu.addAction("Transfer Event")
+        self._act_transfer_event.setShortcut(QKeySequence("Ctrl+R"))
         self._act_transfer_event.triggered.connect(self.open_transfer_event_window)
 
         self._act_delete_event = self.event_menu.addAction("Delete Event")
@@ -426,19 +429,11 @@ class MainWindow(QMainWindow):
         self.battle_summary_menu = menu_bar.addMenu("&Battle Summary")
         self.battle_summary_menu.aboutToShow.connect(self._update_battle_summary_menu_state)
 
-        # Notes Visibility submenu
-        self._notes_vis_menu = self.battle_summary_menu.addMenu("Battle Summary Notes")
-        self._notes_vis_actions = {}
-        for label, mode in [
-            ("Show notes when space allows", "when_space_allows"),
-            ("Show notes at all times", "always"),
-            ("Never show notes", "never"),
-        ]:
-            act = self._notes_vis_menu.addAction(label)
-            act.setCheckable(True)
-            act.triggered.connect(partial(self._set_battle_summary_notes_mode, mode))
-            self._notes_vis_actions[mode] = act
-        self._sync_notes_vis_checks()
+        # Notes visibility toggle
+        self._act_show_notes = self.battle_summary_menu.addAction("Show Notes in Battle Summary")
+        self._act_show_notes.setCheckable(True)
+        self._act_show_notes.setChecked(config.are_notes_visible_in_battle_summary())
+        self._act_show_notes.triggered.connect(self._toggle_battle_summary_notes)
 
         # Player Highlight Strategy submenu
         self._player_strat_menu = self.battle_summary_menu.addMenu("Player Highlight Strategy")
@@ -542,6 +537,7 @@ class MainWindow(QMainWindow):
         editor_layout.setSpacing(0)
 
         self._splitter = QSplitter(Qt.Horizontal)
+        self._splitter.setChildrenCollapsible(False)
         editor_layout.addWidget(self._splitter)
 
         self._build_left_panel()
@@ -559,51 +555,15 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def _build_left_panel(self):
         left_panel = QWidget()
+        left_panel.setMinimumWidth(200)  # Allow left panel to shrink for battle summary
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(4, 4, 4, 4)
         left_layout.setSpacing(2)
 
-        # ---- Top row -------------------------------------------------
-        top_row = QHBoxLayout()
-        top_row.setSpacing(4)
-
-        self.record_button = SimpleButton("Enable Recording")
-        self.record_button.clicked.connect(self.record_button_clicked)
-        self.record_button.setEnabled(False)
-        top_row.addWidget(self.record_button)
-
-        self.run_status_label = QLabel("Run Status: Valid")
-        self.run_status_label.setStyleSheet(
-            "background-color: #abebc6; color: black; padding: 3px 8px; border-radius: 3px;"
-        )
-        top_row.addWidget(self.run_status_label)
-
-        self.route_version_label = QLabel("Version")
-        self.route_version_label.setStyleSheet(
-            "background-color: white; color: black; padding: 3px 8px;"
-        )
-        top_row.addWidget(self.route_version_label)
-
-        top_row.addWidget(QLabel("Route Name:"))
-        self.route_name_entry = SimpleEntry(callback=self._user_set_route_name)
-        self.route_name_entry.setMinimumWidth(180)
-        top_row.addWidget(self.route_name_entry)
-
-        top_row.addWidget(QLabel("Image Path:"))
-        self.image_path_entry = SimpleEntry(callback=self._user_set_image_path)
-        self.image_path_entry.setMinimumWidth(200)
-        top_row.addWidget(self.image_path_entry)
-
+        # ---- Message label -------------------------------------------
         self.message_label = AutoClearingLabel()
         self.message_label.setMinimumWidth(200)
-        top_row.addWidget(self.message_label, 1)
-
-        left_layout.addLayout(top_row)
-
-        # ---- Recorder status (hidden initially) ----------------------
-        self.recorder_status = RecorderStatus(self._controller, self._recorder_controller)
-        self.recorder_status.setVisible(False)
-        left_layout.addWidget(self.recorder_status)
+        left_layout.addWidget(self.message_label)
 
         # ---- Quick-add grid ------------------------------------------
         self._quick_add_container = QWidget()
@@ -725,6 +685,113 @@ class MainWindow(QMainWindow):
 
         self._splitter.addWidget(self.event_details)
 
+        # Auto-resize splitter when switching between pre-state and battle summary
+        self.event_details.battle_summary_visible.connect(self._on_battle_summary_tab_changed)
+
+    def _on_battle_summary_tab_changed(self, is_battle_summary: bool):
+        """Widen right panel for battle summary, shrink it back for pre-state."""
+        # Defer to ensure the splitter is laid out and has a valid width
+        QTimer.singleShot(0, lambda: self._apply_splitter_ratio(is_battle_summary))
+
+    def _apply_splitter_ratio(self, is_battle_summary: bool):
+        total = self._splitter.width()
+        if total <= 0:
+            return
+
+        # Capture the selected item's visual position before the layout changes
+        selected_visual_y = None
+        selected_index = None
+        sel_indexes = self.event_list.selectionModel().selectedIndexes() if self.event_list.selectionModel() else []
+        if sel_indexes:
+            selected_index = sel_indexes[-1]
+            rect = self.event_list.visualRect(selected_index)
+            if not rect.isNull():
+                selected_visual_y = rect.y()
+
+        # Update stretch factors so future window resizes maintain the ratio
+        if is_battle_summary:
+            self._splitter.setStretchFactor(0, 1)
+            self._splitter.setStretchFactor(1, 2)
+            left = int(total * 0.30)
+            right = total - left
+        else:
+            self._splitter.setStretchFactor(0, 3)
+            self._splitter.setStretchFactor(1, 1)
+            left = int(total * 0.75)
+            right = total - left
+
+        # Hide/show the top controls to allow the left panel to shrink
+        self._quick_add_container.setVisible(not is_battle_summary)
+        self.message_label.setVisible(not is_battle_summary)
+        self._splitter.setSizes([left, right])
+
+        # After layout settles, restore the selected item to its original screen position
+        if selected_index is not None and selected_visual_y is not None:
+            QTimer.singleShot(0, lambda: self._restore_scroll_position(selected_index, selected_visual_y))
+
+    def _restore_scroll_position(self, index, target_visual_y):
+        """Adjust scroll so the selected item stays at the same screen Y position."""
+        rect = self.event_list.visualRect(index)
+        if rect.isNull():
+            return
+        current_y = rect.y()
+        delta = current_y - target_visual_y
+        if delta == 0:
+            return
+        scrollbar = self.event_list.verticalScrollBar()
+        if scrollbar:
+            scrollbar.setValue(scrollbar.value() + delta)
+
+    # ------------------------------------------------------------------
+    # Status bar
+    # ------------------------------------------------------------------
+    def _build_status_bar(self):
+        status_bar = self.statusBar()
+        status_bar.setSizeGripEnabled(False)
+
+        self.route_version_label = QLabel("Version")
+        self.route_version_label.setStyleSheet(
+            "background-color: white; color: black; padding: 3px 8px;"
+        )
+        status_bar.addWidget(self.route_version_label)
+
+        self.run_status_label = QLabel("Run Status: Valid")
+        self.run_status_label.setStyleSheet(
+            "background-color: #abebc6; color: black; padding: 3px 8px; border-radius: 3px;"
+        )
+        status_bar.addWidget(self.run_status_label)
+
+        status_bar.addWidget(QLabel("Route Name:"))
+        self.route_name_entry = SimpleEntry(callback=self._user_set_route_name)
+        self.route_name_entry.setMinimumWidth(100)
+        self.route_name_entry.setMaximumWidth(200)
+        status_bar.addWidget(self.route_name_entry)
+
+        status_bar.addWidget(QLabel("Image Path:"))
+        self.image_path_entry = SimpleEntry(callback=self._user_set_image_path)
+        self.image_path_entry.setMinimumWidth(100)
+        self.image_path_entry.setMaximumWidth(200)
+        status_bar.addWidget(self.image_path_entry)
+
+        # Client status label (visible only during recording).
+        self._sb_client_status = QLabel("")
+        self._sb_client_status.setVisible(False)
+        status_bar.addPermanentWidget(self._sb_client_status)
+
+        # Reconnect button (visible only during recording).
+        self._sb_reconnect_btn = QPushButton("\u27f3")
+        self._sb_reconnect_btn.setFixedSize(24, 24)
+        self._sb_reconnect_btn.setEnabled(False)
+        self._sb_reconnect_btn.setVisible(False)
+        status_bar.addPermanentWidget(self._sb_reconnect_btn)
+
+        self.record_button = QPushButton("\u25cf")
+        self.record_button.setFixedSize(24, 24)
+        self.record_button.setEnabled(False)
+        self.record_button.clicked.connect(self.record_button_clicked)
+        self._apply_record_button_style(active=False)
+        status_bar.addPermanentWidget(self.record_button)
+
     # ------------------------------------------------------------------
     # Keyboard shortcuts (QShortcut-based, not menu actions)
     # ------------------------------------------------------------------
@@ -760,7 +827,7 @@ class MainWindow(QMainWindow):
             return sc
 
         _app_shortcut("Ctrl+F", self.toggle_fight_trainer_filter)
-        _app_shortcut("Ctrl+R", self.toggle_rare_candy_filter)
+        _app_shortcut("Ctrl+Y", self.toggle_rare_candy_filter)
         _app_shortcut("Ctrl+T", self.toggle_tm_hm_filter)
         _app_shortcut("Ctrl+G", self.toggle_vitamin_filter)
         _app_shortcut("Ctrl+W", self.toggle_fight_wild_pkmn_filter)
@@ -850,14 +917,29 @@ class MainWindow(QMainWindow):
         else:
             self._show_landing_page()
 
+    def _apply_record_button_style(self, active=False):
+        if active:
+            self.record_button.setStyleSheet(
+                "QPushButton { color: #e74c3c; font-size: 14px; }"
+                "QPushButton:hover { color: #ff6b5b; }"
+            )
+        else:
+            self.record_button.setStyleSheet(
+                "QPushButton { color: #888; font-size: 14px; }"
+                "QPushButton:hover { color: #aaa; }"
+                "QPushButton:disabled { color: #555; }"
+            )
+
     def _on_record_mode_changed(self):
         if self._controller.is_record_mode_active():
-            self.record_button.setText("Cancel Recording")
-            self.recorder_status.setVisible(True)
+            self._apply_record_button_style(active=True)
+            self._sb_client_status.setVisible(True)
+            self._sb_reconnect_btn.setVisible(True)
             self._quick_add_container.setVisible(False)
         else:
-            self.record_button.setText("Enable Recording")
-            self.recorder_status.setVisible(False)
+            self._apply_record_button_style(active=False)
+            self._sb_client_status.setVisible(False)
+            self._sb_reconnect_btn.setVisible(False)
             self._quick_add_container.setVisible(True)
         self._handle_new_selection()
 
@@ -1434,14 +1516,9 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Battle Summary menu helpers
     # ------------------------------------------------------------------
-    def _sync_notes_vis_checks(self):
-        cur = config.get_notes_visibility_mode()
-        for mode, act in self._notes_vis_actions.items():
-            act.setChecked(mode == cur)
-
-    def _set_battle_summary_notes_mode(self, mode):
-        config.set_notes_visibility_mode(mode)
-        self._sync_notes_vis_checks()
+    def _toggle_battle_summary_notes(self):
+        new_val = self._act_show_notes.isChecked()
+        config.set_notes_visibility_in_battle_summary(new_val)
         self.event_details._update_notes_visibility_in_battle_summary()
 
     def _sync_player_strat_checks(self):
@@ -1511,7 +1588,7 @@ class MainWindow(QMainWindow):
         self._act_test_moves.setChecked(config.get_test_moves_enabled())
         self._sync_player_strat_checks()
         self._sync_enemy_strat_checks()
-        self._sync_notes_vis_checks()
+        self._act_show_notes.setChecked(config.are_notes_visible_in_battle_summary())
 
     def _update_event_menu_state(self):
         self._act_undo.setEnabled(self._controller.can_undo())
@@ -1569,26 +1646,12 @@ class MainWindow(QMainWindow):
     # Deferred post-init (background gen loading + auto-load route)
     # ------------------------------------------------------------------
     def _deferred_post_init(self):
-        """Wait for background gen loading, load custom gens, then auto-load route.
-
-        Runs on a background thread to avoid blocking the UI.
-        """
-        import threading
-
-        def _bg_work():
-            try:
-                from utils import setup
-                setup.wait_for_background_loading_complete(timeout=10)
-            except Exception:
-                pass
-            try:
-                self._controller.load_all_custom_versions()
-            except Exception as e:
-                logger.warning(f"Some custom gens could not be loaded: {e}")
-            # Schedule UI work back on the main thread
-            QTimer.singleShot(0, self._post_init_ui_work)
-
-        threading.Thread(target=_bg_work, daemon=True).start()
+        """Load custom gens, then auto-load route."""
+        try:
+            self._controller.load_all_custom_versions()
+        except Exception as e:
+            logger.warning(f"Some custom gens could not be loaded: {e}")
+        self._post_init_ui_work()
 
     def _post_init_ui_work(self):
         """Called on the main thread after background gen loading completes."""

@@ -15,20 +15,27 @@ event_id_counter = 0
 
 
 class InventoryEventDefinition:
-    def __init__(self, item_name, item_amount, is_acquire, with_money):
+    def __init__(self, item_name, item_amount, is_acquire, with_money, custom_price=None):
         self.item_name = item_name
         self.item_amount = item_amount
         self.is_acquire = is_acquire
         self.with_money = with_money
+        self.custom_price = custom_price
 
     def serialize(self):
-        return [self.item_name, self.item_amount, self.is_acquire, self.with_money]
+        result = [self.item_name, self.item_amount, self.is_acquire, self.with_money]
+        if self.custom_price is not None:
+            result.append({const.CUSTOM_PRICE_KEY: self.custom_price})
+        return result
 
     @staticmethod
     def deserialize(raw_val):
         if not raw_val:
             return None
-        return InventoryEventDefinition(raw_val[0], raw_val[1], raw_val[2], raw_val[3])
+        custom_price = None
+        if len(raw_val) > 4 and isinstance(raw_val[4], dict):
+            custom_price = raw_val[4].get(const.CUSTOM_PRICE_KEY)
+        return InventoryEventDefinition(raw_val[0], raw_val[1], raw_val[2], raw_val[3], custom_price=custom_price)
 
     def __str__(self):
         if self.is_acquire and self.with_money:
@@ -211,6 +218,7 @@ class TrainerEventDefinition:
             pay_day_amount=0,
             mon_order=None,
             transformed=False,
+            stat_stage_setup=None,
         ):
         self.trainer_name = trainer_name
         self.second_trainer_name = second_trainer_name
@@ -240,6 +248,9 @@ class TrainerEventDefinition:
             mon_order = []
         self.mon_order = mon_order
         self.transformed = transformed
+        if stat_stage_setup is None:
+            stat_stage_setup = []
+        self.stat_stage_setup:List[Dict[str, Dict[str, str]]] = stat_stage_setup
 
     def serialize(self):
         return {
@@ -257,6 +268,7 @@ class TrainerEventDefinition:
             const.PAY_DAY_AMOUNT: self.pay_day_amount,
             const.MON_ORDER: self.mon_order,
             const.TRANSFORMED: self.transformed,
+            const.STAT_STAGE_SETUP_KEY: self.stat_stage_setup if self.stat_stage_setup else None,
         }
 
     @staticmethod
@@ -289,6 +301,7 @@ class TrainerEventDefinition:
             mon_order=raw_val.get(const.MON_ORDER),
             second_trainer_name=raw_val.get(const.SECOND_TRAINER_NAME, ""),
             transformed=raw_val.get(const.TRANSFORMED, False),
+            stat_stage_setup=raw_val.get(const.STAT_STAGE_SETUP_KEY),
         )
 
     def __str__(self):
@@ -610,6 +623,27 @@ class EventDefinition:
         else:
             self.tags.append(const.HIGHLIGHT_LABEL)
 
+    def get_highlight_type(self):
+        """Get the current highlight type (1-9) or None if not highlighted."""
+        for idx, highlight_label in enumerate(const.ALL_HIGHLIGHT_LABELS, 1):
+            if highlight_label in self.tags:
+                return idx
+        if const.HIGHLIGHT_LABEL in self.tags:
+            return 1
+        return None
+
+    def set_highlight(self, highlight_num):
+        """Set a specific highlight type (1-9) or None to remove all highlights."""
+        # Remove all existing highlights first
+        if const.HIGHLIGHT_LABEL in self.tags:
+            self.tags.remove(const.HIGHLIGHT_LABEL)
+        for highlight_label in const.ALL_HIGHLIGHT_LABELS:
+            if highlight_label in self.tags:
+                self.tags.remove(highlight_label)
+
+        if highlight_num is not None and 1 <= highlight_num <= 9:
+            self.tags.append(const.ALL_HIGHLIGHT_LABELS[highlight_num - 1])
+
     def __str__(self):
         return self.get_label()
 
@@ -734,12 +768,14 @@ class EventItem:
                     self.event_definition.item_event_def.item_name,
                     self.event_definition.item_event_def.item_amount,
                     self.event_definition.item_event_def.with_money,
+                    custom_price=self.event_definition.item_event_def.custom_price,
                 )
             else:
                 self.final_state, self.error_message = cur_state.remove_item(
                     self.event_definition.item_event_def.item_name,
                     self.event_definition.item_event_def.item_amount,
                     self.event_definition.item_event_def.with_money,
+                    custom_price=self.event_definition.item_event_def.custom_price,
                 )
         elif None is not self.event_definition.learn_move:
             # little bit of book-keeping. Manually update the definition to accurately reflect what happened to the move
@@ -929,7 +965,7 @@ class EventGroup:
                             next_pkmn_count = pkmn_counter.get(next_pkmn_name, 0) + 1
                             self.pkmn_after_levelups.append(f"#{next_pkmn_count} {next_pkmn_name}")
                         else:
-                            self.pkmn_after_levelups.append("after_final_pkmn")
+                            self.pkmn_after_levelups.append("end")
                     cur_state = next_state
 
             elif self.event_definition.rare_candy is not None:
@@ -1059,7 +1095,10 @@ class EventGroup:
         if self.has_errors():
             return [const.EVENT_TAG_ERRORS]
 
-        if self.event_definition.is_highlighted():
+        highlight_type = self.event_definition.get_highlight_type()
+        if highlight_type is not None:
+            if 1 <= highlight_type <= 9:
+                return [const.ALL_HIGHLIGHT_LABELS[highlight_type - 1]]
             return [const.HIGHLIGHT_LABEL]
 
         if self.is_major_fight():
@@ -1251,9 +1290,15 @@ class EventFolder:
 
         result = []
         for cur_group in self.children:
-            if const.HIGHLIGHT_LABEL in cur_group.get_tags():
+            child_tags = cur_group.get_tags()
+            # Check for any numbered highlight labels
+            for highlight_label in const.ALL_HIGHLIGHT_LABELS:
+                if highlight_label in child_tags:
+                    result.append(highlight_label)
+                    return result
+            if const.HIGHLIGHT_LABEL in child_tags:
                 result.append(const.HIGHLIGHT_LABEL)
-                break
+                return result
 
         return result
 

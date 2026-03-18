@@ -25,7 +25,7 @@ class Config:
     DEFAULT_DAMAGE_SEARCH_DEPTH = 20
     DEFAULT_DEBUG_MODE = False
     DEFAULT_AUTO_SWITCH = True
-    DEFAULT_NOTES_VISIBILITY = False
+    DEFAULT_NOTES_VISIBILITY = "when_space_allows"
 
     def __init__(self):
         self.reload()
@@ -67,13 +67,29 @@ class Config:
         self._debug_mode = raw.get(const.DEBUG_MODE_KEY, self.DEFAULT_DEBUG_MODE)
         self._auto_switch = raw.get(const.AUTO_SWITCH_KEY, self.DEFAULT_AUTO_SWITCH)
         self._notes_visibility = raw.get(const.NOTES_VISIBILITY_KEY, self.DEFAULT_NOTES_VISIBILITY)
+
+        # Qt-specific settings
+        self._window_state = raw.get("window_state", "normal")
+        self._auto_load_most_recent = raw.get("auto_load_most_recent_route", False)
+        self._fade_folder_text = raw.get("fade_folder_text", False)
+        self._highlight_branched_mandatory = raw.get("highlight_branched_mandatory", False)
+        self._show_move_highlights = raw.get("show_move_highlights", True)
+        self._fade_moves_without_highlight = raw.get("fade_moves_without_highlight", False)
+        self._test_moves_enabled = raw.get("test_moves_enabled", False)
+        self._landing_search_filter = raw.get("landing_search_filter", "")
+        self._landing_sort = raw.get("landing_sort", "recent")
+        self._landing_game_filter = raw.get("landing_game_filter", "All")
+        self._highlight_colors = {}
+        for i in range(1, 10):
+            key = f"highlight_color_{i}"
+            if key in raw:
+                self._highlight_colors[i] = raw[key]
     
     def _save(self):
         if not os.path.exists(const.GLOBAL_CONFIG_DIR):
             os.makedirs(const.GLOBAL_CONFIG_DIR)
 
-        with open(const.GLOBAL_CONFIG_FILE, 'w') as f:
-            json.dump({
+        data = {
                 const.CONFIG_WINDOW_GEOMETRY: self._window_geometry,
                 const.USER_LOCATION_DATA_KEY: self._user_data_dir,
                 const.SUCCESS_COLOR_KEY: self._success_color,
@@ -96,7 +112,26 @@ class Config:
                 const.DEBUG_MODE_KEY: self._debug_mode,
                 const.AUTO_SWITCH_KEY: self._auto_switch,
                 const.NOTES_VISIBILITY_KEY: self._notes_visibility,
-            }, f, indent=4)
+                # Qt-specific settings
+                "window_state": getattr(self, '_window_state', 'normal'),
+                "auto_load_most_recent_route": getattr(self, '_auto_load_most_recent', False),
+                "fade_folder_text": getattr(self, '_fade_folder_text', False),
+                "highlight_branched_mandatory": getattr(self, '_highlight_branched_mandatory', False),
+                "show_move_highlights": getattr(self, '_show_move_highlights', True),
+                "fade_moves_without_highlight": getattr(self, '_fade_moves_without_highlight', False),
+                "test_moves_enabled": getattr(self, '_test_moves_enabled', False),
+                "landing_search_filter": getattr(self, '_landing_search_filter', ''),
+                "landing_sort": getattr(self, '_landing_sort', 'recent'),
+                "landing_game_filter": getattr(self, '_landing_game_filter', 'All'),
+        }
+        # Save highlight colors
+        for i in range(1, 10):
+            colors = getattr(self, '_highlight_colors', {})
+            if i in colors:
+                data[f"highlight_color_{i}"] = colors[i]
+
+        with open(const.GLOBAL_CONFIG_FILE, 'w') as f:
+            json.dump(data, f, indent=4)
     
     def set_window_geometry(self, new_geometry):
         if new_geometry != self._window_geometry:
@@ -187,7 +222,10 @@ class Config:
         self._save()
 
     def set_notes_visibility_in_battle_summary(self, are_notes_visible):
-        self._notes_visibility = are_notes_visible
+        if isinstance(are_notes_visible, bool):
+            self._notes_visibility = "always" if are_notes_visible else "never"
+        else:
+            self._notes_visibility = are_notes_visible
         self._save()
 
     def set_images_dir(self, images_dir):
@@ -261,7 +299,24 @@ class Config:
         return self._auto_switch
     
     def are_notes_visible_in_battle_summary(self):
-        return self._notes_visibility
+        return self._notes_visibility != "never"
+
+    def get_notes_visibility_mode(self):
+        """Returns 'when_space_allows', 'always', or 'never'."""
+        mode = self._notes_visibility
+        if mode in ("when_space_allows", "always", "never"):
+            return mode
+        # Legacy boolean support
+        if mode is True or mode == "True":
+            return "always"
+        if mode is False or mode == "False":
+            return "never"
+        return "when_space_allows"
+
+    def set_notes_visibility_mode(self, mode):
+        """Set notes visibility mode: 'when_space_allows', 'always', or 'never'."""
+        self._notes_visibility = mode
+        self._save()
     
     def reset_all_colors(self):
         self._success_color = self.DEFAULT_SUCCESS
@@ -285,5 +340,107 @@ class Config:
     
     def get_images_dir(self):
         return self._images_dir
+
+    # --- Window state (zoomed/normal/iconic) ---
+    def get_window_state(self):
+        return getattr(self, '_window_state', 'normal')
+
+    def set_window_state(self, state):
+        self._window_state = state
+        self._save()
+
+    # --- Auto-load most recent route ---
+    def get_auto_load_most_recent_route(self):
+        return bool(getattr(self, '_auto_load_most_recent', False))
+
+    def set_auto_load_most_recent_route(self, val):
+        self._auto_load_most_recent = val
+        self._save()
+
+    # --- Highlight colors (1-9) ---
+    def get_highlight_color(self, idx):
+        colors = getattr(self, '_highlight_colors', {})
+        defaults = {
+            1: "#5a3a7a", 2: "#8b4513", 3: "#1e4a72",
+            4: "#2d5a3d", 5: "#8b1a1a", 6: "#4a4a00",
+            7: "#006060", 8: "#4a2060", 9: "#605030",
+        }
+        return colors.get(idx, defaults.get(idx, "#444444"))
+
+    def set_highlight_color(self, idx, color):
+        if not hasattr(self, '_highlight_colors'):
+            self._highlight_colors = {}
+        self._highlight_colors[idx] = color
+        self._save()
+
+    # --- Fade folder text ---
+    def get_fade_folder_text(self):
+        return getattr(self, '_fade_folder_text', False)
+
+    def set_fade_folder_text(self, val):
+        self._fade_folder_text = val
+        self._save()
+
+    # --- Highlight branched mandatory ---
+    def get_highlight_branched_mandatory(self):
+        return getattr(self, '_highlight_branched_mandatory', False)
+
+    def set_highlight_branched_mandatory(self, val):
+        self._highlight_branched_mandatory = val
+        self._save()
+
+    # --- Show move highlights ---
+    def get_show_move_highlights(self):
+        return getattr(self, '_show_move_highlights', True)
+
+    def set_show_move_highlights(self, val):
+        self._show_move_highlights = val
+        self._save()
+
+    # --- Fade moves without highlight ---
+    def get_fade_moves_without_highlight(self):
+        return getattr(self, '_fade_moves_without_highlight', False)
+
+    def set_fade_moves_without_highlight(self, val):
+        self._fade_moves_without_highlight = val
+        self._save()
+
+    # --- Test moves ---
+    def get_test_moves_enabled(self):
+        return getattr(self, '_test_moves_enabled', False)
+
+    def set_test_moves_enabled(self, val):
+        self._test_moves_enabled = val
+        self._save()
+
+    # --- Landing page search filter ---
+    def get_landing_page_search_filter(self):
+        return getattr(self, '_landing_search_filter', '')
+
+    def set_landing_page_search_filter(self, val):
+        self._landing_search_filter = val
+        self._save()
+
+    # --- Custom image path ---
+    def set_custom_image_path(self, path):
+        self._custom_image_path = path
+
+    def get_custom_image_path(self):
+        return getattr(self, '_custom_image_path', '')
+
+    # --- Landing page sort ---
+    def get_landing_page_sort(self):
+        return getattr(self, '_landing_sort', 'recent')
+
+    def set_landing_page_sort(self, val):
+        self._landing_sort = val
+        self._save()
+
+    def get_landing_page_game_filter(self):
+        return getattr(self, '_landing_game_filter', 'All')
+
+    def set_landing_page_game_filter(self, val):
+        self._landing_game_filter = val
+        self._save()
 
 config = Config()

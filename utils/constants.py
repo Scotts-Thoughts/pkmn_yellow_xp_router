@@ -38,6 +38,7 @@ class Constants:
 
         # bunch of keys just for file management crap
         self.MAJOR_FIGHTS_KEY = "major_fights"
+        self.BRANCHED_MANDATORY_FIGHTS_KEY = "branched_mandatory_fights"
         self.BADGE_REWARDS_KEY = "badge_rewards"
         self.FIGHT_REWARDS_KEY = "fight_rewards"
         self.TYPE_CHART_KEY = "type_chart"
@@ -97,6 +98,9 @@ class Constants:
         self.STATS_KEY = "stats"
         self.MODIFIER_KEY = "modifier"
         self.TARGET_KEY = "target"
+        self.EFFECT_TARGET_SELF = "self"
+        self.EFFECT_TARGET_ENEMY = "enemy"
+        self.EFFECT_TARGET_FOE = "foe"
         self.NATURE_KEY = "nature"
 
         self.REALIZED_STAT_XP_KEY = "realized_stat_xp"
@@ -145,12 +149,14 @@ class Constants:
         self.SPECIAL_MOVES = "special_moves"
         self.MONEY = "money"
         self.VERBOSE_KEY = "verbose"
+        self.TEST_MOVES_KEY = "test_moves"
         self.SETUP_MOVES_KEY = "setup_moves"
         self.ENEMY_SETUP_MOVES_KEY = "enemy_setup_moves"
         self.PLAYER_FIELD_MOVES_KEY = "player_field_moves"
         self.ENEMY_FIELD_MOVES_KEY = "enemy_field_moves"
         self.MIMIC_SELECTION = "mimic_selection"
         self.CUSTOM_MOVE_DATA = "custom_move_data"
+        self.STAT_STAGE_SETUP_KEY = "stat_stage_setup"
         self.EXP_SPLIT = "exp_split"
         self.WEATHER = "weather"
         self.PAY_DAY_AMOUNT = "pay_day_amount"
@@ -279,13 +285,30 @@ class Constants:
         self.TAGS_KEY = "Tags"
 
         self.HIGHLIGHT_LABEL = "highlight"
+        self.HIGHLIGHT_LABEL_1 = "highlight1"
+        self.HIGHLIGHT_LABEL_2 = "highlight2"
+        self.HIGHLIGHT_LABEL_3 = "highlight3"
+        self.HIGHLIGHT_LABEL_4 = "highlight4"
+        self.HIGHLIGHT_LABEL_5 = "highlight5"
+        self.HIGHLIGHT_LABEL_6 = "highlight6"
+        self.HIGHLIGHT_LABEL_7 = "highlight7"
+        self.HIGHLIGHT_LABEL_8 = "highlight8"
+        self.HIGHLIGHT_LABEL_9 = "highlight9"
+        self.ALL_HIGHLIGHT_LABELS = [
+            self.HIGHLIGHT_LABEL_1, self.HIGHLIGHT_LABEL_2, self.HIGHLIGHT_LABEL_3,
+            self.HIGHLIGHT_LABEL_4, self.HIGHLIGHT_LABEL_5, self.HIGHLIGHT_LABEL_6,
+            self.HIGHLIGHT_LABEL_7, self.HIGHLIGHT_LABEL_8, self.HIGHLIGHT_LABEL_9,
+        ]
 
         self.IS_KEY_ITEM = "key_item"
         self.PURCHASE_PRICE = "purchase_price"
+        self.CUSTOM_PRICE_KEY = "custom_price"
         self.MARTS = "marts"
 
         self.EVENT_TAG_IMPORTANT = "important"
         self.EVENT_TAG_ERRORS = "errors"
+        self.EVENT_TAG_BRANCHED_MANDATORY = "branched_mandatory"
+        self.EVENT_TAG_FOLDER = "folder"
 
         self.MOVE_KEY = "move"
         self.MOVE_DEST_KEY = "destination_slot"

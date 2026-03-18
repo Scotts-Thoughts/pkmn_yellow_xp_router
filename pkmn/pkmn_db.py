@@ -323,3 +323,71 @@ class MoveDB:
     def get_stat_mod(self, move_name) -> List[Tuple[str, int]]:
         return self.stat_mod_moves.get(sanitize_string(move_name), [])
 
+    def get_stat_mod_for_target(self, move_name, target_self:bool=True) -> List[Tuple[str, int]]:
+        """Get stat modifiers for a move, filtering by target (self vs enemy/foe)."""
+        move = self.get_move(move_name)
+        if move is None:
+            return []
+
+        result = []
+        for cur_effect in move.effects:
+            if const.STAT_KEY in cur_effect and const.MODIFIER_KEY in cur_effect:
+                effect_target = cur_effect.get(const.TARGET_KEY, "self")
+                targets_self = effect_target in ["self", "target_self"]
+                if targets_self == target_self:
+                    result.append((cur_effect[const.STAT_KEY], cur_effect[const.MODIFIER_KEY]))
+
+        return result
+
+    def get_stat_stage_info(self, move_name) -> dict:
+        move = self.get_move(move_name)
+        if move is None:
+            return {'has_stat_effect': False}
+
+        stat_effects = []
+        for cur_effect in move.effects:
+            if const.STAT_KEY in cur_effect and const.MODIFIER_KEY in cur_effect:
+                stat_effects.append(cur_effect)
+
+        if not stat_effects:
+            return {'has_stat_effect': False}
+
+        first_effect = stat_effects[0]
+        effect_target = first_effect.get(const.TARGET_KEY, const.EFFECT_TARGET_SELF)
+        targets_self = effect_target in [const.EFFECT_TARGET_SELF, "target_self"]
+        modifier = first_effect.get(const.MODIFIER_KEY, 0)
+        chance = first_effect.get("chance", 100)
+        is_guaranteed = chance >= 100
+        is_damaging = move.base_power is not None and move.base_power > 0
+
+        if modifier == 0:
+            max_applications = 0
+        else:
+            max_applications = 6 // abs(modifier)
+
+        return {
+            'has_stat_effect': True,
+            'is_guaranteed': is_guaranteed,
+            'targets_self': targets_self,
+            'is_damaging': is_damaging,
+            'max_applications': max_applications,
+            'stage_change': modifier,
+        }
+
+    def get_stat_stage_dropdown_options(self, move_name) -> List[str]:
+        info = self.get_stat_stage_info(move_name)
+        if not info.get('has_stat_effect', False):
+            return None
+
+        is_guaranteed = info.get('is_guaranteed', False)
+        is_damaging = info.get('is_damaging', False)
+
+        if not is_guaranteed and not is_damaging:
+            return None
+
+        max_apps = info.get('max_applications', 0)
+        if max_apps <= 0:
+            return None
+
+        return [str(i) for i in range(max_apps + 1)]
+

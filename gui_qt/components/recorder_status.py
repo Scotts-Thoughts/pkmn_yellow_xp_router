@@ -1,9 +1,7 @@
 import logging
 
-from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QObject, QTimer
 
-from gui_qt.components.custom_components import SimpleButton
 from pkmn.gen_factory import current_gen_info
 from route_recording.recorder import RecorderController, RecorderGameHookClient
 from utils.constants import const
@@ -11,32 +9,19 @@ from utils.constants import const
 logger = logging.getLogger(__name__)
 
 
-class RecorderStatus(QWidget):
-    def __init__(self, main_controller, recorder_controller, parent=None):
+class RecorderStatus(QObject):
+    """Manages the GameHook connection lifecycle and updates external status widgets."""
+
+    def __init__(self, main_controller, recorder_controller, client_status_label, reconnect_button, parent=None):
         super().__init__(parent)
         self._main_controller = main_controller
         self._recorder_controller: RecorderController = recorder_controller
         self._gamehook_client: RecorderGameHookClient = None
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        self.client_status_label = QLabel("Client Status: None", self)
-        self.client_status_label.setAlignment(Qt.AlignLeft)
-        layout.addWidget(self.client_status_label)
-
-        self.recorder_ready_label = QLabel("Recording Status: Inactive", self)
-        self.recorder_ready_label.setAlignment(Qt.AlignLeft)
-        layout.addWidget(self.recorder_ready_label)
-
-        self.game_state_label = QLabel("Game State: None", self)
-        self.game_state_label.setAlignment(Qt.AlignLeft)
-        layout.addWidget(self.game_state_label)
-
-        self.connection_retry_button = SimpleButton(text="Reconnect to GameHook", parent=self)
+        # External widgets (owned by the status bar) that we update.
+        self.client_status_label = client_status_label
+        self.connection_retry_button = reconnect_button
         self.connection_retry_button.clicked.connect(self.reconnect_button_pressed)
-        self.connection_retry_button.disable()
-        layout.addWidget(self.connection_retry_button)
 
         # Register callbacks with the controllers.
         # Recorder callbacks may fire from background GameHook threads, so we
@@ -67,7 +52,7 @@ class RecorderStatus(QWidget):
                 self._gamehook_client.connect()
             except NotImplementedError:
                 self.client_status_label.setText("No recorder has been created yet for the current version")
-                self.connection_retry_button.disable()
+                self.connection_retry_button.setEnabled(False)
             except Exception as e:
                 logger.error("General exception trying to create and connect gamehook client")
                 logger.exception(e)
@@ -82,18 +67,16 @@ class RecorderStatus(QWidget):
     def on_recording_status_changed(self):
         self.client_status_label.setText(f"Client Status: {self._recorder_controller.get_status()}")
         if self._recorder_controller.get_status() == const.RECORDING_STATUS_DISCONNECTED:
-            self.connection_retry_button.enable()
+            self.connection_retry_button.setEnabled(True)
 
     def on_recording_game_state_changed(self):
-        self.game_state_label.setText(f"Game State: {self._recorder_controller.get_game_state()}")
+        pass
 
     def on_recording_ready_changed(self):
         if self._recorder_controller.is_ready():
-            self.recorder_ready_label.setText("Recording Status: Active")
-            self.connection_retry_button.disable()
+            self.connection_retry_button.setEnabled(False)
         else:
-            self.recorder_ready_label.setText("Recording Status: Inactive")
-            self.connection_retry_button.enable()
+            self.connection_retry_button.setEnabled(True)
 
     def reconnect_button_pressed(self):
         if self._gamehook_client is not None:

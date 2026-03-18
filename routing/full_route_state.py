@@ -293,25 +293,25 @@ class RouteState:
             _defeat_trainer(self.inventory, self.solo_pkmn, pkmn.gen_factory.current_gen_info().trainer_db().get_trainer(trainer_name), pay_day_amount)
         ), ""
 
-    def add_item(self, item_name, amount, is_purchase):
+    def add_item(self, item_name, amount, is_purchase, custom_price=None):
         error_message = ""
 
         try:
-            inv = self.inventory.add_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase)
+            inv = self.inventory.add_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, custom_price=custom_price)
         except Exception as e:
             error_message = str(e)
-            inv = self.inventory.add_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, force=True)
+            inv = self.inventory.add_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, force=True, custom_price=custom_price)
 
         return RouteState(self.solo_pkmn, self.badges, inv), error_message
 
-    def remove_item(self, item_name, amount, is_purchase):
+    def remove_item(self, item_name, amount, is_purchase, custom_price=None):
         error_message = ""
 
         try:
-            inv = self.inventory.remove_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase)
+            inv = self.inventory.remove_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, custom_price=custom_price)
         except Exception as e:
             error_message = str(e)
-            inv = self.inventory.remove_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, force=True)
+            inv = self.inventory.remove_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, force=True, custom_price=custom_price)
 
         return RouteState(self.solo_pkmn, self.badges, inv), error_message
 

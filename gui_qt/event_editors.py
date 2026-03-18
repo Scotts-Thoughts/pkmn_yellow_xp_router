@@ -121,24 +121,26 @@ class NotesEditor(EventEditorBase):
         super().__init__(editor_params, notes_visibility_callback=notes_visibility_callback, parent=parent)
 
         # Row 0: label + visibility dropdown
-        self._notes_label = QLabel("Notes:")
-        self._layout.addWidget(self._notes_label, self._cur_row, 0, Qt.AlignLeft)
+        self._notes_label = QLabel("Battle summary notes:")
+        self._layout.addWidget(self._notes_label, self._cur_row, 0)
 
-        vis_label = QLabel("Battle summary notes:")
-        self._layout.addWidget(vis_label, self._cur_row, 1, Qt.AlignRight)
+        notes_options = [
+            "Show notes in battle summary when space allows",
+            "Show notes in battle summary at all times",
+            "Never show notes in battle summary",
+        ]
+        self._notes_mode_map = {
+            notes_options[0]: "when_space_allows",
+            notes_options[1]: "always",
+            notes_options[2]: "never",
+        }
+        self._notes_mode_reverse = {v: k for k, v in self._notes_mode_map.items()}
 
-        self._visibility = SimpleOptionMenu(
-            option_list=[
-                "Show notes in battle summary when space allows",
-                "Show notes in battle summary at all times",
-                "Never show notes in battle summary",
-            ],
-            callback=self._on_visibility_changed,
-            parent=self,
-        )
-        self._visibility.setMinimumWidth(340)
-        self._layout.addWidget(self._visibility, self._cur_row, 2, Qt.AlignRight)
-        self._load_visibility_setting()
+        current_mode = config.get_notes_visibility_mode()
+        current_option = self._notes_mode_reverse.get(current_mode, notes_options[0])
+
+        self._notes_visibility_dropdown = SimpleOptionMenu(notes_options, default_val=current_option, callback=self._on_notes_visibility_changed)
+        self._layout.addWidget(self._notes_visibility_dropdown, self._cur_row, 1)
         self._cur_row += 1
 
         # Row 1: notes text area
@@ -164,7 +166,9 @@ class NotesEditor(EventEditorBase):
         if event_def is not None:
             self._notes.setPlainText(event_def.notes)
         self._notes.blockSignals(False)
-        self._load_visibility_setting()
+        current_mode = config.get_notes_visibility_mode()
+        current_option = self._notes_mode_reverse.get(current_mode, list(self._notes_mode_map.keys())[0])
+        self._notes_visibility_dropdown.set(current_option)
 
     def get_event(self) -> EventDefinition:
         return EventDefinition(notes=self._notes.toPlainText().strip())
@@ -176,28 +180,12 @@ class NotesEditor(EventEditorBase):
         self._notes.setEnabled(False)
 
     # ---- visibility helpers -----------------------------------------------
-    def _on_visibility_changed(self):
-        selected = self._visibility.get()
-        mode_map = {
-            "Show notes in battle summary when space allows": "when_space_allows",
-            "Show notes in battle summary at all times": "always",
-            "Never show notes in battle summary": "never",
-        }
-        mode = mode_map.get(selected, "when_space_allows")
+    def _on_notes_visibility_changed(self):
+        selected = self._notes_visibility_dropdown.get()
+        mode = self._notes_mode_map.get(selected, "when_space_allows")
         config.set_notes_visibility_mode(mode)
         if self._notes_visibility_callback is not None:
             self._notes_visibility_callback()
-
-    def _load_visibility_setting(self):
-        mode = config.get_notes_visibility_mode()
-        text_map = {
-            "when_space_allows": "Show notes in battle summary when space allows",
-            "always": "Show notes in battle summary at all times",
-            "never": "Never show notes in battle summary",
-        }
-        self._visibility.blockSignals(True)
-        self._visibility.set(text_map.get(mode, text_map["when_space_allows"]))
-        self._visibility.blockSignals(False)
 
 
 # ---------------------------------------------------------------------------
@@ -316,19 +304,52 @@ class TrainerFightEditor(EventEditorBase):
             else:
                 speed_class = "contrast"
 
-            # Build a simple text summary for each enemy pokemon
-            pkmn_text = f"<b>{cur_pkmn.name}</b> Lv{cur_pkmn.level}"
-            stats_text = (
-                f"HP:{cur_pkmn.cur_stats.hp} "
-                f"Atk:{cur_pkmn.cur_stats.attack} "
-                f"Def:{cur_pkmn.cur_stats.defense} "
-                f"Spe:{cur_pkmn.cur_stats.speed}"
-            )
-            self._all_pkmn_labels[idx].setText(f"{pkmn_text}<br/>{stats_text}")
-            self._all_pkmn_labels[idx].setProperty("class", speed_class)
-            # Force style recalculation
-            self._all_pkmn_labels[idx].style().unpolish(self._all_pkmn_labels[idx])
-            self._all_pkmn_labels[idx].style().polish(self._all_pkmn_labels[idx])
+            # Build a table-style HTML summary for each enemy pokemon
+            stats = cur_pkmn.cur_stats
+            xp_val = cur_pkmn.xp if hasattr(cur_pkmn, 'xp') and cur_pkmn.xp else ""
+            spe_color = {"success": "#4ec97a", "warning": "#e8b730", "failure": "#e05555"}.get(speed_class, "#d4d4d4")
+
+            moves = []
+            if hasattr(cur_pkmn, 'move_list') and cur_pkmn.move_list:
+                moves = [m for m in cur_pkmn.move_list if m]
+
+            rows = [
+                ("HP:", stats.hp, f"Lv: {cur_pkmn.level}"),
+                ("Atk:", stats.attack, f"Exp: {xp_val}" if xp_val else ""),
+                ("Def:", stats.defense, f"Move 1: {moves[0]}" if len(moves) > 0 else ""),
+                ("SpA:", stats.special_attack, f"Move 2: {moves[1]}" if len(moves) > 1 else ""),
+                ("SpD:", stats.special_defense, f"Move 3: {moves[2]}" if len(moves) > 2 else ""),
+                ("Spe:", stats.speed, f"Move 4: {moves[3]}" if len(moves) > 3 else ""),
+            ]
+
+            html = '<table cellspacing="0" cellpadding="1">'
+            html += f'<tr><td colspan="3"><b>{cur_pkmn.name}</b></td></tr>'
+
+            if hasattr(cur_pkmn, 'ability') and cur_pkmn.ability:
+                nature_str = ""
+                if hasattr(cur_pkmn, 'nature') and cur_pkmn.nature and str(cur_pkmn.nature) != "Hardy":
+                    nature_str = f" ({cur_pkmn.nature})"
+                html += f'<tr><td colspan="3">{cur_pkmn.ability}{nature_str}</td></tr>'
+            if hasattr(cur_pkmn, 'held_item') and cur_pkmn.held_item:
+                html += f'<tr><td colspan="3">Item: {cur_pkmn.held_item}</td></tr>'
+
+            for sn, sv, right_col in rows:
+                if sn == "Spe:":
+                    style_l = f'style="color:{spe_color}; padding-right:4px;"'
+                    style_r = f'style="color:{spe_color}; padding-right:12px; text-align:right;"'
+                else:
+                    style_l = 'style="padding-right:4px;"'
+                    style_r = 'style="padding-right:12px; text-align:right;"'
+                html += (
+                    f'<tr>'
+                    f'<td {style_l}>{sn}</td>'
+                    f'<td {style_r}>{sv}</td>'
+                    f'<td>{right_col}</td>'
+                    f'</tr>'
+                )
+
+            html += '</table>'
+            self._all_pkmn_labels[idx].setText(html)
 
             row_idx = (2 * (idx // 3))
             col_idx = 4 * (idx % 3)
@@ -739,7 +760,7 @@ class LearnMoveEditor(EventEditorBase):
         self._move_selector.enable()
         self._destination.enable()
         # Re-run callback to correctly disable destination if needed
-        ignore_updates(self._move_selected_callback)(self)
+        ignore_updates(self._move_selected_callback)()
 
     def disable(self):
         self._item_filter.disable()

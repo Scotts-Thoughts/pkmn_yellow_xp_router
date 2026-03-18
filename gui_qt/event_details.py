@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
     QPlainTextEdit, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 
 from controllers.main_controller import MainController
 from controllers.battle_summary_controller import BattleSummaryController
@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 class EventDetails(QWidget):
     """Right-panel widget: tabbed state/battle-summary + notes footer."""
+
+    # Emitted when switching to battle summary (True) or pre-state (False)
+    battle_summary_visible = Signal(bool)
 
     SAVE_DELAY_MS = 2000
 
@@ -147,10 +150,13 @@ class EventDetails(QWidget):
     def _tab_changed_callback(self, index=None):
         if index is None:
             index = self._tab_widget.currentIndex()
-        if index == self.battle_summary_tab_index:
+        is_battle = index == self.battle_summary_tab_index
+        self.battle_summary_visible.emit(is_battle)
+        if is_battle:
             QTimer.singleShot(300, self._deferred_show_battle_summary)
         else:
             self.battle_summary.hide_contents()
+            self._update_notes_visibility()
 
     def _deferred_show_battle_summary(self):
         self.battle_summary.show_contents()
@@ -358,18 +364,7 @@ class EventDetails(QWidget):
     def _update_notes_visibility(self):
         idx = self._tab_widget.currentIndex()
         if idx == self.battle_summary_tab_index:
-            mode = config.get_notes_visibility_mode()
-            if mode == "never":
-                self._trainer_notes.setVisible(False)
-            elif mode == "always":
-                self._trainer_notes.setVisible(True)
-            else:
-                # "when_space_allows" - show unless too many matchups
-                try:
-                    visible_matchups = sum(self.battle_summary._did_draw_mon_pairs)
-                    self._trainer_notes.setVisible(visible_matchups <= 3)
-                except Exception:
-                    self._trainer_notes.setVisible(True)
+            self._trainer_notes.setVisible(config.are_notes_visible_in_battle_summary())
         else:
             self._trainer_notes.setVisible(True)
 

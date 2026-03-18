@@ -23,12 +23,12 @@ _COLUMN_DEFS = [
     ("Name",         "name",                         325,   False),
     ("LevelUpsInto", "get_pkmn_after_levelups",      220,   False),
     ("Level",        "pkmn_level",                    50,    False),
-    ("Total Exp",    "total_xp",                      80,    False),
-    ("Exp per sec",  "experience_per_second",          80,    False),
-    ("Exp Gain",     "xp_gain",                        80,    False),
-    ("ToNextLevel",  "xp_to_next_level",               80,    False),
-    ("% TNL",        "percent_xp_to_next_level",       80,    False),
-    ("LvlsGained",   "level_gain",                     80,    False),
+    ("Exp",          "total_xp",                      48,    False),
+    ("Exp/sec",      "experience_per_second",          -1,    False),
+    ("Exp Gain",     "xp_gain",                        -1,    False),
+    ("ToNextLevel",  "xp_to_next_level",               -1,    False),
+    ("% TNL",        "percent_xp_to_next_level",       -1,    False),
+    ("LvlsGained",   "level_gain",                     -1,    False),
     ("event_id",     "group_id",                        0,    True),
 ]
 
@@ -71,6 +71,11 @@ class RouteList(QTreeView):
         self._model.setHorizontalHeaderLabels([c[0] for c in _COLUMN_DEFS])
         self.setModel(self._model)
 
+        # --- tree decoration & indentation --------------------------------
+        self.setRootIsDecorated(True)
+        self.setItemsExpandable(True)
+        self.setIndentation(16)
+
         # --- selection mode -----------------------------------------------
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -80,6 +85,8 @@ class RouteList(QTreeView):
         for idx, (_, _, width, hidden) in enumerate(_COLUMN_DEFS):
             if hidden:
                 self.setColumnHidden(idx, True)
+            elif width == -1:
+                header.setSectionResizeMode(idx, QHeaderView.ResizeToContents)
             elif width:
                 self.setColumnWidth(idx, width)
                 header.setSectionResizeMode(idx, QHeaderView.Fixed)
@@ -88,12 +95,15 @@ class RouteList(QTreeView):
 
         # The first column (tree/name) gets the remaining stretch.
         header.setSectionResizeMode(_COL_NAME, QHeaderView.Interactive)
-        header.setStretchLastSection(False)
+        header.setStretchLastSection(True)
 
         # --- internal bookkeeping -----------------------------------------
         # Maps semantic group_id -> QModelIndex (persistent) stored as
         # (parent_group_id_or_None, row) -- but we just keep QStandardItem refs.
         self._item_lookup: Dict[int, QStandardItem] = {}
+
+        # Guard against recursive refresh (expand/collapse signals during rebuild).
+        self._refreshing: bool = False
 
         # Cache for highlight colors so we don't re-query config every cell.
         self._highlight_colors: Dict[str, QColor] = {}
@@ -209,6 +219,8 @@ class RouteList(QTreeView):
     # ------------------------------------------------------------------
 
     def _on_item_expanded(self, index: QModelIndex):
+        if self._refreshing:
+            return
         item = self._model.itemFromIndex(index)
         if item is None:
             return
@@ -221,6 +233,8 @@ class RouteList(QTreeView):
             self.refresh()
 
     def _on_item_collapsed(self, index: QModelIndex):
+        if self._refreshing:
+            return
         item = self._model.itemFromIndex(index)
         if item is None:
             return
@@ -283,6 +297,15 @@ class RouteList(QTreeView):
             return
 
         super().mousePressEvent(event)
+
+    def drawRow(self, painter, option, index):
+        """Paint row background across full width so highlights span the indentation area."""
+        item = self._model.itemFromIndex(index)
+        if item is not None:
+            bg = item.data(Qt.BackgroundRole)
+            if isinstance(bg, QBrush):
+                painter.fillRect(option.rect, bg)
+        super().drawRow(painter, option, index)
 
     def _unregister_text_field_focus(self):
         """Notify the top-level window to unregister text-field focus."""
@@ -401,30 +424,44 @@ class RouteList(QTreeView):
 
     def refresh(self, *args, **kwargs):
         """Rebuild/update the tree from the controller's route data."""
-        to_delete_ids: Set[int] = set(self._item_lookup.keys())
-        root_item = self._model.invisibleRootItem()
-
-        raw_route = self._controller.get_raw_route()
-        if raw_route is None:
+        if self._refreshing:
             return
+        self._refreshing = True
+        self.setUpdatesEnabled(False)
+        try:
+            to_delete_ids: Set[int] = set(self._item_lookup.keys())
+            root_item = self._model.invisibleRootItem()
 
-        self._refresh_recursively(
-            root_item,
-            raw_route.root_folder.children,
-            to_delete_ids,
-        )
+            raw_route = self._controller.get_raw_route()
+            if raw_route is None:
+                return
 
-        # Remove any items that are no longer present in the route.
-        for del_id in to_delete_ids:
-            name_item = self._item_lookup.pop(del_id, None)
-            if name_item is None:
-                continue
-            parent_item = name_item.parent()
-            if parent_item is None:
-                parent_item = self._model.invisibleRootItem()
-            row = name_item.row()
-            if row >= 0:
-                parent_item.removeRow(row)
+            self._refresh_recursively(
+                root_item,
+                raw_route.root_folder.children,
+                to_delete_ids,
+            )
+
+            # Remove any items that are no longer present in the route.
+            # NOTE: removing a parent row also removes all children, so some items
+            # may already be deleted when we reach them -- just skip those.
+            for del_id in to_delete_ids:
+                name_item = self._item_lookup.pop(del_id, None)
+                if name_item is None:
+                    continue
+                try:
+                    parent_item = name_item.parent()
+                    if parent_item is None:
+                        parent_item = self._model.invisibleRootItem()
+                    row = name_item.row()
+                    if row >= 0:
+                        parent_item.removeRow(row)
+                except RuntimeError:
+                    # C++ object already deleted (parent was removed first)
+                    pass
+        finally:
+            self.setUpdatesEnabled(True)
+            self._refreshing = False
 
         self.route_list_refreshed.emit()
 
@@ -438,22 +475,24 @@ class RouteList(QTreeView):
         cur_filter = self._controller.get_route_filter_types()
         actual_pos = 0
 
+        # Track which rows under this parent should be visible.
+        visible_ids: Set[int] = set()
+
         for event_obj in event_list:
             semantic_id = _get_attr(event_obj, "group_id")
             if semantic_id is None:
                 continue
 
-            if not event_obj.do_render(search=cur_search, filter_types=cur_filter):
-                continue
+            should_render = event_obj.do_render(search=cur_search, filter_types=cur_filter)
 
             is_folder = isinstance(event_obj, route_events.EventFolder)
             force_open = event_obj.expanded if is_folder else False
 
-            # Upsert the row.
+            # Always upsert the row (so it stays in the model), but hide it if filtered out.
             if semantic_id in to_delete_ids:
                 to_delete_ids.discard(semantic_id)
 
-            name_item = self._upsert_row(event_obj, parent_item, force_open)
+            name_item = self._upsert_row(event_obj, parent_item, force_open if should_render else None)
 
             # Ensure correct position under the parent.
             current_row = name_item.row()
@@ -468,6 +507,13 @@ class RouteList(QTreeView):
                 taken = current_parent_item.takeRow(current_row)
                 if taken:
                     parent_item.insertRow(actual_pos, taken)
+
+            # Hide or show based on filter.
+            parent_idx = self._model.indexFromItem(parent_item) if parent_item is not self._model.invisibleRootItem() else self.rootIndex()
+            self.setRowHidden(actual_pos, parent_idx, not should_render)
+
+            if should_render:
+                visible_ids.add(semantic_id)
 
             actual_pos += 1
 
@@ -501,6 +547,8 @@ class RouteList(QTreeView):
                                 taken = cur_par.takeRow(cur_row)
                                 if taken:
                                     parent_item.insertRow(actual_pos, taken)
+                            # Hide level-up siblings if parent is hidden
+                            self.setRowHidden(actual_pos, parent_idx, not should_render)
                             actual_pos += 1
 
                     # Other items rendered as children of the EventGroup.
@@ -620,11 +668,12 @@ class RouteList(QTreeView):
             self._item_lookup[semantic_id] = name_item
 
         # Handle expand/collapse for folders.
-        if force_open:
+        # force_open=None means "don't touch expand state" (used for hidden/filtered rows).
+        if force_open is True:
             idx = self._model.indexFromItem(name_item)
             if idx.isValid() and not self.isExpanded(idx):
                 self.expand(idx)
-        elif is_folder and not force_open:
+        elif force_open is False and is_folder:
             idx = self._model.indexFromItem(name_item)
             if idx.isValid() and self.isExpanded(idx):
                 self.collapse(idx)

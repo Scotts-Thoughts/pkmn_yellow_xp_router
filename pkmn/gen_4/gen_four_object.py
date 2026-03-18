@@ -83,6 +83,7 @@ class GenFour(CurrentGen):
             self._badge_rewards:Dict[str, str] = fight_info[const.BADGE_REWARDS_KEY]
             self._major_fights:List[str] = fight_info[const.MAJOR_FIGHTS_KEY]
             self._fight_rewards:Dict[str, str] = fight_info[const.FIGHT_REWARDS_KEY]
+            self._branched_mandatory_fights:List[str] = fight_info.get(const.BRANCHED_MANDATORY_FIGHTS_KEY, [])
 
             timing_info = fight_info.get(const.TRAINER_TIMING_INFO_KEY, {})
             self._trainer_timing_info = universal_data_objects.TrainerTimingStats(
@@ -204,7 +205,54 @@ class GenFour(CurrentGen):
     
     def is_major_fight(self, trainer_name) -> str:
         return trainer_name in self._major_fights
-    
+
+    def is_branched_mandatory_fight(self, trainer_name) -> bool:
+        return trainer_name in self._branched_mandatory_fights
+
+    def has_branched_mandatory_fights(self) -> bool:
+        return len(self._branched_mandatory_fights) > 0
+
+    def get_gym_leader_names(self) -> List[str]:
+        # HeartGold/SoulSilver use trainers 8-15 (Johto gym leaders)
+        if self._version_name in [const.HEART_GOLD_VERSION, const.SOUL_SILVER_VERSION]:
+            return self._major_fights[8:16]
+        # Platinum: Gym leaders in different order - Fantina is 3rd instead of 5th
+        elif self._version_name == const.PLATINUM_VERSION:
+            return [
+                self._major_fights[0],  # Roark
+                self._major_fights[1],  # Gardenia
+                self._major_fights[4],  # Fantina (moved from 5th to 3rd)
+                self._major_fights[2],  # Maylene (moved from 3rd to 4th)
+                self._major_fights[3],  # Wake (moved from 4th to 5th)
+                self._major_fights[5],  # Byron
+                self._major_fights[6],  # Candice
+                self._major_fights[7],  # Volkner
+            ]
+        # Diamond/Pearl: Use standard order (trainers 0-7)
+        else:
+            return self._major_fights[:8]
+
+    def get_elite_four_and_champion_names(self) -> List[str]:
+        # HeartGold/SoulSilver: Elite Four at indices 26-29, Champion at index 30, Red at index 31
+        if self._version_name in [const.HEART_GOLD_VERSION, const.SOUL_SILVER_VERSION]:
+            return [
+                self._major_fights[26],  # Elite Four Will
+                self._major_fights[27],  # Elite Four Koga
+                self._major_fights[28],  # Elite Four Bruno
+                self._major_fights[29],  # Elite Four Karen
+                self._major_fights[30],  # Champion Lance
+                self._major_fights[31],  # Pokemon Trainer Red
+            ]
+        # Diamond/Pearl/Platinum: Elite Four at indices 20-23, Champion at index 24
+        else:
+            return [
+                self._major_fights[20],  # Elite Four Aaron
+                self._major_fights[21],  # Elite Four Bertha
+                self._major_fights[22],  # Elite Four Flint
+                self._major_fights[23],  # Elite Four Lucian
+                self._major_fights[24],  # Champion Cynthia
+            ]
+
     def get_move_custom_data(self, move_name) -> List[str]:
         return gen_four_const.CUSTOM_MOVE_DATA.get(move_name)
     

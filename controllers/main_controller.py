@@ -1,18 +1,12 @@
 from __future__ import annotations
 import os
 import logging
-<<<<<<< Updated upstream
-from typing import Callable, List, Tuple
-import tkinter
-from PIL import ImageGrab
-=======
 import sys
 from typing import List, Tuple
 from datetime import datetime
 from PIL import ImageGrab, Image
 if sys.platform == 'win32':
     import ctypes
->>>>>>> Stashed changes
 
 from utils.io_utils import sanitize_string
 from utils.constants import const
@@ -21,6 +15,7 @@ from utils import io_utils
 from routing.route_events import EventDefinition, EventFolder, EventGroup, EventItem, TrainerEventDefinition
 import routing.router
 from pkmn import gen_factory
+from controllers.undo_manager import UndoManager
 
 
 logger = logging.getLogger(__name__)
@@ -59,19 +54,11 @@ class MainController:
         self._route_filter_types = []
         self._route_search = ""
         self._unsaved_changes = False
+        self._custom_image_path = None
 
-<<<<<<< Updated upstream
-        self._name_change_events = []
-        self._version_change_events = []
-        self._route_change_events = []
-        self._event_change_events = []
-        self._event_selection_events = []
-        self._event_preview_events = []
-        self._record_mode_change_events = []
-        self._sync_record_mode_change_events:List[Callable] = []
-        self._message_events = []
-        self._exception_events = []
-=======
+        # Undo manager for event list changes
+        self._undo_manager = UndoManager(max_steps=15)
+
         self._name_change_callbacks = []
         self._version_change_callbacks = []
         self._route_change_callbacks = []
@@ -81,7 +68,6 @@ class MainController:
         self._record_mode_change_callbacks = []
         self._message_callbacks = []
         self._exception_callbacks = []
->>>>>>> Stashed changes
 
         self._pre_save_hooks = []
     
@@ -100,82 +86,6 @@ class MainController:
     # Registration methods
     #####
 
-<<<<<<< Updated upstream
-    def register_name_change(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.EVENT_NAME_CHANGE.format(len(self._name_change_events))
-        self._name_change_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_version_change(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.EVENT_VERSION_CHANGE.format(len(self._version_change_events))
-        self._version_change_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_route_change(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.EVENT_ROUTE_CHANGE.format(len(self._route_change_events))
-        self._route_change_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_event_update(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.EVENT_EVENT_CHANGE.format(len(self._event_change_events))
-        self._event_change_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_event_selection(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.EVENT_SELECTION_CHANGE.format(len(self._event_selection_events))
-        self._event_selection_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_event_preview(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.EVENT_PREVIEW_CHANGE.format(len(self._event_preview_events))
-        self._event_preview_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_record_mode_change(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.EVENT_RECORD_MODE_CHANGE.format(len(self._record_mode_change_events))
-        self._record_mode_change_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def sync_register_record_mode_change(self, fn_obj):
-        self._sync_record_mode_change_events.append(fn_obj)
-
-    def register_message_callback(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.MESSAGE_EXCEPTION.format(len(self._message_events))
-        self._message_events.append((tk_obj, new_event_name))
-        return new_event_name
-
-    def register_exception_callback(self, tk_obj):
-        if self._headless:
-            raise ValueError(f"Cannot register events when running in headless mode")
-
-        new_event_name = const.EVENT_EXCEPTION.format(len(self._exception_events))
-        self._exception_events.append((tk_obj, new_event_name))
-        return new_event_name
-=======
     def register_name_change(self, callback):
         self._name_change_callbacks.append(callback)
         return lambda: self._name_change_callbacks.remove(callback)
@@ -211,7 +121,6 @@ class MainController:
     def register_exception_callback(self, callback):
         self._exception_callbacks.append(callback)
         return lambda: self._exception_callbacks.remove(callback)
->>>>>>> Stashed changes
 
     def register_pre_save_hook(self, fn_obj):
         if self._headless:
@@ -223,15 +132,7 @@ class MainController:
     # Event callbacks
     #####
 
-<<<<<<< Updated upstream
-    def _safely_generate_events(self, event_list):
-        if self._headless:
-            # TODO: if we want to push events over a websocket, that will need to happen here
-            return
-
-=======
     def _safely_invoke_callbacks(self, callback_list):
->>>>>>> Stashed changes
         to_delete = []
         for cur_idx, callback in enumerate(callback_list):
             try:
@@ -242,15 +143,6 @@ class MainController:
                 to_delete.append(cur_idx)
 
         for cur_idx in sorted(to_delete, reverse=True):
-<<<<<<< Updated upstream
-            del event_list[cur_idx]
-
-    def _on_name_change(self):
-        self._safely_generate_events(self._name_change_events)
-
-    def _on_version_change(self):
-        self._safely_generate_events(self._version_change_events)
-=======
             del callback_list[cur_idx]
 
     def _on_name_change(self):
@@ -258,7 +150,6 @@ class MainController:
 
     def _on_version_change(self):
         self._safely_invoke_callbacks(self._version_change_callbacks)
->>>>>>> Stashed changes
 
     def _on_route_change(self):
         self._unsaved_changes = True
@@ -275,13 +166,7 @@ class MainController:
         self._safely_invoke_callbacks(self._event_preview_callbacks)
 
     def _on_record_mode_change(self):
-<<<<<<< Updated upstream
-        self._safely_generate_events(self._record_mode_change_events)
-        for cur_sync_fn in self._sync_record_mode_change_events:
-            cur_sync_fn(self.is_record_mode_active())
-=======
         self._safely_invoke_callbacks(self._record_mode_change_callbacks)
->>>>>>> Stashed changes
 
     def _on_info_message(self, info_message):
         self._message_info.append(info_message)
@@ -289,13 +174,8 @@ class MainController:
 
     def _on_exception(self, exception_message):
         self._exception_info.append(exception_message)
-<<<<<<< Updated upstream
-        self._safely_generate_events(self._exception_events)
-
-=======
         self._safely_invoke_callbacks(self._exception_callbacks)
-    
->>>>>>> Stashed changes
+
     def _fire_pre_save_hooks(self):
         for cur_hook in self._pre_save_hooks:
             try:
@@ -334,12 +214,16 @@ class MainController:
     def update_existing_event(self, event_group_id:int, new_event:EventDefinition):
         if new_event.learn_move is not None and new_event.learn_move.source == const.MOVE_SOURCE_LEVELUP:
             return self.update_levelup_move(new_event.learn_move)
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         self._data.replace_event_group(event_group_id, new_event)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_event_change()
 
     @handle_exceptions
     def update_levelup_move(self, new_learn_move_event):
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         self._data.replace_levelup_move_event(new_learn_move_event)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_event_change()
 
     @handle_exceptions
@@ -367,6 +251,9 @@ class MainController:
             self._data.new_route("Abra")
             raise e
         finally:
+            self._undo_manager.clear()
+            if self._data.init_route_state is not None:
+                self._undo_manager.save_state(self._data)
             self._on_name_change()
             self._on_version_change()
             self._on_event_selection()
@@ -389,6 +276,9 @@ class MainController:
             self._data.new_route("Abra")
             raise e
         finally:
+            self._undo_manager.clear()
+            if self._data.init_route_state is not None:
+                self._undo_manager.save_state(self._data)
             self._on_name_change()
             self._on_version_change()
             self._on_event_selection()
@@ -402,19 +292,25 @@ class MainController:
 
     @handle_exceptions
     def move_groups_up(self, event_ids):
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         for cur_event in event_ids:
             self._data.move_event_object(cur_event, True)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 
     @handle_exceptions
     def move_groups_down(self, event_ids):
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         for cur_event in event_ids:
             self._data.move_event_object(cur_event, False)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 
     @handle_exceptions
     def delete_events(self, event_ids):
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         self._data.batch_remove_events(event_ids)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
 
         selection_changed = False
         for cur_event_id in event_ids:
@@ -443,12 +339,80 @@ class MainController:
 
     @handle_exceptions
     def transfer_to_folder(self, event_ids, new_folder_name):
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         self._data.transfer_events(event_ids, new_folder_name)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 
     @handle_exceptions
+    def split_folder_at_current_event(self, event_id):
+        """Split the folder containing the current event at the current event position."""
+        event_obj = self.get_event_by_id(event_id)
+        if event_obj is None:
+            return
+
+        if isinstance(event_obj, EventFolder):
+            return
+
+        parent_folder = event_obj.parent
+        if parent_folder is None or parent_folder.name == const.ROOT_FOLDER_NAME:
+            return
+
+        try:
+            event_index = parent_folder.children.index(event_obj)
+        except ValueError:
+            return
+
+        events_to_move = parent_folder.children[event_index:]
+        if len(events_to_move) == 0:
+            return
+
+        old_folder_name = parent_folder.name
+        new_folder_name = self._generate_unique_folder_name(old_folder_name)
+
+        self._undo_manager.save_state(self._data, is_post_operation=False)
+
+        new_folder_id = self._data.add_event_object(
+            new_folder_name=new_folder_name,
+            insert_after=parent_folder.group_id,
+            dest_folder_name=parent_folder.parent.name,
+            recalc=False
+        )
+
+        event_ids_to_move = [event.group_id for event in events_to_move]
+        self._data.transfer_events(event_ids_to_move, new_folder_name)
+
+        self._undo_manager.save_state(self._data, is_post_operation=True)
+        self._on_route_change()
+
+        self.select_new_events([new_folder_id])
+
+    def _generate_unique_folder_name(self, base_name):
+        """Generate a unique folder name based on the base name."""
+        all_folder_names = set(self.get_all_folder_names())
+
+        variations = [
+            f"{base_name} (Part 2)",
+            f"{base_name} (2)",
+            f"{base_name} - Split",
+        ]
+
+        for variation in variations:
+            if variation not in all_folder_names:
+                return variation
+
+        counter = 2
+        while True:
+            candidate = f"{base_name} (Part {counter})"
+            if candidate not in all_folder_names:
+                return candidate
+            counter += 1
+
+    @handle_exceptions
     def new_event(self, event_def:EventDefinition, insert_after:int=None, insert_before:int=None, dest_folder_name=const.ROOT_FOLDER_NAME, do_select=True):
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         result = self._data.add_event_object(event_def=event_def, insert_after=insert_after, insert_before=insert_before, dest_folder_name=dest_folder_name)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
         if do_select:
             self.select_new_events([result])
@@ -456,12 +420,14 @@ class MainController:
 
     @handle_exceptions
     def finalize_new_folder(self, new_folder_name, prev_folder_name=None, insert_after=None):
+        self._undo_manager.save_state(self._data, is_post_operation=False)
         if prev_folder_name is None and insert_after is None:
             self._data.add_event_object(new_folder_name=new_folder_name)
         elif prev_folder_name is None:
             self._data.add_event_object(new_folder_name=new_folder_name, insert_after=insert_after)
         else:
             self._data.rename_event_folder(prev_folder_name, new_folder_name)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
 
         self._on_route_change()
 
@@ -469,7 +435,15 @@ class MainController:
     def toggle_event_highlight(self, event_ids):
         for cur_event in event_ids:
             self._data.toggle_event_highlight(cur_event)
-        
+
+        self._on_route_change()
+
+    @handle_exceptions
+    def set_event_highlight(self, event_ids, highlight_num):
+        """Set a specific highlight type (1-9) or None to remove all highlights."""
+        for cur_event in event_ids:
+            self._data.set_event_highlight(cur_event, highlight_num)
+
         self._on_route_change()
 
     @handle_exceptions
@@ -478,16 +452,31 @@ class MainController:
         self._on_record_mode_change()
 
     @handle_exceptions
+    def move_groups_to_adjacent_folder_up(self, event_ids):
+        self._undo_manager.save_state(self._data, is_post_operation=False)
+        for cur_event in event_ids:
+            self._data.move_event_to_adjacent_folder(cur_event, True)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
+        self._on_route_change()
+
+    @handle_exceptions
+    def move_groups_to_adjacent_folder_down(self, event_ids):
+        # NOTE: list is already reversed in main_window before being passed here
+        self._undo_manager.save_state(self._data, is_post_operation=False)
+        for cur_event in event_ids:
+            self._data.move_event_to_adjacent_folder(cur_event, False)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
+        self._on_route_change()
+
+    @handle_exceptions
     def set_route_filter_types(self, filter_options):
         self._route_filter_types = filter_options
         self._on_route_change()
-        self._on_event_selection()
 
     @handle_exceptions
     def set_route_search(self, search):
         self._route_search = search
         self._on_route_change()
-        self._on_event_selection()
 
     @handle_exceptions
     def load_all_custom_versions(self):
@@ -516,6 +505,18 @@ class MainController:
 
     def get_current_route_name(self) -> str:
         return self._route_name
+
+    def set_custom_image_path(self, path: str):
+        """Set the custom image path for screenshots."""
+        if path and path.strip():
+            cleaned_path = path.strip().strip('"').strip("'")
+            self._custom_image_path = cleaned_path if cleaned_path else None
+        else:
+            self._custom_image_path = None
+
+    def get_custom_image_path(self) -> str:
+        """Get the custom image path for screenshots. Returns None if using default."""
+        return self._custom_image_path
 
     def get_preview_event(self):
         return self._current_preview_event
@@ -589,8 +590,46 @@ class MainController:
 
         return target_mon.growth_rate == self.get_final_state().solo_pkmn.species_def.growth_rate
 
+    def find_first_event_by_trainer_name(self, trainer_name):
+        """Find the first event in the route that matches the given trainer name."""
+        def search_folder(folder):
+            for child in folder.children:
+                if isinstance(child, EventFolder):
+                    result = search_folder(child)
+                    if result is not None:
+                        return result
+                elif isinstance(child, routing.route_events.EventGroup):
+                    if (child.event_definition.trainer_def is not None and
+                        child.event_definition.trainer_def.trainer_name == trainer_name):
+                        return child.group_id
+            return None
+
+        return search_folder(self._data.root_folder)
+
     def has_unsaved_changes(self) -> routing.router.Router:
         return self._unsaved_changes
+
+    def can_undo(self) -> bool:
+        """Check if undo is available."""
+        return self._undo_manager.can_undo()
+
+    @handle_exceptions
+    def undo(self):
+        """Undo the last event list change."""
+        if not self.can_undo():
+            return
+
+        previous_state = self._undo_manager.get_undo_state()
+        if previous_state is None:
+            return
+
+        self._data.restore_events_from_state(previous_state)
+        self._undo_manager._current_state = previous_state
+
+        self._selected_ids = []
+
+        self._on_event_selection()
+        self._on_route_change()
 
     def get_all_selected_ids(self, allow_event_items=True):
         if allow_event_items:
@@ -657,17 +696,73 @@ class MainController:
         out_path = self._data.export_notes(route_name)
         self.send_message(f"Exported notes to: {out_path}")
 
-    def take_screenshot(self, image_name, bbox):
+    def take_screenshot(self, image_name, bbox, custom_path=None):
         try:
             if self.is_empty():
                 return
-            
+
+            from datetime import datetime
+            date_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
+
+            path_to_use = custom_path if custom_path is not None else self._custom_image_path
+
+            if path_to_use and path_to_use.strip():
+                path_to_use = path_to_use.strip().strip('"').strip("'")
+                path_to_use = os.path.normpath(path_to_use)
+                if os.path.isdir(path_to_use):
+                    save_dir = path_to_use
+                else:
+                    try:
+                        os.makedirs(path_to_use, exist_ok=True)
+                        if os.path.isdir(path_to_use):
+                            save_dir = path_to_use
+                        else:
+                            save_dir = config.get_images_dir()
+                    except Exception:
+                        save_dir = config.get_images_dir()
+            else:
+                save_dir = config.get_images_dir()
+
             out_path = io_utils.get_safe_path_no_collision(
-                config.get_images_dir(),
-                f"{self.get_current_route_name()}_{image_name}",
+                save_dir,
+                f"{date_prefix}-{self.get_current_route_name()}_{image_name}",
                 ext=".png",
             )
-            ImageGrab.grab(bbox=bbox).save(out_path)
+
+            left, top, right, bottom = bbox
+
+            if sys.platform == 'win32':
+                try:
+                    user32 = ctypes.windll.user32
+                    virtual_width = user32.GetSystemMetrics(78)
+                    virtual_height = user32.GetSystemMetrics(79)
+                    virtual_left = user32.GetSystemMetrics(76)
+                    virtual_top = user32.GetSystemMetrics(77)
+
+                    full_screenshot = ImageGrab.grab(bbox=(
+                        virtual_left, virtual_top,
+                        virtual_left + virtual_width,
+                        virtual_top + virtual_height
+                    ))
+
+                    adjusted_left = left - virtual_left
+                    adjusted_top = top - virtual_top
+                    adjusted_right = right - virtual_left
+                    adjusted_bottom = bottom - virtual_top
+
+                    cropped_image = full_screenshot.crop((
+                        adjusted_left, adjusted_top,
+                        adjusted_right, adjusted_bottom
+                    ))
+                    cropped_image.save(out_path)
+                except Exception as e:
+                    try:
+                        ImageGrab.grab(bbox=bbox).save(out_path)
+                    except Exception as fallback_error:
+                        raise ValueError(f"Could not capture screenshot: {e}, Fallback: {fallback_error}")
+            else:
+                ImageGrab.grab(bbox=bbox).save(out_path)
+
             self.send_message(f"Saved screenshot to: {out_path}")
         except Exception as e:
             self.trigger_exception(f"Couldn't save screenshot due to exception! {type(e)}: {e}")

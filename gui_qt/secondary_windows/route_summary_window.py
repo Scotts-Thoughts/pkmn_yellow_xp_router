@@ -137,6 +137,19 @@ class RouteSummaryWindow(QWidget):
         self._controller.take_screenshot("run_summary", bbox)
 
     # ------------------------------------------------------------------
+    # Resize to fit content
+    # ------------------------------------------------------------------
+    def _resize_to_content(self):
+        self._grid.activate()
+        content_size = self._content_widget.sizeHint()
+        scroll_frame = self._scroll_area.frameWidth() * 2
+        menu_h = self._menu_bar.sizeHint().height()
+        target_w = content_size.width() + scroll_frame + 16
+        target_h = content_size.height() + scroll_frame + menu_h + 16
+        screen = self.screen().availableGeometry()
+        self.resize(min(target_w, screen.width()), min(target_h, screen.height()))
+
+    # ------------------------------------------------------------------
     # Helpers for building styled cells
     # ------------------------------------------------------------------
     @staticmethod
@@ -262,6 +275,7 @@ class RouteSummaryWindow(QWidget):
                 SUMMARY_HEADER_BG,
             )
             self._grid.addWidget(frame, 0, 0)
+            self._resize_to_content()
             return
 
         # -- Build display structures -------------------------------------------
@@ -364,3 +378,6 @@ class RouteSummaryWindow(QWidget):
                     1,
                     colspan,
                 )
+
+        # -- Resize window to fit content ----------------------------------------
+        self._resize_to_content()

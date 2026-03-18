@@ -166,11 +166,13 @@ class AmountEntry(QWidget):
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        layout.setSpacing(1)
 
         self._down_button = QPushButton("\u2212")  # minus sign
-        self._down_button.setFixedWidth(20)
-        self._down_button.setFixedHeight(20)
+        self._down_button.setProperty("class", "amount-btn")
+        self._down_button.setFixedWidth(22)
+        self._down_button.setFixedHeight(22)
+        self._down_button.setFocusPolicy(Qt.NoFocus)
         self._down_button.clicked.connect(self._lower_amt)
 
         self._entry = QLineEdit()
@@ -178,12 +180,15 @@ class AmountEntry(QWidget):
             self._entry.setFixedWidth(width * 8)
         else:
             self._entry.setFixedWidth(50)
+        self._entry.setFixedHeight(22)
         self._entry.setAlignment(Qt.AlignCenter)
         self._entry.textChanged.connect(self._on_text_changed)
 
         self._up_button = QPushButton("+")
-        self._up_button.setFixedWidth(20)
-        self._up_button.setFixedHeight(20)
+        self._up_button.setProperty("class", "amount-btn")
+        self._up_button.setFixedWidth(22)
+        self._up_button.setFixedHeight(22)
+        self._up_button.setFocusPolicy(Qt.NoFocus)
         self._up_button.clicked.connect(self._raise_amt)
 
         layout.addWidget(self._down_button)
@@ -277,16 +282,19 @@ class AutoClearingLabel(QLabel):
         super().__init__(parent)
         self._clear_timeout = clear_timeout
         self._message_id = 0
+        self.setVisible(False)
 
     def set_message(self, value):
         self._message_id += 1
         current_id = self._message_id
         self.setText(value)
+        self.setVisible(bool(value))
         QTimer.singleShot(self._clear_timeout, lambda: self._auto_clear(current_id))
 
     def _auto_clear(self, message_id):
         if message_id == self._message_id:
             self.setText("")
+            self.setVisible(False)
 
 
 class NotificationPopup(QWidget):

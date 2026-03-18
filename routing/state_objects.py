@@ -53,10 +53,13 @@ class Inventory:
     def _copy(self):
         return Inventory(cur_money=self.cur_money, cur_items=self.cur_items, bag_limit=self._bag_limit)
 
-    def add_item(self, base_item:pkmn.universal_data_objects.BaseItem, num, is_purchase=False, force=False):
+    def add_item(self, base_item:pkmn.universal_data_objects.BaseItem, num, is_purchase=False, force=False, custom_price=None):
         result = self._copy()
         if is_purchase:
-            total_cost = num * base_item.purchase_price
+            if custom_price is not None:
+                total_cost = num * custom_price
+            else:
+                total_cost = num * base_item.purchase_price
             if total_cost > result.cur_money and not force:
                 raise ValueError(f"Cannot purchase {num} {base_item.name} for {total_cost} with only {result.cur_money} money")
             # when forcing, allow money to go negative, so you can get a sense for the rest of the money management of the route
@@ -80,12 +83,13 @@ class Inventory:
 
         return result
 
-    def remove_item(self, base_item:pkmn.universal_data_objects.BaseItem, num, is_sale=False, force=False):
+    def remove_item(self, base_item:pkmn.universal_data_objects.BaseItem, num, is_sale=False, force=False, custom_price=None):
         if base_item.name not in self._item_lookup:
             if force:
                 if is_sale:
                     result = self._copy()
-                    result.cur_money += (base_item.sell_price * num)
+                    sell_price = custom_price if custom_price is not None else base_item.sell_price
+                    result.cur_money += (sell_price * num)
                     return result
                 else:
                     return self
@@ -105,7 +109,8 @@ class Inventory:
             result._reindex_lookup()
 
         if is_sale:
-            result.cur_money += (base_item.sell_price * num)
+            sell_price = custom_price if custom_price is not None else base_item.sell_price
+            result.cur_money += (sell_price * num)
 
         return result
 
