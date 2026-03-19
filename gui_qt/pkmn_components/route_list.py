@@ -21,13 +21,13 @@ logger = logging.getLogger(__name__)
 # Each entry: (header_text, attr_name, width, hidden)
 _COLUMN_DEFS = [
     ("Name",         "name",                         325,   False),
-    ("LevelUpsInto", "get_pkmn_after_levelups",      220,   False),
+    ("Levels Up",    "get_pkmn_after_levelups",      114,   False),
     ("Level",        "pkmn_level",                    50,    False),
+    ("% TNL",        "percent_xp_to_next_level",       -1,    False),
     ("Exp",          "total_xp",                      48,    False),
     ("Exp/sec",      "experience_per_second",          -1,    False),
     ("Exp Gain",     "xp_gain",                        -1,    False),
     ("ToNextLevel",  "xp_to_next_level",               -1,    False),
-    ("% TNL",        "percent_xp_to_next_level",       -1,    False),
     ("LvlsGained",   "level_gain",                     -1,    False),
     ("event_id",     "group_id",                        0,    True),
 ]
@@ -104,8 +104,9 @@ class RouteList(QTreeView):
             else:
                 header.setSectionResizeMode(idx, QHeaderView.Stretch)
 
-        # The first column (tree/name) gets the remaining stretch.
+        # The first column (tree/name) and Levels Up column are user-resizable.
         header.setSectionResizeMode(_COL_NAME, QHeaderView.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
         header.setStretchLastSection(True)
 
         # --- internal bookkeeping -----------------------------------------

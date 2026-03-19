@@ -30,6 +30,7 @@ class AddEventsDialog(QDialog):
         grid.setColumnStretch(0, 2)
         grid.setColumnStretch(1, 2)
         grid.setColumnStretch(2, 1)
+        grid.setColumnStretch(3, 1)
 
         self.trainer_add = QuickTrainerAdd(self._controller)
         grid.addWidget(self.trainer_add, 0, 0)
@@ -41,7 +42,7 @@ class AddEventsDialog(QDialog):
         grid.addWidget(self.wild_pkmn_add, 0, 2)
 
         self.misc_add = QuickMiscEvents(self._controller)
-        grid.addWidget(self.misc_add, 1, 2)
+        grid.addWidget(self.misc_add, 0, 3)
 
         layout.addLayout(grid)
 
@@ -65,7 +66,12 @@ class AddEventsDialog(QDialog):
         self._center_on_parent()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_F1 and event.modifiers() == Qt.ControlModifier:
+        if event.modifiers() == Qt.ControlModifier and event.key() in (Qt.Key_F1, Qt.Key_F2):
+            # Let the main window handle both toggle shortcuts
             self.close()
+            if event.key() == Qt.Key_F2:
+                parent = self.parentWidget()
+                if parent and hasattr(parent, '_toggle_filters_dialog'):
+                    parent._toggle_filters_dialog()
         else:
             super().keyPressEvent(event)

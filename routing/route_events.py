@@ -968,7 +968,7 @@ class EventGroup:
                         if order_idx + 1 < len(pkmn_to_fight):
                             next_pkmn_name = pkmn_to_fight[order_idx + 1][1].name
                             next_pkmn_count = pkmn_counter.get(next_pkmn_name, 0) + 1
-                            self.pkmn_after_levelups.append(f"#{next_pkmn_count} {next_pkmn_name}")
+                            self.pkmn_after_levelups.append(f"{next_pkmn_name}{next_pkmn_count}")
                         else:
                             self.pkmn_after_levelups.append("end")
                     cur_state = next_state

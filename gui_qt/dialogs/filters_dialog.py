@@ -41,7 +41,12 @@ class FiltersDialog(QDialog):
         self._center_on_parent()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_F2 and event.modifiers() == Qt.ControlModifier:
+        if event.modifiers() == Qt.ControlModifier and event.key() in (Qt.Key_F1, Qt.Key_F2):
+            # Let the main window handle both toggle shortcuts
             self.close()
+            if event.key() == Qt.Key_F1:
+                parent = self.parentWidget()
+                if parent and hasattr(parent, '_toggle_add_events_dialog'):
+                    parent._toggle_add_events_dialog()
         else:
             super().keyPressEvent(event)

@@ -5,7 +5,7 @@ import logging
 from PySide6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTreeWidget,
     QTreeWidgetItem, QHeaderView, QAbstractItemView, QApplication,
-    QMessageBox,
+    QMessageBox, QSizePolicy,
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QBrush
@@ -98,9 +98,9 @@ class NewRoutePage(QWidget):
         self.game_treeview.setRootIsDecorated(False)
         self.game_treeview.setSelectionMode(QAbstractItemView.SingleSelection)
         self.game_treeview.setAlternatingRowColors(True)
-        # Roughly 8 visible rows
-        self.game_treeview.setMinimumHeight(200)
-        self.game_treeview.setMaximumHeight(240)
+        # Prefer showing all rows; shrink with scrollbar in small windows
+        self.game_treeview.setMinimumHeight(100)
+        self.game_treeview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         header = self.game_treeview.header()
         header.setStretchLastSection(True)
@@ -115,7 +115,7 @@ class NewRoutePage(QWidget):
         self.game_treeview.itemSelectionChanged.connect(self._on_game_selection_changed)
 
         version_row.addWidget(self.game_treeview, 1)
-        content_layout.addLayout(version_row)
+        content_layout.addLayout(version_row, 1)
 
         # Populate table
         self._populate_game_table()

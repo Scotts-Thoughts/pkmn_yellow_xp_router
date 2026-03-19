@@ -116,7 +116,7 @@ class LandingPage(QWidget):
         self.auto_load_checkbox.setChecked(config.get_auto_load_most_recent_route())
         self.auto_load_checkbox.stateChanged.connect(self._on_auto_load_toggle_changed)
         outer.addWidget(self.auto_load_checkbox, 0, Qt.AlignCenter)
-        outer.addSpacing(20)
+        outer.addSpacing(10)
 
         # ---- Routes section ------------------------------------------
         routes_container = QWidget()
@@ -125,10 +125,8 @@ class LandingPage(QWidget):
         routes_layout.setContentsMargins(0, 0, 0, 0)
         routes_layout.setSpacing(4)
 
-        routes_title = QLabel("Recent Routes")
-        routes_title_font = routes_title.font()
-        routes_title_font.setPointSize(16)
-        routes_title.setFont(routes_title_font)
+        routes_title = QLabel("Routes")
+        routes_title.setStyleSheet("font-size: 18pt; font-weight: bold;")
         routes_title.setAlignment(Qt.AlignCenter)
         routes_layout.addWidget(routes_title)
 
@@ -214,8 +212,7 @@ class LandingPage(QWidget):
 
         routes_layout.addWidget(self.route_tree, 1)
 
-        outer.addWidget(routes_container, 1, Qt.AlignCenter)
-        outer.addSpacing(20)
+        outer.addWidget(routes_container, 1, Qt.AlignHCenter)
 
         # Initial refresh
         self.refresh_routes()

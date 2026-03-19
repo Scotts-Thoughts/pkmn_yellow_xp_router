@@ -1260,6 +1260,8 @@ class MainWindow(QMainWindow):
         if self._add_events_dialog is not None and self._add_events_dialog.isVisible():
             self._add_events_dialog.close()
             return
+        if self._filters_dialog is not None and self._filters_dialog.isVisible():
+            self._filters_dialog.close()
         if self._add_events_dialog is None:
             from gui_qt.dialogs import AddEventsDialog
             self._add_events_dialog = AddEventsDialog(self._controller, self)
@@ -1270,6 +1272,8 @@ class MainWindow(QMainWindow):
         if self._filters_dialog is not None and self._filters_dialog.isVisible():
             self._filters_dialog.close()
             return
+        if self._add_events_dialog is not None and self._add_events_dialog.isVisible():
+            self._add_events_dialog.close()
         if self._filters_dialog is None:
             from gui_qt.dialogs import FiltersDialog
             self._filters_dialog = FiltersDialog(self._controller, self)
