@@ -9,14 +9,14 @@ from PySide6.QtWidgets import (
     QTreeView, QScrollBar, QMenuBar, QMenu, QCheckBox, QMessageBox,
     QSizePolicy, QFrame, QPlainTextEdit, QApplication,
 )
-from PySide6.QtCore import Qt, QObject, QTimer, QByteArray, Signal, Slot
+from PySide6.QtCore import Qt, QEvent, QObject, QTimer, QByteArray, Signal, Slot
 from PySide6.QtGui import QAction, QKeySequence, QShortcut, QFont
 
 from controllers.main_controller import MainController
 from route_recording.recorder import RecorderController
 from utils.constants import const
 from utils.config_manager import config
-from utils import io_utils
+from utils import io_utils, auto_update
 from routing.route_events import EventFolder
 
 # Import Qt custom components
@@ -139,6 +139,11 @@ logger = logging.getLogger(__name__)
 class MainWindow(QMainWindow):
     """Main application window -- PySide6 port of the tkinter MainWindow."""
 
+    # Signal used to marshal background-thread calls onto the GUI thread.
+    # Emitting a Signal is thread-safe; the connected slot runs on the
+    # receiver's thread (the GUI thread) via Qt's automatic queued connection.
+    _dispatch_signal = Signal(object)
+
     # ------------------------------------------------------------------
     # Initialisation
     # ------------------------------------------------------------------
@@ -146,6 +151,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._controller = controller
         self._recorder_controller = RecorderController(self._controller)
+
+        # Wire up thread-safe callback dispatching for the controller.
+        # This replaces tkinter's event_generate(when="tail") thread-safety.
+        self._dispatch_signal.connect(self._on_dispatch)
+        self._controller.set_callback_dispatcher(self._blocking_dispatch)
 
         # Bookkeeping
         self._text_field_has_focus = False
@@ -157,7 +167,13 @@ class MainWindow(QMainWindow):
 
         self.new_event_window = None
         self.summary_window = None
+        self._summary_panel = None
         self.setup_summary_window = None
+
+        # Update state
+        self._deferred_update_version = None
+        self._deferred_update_url = None
+        self._update_requested_via_menu = False
 
         self.setWindowTitle("Pokemon RBY XP Router")
         self._restore_geometry()
@@ -180,6 +196,9 @@ class MainWindow(QMainWindow):
         # Show landing page initially; auto-load happens in run() after gens load
         self._show_landing_page()
 
+        # Install app-wide event filter: clicking outside a text field clears its focus.
+        QApplication.instance().installEventFilter(self)
+
     # ------------------------------------------------------------------
     # run()
     # ------------------------------------------------------------------
@@ -194,6 +213,35 @@ class MainWindow(QMainWindow):
 
         # Deferred: wait for background gen loading, load custom gens, then auto-load route
         QTimer.singleShot(200, self._deferred_post_init)
+
+    def eventFilter(self, obj, event):
+        """App-wide: click outside a text field clears its focus.
+
+        We walk up the parent chain of the click target to check whether
+        the click landed on (or inside) a text-entry widget.  If it did,
+        we let normal Qt focus handling take over.  Otherwise we clear
+        focus so keyboard shortcuts start working again immediately.
+        """
+        # Track when any text field gains focus so shortcuts can check the flag.
+        if event.type() == QEvent.FocusIn:
+            if isinstance(obj, (QLineEdit, QPlainTextEdit)):
+                self._text_field_has_focus = True
+
+        if event.type() == QEvent.MouseButtonPress:
+            focused = QApplication.focusWidget()
+            if isinstance(focused, (QLineEdit, QPlainTextEdit)):
+                # Walk up from the click target to see if it's inside a text field
+                target = obj
+                clicking_text_field = False
+                while target is not None:
+                    if isinstance(target, (QLineEdit, QPlainTextEdit)):
+                        clicking_text_field = True
+                        break
+                    target = target.parent() if hasattr(target, 'parent') else None
+                if not clicking_text_field:
+                    focused.clearFocus()
+                    self._text_field_has_focus = False
+        return super().eventFilter(obj, event)
 
     # ------------------------------------------------------------------
     # Geometry persistence
@@ -246,6 +294,9 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.Yes:
                 event.ignore()
                 return
+        # Cleanup docked summary panel
+        if self._summary_panel is not None and self._summary_panel.is_docked:
+            self._summary_panel.cleanup()
         # Cleanup EventDetails controller callbacks
         if hasattr(self, 'event_details'):
             self.event_details.cleanup()
@@ -375,7 +426,6 @@ class MainWindow(QMainWindow):
         self._act_toggle_highlight.triggered.connect(self.toggle_event_highlight)
 
         self._act_transfer_event = self.event_menu.addAction("Transfer Event")
-        self._act_transfer_event.setShortcut(QKeySequence("Ctrl+R"))
         self._act_transfer_event.triggered.connect(self.open_transfer_event_window)
 
         self._act_delete_event = self.event_menu.addAction("Delete Event")
@@ -498,6 +548,23 @@ class MainWindow(QMainWindow):
         self._act_toggle_enemy_strat.setShortcut(QKeySequence("F10"))
         self._act_toggle_enemy_strat.triggered.connect(self.toggle_enemy_highlight_strategy)
 
+        # ---- Update menu -------------------------------------------------
+        self.update_menu = menu_bar.addMenu("&Update")
+
+        self._act_check_for_updates = self.update_menu.addAction("Check for Updates")
+        self._act_check_for_updates.triggered.connect(self._check_for_updates)
+
+        self._act_suppress_update_prompt = self.update_menu.addAction("Never prompt for updates")
+        self._act_suppress_update_prompt.setCheckable(True)
+        self._act_suppress_update_prompt.setChecked(config.get_suppress_update_prompt())
+        self._act_suppress_update_prompt.triggered.connect(self._toggle_suppress_update_prompt)
+
+        self.update_menu.addSeparator()
+
+        self._act_apply_update = self.update_menu.addAction("Update")
+        self._act_apply_update.setEnabled(False)
+        self._act_apply_update.triggered.connect(self._apply_deferred_update)
+
     # ------------------------------------------------------------------
     # Central widget construction
     # ------------------------------------------------------------------
@@ -509,7 +576,7 @@ class MainWindow(QMainWindow):
         root_layout.setSpacing(0)
 
         self._stacked = QStackedWidget()
-        root_layout.addWidget(self._stacked)
+        root_layout.addWidget(self._stacked, 1)
 
         # Page 0: Landing page
         self.landing_page = LandingPage(
@@ -546,6 +613,14 @@ class MainWindow(QMainWindow):
         self._splitter.setStretchFactor(1, 1)
 
         self._stacked.addWidget(self._route_editor)  # index 2
+
+        # Docked run-summary container (hidden by default, appears above status bar)
+        self._docked_summary_container = QWidget()
+        self._docked_summary_layout = QVBoxLayout(self._docked_summary_container)
+        self._docked_summary_layout.setContentsMargins(0, 0, 0, 0)
+        self._docked_summary_layout.setSpacing(0)
+        self._docked_summary_container.setVisible(False)
+        root_layout.addWidget(self._docked_summary_container)
 
         # Notification popup (sits on top of everything)
         self.notification_popup = NotificationPopup(self)
@@ -690,25 +765,13 @@ class MainWindow(QMainWindow):
 
     def _on_battle_summary_tab_changed(self, is_battle_summary: bool):
         """Widen right panel for battle summary, shrink it back for pre-state."""
-        # Defer to ensure the splitter is laid out and has a valid width
         QTimer.singleShot(0, lambda: self._apply_splitter_ratio(is_battle_summary))
 
-    def _apply_splitter_ratio(self, is_battle_summary: bool):
+    def _apply_splitter_ratio(self, is_battle_summary):
         total = self._splitter.width()
         if total <= 0:
             return
 
-        # Capture the selected item's visual position before the layout changes
-        selected_visual_y = None
-        selected_index = None
-        sel_indexes = self.event_list.selectionModel().selectedIndexes() if self.event_list.selectionModel() else []
-        if sel_indexes:
-            selected_index = sel_indexes[-1]
-            rect = self.event_list.visualRect(selected_index)
-            if not rect.isNull():
-                selected_visual_y = rect.y()
-
-        # Update stretch factors so future window resizes maintain the ratio
         if is_battle_summary:
             self._splitter.setStretchFactor(0, 1)
             self._splitter.setStretchFactor(1, 2)
@@ -720,27 +783,9 @@ class MainWindow(QMainWindow):
             left = int(total * 0.75)
             right = total - left
 
-        # Hide/show the top controls to allow the left panel to shrink
         self._quick_add_container.setVisible(not is_battle_summary)
         self.message_label.setVisible(not is_battle_summary)
         self._splitter.setSizes([left, right])
-
-        # After layout settles, restore the selected item to its original screen position
-        if selected_index is not None and selected_visual_y is not None:
-            QTimer.singleShot(0, lambda: self._restore_scroll_position(selected_index, selected_visual_y))
-
-    def _restore_scroll_position(self, index, target_visual_y):
-        """Adjust scroll so the selected item stays at the same screen Y position."""
-        rect = self.event_list.visualRect(index)
-        if rect.isNull():
-            return
-        current_y = rect.y()
-        delta = current_y - target_visual_y
-        if delta == 0:
-            return
-        scrollbar = self.event_list.verticalScrollBar()
-        if scrollbar:
-            scrollbar.setValue(scrollbar.value() + delta)
 
     # ------------------------------------------------------------------
     # Status bar
@@ -827,7 +872,7 @@ class MainWindow(QMainWindow):
             return sc
 
         _app_shortcut("Ctrl+F", self.toggle_fight_trainer_filter)
-        _app_shortcut("Ctrl+Y", self.toggle_rare_candy_filter)
+        _app_shortcut("Ctrl+R", self.toggle_rare_candy_filter)
         _app_shortcut("Ctrl+T", self.toggle_tm_hm_filter)
         _app_shortcut("Ctrl+G", self.toggle_vitamin_filter)
         _app_shortcut("Ctrl+W", self.toggle_fight_wild_pkmn_filter)
@@ -861,6 +906,30 @@ class MainWindow(QMainWindow):
 
         unsub = self._controller.register_route_change(self._on_route_change)
         self._unsubscribers.append(unsub)
+
+    # ------------------------------------------------------------------
+    # Thread-safe callback dispatching (replaces tkinter event_generate)
+    # ------------------------------------------------------------------
+    def _blocking_dispatch(self, fn):
+        """Execute *fn* on the GUI thread, blocking until it completes.
+
+        Called from MainController._safely_invoke_callbacks when on a
+        background thread (e.g. the recording FSM).
+        """
+        if threading.current_thread().ident == threading.main_thread().ident:
+            fn()
+            return
+        done = threading.Event()
+        self._dispatch_signal.emit((fn, done))
+        done.wait()
+
+    @Slot(object)
+    def _on_dispatch(self, payload):
+        fn, done = payload
+        try:
+            fn()
+        finally:
+            done.set()
 
     # ------------------------------------------------------------------
     # Page switching helpers
@@ -1341,22 +1410,72 @@ class MainWindow(QMainWindow):
     # Summary windows
     # ------------------------------------------------------------------
     def open_summary_window(self):
-        if self.summary_window is not None:
+        # If already showing, handle based on mode
+        if self._summary_panel is not None:
             try:
-                # If the window still exists, just bring it to front
-                self.summary_window.raise_()
-                self.summary_window.activateWindow()
-                return
+                if self._summary_panel.is_docked:
+                    # Toggle off the docked summary
+                    self._close_summary()
+                    return
+                else:
+                    # Bring undocked window to front
+                    if self.summary_window is not None:
+                        self.summary_window.raise_()
+                        self.summary_window.activateWindow()
+                        return
             except RuntimeError:
-                # Underlying C++ object has been deleted
+                self._summary_panel = None
                 self.summary_window = None
 
+        # Show summary in preferred mode
+        if config.get_run_summary_docked():
+            self._show_docked_summary()
+        else:
+            self._show_undocked_summary()
+
+    def _show_docked_summary(self):
+        from gui_qt.secondary_windows.route_summary_window import RouteSummaryPanel
+        self._summary_panel = RouteSummaryPanel(
+            self, self._controller, is_docked=True,
+            parent=self._docked_summary_container,
+        )
+        self._summary_panel.dock_toggled.connect(self._toggle_summary_dock)
+        self._summary_panel.close_requested.connect(self._close_summary)
+        self._docked_summary_layout.addWidget(self._summary_panel)
+        self._docked_summary_container.setVisible(True)
+
+    def _show_undocked_summary(self):
         from gui_qt.secondary_windows import RouteSummaryWindow
         self.summary_window = RouteSummaryWindow(self, self._controller)
+        self.summary_window.panel.dock_toggled.connect(self._toggle_summary_dock)
+        self.summary_window.panel.close_requested.connect(self._close_summary)
         self.summary_window.destroyed.connect(self._on_summary_window_destroyed)
         self.summary_window.show()
+        self._summary_panel = self.summary_window.panel
+
+    def _toggle_summary_dock(self):
+        is_currently_docked = self._summary_panel.is_docked
+        self._close_summary()
+        config.set_run_summary_docked(not is_currently_docked)
+        if is_currently_docked:
+            self._show_undocked_summary()
+        else:
+            self._show_docked_summary()
+
+    def _close_summary(self):
+        if self._summary_panel is not None:
+            if self._summary_panel.is_docked:
+                self._summary_panel.cleanup()
+                self._docked_summary_container.setVisible(False)
+                self._summary_panel.setParent(None)
+                self._summary_panel.deleteLater()
+            elif self.summary_window is not None:
+                self.summary_window.close()
+            self._summary_panel = None
+            self.summary_window = None
 
     def _on_summary_window_destroyed(self):
+        self._summary_panel = None
         self.summary_window = None
 
     def open_setup_summary_window(self):
@@ -1662,6 +1781,87 @@ class MainWindow(QMainWindow):
                 return
         # If no auto-load, refresh the landing page to show updated game list
         self.landing_page.refresh_routes()
+
+    # ------------------------------------------------------------------
+    # Update menu helpers
+    # ------------------------------------------------------------------
+    def _toggle_suppress_update_prompt(self):
+        config.set_suppress_update_prompt(self._act_suppress_update_prompt.isChecked())
+
+    def _check_for_updates(self):
+        """Run an on-demand update check in a background thread."""
+        self._act_check_for_updates.setEnabled(False)
+
+        def _do_check():
+            try:
+                new_version, new_url = auto_update.get_new_version_info()
+
+                if not auto_update.is_upgrade_needed(new_version, const.APP_VERSION):
+                    def _show_no_update():
+                        QMessageBox.information(
+                            self, "Up to date",
+                            f"You are running the latest version ({const.APP_VERSION}).",
+                        )
+                        self._act_check_for_updates.setEnabled(True)
+                    self._blocking_dispatch(_show_no_update)
+                    return
+
+                if not auto_update.is_upgrade_possible():
+                    def _show_not_possible():
+                        QMessageBox.information(
+                            self, "Update available",
+                            f"Version {new_version} is available, but automatic updates "
+                            f"are not supported for this installation.\n"
+                            f"Please download the new version manually.",
+                        )
+                        self._act_check_for_updates.setEnabled(True)
+                    self._blocking_dispatch(_show_not_possible)
+                    return
+
+                self._deferred_update_version = new_version
+                self._deferred_update_url = new_url
+
+                def _show_update_found():
+                    self._act_apply_update.setEnabled(True)
+                    self._act_apply_update.setText(f"Update to {new_version}")
+                    self._act_check_for_updates.setEnabled(True)
+                    reply = QMessageBox.question(
+                        self, "Update available",
+                        f"Version {new_version} is available.\n"
+                        f"Do you want to update now?",
+                        QMessageBox.Yes | QMessageBox.No,
+                        QMessageBox.No,
+                    )
+                    if reply == QMessageBox.Yes:
+                        self._apply_deferred_update()
+                self._blocking_dispatch(_show_update_found)
+
+            except Exception as e:
+                logger.error(f"Error checking for updates: {e}")
+                def _show_error():
+                    QMessageBox.warning(
+                        self, "Update check failed",
+                        f"Could not check for updates:\n{e}",
+                    )
+                    self._act_check_for_updates.setEnabled(True)
+                self._blocking_dispatch(_show_error)
+
+        t = threading.Thread(target=_do_check, daemon=True)
+        t.start()
+
+    def _apply_deferred_update(self):
+        """Trigger the close-and-update flow using the stored update info."""
+        if self._deferred_update_version is None:
+            return
+        reply = QMessageBox.question(
+            self, "Apply Update",
+            f"The application will close and update to {self._deferred_update_version}.\nContinue?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            self._update_requested_via_menu = True
+            self.cancel_and_quit()
 
     # ------------------------------------------------------------------
     # Quit

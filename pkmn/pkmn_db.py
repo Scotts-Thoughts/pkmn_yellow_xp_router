@@ -344,6 +344,8 @@ class MoveDB:
         if move is None:
             return {'has_stat_effect': False}
 
+        is_belly_drum = const.FLAVOR_BELLY_DRUM in move.attack_flavor
+
         stat_effects = []
         for cur_effect in move.effects:
             if const.STAT_KEY in cur_effect and const.MODIFIER_KEY in cur_effect:
@@ -360,7 +362,9 @@ class MoveDB:
         is_guaranteed = chance >= 100
         is_damaging = move.base_power is not None and move.base_power > 0
 
-        if modifier == 0:
+        if is_belly_drum:
+            max_applications = 1
+        elif modifier == 0:
             max_applications = 0
         else:
             max_applications = 6 // abs(modifier)
@@ -372,6 +376,7 @@ class MoveDB:
             'is_damaging': is_damaging,
             'max_applications': max_applications,
             'stage_change': modifier,
+            'is_belly_drum': is_belly_drum,
         }
 
     def get_stat_stage_dropdown_options(self, move_name) -> List[str]:
@@ -384,6 +389,12 @@ class MoveDB:
 
         if not is_guaranteed and not is_damaging:
             return None
+
+        if info.get('is_belly_drum', False):
+            from pkmn.gen_factory import current_gen_info
+            if current_gen_info().get_generation() == 2:
+                return ["0", "2", "6"]
+            return ["0", "6"]
 
         max_apps = info.get('max_applications', 0)
         if max_apps <= 0:

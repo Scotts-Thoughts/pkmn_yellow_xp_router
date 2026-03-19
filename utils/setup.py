@@ -1,14 +1,11 @@
-import argparse
 import os
-import subprocess
 import sys
-import threading
 import logging
 
 from pkmn.gen_4 import gen_four_object
 from utils.constants import const
 
-from tkinter import Tk, messagebox
+from PySide6.QtWidgets import QMessageBox
 
 from pkmn.gen_1 import gen_one_object
 from pkmn.gen_2 import gen_two_object
@@ -21,25 +18,56 @@ from utils import auto_update
 logger = logging.getLogger(__name__)
 
 
-
-def route_startup_check_for_upgrade(main_app:Tk):
+def route_startup_check_for_upgrade(main_app):
     new_app_version, new_asset_url = auto_update.get_new_version_info()
     logger.info(f"Latest version determined to be: {new_app_version}")
 
     if not auto_update.is_upgrade_needed(new_app_version, const.APP_VERSION):
         logger.info(f"No upgrade needed")
         return False
-    
+
     if not auto_update.is_upgrade_possible():
         logger.info(f"Cannot upgrade this deployment")
         return False
-    
-    if not messagebox.askyesno("Update?", f"Found new version {new_app_version}\nDo you want to update?"):
+
+    # Store update info on the window so the Update menu can use it later
+    main_app._deferred_update_version = new_app_version
+    main_app._deferred_update_url = new_asset_url
+
+    # Enable the "Update" menu action on the GUI thread
+    def _enable_update_action():
+        if hasattr(main_app, '_act_apply_update'):
+            main_app._act_apply_update.setEnabled(True)
+            main_app._act_apply_update.setText(f"Update to {new_app_version}")
+    main_app._blocking_dispatch(_enable_update_action)
+
+    # If user has suppressed the prompt, don't ask — just leave the menu item enabled
+    if config.get_suppress_update_prompt():
+        logger.info(f"Update prompt suppressed by user preference")
+        return False
+
+    # Must show the dialog on the main/GUI thread since this runs in a background thread.
+    # Use the main window's existing _blocking_dispatch mechanism for thread safety.
+    user_accepted = [False]
+
+    def _prompt():
+        result = QMessageBox.question(
+            main_app,
+            "Update?",
+            f"Found new version {new_app_version}\nDo you want to update?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        user_accepted[0] = result == QMessageBox.Yes
+
+    main_app._blocking_dispatch(_prompt)
+
+    if not user_accepted[0]:
         logger.info(f"User rejected auto-update")
         return False
-    
+
     logger.info(f"User requested auto-update")
-    main_app.event_generate(const.FORCE_QUIT_EVENT)
+    main_app._blocking_dispatch(main_app.cancel_and_quit)
     return True
 
 

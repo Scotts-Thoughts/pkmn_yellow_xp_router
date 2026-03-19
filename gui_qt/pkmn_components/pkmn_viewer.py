@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
-from gui_qt.pkmn_components.stat_column import StatColumn
+from gui_qt.pkmn_components.stat_column import StatColumn, tinted_bg_for_style
 
 from pkmn.gen_factory import current_gen_info
 from pkmn import universal_data_objects
@@ -32,26 +32,37 @@ class PkmnViewer(QWidget):
 
         layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setSpacing(2)
+
+        header_bg = tinted_bg_for_style("Header", alpha=0.25)
+        header_color = config.get_header_color()
 
         # Name label (row 0, spans 2 columns)
         self._name_value = QLabel("")
-        self._name_value.setStyleSheet(f"color: {config.get_header_color()};")
-        self._name_value.setContentsMargins(0, 2, 0, 2)
+        self._name_value.setStyleSheet(
+            f"color: {header_color}; background-color: {header_bg};"
+            f" padding: 2px 4px; border-radius: 2px;"
+        )
         if font_to_use is not None:
             self._name_value.setFont(font_to_use)
         layout.addWidget(self._name_value, 0, 0, 1, 2)
 
         # Ability / Nature label (row 2, hidden until set_pkmn)
         self._ability = QLabel("")
-        self._ability.setStyleSheet(f"color: {config.get_header_color()};")
+        self._ability.setStyleSheet(
+            f"color: {header_color}; background-color: {header_bg};"
+            f" padding: 2px 4px; border-radius: 2px;"
+        )
         if font_to_use is not None:
             self._ability.setFont(font_to_use)
         self._ability.setVisible(False)
 
         # Held item label (row 3, hidden until set_pkmn)
         self._held_item = QLabel("")
-        self._held_item.setStyleSheet(f"color: {config.get_header_color()};")
+        self._held_item.setStyleSheet(
+            f"color: {header_color}; background-color: {header_bg};"
+            f" padding: 2px 4px; border-radius: 2px;"
+        )
         if font_to_use is not None:
             self._held_item.setFont(font_to_use)
         self._held_item.setVisible(False)

@@ -1,6 +1,6 @@
 import logging
 
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, Signal, Slot
 
 from pkmn.gen_factory import current_gen_info
 from route_recording.recorder import RecorderController, RecorderGameHookClient
@@ -10,7 +10,19 @@ logger = logging.getLogger(__name__)
 
 
 class RecorderStatus(QObject):
-    """Manages the GameHook connection lifecycle and updates external status widgets."""
+    """Manages the GameHook connection lifecycle and updates external status widgets.
+
+    GameHook / recorder callbacks fire from background threads (SignalR,
+    FSM processing).  We use Qt Signals so that cross-thread emissions
+    are automatically queued onto the GUI thread — QTimer.singleShot does
+    NOT work reliably when called from a non-Qt thread.
+    """
+
+    # Signals used to marshal background-thread callbacks to the GUI thread.
+    _sig_record_mode_changed = Signal()
+    _sig_status_changed = Signal()
+    _sig_ready_changed = Signal()
+    _sig_game_state_changed = Signal()
 
     def __init__(self, main_controller, recorder_controller, client_status_label, reconnect_button, parent=None):
         super().__init__(parent)
@@ -23,21 +35,26 @@ class RecorderStatus(QObject):
         self.connection_retry_button = reconnect_button
         self.connection_retry_button.clicked.connect(self.reconnect_button_pressed)
 
+        # Connect internal signals -> slots (queued automatically across threads).
+        self._sig_record_mode_changed.connect(self.on_recording_mode_changed)
+        self._sig_status_changed.connect(self.on_recording_status_changed)
+        self._sig_ready_changed.connect(self.on_recording_ready_changed)
+        self._sig_game_state_changed.connect(self.on_recording_game_state_changed)
+
         # Register callbacks with the controllers.
-        # Recorder callbacks may fire from background GameHook threads, so we
-        # wrap them with QTimer.singleShot(0, ...) to marshal onto the main
-        # (GUI) thread before touching any widgets.
+        # Emitting a Signal is thread-safe; the connected slot runs on the
+        # GUI thread thanks to Qt's automatic queued connections.
         self._unregister_record_mode = self._main_controller.register_record_mode_change(
-            lambda: QTimer.singleShot(0, self.on_recording_mode_changed)
+            self._sig_record_mode_changed.emit
         )
         self._unregister_status = self._recorder_controller.register_recorder_status_change(
-            lambda: QTimer.singleShot(0, self.on_recording_status_changed)
+            self._sig_status_changed.emit
         )
         self._unregister_ready = self._recorder_controller.register_recorder_ready_change(
-            lambda: QTimer.singleShot(0, self.on_recording_ready_changed)
+            self._sig_ready_changed.emit
         )
         self._unregister_game_state = self._recorder_controller.register_recorder_game_state_change(
-            lambda: QTimer.singleShot(0, self.on_recording_game_state_changed)
+            self._sig_game_state_changed.emit
         )
 
     def on_recording_mode_changed(self):

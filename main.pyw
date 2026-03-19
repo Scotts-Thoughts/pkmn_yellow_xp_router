@@ -46,6 +46,9 @@ if __name__ == '__main__':
         exit_code = qt_app.exec()
 
         flag_to_auto_update = background_thread.result()
+        # Also check if user triggered an update via the menu
+        if not flag_to_auto_update:
+            flag_to_auto_update = getattr(window, '_update_requested_via_menu', False)
         logger.info(f"App closed, autoupdate requested? {flag_to_auto_update}")
 
     if flag_to_auto_update:

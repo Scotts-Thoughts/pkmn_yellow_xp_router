@@ -40,7 +40,7 @@ class CurrentGen:
     def create_trainer_pkmn(self, pkmn_name, pkmn_level) -> universal_data_objects.EnemyPkmn:
         raise NotImplementedError()
 
-    def create_wild_pkmn(self, pkmn_name, pkmn_level) -> universal_data_objects.EnemyPkmn:
+    def create_wild_pkmn(self, pkmn_name, pkmn_level, dv=15) -> universal_data_objects.EnemyPkmn:
         raise NotImplementedError()
     
     def calculate_damage(self,
@@ -105,7 +105,10 @@ class CurrentGen:
     def get_fight_reward(self, trainer_name) -> str:
         raise NotImplementedError()
 
-    def is_major_fight(self, trainer_name) -> str:
+    def is_major_fight(self, trainer_name) -> bool:
+        raise NotImplementedError()
+
+    def get_fight_category(self, trainer_name):
         raise NotImplementedError()
 
     def is_branched_mandatory_fight(self, trainer_name) -> bool:

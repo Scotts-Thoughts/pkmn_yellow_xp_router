@@ -174,15 +174,15 @@ def extract_and_update_code(zip_url, temp_dir, display_fn=None) -> bool:
 
         return False
     finally:
-        #_cleanup()
-        pass
+        _cleanup()
 
 
 def get_new_version_info(nuzlocke_path=False) -> Tuple[str, str]:
     # NOTE: automatic updates are currently only supported for windows
 
     # TODO: brittle, and tightly tied to github api not changing. Not sure what to do about it though...
-    github_api_url = "https://api.github.com/repos/OttoTonsorialist/pkmn_yellow_xp_router/releases/latest"
+    # TODO: update this repo URL to point to the correct git repo for new releases
+    github_api_url = "https://api.github.com/repos/Scotts-Thoughts/pkmn_yellow_xp_router/releases/latest"
     try:
         with urllib.request.urlopen(github_api_url) as response:
             data = json.loads(response.read())

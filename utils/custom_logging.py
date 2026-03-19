@@ -12,8 +12,13 @@ def config_logging(base_log_dir):
     final_log_path = os.path.join(base_log_dir, "pkmn_router_logs.log")
     file_handler = logging.handlers.RotatingFileHandler(final_log_path, encoding="utf-8", backupCount=20)
     file_handler.setFormatter(formatter)
-    if os.path.exists(final_log_path):
-        file_handler.doRollover()
+    try:
+        if os.path.exists(final_log_path):
+            file_handler.doRollover()
+    except OSError:
+        # On Windows, doRollover fails if another instance has the log file
+        # open (can't rename an open file).  Just continue with the existing file.
+        pass
 
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)

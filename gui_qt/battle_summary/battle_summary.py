@@ -7,8 +7,8 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
     QFrame, QCompleter, QLineEdit, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtCore import Qt, QPointF, QTimer, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap, QPolygonF
 
 from controllers.battle_summary_controller import BattleSummaryController, MoveRenderInfo
 from gui_qt.components.custom_components import (
@@ -18,6 +18,7 @@ from pkmn import universal_data_objects
 from pkmn.gen_factory import current_gen_info
 from routing import full_route_state
 from routing import route_events
+from gui_qt import pkmn_icon
 from utils.config_manager import config
 from utils.constants import const
 from utils import io_utils
@@ -181,7 +182,7 @@ class BattleSummary(QWidget):
         player_setup_layout.setSpacing(2)
 
         self.setup_moves = SetupMovesSummary(callback=self._player_setup_move_callback, is_player=True, parent=player_setup_row)
-        player_setup_layout.addWidget(self.setup_moves)
+        player_setup_layout.addWidget(self.setup_moves, 1)
 
         self.transform_checkbox = CheckboxLabel(
             text="Transform:",
@@ -189,7 +190,11 @@ class BattleSummary(QWidget):
             flip=True,
             parent=player_setup_row,
         )
-        player_setup_layout.addWidget(self.transform_checkbox)
+        player_setup_layout.addWidget(self.transform_checkbox, 0)
+
+        self.held_item_label = QLabel("")
+        self.held_item_label.setStyleSheet("QLabel { color: #aaaaaa; border: none; }")
+        player_setup_layout.addWidget(self.held_item_label, 0)
 
         setup_layout.addWidget(player_setup_row)
 
@@ -267,11 +272,12 @@ class BattleSummary(QWidget):
         enemy_pkmn: List[universal_data_objects.EnemyPkmn],
         cur_state: full_route_state.RouteState = None,
         event_group: route_events.EventGroup = None,
+        is_wild: bool = False,
     ):
         if event_group is not None:
             self._controller.load_from_event(event_group)
         elif cur_state is not None and enemy_pkmn is not None:
-            self._controller.load_from_state(cur_state, enemy_pkmn)
+            self._controller.load_from_state(cur_state, enemy_pkmn, is_wild=is_wild)
         else:
             self._controller.load_empty()
 
@@ -299,9 +305,36 @@ class BattleSummary(QWidget):
         except Exception:
             pass
 
+    def _grab_transparent(self, widget):
+        """Render *widget* into a QPixmap with a transparent background.
+
+        The widget and _base_frame backgrounds are temporarily made
+        transparent so that individual move/mon-pair frames keep their
+        own backgrounds while the overall canvas is see-through — ideal
+        for compositing into video footage.
+        """
+        saved_widget = widget.styleSheet()
+        saved_base = self._base_frame.styleSheet()
+        widget.setStyleSheet("background: transparent;")
+        self._base_frame.setStyleSheet("background: transparent;")
+
+        pixmap = QPixmap(widget.size())
+        pixmap.fill(Qt.transparent)
+        widget.render(pixmap)
+
+        widget.setStyleSheet(saved_widget)
+        self._base_frame.setStyleSheet(saved_base)
+        return pixmap
+
     def take_battle_summary_screenshot(self):
-        pixmap = self._base_frame.grab()
-        self._save_pixmap(pixmap, "battle_summary")
+        pixmap = self._grab_transparent(self._base_frame)
+        # Crop tightly: include top bar through the last visible mon pair
+        mon_rect = self._get_mon_pairs_rect()
+        if mon_rect[0] is not None:
+            cropped = pixmap.copy(0, 0, pixmap.width(), mon_rect[1])
+            self._save_pixmap(cropped, "battle_summary")
+        else:
+            self._save_pixmap(pixmap, "battle_summary")
 
     def _get_divider_x_in_base_frame(self):
         """Return (left_edge_x, right_edge_x) of the divider relative to _base_frame.
@@ -312,37 +345,63 @@ class BattleSummary(QWidget):
         for idx, mp in enumerate(self._mon_pairs):
             if self._did_draw_mon_pairs[idx] and mp.isVisible():
                 divider = mp.divider
-                # mapTo gives the position of the divider's top-left corner
-                # relative to _base_frame
                 pos = divider.mapTo(self._base_frame, divider.rect().topLeft())
                 left_x = pos.x()
                 right_x = left_x + divider.width()
                 return (left_x, right_x)
         return None
 
+    def _get_mon_pairs_rect(self):
+        """Return (y_top, y_bottom) of the visible mon-pair area relative to _base_frame.
+
+        Excludes the top bar and any bottom stretch, matching the reference
+        implementation which crops tightly to just the mon-pair grids.
+        """
+        top = None
+        bottom = None
+        for idx in range(6):
+            if self._did_draw_mon_pairs[idx] and self._mon_pairs[idx].isVisible():
+                mp = self._mon_pairs[idx]
+                pos = mp.mapTo(self._base_frame, mp.rect().topLeft())
+                mp_top = pos.y()
+                mp_bottom = mp_top + mp.height()
+                if top is None or mp_top < top:
+                    top = mp_top
+                if bottom is None or mp_bottom > bottom:
+                    bottom = mp_bottom
+        return (top, bottom)
+
     def take_player_ranges_screenshot(self):
         """Capture only the left (player) half of the mon-pair grids."""
-        pixmap = self._base_frame.grab()
-        h = pixmap.height()
+        pixmap = self._grab_transparent(self._base_frame)
         divider_pos = self._get_divider_x_in_base_frame()
+        mon_rect = self._get_mon_pairs_rect()
         if divider_pos is not None:
-            split_x = divider_pos[0]  # left edge of divider
+            split_x = divider_pos[0]
         else:
             split_x = pixmap.width() // 2
-        cropped = pixmap.copy(0, 0, split_x, h)
+        if mon_rect[0] is not None:
+            y_top, y_bottom = mon_rect
+        else:
+            y_top, y_bottom = 0, pixmap.height()
+        cropped = pixmap.copy(0, y_top, split_x, y_bottom - y_top)
         self._save_pixmap(cropped, "player_ranges")
 
     def take_enemy_ranges_screenshot(self):
         """Capture only the right (enemy) half of the mon-pair grids."""
-        pixmap = self._base_frame.grab()
+        pixmap = self._grab_transparent(self._base_frame)
         w = pixmap.width()
-        h = pixmap.height()
         divider_pos = self._get_divider_x_in_base_frame()
+        mon_rect = self._get_mon_pairs_rect()
         if divider_pos is not None:
-            split_x = divider_pos[1]  # right edge of divider
+            split_x = divider_pos[1]
         else:
             split_x = w // 2
-        cropped = pixmap.copy(split_x, 0, w - split_x, h)
+        if mon_rect[0] is not None:
+            y_top, y_bottom = mon_rect
+        else:
+            y_top, y_bottom = 0, pixmap.height()
+        cropped = pixmap.copy(split_x, y_top, w - split_x, y_bottom - y_top)
         self._save_pixmap(cropped, "enemy_ranges")
 
     def _increment_prefight_candies(self):
@@ -402,6 +461,8 @@ class BattleSummary(QWidget):
             self.double_label.setText("Single Battle")
 
         self.transform_checkbox.set_checked(self._controller.is_player_transformed())
+        held = self._controller.get_player_held_item()
+        self.held_item_label.setText(f"Held: {held}" if held else "")
         self.weather_status.set_weather(self._controller.get_weather())
         self.setup_moves.set_move_list(self._controller.get_player_setup_moves())
         self.enemy_setup_moves.set_move_list(self._controller.get_enemy_setup_moves())
@@ -650,6 +711,55 @@ class PrefightCandySummary(QWidget):
 
 
 # ===================================================================
+# DisclosureTriangle -- small painted expand/collapse indicator
+# ===================================================================
+
+class DisclosureTriangle(QWidget):
+    """A small widget that paints a solid triangle pointing down (expanded)
+    or right (collapsed).  Both orientations use the exact same triangle
+    size so the indicator never appears to shrink or distort."""
+
+    def __init__(self, size=12, color="#cccccc", parent=None):
+        super().__init__(parent)
+        self._expanded = True
+        self._color = QColor(color)
+        self.setFixedSize(size, size)
+
+    def set_expanded(self, expanded: bool):
+        if self._expanded != expanded:
+            self._expanded = expanded
+            self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(self._color))
+
+        s = min(self.width(), self.height())
+        margin = s * 0.15
+        tri_size = s - 2 * margin
+
+        if self._expanded:
+            # Down-pointing triangle
+            poly = QPolygonF([
+                QPointF(margin, margin),
+                QPointF(margin + tri_size, margin),
+                QPointF(margin + tri_size / 2, margin + tri_size),
+            ])
+        else:
+            # Right-pointing triangle
+            poly = QPolygonF([
+                QPointF(margin, margin),
+                QPointF(margin + tri_size, margin + tri_size / 2),
+                QPointF(margin, margin + tri_size),
+            ])
+
+        painter.drawPolygon(poly)
+        painter.end()
+
+
+# ===================================================================
 # MonPairSummary -- one row per enemy pokemon matchup
 # ===================================================================
 
@@ -662,7 +772,7 @@ class MonPairSummary(QWidget):
 
         # Outer frame with a subtle border to separate each matchup visually
         self.setStyleSheet(
-            f"MonPairSummary {{ border: 1px solid {_darken(config.get_divider_color(), 0.3)}; border-radius: 3px; }}"
+            f"MonPairSummary {{ border: 1px solid {_darken(config.get_divider_color(), 0.3)}; border-radius: 6px; }}"
         )
 
         outer_layout = QVBoxLayout(self)
@@ -670,17 +780,33 @@ class MonPairSummary(QWidget):
         outer_layout.setSpacing(0)
 
         # ---- clickable header row -----------------------------------------
+        self._header_widget = QWidget()
+        self._header_widget.setCursor(Qt.PointingHandCursor)
+        self._header_widget.mousePressEvent = lambda e: self._toggle_expanded()
+        self._header_widget.setStyleSheet("QWidget { border: none; }")
+        header_row = QHBoxLayout(self._header_widget)
+        header_row.setContentsMargins(6, 3, 6, 3)
+        header_row.setSpacing(4)
+
+        self._disclosure = DisclosureTriangle(size=14, color="#cccccc", parent=self._header_widget)
+        header_row.addWidget(self._disclosure)
+
+        self._enemy_icon = QLabel()
+        self._enemy_icon.setFixedSize(28, 28)
+        self._enemy_icon.setStyleSheet("border: none;")
+        header_row.addWidget(self._enemy_icon)
+
         self._header = QLabel("")
         self._header.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self._header.setStyleSheet(
-            "QLabel { padding: 3px 6px; font-weight: bold; border: none; }"
+            "QLabel { font-weight: bold; border: none; }"
         )
         header_font = QFont()
         header_font.setBold(True)
         self._header.setFont(header_font)
-        self._header.setCursor(Qt.PointingHandCursor)
-        self._header.mousePressEvent = lambda e: self._toggle_expanded()
-        outer_layout.addWidget(self._header)
+        header_row.addWidget(self._header, 1)
+
+        outer_layout.addWidget(self._header_widget)
 
         # ---- collapsible content area -------------------------------------
         self._content = QWidget()
@@ -733,8 +859,7 @@ class MonPairSummary(QWidget):
     def _toggle_expanded(self):
         self._expanded = not self._expanded
         self._content.setVisible(self._expanded)
-        # Re-render header to update the expand/collapse indicator
-        self._update_header_text()
+        self._disclosure.set_expanded(self._expanded)
 
     def _update_header_text(self):
         player_info = self._controller.get_pkmn_info(self._mon_idx, True)
@@ -742,9 +867,18 @@ class MonPairSummary(QWidget):
 
         if player_info is None or enemy_info is None:
             self._header.setText("")
+            self._enemy_icon.clear()
             return
 
-        arrow = "\u25bc" if self._expanded else "\u25b6"  # ▼ or ▶
+        # Set enemy Pokemon icon
+        icon_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=28)
+        if icon_pm is not None:
+            self._enemy_icon.setPixmap(icon_pm)
+            self._enemy_icon.setVisible(True)
+        else:
+            self._enemy_icon.setVisible(False)
+
+        self._disclosure.set_expanded(self._expanded)
 
         player_text = f"{player_info.attacking_mon_name} Lv{player_info.attacking_mon_level}"
         enemy_text = f"{enemy_info.attacking_mon_name} Lv{enemy_info.attacking_mon_level}"
@@ -758,7 +892,7 @@ class MonPairSummary(QWidget):
             text_color = "#e74c3c"  # Red - player underspeeds
 
         self._header.setText(
-            f'{arrow}  <span style="color:{text_color}">{player_text} vs. {enemy_text}</span>'
+            f'<span style="color:{text_color}">{player_text} vs. {enemy_text}</span>'
         )
         self._header.setTextFormat(Qt.RichText)
 
@@ -917,11 +1051,12 @@ class DamageSummary(QWidget):
 
         # ---- header row (move name + optional dropdowns) ------------------
         self.header = QFrame()
+        self.header.setFixedHeight(26)
         self.header.setStyleSheet(
-            f"QFrame {{ background-color: {primary_bg}; border: none; border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+            f"QFrame {{ background-color: {primary_bg}; border: none; border-top-left-radius: 6px; border-top-right-radius: 6px; }}"
         )
         header_layout = QHBoxLayout(self.header)
-        header_layout.setContentsMargins(3, 2, 3, 2)
+        header_layout.setContentsMargins(3, 0, 3, 0)
         header_layout.setSpacing(2)
 
         # Test-move dropdown (only for first pokemon)
@@ -962,11 +1097,12 @@ class DamageSummary(QWidget):
 
         # ---- damage range rows -------------------------------------------
         self.range_frame = QFrame()
+        self.range_frame.setFixedHeight(34)
         self.range_frame.setStyleSheet(
             f"QFrame {{ background-color: {range_bg}; border: none; }}"
         )
         range_layout = QGridLayout(self.range_frame)
-        range_layout.setContentsMargins(4, 1, 4, 1)
+        range_layout.setContentsMargins(4, 0, 4, 0)
         range_layout.setSpacing(0)
         range_layout.setColumnStretch(0, 1)
         range_layout.setColumnStretch(1, 1)
@@ -997,11 +1133,12 @@ class DamageSummary(QWidget):
 
         # ---- kill info row ------------------------------------------------
         self.kill_frame = QFrame()
+        self.kill_frame.setFixedHeight(52)
         self.kill_frame.setStyleSheet(
-            f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+            f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }}"
         )
         kill_layout = QHBoxLayout(self.kill_frame)
-        kill_layout.setContentsMargins(4, 1, 4, 2)
+        kill_layout.setContentsMargins(4, 1, 4, 1)
         kill_layout.setSpacing(0)
 
         kill_label_style = f"color: {secondary_color}; background: transparent; border: none;"
@@ -1028,7 +1165,7 @@ class DamageSummary(QWidget):
             flag_color = config.get_failure_color()
         flag_bg = _blend_color(flag_color, config.get_background_color(), 0.20)
         self.kill_frame.setStyleSheet(
-            f"QFrame {{ background-color: {flag_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+            f"QFrame {{ background-color: {flag_bg}; border: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }}"
         )
         kill_style = f"color: {flag_color}; background: transparent; border: none; font-weight: bold;"
         self.num_to_kill.setStyleSheet(kill_style)
@@ -1038,7 +1175,7 @@ class DamageSummary(QWidget):
         secondary_color = config.get_secondary_color()
         kill_bg = _blend_color(secondary_color, config.get_background_color(), 0.08)
         self.kill_frame.setStyleSheet(
-            f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+            f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }}"
         )
         kill_style = f"color: {secondary_color}; background: transparent; border: none;"
         self.num_to_kill.setStyleSheet(kill_style)
@@ -1120,7 +1257,7 @@ class DamageSummary(QWidget):
         if highlight_state in _HIGHLIGHT_COLORS_IMMEDIATE:
             bg = _HIGHLIGHT_COLORS_IMMEDIATE[highlight_state]
             self.header.setStyleSheet(
-                f"QFrame {{ background-color: {bg}; border: none; border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+                f"QFrame {{ background-color: {bg}; border: none; border-top-left-radius: 6px; border-top-right-radius: 6px; }}"
             )
             self.move_name_label.setStyleSheet(
                 f"background-color: {bg}; color: white; padding: 2px 4px; border: none; font-weight: bold;"
@@ -1130,7 +1267,7 @@ class DamageSummary(QWidget):
         elif should_fade:
             faded_fg = _blend_color(default_fg, default_bg, 0.1)
             self.header.setStyleSheet(
-                f"QFrame {{ background-color: {default_bg}; border: none; border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+                f"QFrame {{ background-color: {default_bg}; border: none; border-top-left-radius: 6px; border-top-right-radius: 6px; }}"
             )
             self.move_name_label.setStyleSheet(
                 f"background-color: {default_bg}; color: {faded_fg}; padding: 2px 4px; border: none;"
@@ -1138,7 +1275,7 @@ class DamageSummary(QWidget):
             self._apply_fade_to_all_elements(faded_fg, default_bg)
         else:
             self.header.setStyleSheet(
-                f"QFrame {{ background-color: {default_bg}; border: none; border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+                f"QFrame {{ background-color: {default_bg}; border: none; border-top-left-radius: 6px; border-top-right-radius: 6px; }}"
             )
             self.move_name_label.setStyleSheet(
                 f"background-color: {default_bg}; color: {default_fg}; padding: 2px 4px; border: none; font-weight: bold;"
@@ -1173,7 +1310,7 @@ class DamageSummary(QWidget):
 
             faded_kill_bg = _blend_color(secondary_fg, secondary_bg, 0.03)
             self.kill_frame.setStyleSheet(
-                f"QFrame {{ background-color: {faded_kill_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+                f"QFrame {{ background-color: {faded_kill_bg}; border: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }}"
             )
 
             self.custom_data_dropdown.setVisible(False)
@@ -1205,7 +1342,7 @@ class DamageSummary(QWidget):
 
             kill_bg = _blend_color(secondary_fg, base_bg, 0.08)
             self.kill_frame.setStyleSheet(
-                f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+                f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }}"
             )
 
             if self.test_move_dropdown is not None:
@@ -1353,7 +1490,7 @@ class DamageSummary(QWidget):
             default_fg = _primary_fg()
             header_frame_style = (
                 f"QFrame {{ background-color: {default_bg}; border: none;"
-                f" border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+                f" border-top-left-radius: 6px; border-top-right-radius: 6px; }}"
             )
             move_label_style = (
                 f"background-color: {default_bg}; color: {default_fg};"
@@ -1373,7 +1510,7 @@ class DamageSummary(QWidget):
                     bg = _HIGHLIGHT_COLORS[highlight_state]
                     header_frame_style = (
                         f"QFrame {{ background-color: {bg}; border: none;"
-                        f" border-top-left-radius: 2px; border-top-right-radius: 2px; }}"
+                        f" border-top-left-radius: 6px; border-top-right-radius: 6px; }}"
                     )
                     move_label_style = (
                         f"background-color: {bg}; color: white;"
@@ -1465,7 +1602,7 @@ class DamageSummary(QWidget):
                     faded_kill_bg = _blend_color(secondary_fg, contrast_bg, 0.03)
                     self.kill_frame.setStyleSheet(
                         f"QFrame {{ background-color: {faded_kill_bg}; border: none;"
-                        f" border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+                        f" border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }}"
                     )
 
                     self.custom_data_dropdown.setVisible(False)
@@ -1486,7 +1623,7 @@ class DamageSummary(QWidget):
                     kill_bg = _blend_color(secondary_fg, contrast_bg, 0.08)
                     self.kill_frame.setStyleSheet(
                         f"QFrame {{ background-color: {kill_bg}; border: none;"
-                        f" border-bottom-left-radius: 2px; border-bottom-right-radius: 2px; }}"
+                        f" border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }}"
                     )
 
                     if self.test_move_dropdown is not None:

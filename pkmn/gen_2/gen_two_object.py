@@ -93,7 +93,19 @@ class GenTwo(CurrentGen):
                 fight_info = json.load(f)
             
             self._badge_rewards:Dict[str, str] = fight_info[const.BADGE_REWARDS_KEY]
-            self._major_fights:List[str] = fight_info[const.MAJOR_FIGHTS_KEY]
+            raw_major_fights = fight_info[const.MAJOR_FIGHTS_KEY]
+            if isinstance(raw_major_fights, list):
+                self._fight_categories = {}
+                self._major_fights = set(raw_major_fights)
+                self._trainer_to_category = {}
+            else:
+                self._fight_categories = raw_major_fights
+                self._major_fights = set()
+                self._trainer_to_category = {}
+                for cat, names in raw_major_fights.items():
+                    self._major_fights.update(names)
+                    for name in names:
+                        self._trainer_to_category[name] = cat
             self._fight_rewards:Dict[str, str] = fight_info[const.FIGHT_REWARDS_KEY]
             self._branched_mandatory_fights:List[str] = fight_info.get(const.BRANCHED_MANDATORY_FIGHTS_KEY, [])
 
@@ -156,8 +168,8 @@ class GenTwo(CurrentGen):
     def create_trainer_pkmn(self, pkmn_name, pkmn_level):
         return instantiate_trainer_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level)
     
-    def create_wild_pkmn(self, pkmn_name, pkmn_level):
-        return instantiate_wild_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level)
+    def create_wild_pkmn(self, pkmn_name, pkmn_level, dv=15):
+        return instantiate_wild_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level, dv=dv)
     
     def get_crit_rate(self, pkmn, move, custom_move_data):
         return pkmn_damage_calc.get_crit_rate(pkmn, move)
@@ -220,8 +232,11 @@ class GenTwo(CurrentGen):
     def get_fight_reward(self, trainer_name) -> str:
         return self._fight_rewards.get(trainer_name)
     
-    def is_major_fight(self, trainer_name) -> str:
+    def is_major_fight(self, trainer_name) -> bool:
         return trainer_name in self._major_fights
+
+    def get_fight_category(self, trainer_name):
+        return self._trainer_to_category.get(trainer_name)
 
     def is_branched_mandatory_fight(self, trainer_name) -> bool:
         return trainer_name in self._branched_mandatory_fights
@@ -230,23 +245,15 @@ class GenTwo(CurrentGen):
         return len(self._branched_mandatory_fights) > 0
 
     def get_gym_leader_names(self) -> List[str]:
-        # Gen 2: Gym leaders in game order (not array order)
-        # Array has them as: Falkner, Whitney, Bugsy, Morty, Chuck, Pryce, Jasmine, Clair
-        # But game order is: Falkner, Bugsy, Whitney, Morty, Chuck, Jasmine, Pryce, Clair
-        return [
-            self._major_fights[0],  # Falkner
-            self._major_fights[2],  # Bugsy
-            self._major_fights[1],  # Whitney
-            self._major_fights[3],  # Morty
-            self._major_fights[4],  # Chuck
-            self._major_fights[6],  # Jasmine
-            self._major_fights[5],  # Pryce
-            self._major_fights[7],  # Clair
-        ]
+        return self._fight_categories.get(const.FIGHT_CATEGORY_GYM_LEADER, [])
 
     def get_elite_four_and_champion_names(self) -> List[str]:
-        # Gen 2: Elite Four at indices 29-32, Champion at index 33, Red at index 42
-        return self._major_fights[29:34] + [self._major_fights[42]]
+        e4 = self._fight_categories.get(const.FIGHT_CATEGORY_ELITE_FOUR, [])
+        champ = self._fight_categories.get(const.FIGHT_CATEGORY_CHAMPION, [])
+        post = self._fight_categories.get(const.FIGHT_CATEGORY_POST_GAME, [])
+        # Include Red from post_game for backward compat
+        red = [name for name in post if "Red" in name]
+        return e4 + champ + red
 
     def get_move_custom_data(self, move_name) -> List[str]:
         return gen_two_const.CUSTOM_MOVE_DATA.get(move_name)

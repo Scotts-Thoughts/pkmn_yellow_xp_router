@@ -556,23 +556,22 @@ def instantiate_trainer_pokemon(pkmn_data:universal_data_objects.PokemonSpecies,
     )
 
 
-def instantiate_wild_pokemon(pkmn_data:universal_data_objects.PokemonSpecies, target_level, nature:Nature=Nature.HARDY) -> universal_data_objects.EnemyPkmn:
-    # NOTE: wild pokemon have random DVs. just setting to max to get highest possible stats for now
+def instantiate_wild_pokemon(pkmn_data:universal_data_objects.PokemonSpecies, target_level, nature:Nature=Nature.HARDY, dv=15) -> universal_data_objects.EnemyPkmn:
     return universal_data_objects.EnemyPkmn(
         pkmn_data.name,
         target_level,
         universal_utils.calc_xp_yield(pkmn_data.base_xp, target_level, False),
         get_move_list(pkmn_data.initial_moves, pkmn_data.levelup_moves, target_level),
         GenThreeStatBlock(
-            calc_stat(pkmn_data.stats.hp, target_level, 15, 0, is_hp=True),
-            calc_stat(pkmn_data.stats.attack, target_level, 15, 0, nature_raised=nature.is_stat_raised(const.ATTACK), nature_lowered=nature.is_stat_lowered(const.ATTACK)),
-            calc_stat(pkmn_data.stats.defense, target_level, 15, 0, nature_raised=nature.is_stat_raised(const.DEFENSE), nature_lowered=nature.is_stat_lowered(const.DEFENSE)),
-            calc_stat(pkmn_data.stats.special_attack, target_level, 15, 0, nature_raised=nature.is_stat_raised(const.SPECIAL_ATTACK), nature_lowered=nature.is_stat_lowered(const.SPECIAL_ATTACK)),
-            calc_stat(pkmn_data.stats.special_defense, target_level, 15, 0, nature_raised=nature.is_stat_raised(const.SPECIAL_DEFENSE), nature_lowered=nature.is_stat_lowered(const.SPECIAL_DEFENSE)),
-            calc_stat(pkmn_data.stats.speed, target_level, 15, 0, nature_raised=nature.is_stat_raised(const.SPEED), nature_lowered=nature.is_stat_lowered(const.SPEED)),
+            calc_stat(pkmn_data.stats.hp, target_level, dv, 0, is_hp=True),
+            calc_stat(pkmn_data.stats.attack, target_level, dv, 0, nature_raised=nature.is_stat_raised(const.ATTACK), nature_lowered=nature.is_stat_lowered(const.ATTACK)),
+            calc_stat(pkmn_data.stats.defense, target_level, dv, 0, nature_raised=nature.is_stat_raised(const.DEFENSE), nature_lowered=nature.is_stat_lowered(const.DEFENSE)),
+            calc_stat(pkmn_data.stats.special_attack, target_level, dv, 0, nature_raised=nature.is_stat_raised(const.SPECIAL_ATTACK), nature_lowered=nature.is_stat_lowered(const.SPECIAL_ATTACK)),
+            calc_stat(pkmn_data.stats.special_defense, target_level, dv, 0, nature_raised=nature.is_stat_raised(const.SPECIAL_DEFENSE), nature_lowered=nature.is_stat_lowered(const.SPECIAL_DEFENSE)),
+            calc_stat(pkmn_data.stats.speed, target_level, dv, 0, nature_raised=nature.is_stat_raised(const.SPEED), nature_lowered=nature.is_stat_lowered(const.SPEED)),
         ),
         pkmn_data.stats,
-        GenThreeStatBlock(15, 15, 15, 15, 15, 15),
+        GenThreeStatBlock(dv, dv, dv, dv, dv, dv),
         GenThreeStatBlock(0, 0, 0, 0, 0, 0, is_stat_xp=True),
         None,
         is_trainer_mon=False

@@ -5,6 +5,7 @@ from typing import Dict, List
 from pkmn.universal_data_objects import EnemyPkmn
 from routing.full_route_state import RouteState
 from utils.constants import const
+from utils.config_manager import config
 from pkmn.gen_factory import current_gen_info
 from pkmn import universal_utils
 from pkmn.pkmn_db import sanitize_string
@@ -33,8 +34,12 @@ class InventoryEventDefinition:
         if not raw_val:
             return None
         custom_price = None
-        if len(raw_val) > 4 and isinstance(raw_val[4], dict):
-            custom_price = raw_val[4].get(const.CUSTOM_PRICE_KEY)
+        if len(raw_val) > 4:
+            if isinstance(raw_val[4], dict):
+                custom_price = raw_val[4].get(const.CUSTOM_PRICE_KEY)
+            else:
+                # Backward compat: old routes stored custom_price as a plain value
+                custom_price = raw_val[4]
         return InventoryEventDefinition(raw_val[0], raw_val[1], raw_val[2], raw_val[3], custom_price=custom_price)
 
     def __str__(self):
@@ -1102,6 +1107,14 @@ class EventGroup:
             return [const.HIGHLIGHT_LABEL]
 
         if self.is_major_fight():
+            if config.get_color_major_battles():
+                category = current_gen_info().get_fight_category(
+                    self.event_definition.trainer_def.trainer_name
+                )
+                if category is not None:
+                    tag = const.FIGHT_CATEGORY_TO_TAG.get(category)
+                    if tag is not None:
+                        return [tag]
             return [const.EVENT_TAG_IMPORTANT]
 
         return []
@@ -1298,6 +1311,14 @@ class EventFolder:
                     return result
             if const.HIGHLIGHT_LABEL in child_tags:
                 result.append(const.HIGHLIGHT_LABEL)
+                return result
+            # Check for fight category tags
+            for cat_tag in const.ALL_FIGHT_CATEGORY_TAGS:
+                if cat_tag in child_tags:
+                    result.append(cat_tag)
+                    return result
+            if const.EVENT_TAG_IMPORTANT in child_tags:
+                result.append(const.EVENT_TAG_IMPORTANT)
                 return result
 
         return result

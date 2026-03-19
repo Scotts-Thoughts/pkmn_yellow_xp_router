@@ -82,7 +82,19 @@ class GenThree(CurrentGen):
                 fight_info = json.load(f)
             
             self._badge_rewards:Dict[str, str] = fight_info[const.BADGE_REWARDS_KEY]
-            self._major_fights:List[str] = fight_info[const.MAJOR_FIGHTS_KEY]
+            raw_major_fights = fight_info[const.MAJOR_FIGHTS_KEY]
+            if isinstance(raw_major_fights, list):
+                self._fight_categories = {}
+                self._major_fights = set(raw_major_fights)
+                self._trainer_to_category = {}
+            else:
+                self._fight_categories = raw_major_fights
+                self._major_fights = set()
+                self._trainer_to_category = {}
+                for cat, names in raw_major_fights.items():
+                    self._major_fights.update(names)
+                    for name in names:
+                        self._trainer_to_category[name] = cat
             self._fight_rewards:Dict[str, str] = fight_info[const.FIGHT_REWARDS_KEY]
             self._branched_mandatory_fights:List[str] = fight_info.get(const.BRANCHED_MANDATORY_FIGHTS_KEY, [])
 
@@ -147,8 +159,8 @@ class GenThree(CurrentGen):
     def create_trainer_pkmn(self, pkmn_name, pkmn_level):
         return instantiate_trainer_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level)
     
-    def create_wild_pkmn(self, pkmn_name, pkmn_level):
-        return instantiate_wild_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level)
+    def create_wild_pkmn(self, pkmn_name, pkmn_level, dv=15):
+        return instantiate_wild_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level, dv=dv)
     
     def get_crit_rate(self, pkmn, move, custom_move_data):
         return pkmn_damage_calc.get_crit_rate(pkmn, move, custom_move_data)
@@ -212,8 +224,11 @@ class GenThree(CurrentGen):
     def get_fight_reward(self, trainer_name) -> str:
         return self._fight_rewards.get(trainer_name)
     
-    def is_major_fight(self, trainer_name) -> str:
+    def is_major_fight(self, trainer_name) -> bool:
         return trainer_name in self._major_fights
+
+    def get_fight_category(self, trainer_name):
+        return self._trainer_to_category.get(trainer_name)
 
     def is_branched_mandatory_fight(self, trainer_name) -> bool:
         return trainer_name in self._branched_mandatory_fights
@@ -222,47 +237,33 @@ class GenThree(CurrentGen):
         return len(self._branched_mandatory_fights) > 0
 
     def get_gym_leader_names(self) -> List[str]:
-        # FireRed/LeafGreen use trainers 8-15 (Kanto gym leaders)
+        all_leaders = self._fight_categories.get(const.FIGHT_CATEGORY_GYM_LEADER, [])
         if self._version_name in [const.FIRE_RED_VERSION, const.LEAF_GREEN_VERSION]:
-            return self._major_fights[8:16]
-        # Emerald: Use indices 0-6, then 7 (Juan at index 7)
+            # FRLG: Kanto gym leaders only
+            kanto = ["Brock", "Misty", "Lt. surge", "Erika", "Koga", "Sabrina", "Blaine", "Giovanni"]
+            return [name for name in all_leaders if any(k in name for k in kanto)]
         elif self._version_name == const.EMERALD_VERSION:
-            return self._major_fights[:8]  # Juan is already at index 7
-        # Ruby/Sapphire: Use indices 0-6, then 16 (Wallace at index 16 for gym leader)
+            # Emerald: Hoenn leaders including Juan
+            hoenn = ["Roxanne", "Brawly", "Wattson", "Flannery", "Norman", "Winona", "Tate & Liza", "Juan"]
+            return [name for name in all_leaders if any(k in name for k in hoenn)]
         else:
-            return self._major_fights[:7] + [self._major_fights[16]]
+            # Ruby/Sapphire: Hoenn leaders with Wallace as 8th gym leader
+            hoenn = ["Roxanne", "Brawly", "Wattson", "Flannery", "Norman", "Winona", "Tate & Liza", "Wallace"]
+            return [name for name in all_leaders if any(k in name for k in hoenn)]
 
     def get_elite_four_and_champion_names(self) -> List[str]:
-        # FireRed/LeafGreen: Elite Four at indices 72-75, Champion variants at 68-70 and 76
+        all_e4 = self._fight_categories.get(const.FIGHT_CATEGORY_ELITE_FOUR, [])
+        all_champ = self._fight_categories.get(const.FIGHT_CATEGORY_CHAMPION, [])
+        post = self._fight_categories.get(const.FIGHT_CATEGORY_POST_GAME, [])
         if self._version_name in [const.FIRE_RED_VERSION, const.LEAF_GREEN_VERSION]:
-            # Champion variants: Squirtle/Bulbasaur/Charmander at indices 68-70, plus Terry at 76
-            champion_variants = [name for name in self._major_fights if name.startswith("Champion")]
-            return [
-                self._major_fights[72],   # Elite Four Lorelei
-                self._major_fights[73],   # Elite Four Bruno
-                self._major_fights[74],   # Elite Four Agatha
-                self._major_fights[75],   # Elite Four Lance
-                champion_variants,        # All Champion variants
-            ]
-        # Emerald: Elite Four at indices 41-44, Champion at index 45, Steven at index 46
-        elif self._version_name == const.EMERALD_VERSION:
-            return [
-                self._major_fights[41],  # Elite Four Sidney
-                self._major_fights[42],  # Elite Four Phoebe
-                self._major_fights[43],  # Elite Four Glacia
-                self._major_fights[44],  # Elite Four Drake
-                self._major_fights[45],  # Champion Wallace
-                self._major_fights[46],  # Rival Steven
-            ]
-        # Ruby/Sapphire: Elite Four at indices 41-44, Champion at index 45
+            frlg_e4 = [name for name in all_e4 if any(k in name for k in ["Lorelei", "Bruno", "Agatha", "Lance"])]
+            frlg_champ = [name for name in all_champ if any(k in name for k in ["Squirtle", "Bulbasaur", "Charmander", "Terry"])]
+            return frlg_e4 + [frlg_champ]
         else:
-            return [
-                self._major_fights[41],  # Elite Four Sidney
-                self._major_fights[42],  # Elite Four Phoebe
-                self._major_fights[43],  # Elite Four Glacia
-                self._major_fights[44],  # Elite Four Drake
-                self._major_fights[45],  # Champion Wallace
-            ]
+            rse_e4 = [name for name in all_e4 if any(k in name for k in ["Sidney", "Phoebe", "Glacia", "Drake"])]
+            rse_champ = [name for name in all_champ if "Wallace" in name]
+            steven = [name for name in post if "Steven" in name]
+            return rse_e4 + rse_champ + steven
 
     def get_move_custom_data(self, move_name) -> List[str]:
         return gen_three_const.CUSTOM_MOVE_DATA.get(move_name)

@@ -20,8 +20,8 @@ class StateViewer(QWidget):
         super().__init__(parent)
 
         layout = QGridLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
 
         # Solo Pokemon stats at the top - expand horizontally to fill available space
         self.pkmn = PkmnViewer(self, font_size=12)

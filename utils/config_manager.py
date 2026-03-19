@@ -79,7 +79,15 @@ class Config:
         self._landing_search_filter = raw.get("landing_search_filter", "")
         self._landing_sort = raw.get("landing_sort", "recent")
         self._landing_game_filter = raw.get("landing_game_filter", "All")
+        self._run_summary_docked = raw.get("run_summary_docked", True)
+        self._color_major_battles = raw.get("color_major_battles", True)
+        self._suppress_update_prompt = raw.get("suppress_update_prompt", False)
         self._highlight_colors = {}
+        self._fight_category_colors = {}
+        for cat in ["rival", "gym_leader", "elite_four", "champion", "post_game", "boss", "team_leader"]:
+            key = f"fight_category_color_{cat}"
+            if key in raw:
+                self._fight_category_colors[cat] = raw[key]
         for i in range(1, 10):
             key = f"highlight_color_{i}"
             if key in raw:
@@ -123,12 +131,18 @@ class Config:
                 "landing_search_filter": getattr(self, '_landing_search_filter', ''),
                 "landing_sort": getattr(self, '_landing_sort', 'recent'),
                 "landing_game_filter": getattr(self, '_landing_game_filter', 'All'),
+                "run_summary_docked": getattr(self, '_run_summary_docked', True),
+                "color_major_battles": getattr(self, '_color_major_battles', True),
+                "suppress_update_prompt": getattr(self, '_suppress_update_prompt', False),
         }
         # Save highlight colors
         for i in range(1, 10):
             colors = getattr(self, '_highlight_colors', {})
             if i in colors:
                 data[f"highlight_color_{i}"] = colors[i]
+        # Save fight category colors
+        for cat, color in getattr(self, '_fight_category_colors', {}).items():
+            data[f"fight_category_color_{cat}"] = color
 
         with open(const.GLOBAL_CONFIG_FILE, 'w') as f:
             json.dump(data, f, indent=4)
@@ -373,6 +387,34 @@ class Config:
         self._highlight_colors[idx] = color
         self._save()
 
+    # --- Fight category colors ---
+    FIGHT_CATEGORY_COLOR_DEFAULTS = {
+        "rival": "#121299",
+        "gym_leader": "#828427",
+        "elite_four": "#5a3f82",
+        "champion": "#1d6464",
+        "post_game": "#327032",
+        "boss": "#8c3f3f",
+        "team_leader": "#7d4d7d",
+    }
+
+    def get_fight_category_color(self, category):
+        colors = getattr(self, '_fight_category_colors', {})
+        return colors.get(category, self.FIGHT_CATEGORY_COLOR_DEFAULTS.get(category, "#1f1f1f"))
+
+    def set_fight_category_color(self, category, color):
+        if not hasattr(self, '_fight_category_colors'):
+            self._fight_category_colors = {}
+        self._fight_category_colors[category] = color
+        self._save()
+
+    def get_color_major_battles(self):
+        return getattr(self, '_color_major_battles', True)
+
+    def set_color_major_battles(self, val):
+        self._color_major_battles = val
+        self._save()
+
     # --- Fade folder text ---
     def get_fade_folder_text(self):
         return getattr(self, '_fade_folder_text', False)
@@ -441,6 +483,22 @@ class Config:
 
     def set_landing_page_game_filter(self, val):
         self._landing_game_filter = val
+        self._save()
+
+    # --- Suppress update prompt ---
+    def get_suppress_update_prompt(self):
+        return getattr(self, '_suppress_update_prompt', False)
+
+    def set_suppress_update_prompt(self, val):
+        self._suppress_update_prompt = val
+        self._save()
+
+    # --- Run summary docked ---
+    def get_run_summary_docked(self):
+        return getattr(self, '_run_summary_docked', True)
+
+    def set_run_summary_docked(self, val):
+        self._run_summary_docked = val
         self._save()
 
 config = Config()

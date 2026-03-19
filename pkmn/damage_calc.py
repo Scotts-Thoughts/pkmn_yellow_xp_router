@@ -29,6 +29,21 @@ class DamageRange:
 
         self.num_attacks = num_attacks
 
+    @staticmethod
+    def merge_Pokemon_min_max(range_for_min, range_for_max):
+        """Merge two DamageRanges: take min from one and max from the other.
+
+        Used for wild pokemon where DVs are unknown: the min damage comes
+        from the calculation against the tankiest/weakest variant, and the
+        max comes from the squishiest/strongest variant.
+        """
+        if range_for_min is None or range_for_max is None:
+            return range_for_min or range_for_max
+        merged_vals = {}
+        merged_vals[range_for_min.min_damage] = 1
+        merged_vals[range_for_max.max_damage] = 1
+        return DamageRange(merged_vals)
+
     def add(self, other):
         if not isinstance(other, DamageRange):
             raise ValueError("Can only add DamageRange to other DamageRanges")

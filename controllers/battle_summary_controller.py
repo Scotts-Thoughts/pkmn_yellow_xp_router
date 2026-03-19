@@ -90,6 +90,9 @@ class BattleSummaryController:
         self._weather = None
         self._double_battle_flag = False
         self._stat_stage_setup:List[Dict[str, Dict[str, str]]] = []
+        self._is_wild_battle:bool = False
+        self._wild_min_dv_mons:List[EnemyPkmn] = []
+        self._wild_max_dv_mons:List[EnemyPkmn] = []
 
         # NOTE: all of the state above this comment is considered the "true" state
         # The below state is all calculated based on values from the above state
@@ -217,6 +220,21 @@ class BattleSummaryController:
         if self._event_group_id is None:
             return
 
+        # Save transient state that should survive the route change cascade.
+        # The main controller calls below trigger _on_route_change -> load_from_event,
+        # which reloads all state from the (not yet saved) event definition,
+        # wiping out setup moves, stat stage selections, etc.
+        saved_player_setup = self._player_setup_move_list.copy()
+        saved_player_field = self._player_field_move_list.copy()
+        saved_enemy_setup = self._enemy_setup_move_list.copy()
+        saved_enemy_field = self._enemy_field_move_list.copy()
+        saved_stat_stage = copy.deepcopy(self._stat_stage_setup)
+        saved_custom_data = copy.deepcopy(self._custom_move_data)
+        saved_weather = self._weather
+        saved_mimic = self._mimic_selection
+        saved_transformed = self._is_player_transformed
+        saved_double = self._double_battle_flag
+
         prev_event = self._main_controller.get_previous_event(self._event_group_id, enabled_only=True)
         if prev_event is None or prev_event.event_definition is None or prev_event.event_definition.rare_candy is None:
             # If num_candies is 0 and we don't have a number to update, don't create a pointless "use 0 candies" event
@@ -228,10 +246,27 @@ class BattleSummaryController:
                 do_select=False
             )
         else:
-            self._main_controller.update_existing_event(
-                prev_event.group_id,
-                EventDefinition(rare_candy=RareCandyEventDefinition(amount=num_candies)),
-            )
+            if num_candies <= 0:
+                self._main_controller.delete_events([prev_event.group_id])
+            else:
+                self._main_controller.update_existing_event(
+                    prev_event.group_id,
+                    EventDefinition(rare_candy=RareCandyEventDefinition(amount=num_candies)),
+                )
+
+        # Restore transient state (overwritten by the route change -> load_from_event cascade).
+        # The player mon list was correctly rebuilt with the new level from rare candies;
+        # we just need the user's setup moves and stat stage selections back.
+        self._player_setup_move_list = saved_player_setup
+        self._player_field_move_list = saved_player_field
+        self._enemy_setup_move_list = saved_enemy_setup
+        self._enemy_field_move_list = saved_enemy_field
+        self._stat_stage_setup = saved_stat_stage
+        self._custom_move_data = saved_custom_data
+        self._weather = saved_weather
+        self._mimic_selection = saved_mimic
+        self._is_player_transformed = saved_transformed
+        self._double_battle_flag = saved_double
 
         self._full_refresh()
 
@@ -499,35 +534,125 @@ class BattleSummaryController:
         elif custom_data_selection not in custom_data_options:
             custom_data_selection = custom_data_options[0]
 
-        normal_ranges = current_gen_info().calculate_damage(
-            attacking_mon,
-            move,
-            defending_mon,
-            attacking_stage_modifiers=attacking_stage_modifiers,
-            defending_stage_modifiers=defending_stage_modifiers,
-            attacking_field=attacking_field_status,
-            defending_field=defending_field_status,
-            custom_move_data=custom_data_selection,
-            weather=self._weather,
-            is_double_battle=self._double_battle_flag,
-            attacking_battle_stats=attacking_mon_stats,
-            defending_battle_stats=defending_mon_stats,
-        )
-        crit_ranges = current_gen_info().calculate_damage(
-            crit_mon,
-            move,
-            defending_mon,
-            attacking_stage_modifiers=attacking_stage_modifiers,
-            defending_stage_modifiers=defending_stage_modifiers,
-            attacking_field=attacking_field_status,
-            defending_field=defending_field_status,
-            custom_move_data=custom_data_selection,
-            is_crit=True,
-            weather=self._weather,
-            is_double_battle=self._double_battle_flag,
-            attacking_battle_stats=crit_mon_stats,
-            defending_battle_stats=defending_mon_stats,
-        )
+        # For wild pokemon battles, calculate against both 0-DV and 15-DV
+        # variants to get the true min/max damage range across all possible DVs.
+        if self._is_wild_battle and mon_idx < len(self._wild_min_dv_mons):
+            wild_min = self._wild_min_dv_mons[mon_idx]  # 0 DVs
+            wild_max = self._wild_max_dv_mons[mon_idx]  # 15 DVs
+
+            if is_player_mon:
+                # Player attacking: min = worst roll vs tankiest (15 DV), max = best roll vs squishiest (0 DV)
+                ranges_tanky = current_gen_info().calculate_damage(
+                    attacking_mon, move, wild_max,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers,
+                    attacking_field=attacking_field_status, defending_field=defending_field_status,
+                    custom_move_data=custom_data_selection, weather=self._weather,
+                    is_double_battle=self._double_battle_flag,
+                    attacking_battle_stats=attacking_mon_stats,
+                )
+                ranges_squishy = current_gen_info().calculate_damage(
+                    attacking_mon, move, wild_min,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers,
+                    attacking_field=attacking_field_status, defending_field=defending_field_status,
+                    custom_move_data=custom_data_selection, weather=self._weather,
+                    is_double_battle=self._double_battle_flag,
+                    attacking_battle_stats=attacking_mon_stats,
+                )
+                crit_tanky = current_gen_info().calculate_damage(
+                    crit_mon, move, wild_max,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers,
+                    attacking_field=attacking_field_status, defending_field=defending_field_status,
+                    custom_move_data=custom_data_selection, is_crit=True, weather=self._weather,
+                    is_double_battle=self._double_battle_flag,
+                    attacking_battle_stats=crit_mon_stats,
+                )
+                crit_squishy = current_gen_info().calculate_damage(
+                    crit_mon, move, wild_min,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers,
+                    attacking_field=attacking_field_status, defending_field=defending_field_status,
+                    custom_move_data=custom_data_selection, is_crit=True, weather=self._weather,
+                    is_double_battle=self._double_battle_flag,
+                    attacking_battle_stats=crit_mon_stats,
+                )
+                normal_ranges = DamageRange.merge_Pokemon_min_max(ranges_tanky, ranges_squishy)
+                crit_ranges = DamageRange.merge_Pokemon_min_max(crit_tanky, crit_squishy)
+                # Use 0-DV mon HP for kill range (best case for player)
+                defending_mon = wild_min
+            else:
+                # Enemy attacking: min = weakest (0 DV) worst roll, max = strongest (15 DV) best roll
+                ranges_weak = current_gen_info().calculate_damage(
+                    wild_min, move, defending_mon,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers,
+                    attacking_field=attacking_field_status, defending_field=defending_field_status,
+                    custom_move_data=custom_data_selection, weather=self._weather,
+                    is_double_battle=self._double_battle_flag,
+                    defending_battle_stats=defending_mon_stats,
+                )
+                ranges_strong = current_gen_info().calculate_damage(
+                    wild_max, move, defending_mon,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers,
+                    attacking_field=attacking_field_status, defending_field=defending_field_status,
+                    custom_move_data=custom_data_selection, weather=self._weather,
+                    is_double_battle=self._double_battle_flag,
+                    defending_battle_stats=defending_mon_stats,
+                )
+                crit_weak = current_gen_info().calculate_damage(
+                    wild_min, move, defending_mon,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers,
+                    attacking_field=attacking_field_status, defending_field=defending_field_status,
+                    custom_move_data=custom_data_selection, is_crit=True, weather=self._weather,
+                    is_double_battle=self._double_battle_flag,
+                    defending_battle_stats=defending_mon_stats,
+                )
+                crit_strong = current_gen_info().calculate_damage(
+                    wild_max, move, defending_mon,
+                    attacking_stage_modifiers=attacking_stage_modifiers,
+                    defending_stage_modifiers=defending_stage_modifiers,
+                    attacking_field=attacking_field_status, defending_field=defending_field_status,
+                    custom_move_data=custom_data_selection, is_crit=True, weather=self._weather,
+                    is_double_battle=self._double_battle_flag,
+                    defending_battle_stats=defending_mon_stats,
+                )
+                normal_ranges = DamageRange.merge_Pokemon_min_max(ranges_weak, ranges_strong)
+                crit_ranges = DamageRange.merge_Pokemon_min_max(crit_weak, crit_strong)
+                attacking_mon = wild_max  # for crit rate calculation
+        else:
+            normal_ranges = current_gen_info().calculate_damage(
+                attacking_mon,
+                move,
+                defending_mon,
+                attacking_stage_modifiers=attacking_stage_modifiers,
+                defending_stage_modifiers=defending_stage_modifiers,
+                attacking_field=attacking_field_status,
+                defending_field=defending_field_status,
+                custom_move_data=custom_data_selection,
+                weather=self._weather,
+                is_double_battle=self._double_battle_flag,
+                attacking_battle_stats=attacking_mon_stats,
+                defending_battle_stats=defending_mon_stats,
+            )
+            crit_ranges = current_gen_info().calculate_damage(
+                crit_mon,
+                move,
+                defending_mon,
+                attacking_stage_modifiers=attacking_stage_modifiers,
+                defending_stage_modifiers=defending_stage_modifiers,
+                attacking_field=attacking_field_status,
+                defending_field=defending_field_status,
+                custom_move_data=custom_data_selection,
+                is_crit=True,
+                weather=self._weather,
+                is_double_battle=self._double_battle_flag,
+                attacking_battle_stats=crit_mon_stats,
+                defending_battle_stats=defending_mon_stats,
+            )
         if normal_ranges is not None and crit_ranges is not None:
             if config.do_ignore_accuracy():
                 accuracy = 100
@@ -596,6 +721,9 @@ class BattleSummaryController:
         self._double_battle_flag = trainer_obj.double_battle or second_trainer_obj is not None
         self._mimic_selection = trainer_def.mimic_selection
         self._is_player_transformed = trainer_def.transformed
+        self._is_wild_battle = False
+        self._wild_min_dv_mons = []
+        self._wild_max_dv_mons = []
         self._player_setup_move_list = trainer_def.setup_moves.copy()
         self._player_field_move_list = trainer_def.player_field_moves.copy()
         self._player_stage_modifier = self._calc_stage_modifier(self._player_setup_move_list)
@@ -661,7 +789,7 @@ class BattleSummaryController:
 
         self._full_refresh(is_load=True)
 
-    def load_from_state(self, init_state:RouteState, enemy_mons:List[EnemyPkmn], trainer_name:str=None):
+    def load_from_state(self, init_state:RouteState, enemy_mons:List[EnemyPkmn], trainer_name:str=None, is_wild:bool=False):
         if init_state is None or not enemy_mons:
             self.load_empty()
             return
@@ -678,6 +806,9 @@ class BattleSummaryController:
         self._enemy_field_move_list = []
         self._custom_move_data = []
         self._stat_stage_setup = []
+        self._is_wild_battle = is_wild
+        self._wild_min_dv_mons = []
+        self._wild_max_dv_mons = []
         self._cached_definition_order = list(range(len(enemy_mons)))
         for _ in range(len(enemy_mons)):
             self._custom_move_data.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
@@ -695,6 +826,14 @@ class BattleSummaryController:
             self._original_player_mon_list.append(cur_state.solo_pkmn.get_pkmn_obj(cur_state.badges))
             self._transformed_mon_list[-1].level = self._original_player_mon_list[-1].level
             self._transformed_mon_list[-1].cur_stats.hp = self._original_player_mon_list[-1].cur_stats.hp
+
+            if is_wild:
+                self._wild_min_dv_mons.append(
+                    current_gen_info().create_wild_pkmn(cur_enemy.name, cur_enemy.level, dv=0)
+                )
+                self._wild_max_dv_mons.append(
+                    current_gen_info().create_wild_pkmn(cur_enemy.name, cur_enemy.level, dv=15)
+                )
 
             cur_state = cur_state.defeat_pkmn(cur_enemy)[0]
 
@@ -714,6 +853,9 @@ class BattleSummaryController:
         self._double_battle_flag = False
         self._mimic_selection = ""
         self._is_player_transformed = False
+        self._is_wild_battle = False
+        self._wild_min_dv_mons = []
+        self._wild_max_dv_mons = []
         self._player_setup_move_list = []
         self._player_field_move_list = []
         self._enemy_setup_move_list = []
@@ -836,6 +978,11 @@ class BattleSummaryController:
 
     def is_player_transformed(self) -> bool:
         return self._is_player_transformed
+
+    def get_player_held_item(self) -> str:
+        if self._original_player_mon_list:
+            return self._original_player_mon_list[0].held_item or ""
+        return ""
 
     @staticmethod
     def _is_move_better(new_move:MoveRenderInfo, prev_move:MoveRenderInfo, strat:str, other_mon:PkmnRenderInfo) -> bool:
@@ -1015,10 +1162,15 @@ class BattleSummaryController:
 
                     if targets_self and not is_damaging:
                         # Self-targeting status move - apply to player, persists
-                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=True)
-                        for _ in range(count):
-                            persistent_player_modifier = persistent_player_modifier.apply_stat_mod(stat_mods)
-                            cur_player_modifier = cur_player_modifier.apply_stat_mod(stat_mods)
+                        if stat_info.get('is_belly_drum', False):
+                            # Belly Drum: dropdown value is the desired ATK stage directly
+                            persistent_player_modifier = persistent_player_modifier.set_attack_stage(count)
+                            cur_player_modifier = cur_player_modifier.set_attack_stage(count)
+                        else:
+                            stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=True)
+                            for _ in range(count):
+                                persistent_player_modifier = persistent_player_modifier.apply_stat_mod(stat_mods)
+                                cur_player_modifier = cur_player_modifier.apply_stat_mod(stat_mods)
                     elif not targets_self and not is_damaging:
                         # Opponent-targeting status move - apply to enemy, current matchup only
                         stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)
@@ -1059,9 +1211,12 @@ class BattleSummaryController:
 
                     if targets_self and not is_damaging:
                         # Enemy self-targeting: only affects current matchup
-                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=True)
-                        for _ in range(count):
-                            cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(stat_mods)
+                        if stat_info.get('is_belly_drum', False):
+                            cur_enemy_modifier = cur_enemy_modifier.set_attack_stage(count)
+                        else:
+                            stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=True)
+                            for _ in range(count):
+                                cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(stat_mods)
                     elif not targets_self and not is_damaging:
                         # Enemy opponent-targeting: affects player, persists for rest of battle
                         stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)

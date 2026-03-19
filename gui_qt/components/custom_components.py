@@ -91,6 +91,10 @@ class SimpleOptionMenu(QComboBox):
 
     def new_values(self, option_list, default_val=None):
         if option_list == self.cur_options:
+            if default_val is not None:
+                self.blockSignals(True)
+                self.setCurrentText(default_val)
+                self.blockSignals(False)
             return
         self.cur_options = list(option_list)
         self.blockSignals(True)

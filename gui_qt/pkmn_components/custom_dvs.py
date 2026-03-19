@@ -142,6 +142,7 @@ class CustomDVsFrame(QWidget):
             self.custom_dvs_hp_label.setText(f"HP {dv_text}:")
             self.custom_dvs_hp.max_val = dv_max
             self.custom_dvs_hp.set(init_dvs.hp)
+            self.custom_dvs_hp.enable()
             self.custom_dvs_atk_label.setText(f"Attack {dv_text}:")
             self.custom_dvs_atk.max_val = dv_max
             self.custom_dvs_atk.set(init_dvs.attack)
@@ -194,9 +195,6 @@ class CustomDVsFrame(QWidget):
                 if self.hidden_power is None:
                     self.hidden_power = QLabel("")
 
-            self.custom_dvs_hp_label.setText(f"HP {dv_text}:")
-            self.custom_dvs_hp.max_val = dv_max
-            self.custom_dvs_hp.set(init_dvs.hp)
             self.custom_dvs_atk_label.setText(f"Attack {dv_text}:")
             self.custom_dvs_atk.max_val = dv_max
             self.custom_dvs_atk.set(init_dvs.attack)
@@ -209,6 +207,12 @@ class CustomDVsFrame(QWidget):
             self.custom_dvs_spc_atk_label.setText(f"Special {dv_text}:")
             self.custom_dvs_spc_atk.max_val = dv_max
             self.custom_dvs_spc_atk.set(init_dvs.special_attack)
+
+            # Gen 1 & 2: HP DV is derived from the other DVs, not user-editable
+            self.custom_dvs_hp_label.setText(f"HP {dv_text}:")
+            self.custom_dvs_hp.max_val = dv_max
+            self.custom_dvs_hp.disable()
+            self._recalc_hp_dv()
 
         # Place all existing widgets into the grid
         self._grid.addWidget(self.custom_dvs_hp_label, 0, 0)
@@ -240,7 +244,24 @@ class CustomDVsFrame(QWidget):
         if self.ability_vals is not None:
             self._grid.addWidget(self.ability_vals, 12, 1)
 
+    def _recalc_hp_dv(self):
+        """Auto-calculate HP DV for Gen 1 & 2 from the other DVs."""
+        try:
+            atk = int(self.custom_dvs_atk.get())
+            defense = int(self.custom_dvs_def.get())
+            spd = int(self.custom_dvs_spd.get())
+            spc = int(self.custom_dvs_spc_atk.get())
+            hp_dv = (atk % 2) * 8 + (defense % 2) * 4 + (spd % 2) * 2 + (spc % 2) * 1
+            self.custom_dvs_hp.set(hp_dv)
+        except (ValueError, TypeError):
+            pass
+
     def recalc_hidden_power(self, *args, **kwargs):
+        # For Gen 1 & 2, recalculate the HP DV from the other DVs
+        if hasattr(self, '_target_game') and self._target_game is not None:
+            if self._target_game.get_generation() <= 2:
+                self._recalc_hp_dv()
+
         if not hasattr(self, 'hidden_power') or self.hidden_power is None:
             return
         try:

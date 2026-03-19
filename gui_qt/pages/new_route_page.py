@@ -348,7 +348,6 @@ class NewRoutePage(QWidget):
         if cache_key in self._pkmn_list_cache:
             pkmn_list = self._pkmn_list_cache[cache_key]
         else:
-            self._show_busy()
             pkmn_list = self._selected_gen_obj.pkmn_db().get_filtered_names(filter_val=filter_val)
             self._pkmn_list_cache[cache_key] = pkmn_list
 

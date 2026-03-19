@@ -131,6 +131,12 @@ class StageModifiers:
             speed_bb=self.speed_badge_boosts, special_bb=self.special_badge_boosts,
         )
     
+    def set_attack_stage(self, value) -> StageModifiers:
+        result = self._copy_constructor()
+        result.attack_stage = max(min(value, 6), -6)
+        result.attack_badge_boosts = 0
+        return result
+
     def clear_badge_boosts(self) -> StageModifiers:
         result = self._copy_constructor()
 

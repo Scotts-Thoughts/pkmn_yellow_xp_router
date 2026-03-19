@@ -352,6 +352,47 @@ class Router:
             logger.exception(e)
             raise ValueError(f"Failed to find event object with id: {event_id}")
 
+    def move_event_to_position(self, event_id, dest_folder_id, after_event_id=None, before_event_id=None):
+        """Move an event to an arbitrary position within any folder.
+
+        The event is removed from its current parent and inserted into the
+        folder identified by *dest_folder_id*.  Exactly one of *after_event_id*
+        or *before_event_id* should be provided to control placement; if
+        neither is given the event is appended to the end of the folder.
+        """
+        obj_to_move = self.get_event_obj(event_id)
+        if obj_to_move is None:
+            raise ValueError(f"Cannot find event with id: {event_id}")
+
+        dest_folder = self.get_event_obj(dest_folder_id)
+        if dest_folder is None:
+            raise ValueError(f"Cannot find destination folder with id: {dest_folder_id}")
+        if not isinstance(dest_folder, route_events.EventFolder):
+            raise ValueError(f"Destination {dest_folder_id} is not a folder")
+
+        # Prevent moving a folder into itself or one of its descendants.
+        if isinstance(obj_to_move, route_events.EventFolder):
+            check = dest_folder
+            while check is not None:
+                if check is obj_to_move:
+                    raise ValueError("Cannot move a folder into itself or a descendant")
+                check = check.parent
+
+        after_obj = self.get_event_obj(after_event_id) if after_event_id is not None else None
+        before_obj = self.get_event_obj(before_event_id) if before_event_id is not None else None
+
+        # No-op if anchoring relative to self
+        if obj_to_move is after_obj or obj_to_move is before_obj:
+            return
+
+        # Remove from current location
+        obj_to_move.parent.remove_child(obj_to_move)
+
+        # Insert at new location
+        dest_folder.insert_child_after(obj_to_move, after_obj=after_obj, before_obj=before_obj)
+
+        self._recalc()
+
     def toggle_event_highlight(self, event_id):
         # NOTE: can only move within a folder. To change folders, need to call a separate function
         try:

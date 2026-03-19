@@ -472,23 +472,22 @@ def instantiate_trainer_pokemon(pkmn_data:universal_data_objects.PokemonSpecies,
     )
 
 
-def instantiate_wild_pokemon(pkmn_data:universal_data_objects.PokemonSpecies, target_level) -> universal_data_objects.EnemyPkmn:
-    # NOTE: wild pokemon have random DVs. just setting to max to get highest possible stats for now
+def instantiate_wild_pokemon(pkmn_data:universal_data_objects.PokemonSpecies, target_level, dv=15) -> universal_data_objects.EnemyPkmn:
     return universal_data_objects.EnemyPkmn(
         pkmn_data.name,
         target_level,
         universal_utils.calc_xp_yield(pkmn_data.base_xp, target_level, False),
         get_move_list(pkmn_data.initial_moves, pkmn_data.levelup_moves, target_level),
         GenTwoStatBlock(
-            calc_stat(pkmn_data.stats.hp, target_level, 15, 0, is_hp=True),
-            calc_stat(pkmn_data.stats.attack, target_level, 15, 0),
-            calc_stat(pkmn_data.stats.defense, target_level, 15, 0),
-            calc_stat(pkmn_data.stats.special_attack, target_level, 15, 0),
-            calc_stat(pkmn_data.stats.special_defense, target_level, 15, 0),
-            calc_stat(pkmn_data.stats.speed, target_level, 15, 0),
+            calc_stat(pkmn_data.stats.hp, target_level, dv, 0, is_hp=True),
+            calc_stat(pkmn_data.stats.attack, target_level, dv, 0),
+            calc_stat(pkmn_data.stats.defense, target_level, dv, 0),
+            calc_stat(pkmn_data.stats.special_attack, target_level, dv, 0),
+            calc_stat(pkmn_data.stats.special_defense, target_level, dv, 0),
+            calc_stat(pkmn_data.stats.speed, target_level, dv, 0),
         ),
         pkmn_data.stats,
-        GenTwoStatBlock(15, 15, 15, 15, 15, 15),
+        GenTwoStatBlock(dv, dv, dv, dv, dv, dv),
         GenTwoStatBlock(0, 0, 0, 0, 0, 0, is_stat_xp=True),
         None,
         is_trainer_mon=False

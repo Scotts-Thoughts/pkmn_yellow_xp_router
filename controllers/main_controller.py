@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import logging
 import sys
+import threading
 from typing import List, Tuple
 from datetime import datetime
 from PIL import ImageGrab, Image
@@ -70,6 +71,15 @@ class MainController:
         self._exception_callbacks = []
 
         self._pre_save_hooks = []
+
+        # Thread-safe callback dispatcher.  The old tkinter code used
+        # event_generate(when="tail") which is inherently thread-safe.
+        # The Qt refactor replaced that with direct callback(), but the
+        # recording FSM fires MainController methods from a background
+        # thread.  The UI layer can set _callback_dispatcher to a
+        # function that blocks until the callbacks finish on the GUI thread.
+        self._callback_dispatcher = None
+        self._main_thread_id = threading.current_thread().ident
     
     def get_next_exception_info(self):
         if not len(self._exception_info):
@@ -128,11 +138,30 @@ class MainController:
 
         self._pre_save_hooks.append(fn_obj)
 
+    def set_callback_dispatcher(self, dispatcher):
+        """Set a function that executes a callable on the GUI thread (blocking).
+
+        The dispatcher signature is: dispatcher(fn) -> None
+        It must block until fn() has finished on the GUI thread.
+        This replaces tkinter's event_generate(when="tail") thread safety.
+        """
+        self._callback_dispatcher = dispatcher
+
     #####
     # Event callbacks
     #####
 
     def _safely_invoke_callbacks(self, callback_list):
+        # If called from a background thread, marshal the entire batch
+        # onto the GUI thread via the dispatcher (mirrors the old tkinter
+        # event_generate thread-safety).
+        if (
+            self._callback_dispatcher is not None
+            and threading.current_thread().ident != self._main_thread_id
+        ):
+            self._callback_dispatcher(lambda: self._safely_invoke_callbacks(callback_list))
+            return
+
         to_delete = []
         for cur_idx, callback in enumerate(callback_list):
             try:
@@ -295,6 +324,28 @@ class MainController:
         self._undo_manager.save_state(self._data, is_post_operation=False)
         for cur_event in event_ids:
             self._data.move_event_object(cur_event, True)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
+        self._on_route_change()
+
+    @handle_exceptions
+    def move_event_to_position(self, event_id, dest_folder_id, after_event_id=None, before_event_id=None):
+        """Move an event to an arbitrary position."""
+        self._undo_manager.save_state(self._data, is_post_operation=False)
+        self._data.move_event_to_position(event_id, dest_folder_id, after_event_id, before_event_id)
+        self._undo_manager.save_state(self._data, is_post_operation=True)
+        self._on_route_change()
+
+    @handle_exceptions
+    def move_events_to_position(self, event_ids, dest_folder_id, after_event_id=None, before_event_id=None):
+        """Move multiple events to a position, preserving relative order (used by drag-and-drop)."""
+        self._undo_manager.save_state(self._data, is_post_operation=False)
+        cur_after_id = after_event_id
+        cur_before_id = before_event_id
+        for event_id in event_ids:
+            self._data.move_event_to_position(event_id, dest_folder_id, cur_after_id, cur_before_id)
+            # Subsequent events go after the one we just placed
+            cur_after_id = event_id
+            cur_before_id = None
         self._undo_manager.save_state(self._data, is_post_operation=True)
         self._on_route_change()
 

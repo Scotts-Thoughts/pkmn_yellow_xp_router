@@ -76,9 +76,20 @@ class RouteList(QTreeView):
         self.setItemsExpandable(True)
         self.setIndentation(16)
 
+        # --- scroll bars --------------------------------------------------
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
         # --- selection mode -----------------------------------------------
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
+
+        # --- drag-and-drop ------------------------------------------------
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self._drag_source_ids: List[int] = []
 
         # --- columns ------------------------------------------------------
         header = self.header()
@@ -151,6 +162,9 @@ class RouteList(QTreeView):
         self._highlight_colors.clear()
         for idx, label in enumerate(const.ALL_HIGHLIGHT_LABELS, 1):
             self._highlight_colors[label] = QColor(config.get_highlight_color(idx))
+        # Fight category colors from config.
+        for cat, tag in const.FIGHT_CATEGORY_TO_TAG.items():
+            self._highlight_colors[tag] = QColor(config.get_fight_category_color(cat))
         # Also keep the static tag colors.
         for tag, color in _STATIC_TAG_COLORS.items():
             self._highlight_colors[tag] = color
@@ -297,6 +311,114 @@ class RouteList(QTreeView):
             return
 
         super().mousePressEvent(event)
+
+    # ------------------------------------------------------------------
+    #  Drag-and-drop
+    # ------------------------------------------------------------------
+
+    def startDrag(self, supportedActions):
+        """Record the dragged event IDs before starting the drag."""
+        self._drag_source_ids = self.get_all_selected_event_ids(allow_event_items=False)
+        if not self._drag_source_ids:
+            return
+        super().startDrag(supportedActions)
+
+    def dropEvent(self, event):
+        """Handle the drop by computing the target position and calling the controller."""
+        if not self._drag_source_ids:
+            event.ignore()
+            return
+
+        drop_index = self.indexAt(event.position().toPoint())
+        drop_pos = self.dropIndicatorPosition()
+
+        target_info = self._resolve_drop_target(drop_index, drop_pos)
+        if target_info is None:
+            event.ignore()
+            self._drag_source_ids = []
+            return
+
+        folder_id, after_id, before_id = target_info
+
+        # Prevent the default model modification -- we handle it via the controller.
+        event.setDropAction(Qt.IgnoreAction)
+        event.accept()
+
+        try:
+            self._controller.move_events_to_position(
+                self._drag_source_ids, folder_id,
+                after_event_id=after_id, before_event_id=before_id,
+            )
+        except Exception as e:
+            logger.error(f"Drag-and-drop move failed: {e}")
+
+        self._drag_source_ids = []
+
+    def _resolve_drop_target(self, drop_index, drop_pos):
+        """Compute (folder_id, after_event_id, before_event_id) from drop position.
+
+        Returns None if the drop target is invalid.
+        """
+        raw_route = self._controller.get_raw_route()
+        if raw_route is None:
+            return None
+
+        if not drop_index.isValid():
+            # Dropped on empty area -- append to root folder.
+            root = raw_route.root_folder
+            children = root.children
+            if children:
+                return root.group_id, children[-1].group_id, None
+            return root.group_id, None, None
+
+        name_item = self._model.itemFromIndex(
+            drop_index.sibling(drop_index.row(), _COL_NAME)
+        )
+        if name_item is None:
+            return None
+
+        target_id = self._group_id_from_name_item(name_item)
+        if target_id is None:
+            return None
+
+        target_obj = self._controller.get_event_by_id(target_id)
+        if target_obj is None:
+            return None
+
+        # Redirect EventItem targets to their parent EventGroup.
+        if isinstance(target_obj, route_events.EventItem):
+            group = target_obj.parent
+            if isinstance(group, route_events.EventGroup):
+                target_obj = group
+                target_id = group.group_id
+            else:
+                return None
+
+        if drop_pos == QAbstractItemView.DropIndicatorPosition.OnItem:
+            if isinstance(target_obj, route_events.EventFolder):
+                # Drop into folder -- append at end.
+                return target_obj.group_id, None, None
+            # Drop on a non-folder -- treat as "below".
+            drop_pos = QAbstractItemView.DropIndicatorPosition.BelowItem
+
+        parent_folder = target_obj.parent
+        if parent_folder is None or not isinstance(parent_folder, route_events.EventFolder):
+            return None
+
+        if drop_pos == QAbstractItemView.DropIndicatorPosition.AboveItem:
+            return parent_folder.group_id, None, target_id
+
+        if drop_pos == QAbstractItemView.DropIndicatorPosition.BelowItem:
+            return parent_folder.group_id, target_id, None
+
+        # OnViewport fallback.
+        root = raw_route.root_folder
+        children = root.children
+        if children:
+            return root.group_id, children[-1].group_id, None
+        return root.group_id, None, None
+
+    # ------------------------------------------------------------------
 
     def drawRow(self, painter, option, index):
         """Paint row background across full width so highlights span the indentation area."""
@@ -533,12 +655,13 @@ class RouteList(QTreeView):
                         else:
                             other_items.append(item_obj)
 
-                    # Level-up moves rendered as siblings of the EventGroup.
+                    # Level-up moves rendered as siblings of the EventGroup,
+                    # but with a visual prefix to show they derive from the battle above.
                     for level_up_item in level_up_moves:
                         item_semantic_id = _get_attr(level_up_item, "group_id")
                         if item_semantic_id is not None:
                             to_delete_ids.discard(item_semantic_id)
-                            lu_name_item = self._upsert_row(level_up_item, parent_item, False)
+                            lu_name_item = self._upsert_row(level_up_item, parent_item, False, is_level_up_child=True)
                             cur_row = lu_name_item.row()
                             cur_par = lu_name_item.parent()
                             if cur_par is None:
@@ -575,13 +698,15 @@ class RouteList(QTreeView):
         event_obj,
         parent_item: QStandardItem,
         force_open: bool,
+        is_level_up_child: bool = False,
     ) -> QStandardItem:
         """Create or update a row for *event_obj* under *parent_item*.
 
         Returns the name-column QStandardItem.
         """
         semantic_id = _get_attr(event_obj, "group_id")
-        text_val = str(_get_attr(event_obj, "name") or "")
+        raw_name = str(_get_attr(event_obj, "name") or "")
+        text_val = f"  \u2514 {raw_name}" if is_level_up_child else raw_name
         tags = _get_attr(event_obj, "get_tags") or []
         is_enabled = _get_attr(event_obj, "is_enabled")
 
@@ -591,16 +716,25 @@ class RouteList(QTreeView):
         else:
             check_state = None
 
+        # Configure drag-and-drop flags per event type.
+        is_folder = isinstance(event_obj, route_events.EventFolder)
+        is_group = isinstance(event_obj, route_events.EventGroup)
+        can_drag = (is_folder or is_group) and not is_level_up_child
+        can_drop = is_folder
+
         # Determine background color from tags.
         bg_brush = self._brush_for_tags(tags)
 
         # Determine foreground color for folders.
-        is_folder = isinstance(event_obj, route_events.EventFolder)
         fg_brush = None
         if is_folder and self._folder_fg_color is not None:
             fg_brush = QBrush(self._folder_fg_color)
 
-        # Unchecked style: gray foreground.
+        # Level-up move children: dimmed foreground to show derivation.
+        if is_level_up_child and fg_brush is None:
+            fg_brush = QBrush(QColor("#8899aa"))
+
+        # Unchecked style: gray foreground (overrides level-up dim).
         if check_state == Qt.Unchecked:
             fg_brush = QBrush(QColor("#cbcbcb"))
 
@@ -640,6 +774,8 @@ class RouteList(QTreeView):
             # Create new row.
             name_item = QStandardItem(text_val)
             name_item.setEditable(False)
+            name_item.setDragEnabled(can_drag)
+            name_item.setDropEnabled(can_drop)
             if check_state is not None:
                 name_item.setCheckable(True)
                 name_item.setCheckState(check_state)

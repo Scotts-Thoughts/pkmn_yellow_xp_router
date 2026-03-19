@@ -81,7 +81,19 @@ class GenFour(CurrentGen):
                 fight_info = json.load(f)
             
             self._badge_rewards:Dict[str, str] = fight_info[const.BADGE_REWARDS_KEY]
-            self._major_fights:List[str] = fight_info[const.MAJOR_FIGHTS_KEY]
+            raw_major_fights = fight_info[const.MAJOR_FIGHTS_KEY]
+            if isinstance(raw_major_fights, list):
+                self._fight_categories = {}
+                self._major_fights = set(raw_major_fights)
+                self._trainer_to_category = {}
+            else:
+                self._fight_categories = raw_major_fights
+                self._major_fights = set()
+                self._trainer_to_category = {}
+                for cat, names in raw_major_fights.items():
+                    self._major_fights.update(names)
+                    for name in names:
+                        self._trainer_to_category[name] = cat
             self._fight_rewards:Dict[str, str] = fight_info[const.FIGHT_REWARDS_KEY]
             self._branched_mandatory_fights:List[str] = fight_info.get(const.BRANCHED_MANDATORY_FIGHTS_KEY, [])
 
@@ -136,8 +148,8 @@ class GenFour(CurrentGen):
     def create_trainer_pkmn(self, pkmn_name, pkmn_level):
         return instantiate_trainer_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level)
     
-    def create_wild_pkmn(self, pkmn_name, pkmn_level):
-        return instantiate_wild_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level)
+    def create_wild_pkmn(self, pkmn_name, pkmn_level, dv=15):
+        return instantiate_wild_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level, dv=dv)
     
     def get_crit_rate(self, pkmn, move, custom_move_data):
         return pkmn_damage_calc.get_crit_rate(pkmn, move, custom_move_data)
@@ -203,8 +215,11 @@ class GenFour(CurrentGen):
     def get_fight_reward(self, trainer_name) -> str:
         return self._fight_rewards.get(trainer_name)
     
-    def is_major_fight(self, trainer_name) -> str:
+    def is_major_fight(self, trainer_name) -> bool:
         return trainer_name in self._major_fights
+
+    def get_fight_category(self, trainer_name):
+        return self._trainer_to_category.get(trainer_name)
 
     def is_branched_mandatory_fight(self, trainer_name) -> bool:
         return trainer_name in self._branched_mandatory_fights
@@ -213,45 +228,32 @@ class GenFour(CurrentGen):
         return len(self._branched_mandatory_fights) > 0
 
     def get_gym_leader_names(self) -> List[str]:
-        # HeartGold/SoulSilver use trainers 8-15 (Johto gym leaders)
+        all_leaders = self._fight_categories.get(const.FIGHT_CATEGORY_GYM_LEADER, [])
         if self._version_name in [const.HEART_GOLD_VERSION, const.SOUL_SILVER_VERSION]:
-            return self._major_fights[8:16]
-        # Platinum: Gym leaders in different order - Fantina is 3rd instead of 5th
+            johto = ["Falkner", "Bugsy", "Whitney", "Morty", "Chuck", "Jasmine", "Pryce", "Clair"]
+            return [name for name in all_leaders if any(k in name for k in johto)]
         elif self._version_name == const.PLATINUM_VERSION:
-            return [
-                self._major_fights[0],  # Roark
-                self._major_fights[1],  # Gardenia
-                self._major_fights[4],  # Fantina (moved from 5th to 3rd)
-                self._major_fights[2],  # Maylene (moved from 3rd to 4th)
-                self._major_fights[3],  # Wake (moved from 4th to 5th)
-                self._major_fights[5],  # Byron
-                self._major_fights[6],  # Candice
-                self._major_fights[7],  # Volkner
-            ]
-        # Diamond/Pearl: Use standard order (trainers 0-7)
+            sinnoh = ["Roark", "Gardenia", "Fantina", "Maylene", "Wake", "Byron", "Candice", "Volkner"]
+            leaders = [name for name in all_leaders if any(k in name for k in sinnoh)]
+            # Platinum order: Roark, Gardenia, Fantina, Maylene, Wake, Byron, Candice, Volkner
+            order = {k: i for i, k in enumerate(sinnoh)}
+            leaders.sort(key=lambda n: next((order[k] for k in sinnoh if k in n), 99))
+            return leaders
         else:
-            return self._major_fights[:8]
+            sinnoh = ["Roark", "Gardenia", "Maylene", "Wake", "Fantina", "Byron", "Candice", "Volkner"]
+            return [name for name in all_leaders if any(k in name for k in sinnoh)]
 
     def get_elite_four_and_champion_names(self) -> List[str]:
-        # HeartGold/SoulSilver: Elite Four at indices 26-29, Champion at index 30, Red at index 31
+        all_e4 = self._fight_categories.get(const.FIGHT_CATEGORY_ELITE_FOUR, [])
+        all_champ = self._fight_categories.get(const.FIGHT_CATEGORY_CHAMPION, [])
         if self._version_name in [const.HEART_GOLD_VERSION, const.SOUL_SILVER_VERSION]:
-            return [
-                self._major_fights[26],  # Elite Four Will
-                self._major_fights[27],  # Elite Four Koga
-                self._major_fights[28],  # Elite Four Bruno
-                self._major_fights[29],  # Elite Four Karen
-                self._major_fights[30],  # Champion Lance
-                self._major_fights[31],  # Pokemon Trainer Red
-            ]
-        # Diamond/Pearl/Platinum: Elite Four at indices 20-23, Champion at index 24
+            hgss_e4 = [name for name in all_e4 if any(k in name for k in ["Will", "Koga", "Bruno", "Karen"])]
+            hgss_champ = [name for name in all_champ if "Lance" in name]
+            return hgss_e4 + hgss_champ
         else:
-            return [
-                self._major_fights[20],  # Elite Four Aaron
-                self._major_fights[21],  # Elite Four Bertha
-                self._major_fights[22],  # Elite Four Flint
-                self._major_fights[23],  # Elite Four Lucian
-                self._major_fights[24],  # Champion Cynthia
-            ]
+            dpp_e4 = [name for name in all_e4 if any(k in name for k in ["Aaron", "Bertha", "Flint", "Lucian"])]
+            dpp_champ = [name for name in all_champ if "Cynthia" in name]
+            return dpp_e4 + dpp_champ
 
     def get_move_custom_data(self, move_name) -> List[str]:
         return gen_four_const.CUSTOM_MOVE_DATA.get(move_name)

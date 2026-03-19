@@ -5,7 +5,9 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QGridLayout,
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPalette, QColor
 
+from gui_qt.pkmn_components.stat_column import tinted_bg_for_style
 from routing import state_objects
 from utils.config_manager import config
 
@@ -18,13 +20,24 @@ class InventoryViewer(QWidget):
         self.setMinimumHeight(150)
         self.setMinimumWidth(250)
 
+        # Subtle tinted background to distinguish from stats section
+        inv_bg = tinted_bg_for_style("Secondary", alpha=0.10)
+        self.setAutoFillBackground(True)
+        pal = self.palette()
+        pal.setColor(QPalette.Window, QColor(inv_bg))
+        self.setPalette(pal)
+
         layout = QGridLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 2, 4, 2)
         layout.setSpacing(2)
 
+        header_bg = tinted_bg_for_style("Header", alpha=0.25)
+        header_color = config.get_header_color()
         self._money_label = QLabel("Current Money: ")
-        self._money_label.setStyleSheet(f"color: {config.get_header_color()};")
-        self._money_label.setContentsMargins(0, 2, 0, 2)
+        self._money_label.setStyleSheet(
+            f"color: {header_color}; background-color: {header_bg};"
+            f" padding: 2px 4px; border-radius: 2px;"
+        )
         layout.addWidget(self._money_label, 0, 0, 1, 2)
 
         self._all_items: List[QLabel] = []

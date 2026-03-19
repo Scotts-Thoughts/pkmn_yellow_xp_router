@@ -4,6 +4,7 @@ import logging
 from gui import custom_components
 from routing import route_events
 from utils.constants import const
+from utils.config_manager import config
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,8 @@ class RouteList(custom_components.CustomGridview):
         self.tag_configure(const.EVENT_TAG_ERRORS, background="#61520f")
         self.tag_configure(const.EVENT_TAG_IMPORTANT, background="#1f1f1f")
         self.tag_configure(const.HIGHLIGHT_LABEL, background="#156152")
+        for cat, tag in const.FIGHT_CATEGORY_TO_TAG.items():
+            self.tag_configure(tag, background=config.get_fight_category_color(cat))
 
         self.bind("<<TreeviewOpen>>", self._treeview_opened_callback)
         self.bind("<<TreeviewClose>>", self._treeview_closed_callback)

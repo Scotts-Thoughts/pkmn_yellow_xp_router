@@ -4,10 +4,10 @@ import logging
 
 from PySide6.QtWidgets import (
     QWidget, QLabel, QGridLayout, QVBoxLayout, QHBoxLayout,
-    QScrollArea, QMenuBar, QSizePolicy, QFrame,
+    QScrollArea, QSizePolicy, QFrame, QPushButton,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 
 from controllers.main_controller import MainController
 from pkmn.gen_factory import current_gen_info
@@ -67,35 +67,63 @@ class RenderInfo:
     end_idx: int
 
 
-class RouteSummaryWindow(QWidget):
-    """Non-modal window that displays a grid summary of the current route.
+class RouteSummaryPanel(QWidget):
+    """Reusable panel containing the route summary grid with a toolbar.
 
-    Each column represents a major trainer fight or rare-candy usage,
-    with header rows for trainer name / level, an optional held-item row,
-    and up to four move-slot rows colour-coded by Pokemon type.
+    Can be embedded in the main window (docked) or placed inside
+    a standalone RouteSummaryWindow (undocked).
     """
 
-    def __init__(self, main_window, controller: MainController, parent=None):
-        super().__init__(parent)
-        self.setWindowFlags(Qt.Window)
-        self.setAttribute(Qt.WA_DeleteOnClose)
+    dock_toggled = Signal()
+    close_requested = Signal()
+    content_refreshed = Signal()
 
+    def __init__(self, main_window, controller: MainController, is_docked=True, parent=None):
+        super().__init__(parent)
         self._controller = controller
         self._main_window = main_window
+        self._is_docked = is_docked
 
-        self.setWindowTitle("Route Summary")
-
-        # ---- menu bar ----
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        self._menu_bar = QMenuBar(self)
-        export_action = QAction("Export Screenshot (Ctrl+P)", self)
-        export_action.setShortcut(QKeySequence("Ctrl+P"))
-        export_action.triggered.connect(self._export_screen_shot)
-        self._menu_bar.addAction(export_action)
-        outer.addWidget(self._menu_bar)
+        # ---- toolbar ----
+        toolbar_widget = QFrame()
+        toolbar_widget.setFrameShape(QFrame.NoFrame)
+        toolbar_widget.setStyleSheet(
+            "QFrame { background-color: #2a2a2a; border-bottom: 1px solid #444; }"
+        )
+        toolbar = QHBoxLayout(toolbar_widget)
+        toolbar.setContentsMargins(6, 3, 6, 3)
+        toolbar.setSpacing(6)
+
+        title_label = QLabel("Run Summary")
+        title_label.setStyleSheet(
+            "color: #d4d4d4; font-weight: bold; background: transparent; border: none;"
+        )
+        toolbar.addWidget(title_label)
+
+        export_btn = QPushButton("Export Screenshot")
+        export_btn.setFixedHeight(22)
+        export_btn.clicked.connect(self._export_screen_shot)
+        toolbar.addWidget(export_btn)
+
+        toolbar.addStretch()
+
+        self._dock_btn = QPushButton()
+        self._dock_btn.setFixedHeight(22)
+        self._update_dock_button_text()
+        self._dock_btn.clicked.connect(self.dock_toggled.emit)
+        toolbar.addWidget(self._dock_btn)
+
+        close_btn = QPushButton("\u2715")
+        close_btn.setFixedSize(22, 22)
+        close_btn.setToolTip("Close")
+        close_btn.clicked.connect(self.close_requested.emit)
+        toolbar.addWidget(close_btn)
+
+        outer.addWidget(toolbar_widget)
 
         # ---- scrollable content area ----
         self._scroll_area = QScrollArea()
@@ -110,44 +138,53 @@ class RouteSummaryWindow(QWidget):
         self._grid.setContentsMargins(4, 4, 4, 4)
         self._scroll_area.setWidget(self._content_widget)
 
-        # ---- keyboard shortcuts ----
-        QShortcut(QKeySequence("Ctrl+P"), self, self._export_screen_shot)
-        QShortcut(QKeySequence("Ctrl+`"), self, lambda: self._main_window.open_summary_window())
-
         # ---- controller subscription ----
         self._unsubscribe_route = self._controller.register_route_change(self._refresh)
 
         self._refresh()
 
     # ------------------------------------------------------------------
-    # Cleanup
+    # Properties / helpers
     # ------------------------------------------------------------------
-    def closeEvent(self, event):
+    @property
+    def is_docked(self):
+        return self._is_docked
+
+    def set_docked(self, is_docked):
+        self._is_docked = is_docked
+        self._update_dock_button_text()
+
+    def _update_dock_button_text(self):
+        self._dock_btn.setText("Undock" if self._is_docked else "Dock")
+        self._dock_btn.setToolTip(
+            "Pop out to separate window" if self._is_docked
+            else "Dock back into main window"
+        )
+
+    def cleanup(self):
         if self._unsubscribe_route is not None:
             self._unsubscribe_route()
             self._unsubscribe_route = None
-        super().closeEvent(event)
+
+    def get_content_size_hint(self):
+        """Return ideal (width, height) for the content area."""
+        self._grid.activate()
+        content_size = self._content_widget.sizeHint()
+        scroll_frame = self._scroll_area.frameWidth() * 2
+        toolbar_h = 30
+        return (
+            content_size.width() + scroll_frame + 16,
+            content_size.height() + scroll_frame + toolbar_h + 16,
+        )
 
     # ------------------------------------------------------------------
     # Screenshot
     # ------------------------------------------------------------------
     def _export_screen_shot(self):
-        geo = self.geometry()
-        bbox = (geo.x(), geo.y(), geo.x() + geo.width(), geo.y() + geo.height())
+        pos = self._scroll_area.mapToGlobal(self._scroll_area.rect().topLeft())
+        size = self._scroll_area.size()
+        bbox = (pos.x(), pos.y(), pos.x() + size.width(), pos.y() + size.height())
         self._controller.take_screenshot("run_summary", bbox)
-
-    # ------------------------------------------------------------------
-    # Resize to fit content
-    # ------------------------------------------------------------------
-    def _resize_to_content(self):
-        self._grid.activate()
-        content_size = self._content_widget.sizeHint()
-        scroll_frame = self._scroll_area.frameWidth() * 2
-        menu_h = self._menu_bar.sizeHint().height()
-        target_w = content_size.width() + scroll_frame + 16
-        target_h = content_size.height() + scroll_frame + menu_h + 16
-        screen = self.screen().availableGeometry()
-        self.resize(min(target_w, screen.width()), min(target_h, screen.height()))
 
     # ------------------------------------------------------------------
     # Helpers for building styled cells
@@ -275,7 +312,7 @@ class RouteSummaryWindow(QWidget):
                 SUMMARY_HEADER_BG,
             )
             self._grid.addWidget(frame, 0, 0)
-            self._resize_to_content()
+            self.content_refreshed.emit()
             return
 
         # -- Build display structures -------------------------------------------
@@ -379,5 +416,41 @@ class RouteSummaryWindow(QWidget):
                     colspan,
                 )
 
-        # -- Resize window to fit content ----------------------------------------
+        self.content_refreshed.emit()
+
+
+class RouteSummaryWindow(QWidget):
+    """Non-modal standalone window wrapping a RouteSummaryPanel."""
+
+    def __init__(self, main_window, controller: MainController, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.Window)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.setWindowTitle("Route Summary")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self.panel = RouteSummaryPanel(
+            main_window, controller, is_docked=False, parent=self,
+        )
+        self.panel.content_refreshed.connect(self._resize_to_content)
+        layout.addWidget(self.panel)
+
+        # Keyboard shortcut: Ctrl+` toggles summary from the undocked window
+        QShortcut(
+            QKeySequence("Ctrl+`"), self,
+            lambda: main_window.open_summary_window(),
+        )
+
         self._resize_to_content()
+
+    def closeEvent(self, event):
+        self.panel.cleanup()
+        super().closeEvent(event)
+
+    def _resize_to_content(self):
+        w, h = self.panel.get_content_size_hint()
+        screen = self.screen().availableGeometry()
+        self.resize(min(w, screen.width()), min(h, screen.height()))

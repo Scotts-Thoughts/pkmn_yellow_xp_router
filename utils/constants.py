@@ -5,7 +5,7 @@ import sys
 
 class Constants:
     def __init__(self):
-        self.APP_VERSION = "v3.1k"
+        self.APP_VERSION = "v5.0a"
         self.APP_RELEASE_DATE = "2025-Dec-20"
 
         self.DEBUG_MODE = False
@@ -240,21 +240,21 @@ class Constants:
 
         self.ROUTE_EVENT_TYPES = [
             self.TASK_TRAINER_BATTLE,
-            self.TASK_FIGHT_WILD_PKMN,
             self.TASK_LEARN_MOVE_LEVELUP,
-            self.TASK_LEARN_MOVE_TM,
+            self.TASK_SELL_ITEM,
+            self.TASK_NOTES_ONLY,
             self.TASK_HOLD_ITEM,
             self.TASK_RARE_CANDY,
-            self.TASK_VITAMIN,
+            self.TASK_FIGHT_WILD_PKMN,
             self.TASK_GET_FREE_ITEM,
             self.TASK_PURCHASE_ITEM,
             self.TASK_USE_ITEM,
-            self.TASK_SELL_ITEM,
+            self.TASK_VITAMIN,
             self.TASK_SAVE,
             self.TASK_HEAL,
             self.TASK_BLACKOUT,
             self.TASK_EVOLUTION,
-            self.TASK_NOTES_ONLY,
+            self.TASK_LEARN_MOVE_TM,
             # NOTE: not a full type, but we only use this list for populating the search component
             self.ERROR_SEARCH,
         ]
@@ -309,6 +309,39 @@ class Constants:
         self.EVENT_TAG_ERRORS = "errors"
         self.EVENT_TAG_BRANCHED_MANDATORY = "branched_mandatory"
         self.EVENT_TAG_FOLDER = "folder"
+
+        self.FIGHT_CATEGORY_RIVAL = "rival"
+        self.FIGHT_CATEGORY_GYM_LEADER = "gym_leader"
+        self.FIGHT_CATEGORY_ELITE_FOUR = "elite_four"
+        self.FIGHT_CATEGORY_CHAMPION = "champion"
+        self.FIGHT_CATEGORY_POST_GAME = "post_game"
+        self.FIGHT_CATEGORY_BOSS = "boss"
+        self.FIGHT_CATEGORY_TEAM_LEADER = "team_leader"
+
+        self.EVENT_TAG_RIVAL = "fight_rival"
+        self.EVENT_TAG_GYM_LEADER = "fight_gym_leader"
+        self.EVENT_TAG_ELITE_FOUR = "fight_elite_four"
+        self.EVENT_TAG_CHAMPION = "fight_champion"
+        self.EVENT_TAG_POST_GAME = "fight_post_game"
+        self.EVENT_TAG_BOSS = "fight_boss"
+        self.EVENT_TAG_TEAM_LEADER = "fight_team_leader"
+
+        self.FIGHT_CATEGORY_TO_TAG = {
+            self.FIGHT_CATEGORY_RIVAL: self.EVENT_TAG_RIVAL,
+            self.FIGHT_CATEGORY_GYM_LEADER: self.EVENT_TAG_GYM_LEADER,
+            self.FIGHT_CATEGORY_ELITE_FOUR: self.EVENT_TAG_ELITE_FOUR,
+            self.FIGHT_CATEGORY_CHAMPION: self.EVENT_TAG_CHAMPION,
+            self.FIGHT_CATEGORY_POST_GAME: self.EVENT_TAG_POST_GAME,
+            self.FIGHT_CATEGORY_BOSS: self.EVENT_TAG_BOSS,
+            self.FIGHT_CATEGORY_TEAM_LEADER: self.EVENT_TAG_TEAM_LEADER,
+        }
+
+        self.ALL_FIGHT_CATEGORY_TAGS = [
+            self.EVENT_TAG_RIVAL, self.EVENT_TAG_GYM_LEADER,
+            self.EVENT_TAG_ELITE_FOUR, self.EVENT_TAG_CHAMPION,
+            self.EVENT_TAG_POST_GAME, self.EVENT_TAG_BOSS,
+            self.EVENT_TAG_TEAM_LEADER,
+        ]
 
         self.MOVE_KEY = "move"
         self.MOVE_DEST_KEY = "destination_slot"
@@ -462,6 +495,7 @@ class Constants:
 
         self.DOUBLE_HIT_FLAVOR = "two_hit"
         self.FLAVOR_MULTI_HIT = "multi_hit"
+        self.FLAVOR_BELLY_DRUM = "belly_drum"
         self.FLAVOR_HIGH_CRIT = "high_crit"
         self.FLAVOR_FIXED_DAMAGE = "fixed_damage"
         self.FLAVOR_LEVEL_DAMAGE = "level_damage"

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QSizePolicy,
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPalette, QColor
 
 from utils.config_manager import config
 
@@ -30,6 +31,18 @@ def _color_for_style(style_prefix: str) -> str:
     return config.get_text_color()
 
 
+def tinted_bg_for_style(style_prefix: str, alpha=0.15) -> str:
+    """Mix the style color into the base background for a subtle tinted panel."""
+    fg_hex = _color_for_style(style_prefix).lstrip('#')
+    bg_hex = config.get_background_color().lstrip('#')
+
+    fg_rgb = tuple(int(fg_hex[i:i+2], 16) for i in (0, 2, 4))
+    bg_rgb = tuple(int(bg_hex[i:i+2], 16) for i in (0, 2, 4))
+
+    mixed = tuple(int(b + (f - b) * alpha) for f, b in zip(fg_rgb, bg_rgb))
+    return f"#{mixed[0]:02x}{mixed[1]:02x}{mixed[2]:02x}"
+
+
 class StatColumn(QWidget):
     def __init__(
         self,
@@ -46,8 +59,15 @@ class StatColumn(QWidget):
         self._label_width = label_width
         self._val_width = val_width
 
+        # Subtle tinted background for visual section grouping
+        bg_tint = tinted_bg_for_style(style_prefix)
+        self.setAutoFillBackground(True)
+        pal = self.palette()
+        pal.setColor(QPalette.Window, QColor(bg_tint))
+        self.setPalette(pal)
+
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setContentsMargins(4, 2, 4, 2)
         main_layout.setSpacing(0)
 
         # Header
