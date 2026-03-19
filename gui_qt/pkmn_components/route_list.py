@@ -544,13 +544,54 @@ class RouteList(QTreeView):
     #  Refresh / tree building
     # ------------------------------------------------------------------
 
+    def _collect_expand_state(self, parent_item: QStandardItem, path: str = "") -> Dict[str, bool]:
+        """Walk the tree and record expand state keyed by folder name path."""
+        result = {}
+        for row in range(parent_item.rowCount()):
+            child = parent_item.child(row, 0)
+            if child is None:
+                continue
+            idx = self._model.indexFromItem(child)
+            if not idx.isValid():
+                continue
+            # Only record folders (items that have children or are expandable)
+            if child.rowCount() > 0 or self.isExpanded(idx):
+                key = f"{path}/{child.text()}"
+                result[key] = self.isExpanded(idx)
+                result.update(self._collect_expand_state(child, key))
+        return result
+
+    def _restore_expand_state(self, parent_item: QStandardItem, saved: Dict[str, bool], path: str = ""):
+        """Restore expand state from a saved snapshot."""
+        for row in range(parent_item.rowCount()):
+            child = parent_item.child(row, 0)
+            if child is None:
+                continue
+            idx = self._model.indexFromItem(child)
+            if not idx.isValid():
+                continue
+            key = f"{path}/{child.text()}"
+            if key in saved:
+                if saved[key]:
+                    self.expand(idx)
+                else:
+                    self.collapse(idx)
+            self._restore_expand_state(child, saved, key)
+
     def refresh(self, *args, **kwargs):
         """Rebuild/update the tree from the controller's route data."""
         if self._refreshing:
             return
         self._refreshing = True
+
+        # Save scroll position before any model changes.
+        saved_scroll = self.verticalScrollBar().value()
+
         self.setUpdatesEnabled(False)
         try:
+            # Snapshot current expand state before rebuilding.
+            saved_expand = self._collect_expand_state(self._model.invisibleRootItem())
+
             to_delete_ids: Set[int] = set(self._item_lookup.keys())
             root_item = self._model.invisibleRootItem()
 
@@ -581,9 +622,16 @@ class RouteList(QTreeView):
                 except RuntimeError:
                     # C++ object already deleted (parent was removed first)
                     pass
+
+            # Restore expand state from before the rebuild.
+            if saved_expand:
+                self._restore_expand_state(self._model.invisibleRootItem(), saved_expand)
         finally:
             self.setUpdatesEnabled(True)
             self._refreshing = False
+
+        # Restore scroll position so the viewport doesn't jump.
+        self.verticalScrollBar().setValue(saved_scroll)
 
         self.route_list_refreshed.emit()
 
@@ -803,16 +851,16 @@ class RouteList(QTreeView):
             parent_item.appendRow(row)
             self._item_lookup[semantic_id] = name_item
 
-        # Handle expand/collapse for folders.
-        # force_open=None means "don't touch expand state" (used for hidden/filtered rows).
-        if force_open is True:
+        # Handle expand/collapse for folders — only for newly created items.
+        # Existing items keep their current visual expand state (matches Tkinter
+        # behaviour where force_open is only used on insert, not update).
+        if existing_name_item is None and force_open is not None:
             idx = self._model.indexFromItem(name_item)
-            if idx.isValid() and not self.isExpanded(idx):
-                self.expand(idx)
-        elif force_open is False and is_folder:
-            idx = self._model.indexFromItem(name_item)
-            if idx.isValid() and self.isExpanded(idx):
-                self.collapse(idx)
+            if idx.isValid():
+                if force_open:
+                    self.expand(idx)
+                elif is_folder:
+                    self.collapse(idx)
 
         return name_item
 

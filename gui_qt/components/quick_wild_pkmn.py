@@ -109,6 +109,8 @@ class QuickWildPkmn(QGroupBox):
         self.update_button_status()
 
     def update_button_status(self):
+        if not hasattr(self, '_add_wild_pkmn'):
+            return
         if not self._controller.can_insert_after_current_selection():
             self._add_wild_pkmn.disable()
             self._add_trainer_pkmn.disable()

@@ -7,12 +7,12 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
     QFrame, QCompleter, QLineEdit, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QPointF, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap, QPolygonF
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QFont, QPixmap
 
 from controllers.battle_summary_controller import BattleSummaryController, MoveRenderInfo
 from gui_qt.components.custom_components import (
-    SimpleButton, SimpleOptionMenu, AmountEntry, CheckboxLabel,
+    SimpleButton, SimpleOptionMenu, AmountEntry, CheckboxLabel, DisclosureTriangle,
 )
 from pkmn import universal_data_objects
 from pkmn.gen_factory import current_gen_info
@@ -448,40 +448,45 @@ class BattleSummary(QWidget):
         if not self.should_render:
             return
 
-        self._loading = True
-        self.candy_summary.set_candy_count(self._controller.get_prefight_candy_count())
-        if not self._controller.can_support_prefight_candies():
-            self.candy_summary.disable()
-        else:
-            self.candy_summary.enable()
-
-        if self._controller.is_double_battle():
-            self.double_label.setText("Double Battle")
-        else:
-            self.double_label.setText("Single Battle")
-
-        self.transform_checkbox.set_checked(self._controller.is_player_transformed())
-        held = self._controller.get_player_held_item()
-        self.held_item_label.setText(f"Held: {held}" if held else "")
-        self.weather_status.set_weather(self._controller.get_weather())
-        self.setup_moves.set_move_list(self._controller.get_player_setup_moves())
-        self.enemy_setup_moves.set_move_list(self._controller.get_enemy_setup_moves())
-
-        for idx in range(6):
-            player_info = self._controller.get_pkmn_info(idx, True)
-            enemy_info = self._controller.get_pkmn_info(idx, False)
-
-            if player_info is None and enemy_info is None:
-                if self._did_draw_mon_pairs[idx]:
-                    self._mon_pairs[idx].setVisible(False)
-                    self._did_draw_mon_pairs[idx] = False
+        # Suppress intermediate repaints while updating many child widgets.
+        self._base_frame.setUpdatesEnabled(False)
+        try:
+            self._loading = True
+            self.candy_summary.set_candy_count(self._controller.get_prefight_candy_count())
+            if not self._controller.can_support_prefight_candies():
+                self.candy_summary.disable()
             else:
-                if not self._did_draw_mon_pairs[idx]:
-                    self._mon_pairs[idx].setVisible(True)
-                    self._did_draw_mon_pairs[idx] = True
-                self._mon_pairs[idx].update_rendering()
+                self.candy_summary.enable()
 
-        self._loading = False
+            if self._controller.is_double_battle():
+                self.double_label.setText("Double Battle")
+            else:
+                self.double_label.setText("Single Battle")
+
+            self.transform_checkbox.set_checked(self._controller.is_player_transformed())
+            held = self._controller.get_player_held_item()
+            self.held_item_label.setText(f"Held: {held}" if held else "")
+            self.weather_status.set_weather(self._controller.get_weather())
+            self.setup_moves.set_move_list(self._controller.get_player_setup_moves())
+            self.enemy_setup_moves.set_move_list(self._controller.get_enemy_setup_moves())
+
+            for idx in range(6):
+                player_info = self._controller.get_pkmn_info(idx, True)
+                enemy_info = self._controller.get_pkmn_info(idx, False)
+
+                if player_info is None and enemy_info is None:
+                    if self._did_draw_mon_pairs[idx]:
+                        self._mon_pairs[idx].setVisible(False)
+                        self._did_draw_mon_pairs[idx] = False
+                else:
+                    if not self._did_draw_mon_pairs[idx]:
+                        self._mon_pairs[idx].setVisible(True)
+                        self._did_draw_mon_pairs[idx] = True
+                    self._mon_pairs[idx].update_rendering()
+
+            self._loading = False
+        finally:
+            self._base_frame.setUpdatesEnabled(True)
 
     # ------------------------------------------------------------------
     # Bounding-box helpers (used by screenshot cropping in main_window)
@@ -708,55 +713,6 @@ class PrefightCandySummary(QWidget):
     def enable(self):
         self.candy_count.enable()
 
-
-
-# ===================================================================
-# DisclosureTriangle -- small painted expand/collapse indicator
-# ===================================================================
-
-class DisclosureTriangle(QWidget):
-    """A small widget that paints a solid triangle pointing down (expanded)
-    or right (collapsed).  Both orientations use the exact same triangle
-    size so the indicator never appears to shrink or distort."""
-
-    def __init__(self, size=12, color="#cccccc", parent=None):
-        super().__init__(parent)
-        self._expanded = True
-        self._color = QColor(color)
-        self.setFixedSize(size, size)
-
-    def set_expanded(self, expanded: bool):
-        if self._expanded != expanded:
-            self._expanded = expanded
-            self.update()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(self._color))
-
-        s = min(self.width(), self.height())
-        margin = s * 0.15
-        tri_size = s - 2 * margin
-
-        if self._expanded:
-            # Down-pointing triangle
-            poly = QPolygonF([
-                QPointF(margin, margin),
-                QPointF(margin + tri_size, margin),
-                QPointF(margin + tri_size / 2, margin + tri_size),
-            ])
-        else:
-            # Right-pointing triangle
-            poly = QPolygonF([
-                QPointF(margin, margin),
-                QPointF(margin + tri_size, margin + tri_size / 2),
-                QPointF(margin, margin + tri_size),
-            ])
-
-        painter.drawPolygon(poly)
-        painter.end()
 
 
 # ===================================================================
@@ -989,7 +945,10 @@ class AutocompleteEntry(QWidget):
         return self._entry.text()
 
     def set(self, value):
+        # Temporarily detach the completer so setText doesn't flash its popup.
+        self._entry.setCompleter(None)
         self._entry.setText(value)
+        self._entry.setCompleter(self._completer)
         self._original_value = value
 
     def enable(self):
@@ -1070,6 +1029,8 @@ class DamageSummary(QWidget):
                 width=18,
                 parent=self.header,
             )
+            self.test_move_dropdown.setVisible(False)
+            header_layout.addWidget(self.test_move_dropdown, 1)
 
         self.move_name_label = QLabel("")
         self.move_name_label.setAlignment(Qt.AlignCenter)

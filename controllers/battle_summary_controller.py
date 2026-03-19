@@ -419,6 +419,21 @@ class BattleSummaryController:
                 self._enemy_move_data[mon_idx].append(cur_enemy_move_data)
 
             #####
+            # Add test moves (player moves 5-8) - always calculate if any test moves are defined
+            # so data is ready when display is enabled
+            #####
+            test_moves = self._main_controller.get_raw_route().test_moves
+            has_test_moves = any(test_moves[i] and test_moves[i].strip() for i in range(min(4, len(test_moves))))
+            if has_test_moves or config.get_test_moves_enabled():
+                for test_idx in range(4):
+                    if test_idx < len(test_moves) and test_moves[test_idx] and test_moves[test_idx].strip():
+                        test_move_name = test_moves[test_idx].strip()
+                        test_move_data = self._recalculate_single_move(mon_idx, True, test_move_name)
+                        self._player_move_data[mon_idx].append(test_move_data)
+                    else:
+                        self._player_move_data[mon_idx].append(None)
+
+            #####
             # Finally out of move data loop. Update best moves
             #####
             self._update_best_move_inplace(mon_idx, True)
@@ -953,7 +968,22 @@ class BattleSummaryController:
         else:
             cur_move_data = self._enemy_move_data
 
-        if pkmn_idx < 0 or pkmn_idx >= len(cur_move_data) or move_idx < 0 or move_idx >= 4:
+        if pkmn_idx < 0 or pkmn_idx >= len(cur_move_data) or move_idx < 0:
+            return None
+
+        # For player moves, allow indices 0-7 when test moves exist or display is enabled (0-3 regular, 4-7 test)
+        # For enemy moves, only allow 0-3
+        if is_player_mon:
+            test_moves = self._main_controller.get_raw_route().test_moves
+            has_test_moves = any(test_moves[i] and test_moves[i].strip() for i in range(min(4, len(test_moves))))
+            max_idx = 7 if (has_test_moves or config.get_test_moves_enabled()) else 3
+        else:
+            max_idx = 3
+
+        if move_idx > max_idx:
+            return None
+
+        if move_idx >= len(cur_move_data[pkmn_idx]):
             return None
 
         return cur_move_data[pkmn_idx][move_idx]
@@ -1258,20 +1288,25 @@ class BattleSummaryController:
             bbox
         )
 
-    # --- Stubs for features not yet in this version of the controller ---
-
     def get_test_moves_enabled(self):
-        return config.get_test_moves_enabled() if hasattr(config, 'get_test_moves_enabled') else False
+        return config.get_test_moves_enabled()
 
     def get_test_moves(self):
-        return getattr(self, '_test_moves', ["", "", "", ""])
+        test_moves = self._main_controller.get_raw_route().test_moves.copy()
+        while len(test_moves) < 4:
+            test_moves.append("")
+        return test_moves[:4]
 
     def update_test_move(self, slot_idx, move_name):
-        if not hasattr(self, '_test_moves'):
-            self._test_moves = ["", "", "", ""]
-        if 0 <= slot_idx < len(self._test_moves):
-            self._test_moves[slot_idx] = move_name
+        if slot_idx < 0 or slot_idx >= 4:
+            return
+        test_moves = self._main_controller.get_raw_route().test_moves
+        while len(test_moves) < 4:
+            test_moves.append("")
+        test_moves[slot_idx] = move_name
+        self._main_controller.get_raw_route().test_moves = test_moves
         self._full_refresh()
+        self._on_nonload_change()
 
     def get_show_move_highlights(self):
         return config.get_show_move_highlights() if hasattr(config, 'get_show_move_highlights') else False

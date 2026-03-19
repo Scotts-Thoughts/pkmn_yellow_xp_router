@@ -201,6 +201,15 @@ class EventDetails(QWidget):
                 self.battle_summary.set_team(None)
 
     def _handle_selection(self):
+        # Suppress all intermediate repaints during the entire selection
+        # transition (tab switch + data load + battle summary refresh).
+        self.setUpdatesEnabled(False)
+        try:
+            self._handle_selection_inner()
+        finally:
+            self.setUpdatesEnabled(True)
+
+    def _handle_selection_inner(self):
         # When recording starts, immediately show the battle summary tab
         # so the right side stays stable throughout the recording session.
         if self._controller.is_record_mode_active():

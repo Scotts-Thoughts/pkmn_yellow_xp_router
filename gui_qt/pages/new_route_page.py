@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QBrush
 
 from gui_qt.components.custom_components import SimpleEntry, SimpleOptionMenu, SimpleButton
 from gui_qt.pkmn_components.custom_dvs import CustomDVsFrame
@@ -272,6 +273,13 @@ class NewRoutePage(QWidget):
                     recorder = "Unknown"
 
             item = QTreeWidgetItem([game_name, gen, platform, recorder])
+            hex_color = const.VERSION_COLORS.get(game_name)
+            if hex_color:
+                bg = QColor(hex_color)
+                item.setBackground(0, QBrush(bg))
+                # Use white text on dark backgrounds, black on light
+                lum = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
+                item.setForeground(0, QBrush(QColor("black") if lum > 128 else QColor("white")))
             self.game_treeview.addTopLevelItem(item)
 
     # ------------------------------------------------------------------

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /a/pkmn_yellow_xp_router -name *.json -path *route* -o -name *.json -path *test*)",
+      "Bash(find /a/pkmn_yellow_xp_router -name *.Pokemon*)",
+      "Bash(cp \"A:/Dropbox/stp-projects/programs/router_data/saved_routes/yellow-pinsir-lv10brock.json\" /a/pkmn_yellow_xp_router/tests/test_data/)",
+      "Bash(cp \"A:/Dropbox/stp-projects/programs/router_data/saved_routes/c-porygon-1-.json\" /a/pkmn_yellow_xp_router/tests/test_data/)",
+      "Bash(cp \"A:/Dropbox/stp-projects/programs/router_data/saved_routes/f-ditto-tests.json\" /a/pkmn_yellow_xp_router/tests/test_data/)",
+      "Bash(cp \"A:/Dropbox/stp-projects/programs/router_data/saved_routes/qwe.json\" /a/pkmn_yellow_xp_router/tests/test_data/platinum_chimchar.json)",
+      "Bash(python3:*)",
+      "Bash(pip install:*)"
+    ]
+  }
+}

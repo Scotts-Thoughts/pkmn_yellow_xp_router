@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy, QFrame, QPushButton,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QShortcut
 
 from controllers.main_controller import MainController
 from pkmn.gen_factory import current_gen_info
@@ -48,6 +48,21 @@ _LIGHT_TEXT_TYPES = {"Poison", "Ghost", "Dark", "Dragon", "Fighting"}
 
 SUMMARY_HEADER_BG = "#737373"        # disabledbg in the Tk theme
 SUMMARY_HEADER_CANDY_BG = "#61520f"  # warning colour in the Tk theme
+SUMMARY_HELD_ITEM_BG = "#506878"     # blue-grey, distinct from leader header
+
+
+def _gradient_css(base_hex: str, lighten: int = 30) -> str:
+    """Return a QSS vertical gradient string: lighter top -> base bottom."""
+    base = QColor(base_hex)
+    top = QColor(
+        min(base.red() + lighten, 255),
+        min(base.green() + lighten, 255),
+        min(base.blue() + lighten, 255),
+    )
+    return (
+        f"qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+        f"stop:0 {top.name()}, stop:1 {base.name()})"
+    )
 
 
 @dataclass
@@ -134,8 +149,8 @@ class RouteSummaryPanel(QWidget):
 
         self._content_widget = QWidget()
         self._grid = QGridLayout(self._content_widget)
-        self._grid.setSpacing(2)
-        self._grid.setContentsMargins(4, 4, 4, 4)
+        self._grid.setSpacing(4)
+        self._grid.setContentsMargins(6, 6, 6, 6)
         self._scroll_area.setWidget(self._content_widget)
 
         # ---- controller subscription ----
@@ -191,8 +206,9 @@ class RouteSummaryPanel(QWidget):
     # ------------------------------------------------------------------
     @staticmethod
     def _make_header_cell(text: str, bg: str) -> QFrame:
+        grad = _gradient_css(bg, lighten=30)
         frame = QFrame()
-        frame.setStyleSheet(f"QFrame {{ background-color: {bg}; border-radius: 3px; }}")
+        frame.setStyleSheet(f"QFrame {{ background: {grad}; border-radius: 3px; }}")
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(2)
@@ -203,13 +219,28 @@ class RouteSummaryPanel(QWidget):
         return frame, label
 
     @staticmethod
+    def _make_held_item_cell(text: str) -> QFrame:
+        grad = _gradient_css(SUMMARY_HELD_ITEM_BG, lighten=25)
+        frame = QFrame()
+        frame.setStyleSheet(f"QFrame {{ background: {grad}; border-radius: 3px; }}")
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(5, 4, 5, 4)
+        layout.setSpacing(2)
+        label = QLabel(text)
+        label.setAlignment(Qt.AlignCenter)
+        label.setStyleSheet("color: white; background: transparent;")
+        layout.addWidget(label)
+        return frame
+
+    @staticmethod
     def _make_type_cell(text: str, move_type: str) -> QFrame:
         bg = TYPE_COLORS.get(move_type, TYPE_COLORS[None])
         fg = "white" if move_type in _LIGHT_TEXT_TYPES else config.get_background_color()
+        grad = _gradient_css(bg, lighten=35)
         frame = QFrame()
-        frame.setStyleSheet(f"QFrame {{ background-color: {bg}; border-radius: 2px; }}")
+        frame.setStyleSheet(f"QFrame {{ background: {grad}; border-radius: 2px; }}")
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setContentsMargins(4, 3, 4, 3)
         label = QLabel(text)
         label.setAlignment(Qt.AlignCenter)
         label.setStyleSheet(f"color: {fg}; background: transparent;")
@@ -338,12 +369,13 @@ class RouteSummaryPanel(QWidget):
                 level_text = f"Lv: {cur_summary.mon_level - cur_summary.rare_candy_count}->{cur_summary.mon_level}"
 
             # Build header frame with trainer + level
+            header_grad = _gradient_css(header_bg, lighten=30)
             header_frame = QFrame()
             header_frame.setStyleSheet(
-                f"QFrame {{ background-color: {header_bg}; border-radius: 3px; }}"
+                f"QFrame {{ background: {header_grad}; border-radius: 3px; }}"
             )
             header_layout = QVBoxLayout(header_frame)
-            header_layout.setContentsMargins(5, 15, 5, 15)
+            header_layout.setContentsMargins(5, 11, 5, 11)
             header_layout.setSpacing(2)
 
             trainer_label = QLabel(trainer_text)
@@ -399,7 +431,7 @@ class RouteSummaryPanel(QWidget):
         if current_gen_info().get_generation() != 1:
             for info in held_item_display_info:
                 display_text = info.move_name if info.move_name else "None"
-                frame, _ = self._make_header_cell(display_text, SUMMARY_HEADER_BG)
+                frame = self._make_held_item_cell(display_text)
                 colspan = (info.end_idx - info.start_idx) + 1
                 self._grid.addWidget(frame, ROW_HELD_ITEM, info.start_idx, 1, colspan)
 

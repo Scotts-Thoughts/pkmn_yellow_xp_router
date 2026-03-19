@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QHeaderView, QAbstractItemView, QSizePolicy,
 )
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QBrush
 
 from utils.constants import const
 from utils.config_manager import config
@@ -425,4 +426,10 @@ class LandingPage(QWidget):
             except Exception:
                 mtime_str = "Unknown"
             item = QTreeWidgetItem([game_version, species_name, route_name, mtime_str])
+            hex_color = const.VERSION_COLORS.get(game_version)
+            if hex_color:
+                bg = QColor(hex_color)
+                item.setBackground(0, QBrush(bg))
+                lum = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
+                item.setForeground(0, QBrush(QColor("black") if lum > 128 else QColor("white")))
             self.route_tree.addTopLevelItem(item)

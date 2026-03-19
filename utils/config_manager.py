@@ -82,6 +82,7 @@ class Config:
         self._run_summary_docked = raw.get("run_summary_docked", True)
         self._color_major_battles = raw.get("color_major_battles", True)
         self._suppress_update_prompt = raw.get("suppress_update_prompt", False)
+        self._notes_collapsed = raw.get("notes_collapsed", False)
         self._highlight_colors = {}
         self._fight_category_colors = {}
         for cat in ["rival", "gym_leader", "elite_four", "champion", "post_game", "boss", "team_leader"]:
@@ -134,6 +135,7 @@ class Config:
                 "run_summary_docked": getattr(self, '_run_summary_docked', True),
                 "color_major_battles": getattr(self, '_color_major_battles', True),
                 "suppress_update_prompt": getattr(self, '_suppress_update_prompt', False),
+                "notes_collapsed": getattr(self, '_notes_collapsed', False),
         }
         # Save highlight colors
         for i in range(1, 10):
@@ -331,7 +333,14 @@ class Config:
         """Set notes visibility mode: 'when_space_allows', 'always', or 'never'."""
         self._notes_visibility = mode
         self._save()
-    
+
+    def get_notes_collapsed(self):
+        return self._notes_collapsed
+
+    def set_notes_collapsed(self, collapsed):
+        self._notes_collapsed = collapsed
+        self._save()
+
     def reset_all_colors(self):
         self._success_color = self.DEFAULT_SUCCESS
         self._warning_color = self.DEFAULT_WARNING

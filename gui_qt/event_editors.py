@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, Signal
 
 from gui_qt.components.custom_components import (
     SimpleEntry, SimpleOptionMenu, SimpleButton, AmountEntry, CheckboxLabel,
+    DisclosureTriangle,
 )
 from utils.constants import const
 from utils.config_manager import config
@@ -120,9 +121,25 @@ class NotesEditor(EventEditorBase):
     def __init__(self, editor_params: EditorParams, notes_visibility_callback=None, parent=None):
         super().__init__(editor_params, notes_visibility_callback=notes_visibility_callback, parent=parent)
 
-        # Row 0: label + visibility dropdown
-        self._notes_label = QLabel("Battle summary notes:")
-        self._layout.addWidget(self._notes_label, self._cur_row, 0)
+        self._collapsed = config.get_notes_collapsed()
+
+        # Row 0: clickable arrow + label, visibility dropdown
+        header_widget = QWidget()
+        header_widget.setCursor(Qt.PointingHandCursor)
+        header_widget.mousePressEvent = lambda e: self._toggle_collapsed()
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(4)
+
+        self._disclosure = DisclosureTriangle(size=14, color="#cccccc", parent=header_widget)
+        self._disclosure.set_expanded(not self._collapsed)
+        header_layout.addWidget(self._disclosure)
+
+        self._notes_label = QLabel("Notes:")
+        header_layout.addWidget(self._notes_label)
+
+        header_layout.addStretch()
+        self._layout.addWidget(header_widget, self._cur_row, 0, 1, 2)
 
         notes_options = [
             "Show notes in battle summary when space allows",
@@ -140,7 +157,7 @@ class NotesEditor(EventEditorBase):
         current_option = self._notes_mode_reverse.get(current_mode, notes_options[0])
 
         self._notes_visibility_dropdown = SimpleOptionMenu(notes_options, default_val=current_option, callback=self._on_notes_visibility_changed)
-        self._layout.addWidget(self._notes_visibility_dropdown, self._cur_row, 1)
+        self._layout.addWidget(self._notes_visibility_dropdown, self._cur_row, 2, 1, 2)
         self._cur_row += 1
 
         # Row 1: notes text area
@@ -153,6 +170,19 @@ class NotesEditor(EventEditorBase):
 
         self._layout.setColumnStretch(0, 1)
         self._layout.setColumnStretch(2, 1)
+
+        # Apply initial collapsed state
+        if self._collapsed:
+            self._notes_visibility_dropdown.setVisible(False)
+            self._notes.setVisible(False)
+
+    # ---- collapse/expand --------------------------------------------------
+    def _toggle_collapsed(self):
+        self._collapsed = not self._collapsed
+        self._disclosure.set_expanded(not self._collapsed)
+        self._notes_visibility_dropdown.setVisible(not self._collapsed)
+        self._notes.setVisible(not self._collapsed)
+        config.set_notes_collapsed(self._collapsed)
 
     # ---- overrides --------------------------------------------------------
     @ignore_updates

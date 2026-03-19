@@ -6,8 +6,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout, QGridLayout, QSpinBox, QPlainTextEdit,
     QColorDialog, QFrame, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QPropertyAnimation, QPoint
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, QTimer, QPointF, Signal, QPropertyAnimation, QPoint
+from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPolygonF
 
 from utils.constants import const
 from utils.config_manager import config
@@ -431,3 +431,48 @@ class ConfigColorUpdater(QWidget):
             self.color_changed.emit(hex_color)
             if self._callback:
                 self._callback()
+
+
+class DisclosureTriangle(QWidget):
+    """A small widget that paints a solid triangle pointing down (expanded)
+    or right (collapsed).  Both orientations use the exact same triangle
+    size so the indicator never appears to shrink or distort."""
+
+    def __init__(self, size=12, color="#cccccc", parent=None):
+        super().__init__(parent)
+        self._expanded = True
+        self._color = QColor(color)
+        self.setFixedSize(size, size)
+
+    def set_expanded(self, expanded: bool):
+        if self._expanded != expanded:
+            self._expanded = expanded
+            self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(self._color))
+
+        s = min(self.width(), self.height())
+        margin = s * 0.15
+        tri_size = s - 2 * margin
+
+        if self._expanded:
+            # Down-pointing triangle
+            poly = QPolygonF([
+                QPointF(margin, margin),
+                QPointF(margin + tri_size, margin),
+                QPointF(margin + tri_size / 2, margin + tri_size),
+            ])
+        else:
+            # Right-pointing triangle
+            poly = QPolygonF([
+                QPointF(margin, margin),
+                QPointF(margin + tri_size, margin + tri_size / 2),
+                QPointF(margin, margin + tri_size),
+            ])
+
+        painter.drawPolygon(poly)
+        painter.end()

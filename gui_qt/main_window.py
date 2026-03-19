@@ -25,53 +25,6 @@ from gui_qt.components.custom_components import (
     CheckboxLabel, SimpleOptionMenu,
 )
 
-# Attempt imports of sub-components; fall back to placeholders when the real
-# widgets have not been ported yet.
-try:
-    from gui_qt.components.quick_add_components import (
-        QuickTrainerAdd, QuickItemAdd, QuickWildPkmn, QuickMiscEvents,
-    )
-except ImportError:
-    class _PlaceholderQuickAdd(QWidget):
-        """Minimal stand-in used until the real quick-add widgets are ported."""
-        def __init__(self, controller, parent=None):
-            super().__init__(parent)
-            self._controller = controller
-            lbl = QLabel(self.__class__.__name__, self)
-            lay = QVBoxLayout(self)
-            lay.setContentsMargins(2, 2, 2, 2)
-            lay.addWidget(lbl)
-        def trainer_filter_callback(self):
-            pass
-    class QuickTrainerAdd(_PlaceholderQuickAdd):
-        pass
-    class QuickItemAdd(_PlaceholderQuickAdd):
-        pass
-    class QuickWildPkmn(_PlaceholderQuickAdd):
-        pass
-    class QuickMiscEvents(_PlaceholderQuickAdd):
-        pass
-
-try:
-    from gui_qt.components.route_search import RouteSearch
-except ImportError:
-    class RouteSearch(QWidget):
-        def __init__(self, controller, parent=None):
-            super().__init__(parent)
-            self._controller = controller
-            lbl = QLabel("RouteSearch (placeholder)", self)
-            lay = QVBoxLayout(self)
-            lay.setContentsMargins(2, 2, 2, 2)
-            lay.addWidget(lbl)
-        def toggle_filter_by_type(self, filter_type):
-            pass
-        def is_filter_checked(self, filter_type):
-            return False
-        def set_filter_by_type(self, filter_type, checked):
-            pass
-        def reset_all_filters(self):
-            pass
-
 try:
     from gui_qt.components.recorder_status import RecorderStatus
 except ImportError:
@@ -222,10 +175,13 @@ class MainWindow(QMainWindow):
         we let normal Qt focus handling take over.  Otherwise we clear
         focus so keyboard shortcuts start working again immediately.
         """
-        # Track when any text field gains focus so shortcuts can check the flag.
+        # Track when any text field gains/loses focus so shortcuts can check the flag.
         if event.type() == QEvent.FocusIn:
             if isinstance(obj, (QLineEdit, QPlainTextEdit)):
                 self._text_field_has_focus = True
+        elif event.type() == QEvent.FocusOut:
+            if isinstance(obj, (QLineEdit, QPlainTextEdit)):
+                self._text_field_has_focus = False
 
         if event.type() == QEvent.MouseButtonPress:
             focused = QApplication.focusWidget()
@@ -444,6 +400,14 @@ class MainWindow(QMainWindow):
         self._act_fade_folder_text.setChecked(config.get_fade_folder_text())
         self._act_fade_folder_text.triggered.connect(self._toggle_fade_folder_text)
 
+        self.event_menu.addSeparator()
+
+        self._act_setup_summary = self.event_menu.addAction("Setup Summary")
+        self._act_setup_summary.triggered.connect(self.open_setup_summary_window)
+
+        self._act_run_summary = self.event_menu.addAction("Run Summary")
+        self._act_run_summary.triggered.connect(self.open_summary_window)
+
         # ---- Highlight menu ------------------------------------------
         self.highlight_menu = menu_bar.addMenu("&Highlight")
         for i in range(1, 10):
@@ -458,6 +422,7 @@ class MainWindow(QMainWindow):
         self.folder_menu = menu_bar.addMenu("F&olders")
 
         self._act_new_folder = self.folder_menu.addAction("New Folder")
+        self._act_new_folder.setShortcut(QKeySequence("Ctrl+Shift+Alt+F"))
         self._act_new_folder.triggered.connect(self.open_new_folder_window)
 
         self._act_rename_folder = self.folder_menu.addAction("Rename Cur Folder")
@@ -640,90 +605,9 @@ class MainWindow(QMainWindow):
         self.message_label.setMinimumWidth(200)
         left_layout.addWidget(self.message_label)
 
-        # ---- Quick-add grid ------------------------------------------
-        self._quick_add_container = QWidget()
-        qa_grid = QGridLayout(self._quick_add_container)
-        qa_grid.setContentsMargins(0, 0, 0, 0)
-        qa_grid.setSpacing(4)
-        qa_grid.setColumnStretch(0, 2)
-        qa_grid.setColumnStretch(1, 2)
-        qa_grid.setColumnStretch(2, 1)
-
-        self.trainer_add = QuickTrainerAdd(self._controller, self._quick_add_container)
-        qa_grid.addWidget(self.trainer_add, 0, 0)
-
-        self.item_add = QuickItemAdd(self._controller, self._quick_add_container)
-        qa_grid.addWidget(self.item_add, 0, 1)
-
-        self.wild_pkmn_add = QuickWildPkmn(self._controller, self._quick_add_container)
-        qa_grid.addWidget(self.wild_pkmn_add, 0, 2)
-
-        self.misc_add = QuickMiscEvents(self._controller, self._quick_add_container)
-        qa_grid.addWidget(self.misc_add, 1, 2)
-
-        left_layout.addWidget(self._quick_add_container)
-
-        # ---- Filters and control buttons -----------------------------
-        self._filters_controls_container = QWidget()
-        fc_layout = QVBoxLayout(self._filters_controls_container)
-        fc_layout.setContentsMargins(0, 0, 0, 0)
-        fc_layout.setSpacing(2)
-
-        # Control buttons row
-        btn_grid = QGridLayout()
-        btn_grid.setSpacing(2)
-
-        self.show_summary_btn = SimpleButton("Run Summary")
-        self.show_summary_btn.clicked.connect(self.open_summary_window)
-        btn_grid.addWidget(self.show_summary_btn, 0, 0)
-
-        self.show_setup_summary_btn = SimpleButton("Setup Summary")
-        self.show_setup_summary_btn.clicked.connect(self.open_setup_summary_window)
-        btn_grid.addWidget(self.show_setup_summary_btn, 1, 0)
-
-        self.move_group_up_button = SimpleButton("Move Event Up")
-        self.move_group_up_button.clicked.connect(self.move_group_up)
-        btn_grid.addWidget(self.move_group_up_button, 0, 1)
-
-        self.move_group_down_button = SimpleButton("Move Event Down")
-        self.move_group_down_button.clicked.connect(self.move_group_down)
-        btn_grid.addWidget(self.move_group_down_button, 1, 1)
-
-        self.highlight_toggle_button = SimpleButton("Enable/Disable")
-        self.highlight_toggle_button.clicked.connect(self.toggle_enable_disable)
-        btn_grid.addWidget(self.highlight_toggle_button, 0, 2)
-
-        self.highlight_toggle_button2 = SimpleButton("Toggle Highlight")
-        self.highlight_toggle_button2.clicked.connect(self.toggle_event_highlight)
-        btn_grid.addWidget(self.highlight_toggle_button2, 1, 2)
-
-        self.transfer_event_button = SimpleButton("Transfer Event")
-        self.transfer_event_button.clicked.connect(self.open_transfer_event_window)
-        btn_grid.addWidget(self.transfer_event_button, 0, 3)
-
-        self.delete_event_button = SimpleButton("Delete Event")
-        self.delete_event_button.clicked.connect(self.delete_group)
-        btn_grid.addWidget(self.delete_event_button, 1, 3)
-
-        self.new_folder_button = SimpleButton("New Folder")
-        self.new_folder_button.clicked.connect(self.open_new_folder_window)
-        btn_grid.addWidget(self.new_folder_button, 0, 4)
-
-        self.rename_folder_button = SimpleButton("Rename Folder")
-        self.rename_folder_button.clicked.connect(self.rename_folder)
-        btn_grid.addWidget(self.rename_folder_button, 1, 4)
-
-        fc_layout.addLayout(btn_grid)
-
-        # Route search (filter checkboxes + search)
-        self.route_search = RouteSearch(self._controller, self._filters_controls_container)
-        fc_layout.addWidget(self.route_search)
-
-        # Place filters/controls spanning columns 0-1 in the quick-add grid
-        qa_grid = self._quick_add_container.layout()
-        qa_grid.addWidget(self._filters_controls_container, 1, 0, 1, 2)
-
-        left_layout.addWidget(self._quick_add_container)
+        # ---- Popover dialogs (created on first use) --------------------
+        self._add_events_dialog = None
+        self._filters_dialog = None
 
         # ---- Event list ----------------------------------------------
         event_list_frame = QWidget()
@@ -764,10 +648,7 @@ class MainWindow(QMainWindow):
         self.event_details.battle_summary_visible.connect(self._on_battle_summary_tab_changed)
 
     def _on_battle_summary_tab_changed(self, is_battle_summary: bool):
-        """Widen right panel for battle summary, shrink it back for pre-state."""
-        QTimer.singleShot(0, lambda: self._apply_splitter_ratio(is_battle_summary))
-
-    def _apply_splitter_ratio(self, is_battle_summary):
+        """Adjust splitter proportions when switching tabs."""
         total = self._splitter.width()
         if total <= 0:
             return
@@ -776,16 +657,12 @@ class MainWindow(QMainWindow):
             self._splitter.setStretchFactor(0, 1)
             self._splitter.setStretchFactor(1, 2)
             left = int(total * 0.30)
-            right = total - left
         else:
             self._splitter.setStretchFactor(0, 3)
             self._splitter.setStretchFactor(1, 1)
             left = int(total * 0.75)
-            right = total - left
 
-        self._quick_add_container.setVisible(not is_battle_summary)
-        self.message_label.setVisible(not is_battle_summary)
-        self._splitter.setSizes([left, right])
+        self._splitter.setSizes([left, total - left])
 
     # ------------------------------------------------------------------
     # Status bar
@@ -863,6 +740,10 @@ class MainWindow(QMainWindow):
         for i in range(1, 7):
             sc = QShortcut(QKeySequence(f"Ctrl+{i}"), self)
             sc.activated.connect(partial(self.select_elite_four_or_champion, i - 1))
+
+        # Add Events / Filters popovers
+        QShortcut(QKeySequence("Ctrl+F1"), self, self._toggle_add_events_dialog)
+        QShortcut(QKeySequence("Ctrl+F2"), self, self._toggle_filters_dialog)
 
         # Filter toggles (application-wide)
         def _app_shortcut(key_seq, slot):
@@ -944,6 +825,7 @@ class MainWindow(QMainWindow):
 
     def _show_route_controls(self):
         self._stacked.setCurrentIndex(2)
+        self.setFocus()
 
     # ------------------------------------------------------------------
     # Controller callback handlers
@@ -1004,12 +886,10 @@ class MainWindow(QMainWindow):
             self._apply_record_button_style(active=True)
             self._sb_client_status.setVisible(True)
             self._sb_reconnect_btn.setVisible(True)
-            self._quick_add_container.setVisible(False)
         else:
             self._apply_record_button_style(active=False)
             self._sb_client_status.setVisible(False)
             self._sb_reconnect_btn.setVisible(False)
-            self._quick_add_container.setVisible(True)
         self._handle_new_selection()
 
     def trainer_preview(self):
@@ -1029,44 +909,10 @@ class MainWindow(QMainWindow):
     def _handle_new_selection(self):
         all_event_ids = self._controller.get_all_selected_ids()
         if all_event_ids != self.event_list.get_all_selected_event_ids():
+            # Selection changed programmatically (not by user click) — sync
+            # the tree and scroll so the new selection is visible.
             self.event_list.set_all_selected_event_ids(all_event_ids)
-        self.event_list.scroll_to_selected_events()
-
-        all_event_ids = self.event_list.get_all_selected_event_ids(allow_event_items=False)
-        if len(all_event_ids) > 1 or len(all_event_ids) == 0:
-            event_group = None
-        else:
-            event_group = self._controller.get_event_by_id(all_event_ids[0])
-
-        disable_all = (
-            self._controller.is_record_mode_active()
-            or self._controller.get_raw_route().init_route_state is None
-        )
-
-        if not disable_all and isinstance(event_group, EventFolder):
-            self.rename_folder_button.enable()
-        else:
-            self.rename_folder_button.disable()
-
-        if not disable_all and (event_group is not None or len(all_event_ids) > 0):
-            self.delete_event_button.enable()
-            self.transfer_event_button.enable()
-            self.move_group_down_button.enable()
-            self.move_group_up_button.enable()
-            self.highlight_toggle_button.enable()
-        else:
-            self.delete_event_button.disable()
-            self.transfer_event_button.disable()
-            self.move_group_down_button.disable()
-            self.move_group_up_button.disable()
-            self.highlight_toggle_button.disable()
-
-        if not disable_all and (
-            event_group is not None or len(self.event_list.get_all_selected_event_ids()) == 0
-        ):
-            self.new_folder_button.enable()
-        else:
-            self.new_folder_button.disable()
+            self.event_list.scroll_to_selected_events()
 
     def update_run_status(self):
         if self._controller.has_errors():
@@ -1342,7 +1188,8 @@ class MainWindow(QMainWindow):
         else:
             self._controller.delete_events([all_ids[0]])
         self.event_list.refresh()
-        self.trainer_add.trainer_filter_callback()
+        if self._add_events_dialog is not None:
+            self._add_events_dialog.trainer_add.trainer_filter_callback()
 
     def open_transfer_event_window(self):
         all_ids = self.event_list.get_all_selected_event_ids(allow_event_items=False)
@@ -1405,6 +1252,29 @@ class MainWindow(QMainWindow):
 
     def scroll_to_bottom(self):
         self.event_list.scroll_to_bottom()
+
+    # ------------------------------------------------------------------
+    # Add Events / Filters popovers
+    # ------------------------------------------------------------------
+    def _toggle_add_events_dialog(self):
+        if self._add_events_dialog is not None and self._add_events_dialog.isVisible():
+            self._add_events_dialog.close()
+            return
+        if self._add_events_dialog is None:
+            from gui_qt.dialogs import AddEventsDialog
+            self._add_events_dialog = AddEventsDialog(self._controller, self)
+        self._add_events_dialog.show()
+        self._add_events_dialog.raise_()
+
+    def _toggle_filters_dialog(self):
+        if self._filters_dialog is not None and self._filters_dialog.isVisible():
+            self._filters_dialog.close()
+            return
+        if self._filters_dialog is None:
+            from gui_qt.dialogs import FiltersDialog
+            self._filters_dialog = FiltersDialog(self._controller, self)
+        self._filters_dialog.show()
+        self._filters_dialog.raise_()
 
     # ------------------------------------------------------------------
     # Summary windows
@@ -1545,11 +1415,18 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Filter toggles
     # ------------------------------------------------------------------
+    def _get_route_search(self):
+        """Return the RouteSearch widget from the filters dialog, creating it if needed."""
+        if self._filters_dialog is None:
+            from gui_qt.dialogs import FiltersDialog
+            self._filters_dialog = FiltersDialog(self._controller, self)
+        return self._filters_dialog.route_search
+
     def toggle_fight_trainer_filter(self):
         if self._text_field_has_focus:
             return
         try:
-            self.route_search.toggle_filter_by_type(const.TASK_TRAINER_BATTLE)
+            self._get_route_search().toggle_filter_by_type(const.TASK_TRAINER_BATTLE)
         except Exception as e:
             logger.error(f"Error toggling Fight Trainer filter: {e}")
 
@@ -1557,7 +1434,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self.route_search.toggle_filter_by_type(const.TASK_RARE_CANDY)
+            self._get_route_search().toggle_filter_by_type(const.TASK_RARE_CANDY)
         except Exception as e:
             logger.error(f"Error toggling Rare Candy filter: {e}")
 
@@ -1565,7 +1442,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self.route_search.toggle_filter_by_type(const.TASK_LEARN_MOVE_TM)
+            self._get_route_search().toggle_filter_by_type(const.TASK_LEARN_MOVE_TM)
         except Exception as e:
             logger.error(f"Error toggling TM/HM filter: {e}")
 
@@ -1573,7 +1450,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self.route_search.toggle_filter_by_type(const.TASK_VITAMIN)
+            self._get_route_search().toggle_filter_by_type(const.TASK_VITAMIN)
         except Exception as e:
             logger.error(f"Error toggling Vitamin filter: {e}")
 
@@ -1581,7 +1458,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self.route_search.toggle_filter_by_type(const.TASK_FIGHT_WILD_PKMN)
+            self._get_route_search().toggle_filter_by_type(const.TASK_FIGHT_WILD_PKMN)
         except Exception as e:
             logger.error(f"Error toggling Wild Pkmn filter: {e}")
 
@@ -1589,13 +1466,14 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            trainer_on = self.route_search.is_filter_checked(const.TASK_TRAINER_BATTLE)
-            candy_on = self.route_search.is_filter_checked(const.TASK_RARE_CANDY)
-            vitamin_on = self.route_search.is_filter_checked(const.TASK_VITAMIN)
+            rs = self._get_route_search()
+            trainer_on = rs.is_filter_checked(const.TASK_TRAINER_BATTLE)
+            candy_on = rs.is_filter_checked(const.TASK_RARE_CANDY)
+            vitamin_on = rs.is_filter_checked(const.TASK_VITAMIN)
             new_state = not (trainer_on and candy_on and vitamin_on)
-            self.route_search.set_filter_by_type(const.TASK_TRAINER_BATTLE, new_state)
-            self.route_search.set_filter_by_type(const.TASK_RARE_CANDY, new_state)
-            self.route_search.set_filter_by_type(const.TASK_VITAMIN, new_state)
+            rs.set_filter_by_type(const.TASK_TRAINER_BATTLE, new_state)
+            rs.set_filter_by_type(const.TASK_RARE_CANDY, new_state)
+            rs.set_filter_by_type(const.TASK_VITAMIN, new_state)
         except Exception as e:
             logger.error(f"Error toggling common filters: {e}")
 
@@ -1603,7 +1481,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self.route_search.reset_all_filters()
+            self._get_route_search().reset_all_filters()
         except Exception as e:
             logger.error(f"Error resetting filters: {e}")
 
@@ -1676,6 +1554,8 @@ class MainWindow(QMainWindow):
         new_val = not config.get_test_moves_enabled()
         config.set_test_moves_enabled(new_val)
         self._act_test_moves.setChecked(new_val)
+        if hasattr(self, 'event_details') and hasattr(self.event_details, '_battle_summary_controller'):
+            self.event_details._battle_summary_controller._on_refresh()
 
     def _toggle_highlight_branched_mandatory(self):
         new_val = self._act_highlight_branched.isChecked()

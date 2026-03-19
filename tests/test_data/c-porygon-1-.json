@@ -1,0 +1,390 @@
+{
+    "name": "Charizard",
+    "dv": {
+        "hp": 15,
+        "attack": 15,
+        "defense": 13,
+        "speed": 15,
+        "special_attack": 15,
+        "special_defense": 15
+    },
+    "ability": 0,
+    "nature": 0,
+    "Version": "Crystal",
+    "Learn Levelup Move": [
+        {
+            "LearnMove": "Scratch",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 1,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Growl",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 1,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Ember",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 1,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Smokescreen",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 1,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Ember",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 7,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Smokescreen",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 13,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Rage",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 20,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Scary Face",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 27,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Flamethrower",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 34,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Wing Attack",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 36,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Slash",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 44,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Dragon Rage",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 54,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Fire Spin",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 64,
+            "species_when_learned": "Charizard"
+        },
+        {
+            "LearnMove": "Conversion",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 5,
+            "species_when_learned": "Charizard"
+        }
+    ],
+    "events": [
+        {
+            "Event Folder Name": "ROOT",
+            "Just Notes": "",
+            "events": [
+                {
+                    "Event Folder Name": "NEW BARK Map 7",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Berry",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Hold Item": [
+                                "Berry",
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Potion",
+                                1,
+                                true,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "CHERRYGROVE Map 3",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Mystery Egg",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Antidote",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Berry",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "Rival1 1 Chikorita",
+                                "second_trainer_name": "",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": [
+                                    1,
+                                    0
+                                ]
+                            }
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "NEW BARK Map 3",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Mystery Egg",
+                                1,
+                                false,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Poke Ball",
+                                5,
+                                true,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "CHERRYGROVE Map 3: Trip 2",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "Youngster Mikey",
+                                "second_trainer_name": "",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": [
+                                    1,
+                                    2,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "Bug Catcher Don",
+                                "second_trainer_name": "",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": [
+                                    1,
+                                    2,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Potion",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Bitter Berry",
+                                1,
+                                true,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "VIOLET Map 11",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "PkmnCenter Heal": [
+                                "VIOLET"
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Game Save": [
+                                "VIOLET"
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "Bird Keeper Abe",
+                                "second_trainer_name": "",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": [
+                                    1,
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Hold Item": [
+                                null,
+                                true
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "PkmnCenter Heal": [
+                                "VIOLET"
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "Bird Keeper Rod",
+                                "second_trainer_name": "",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": []
+                            }
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                }
+            ],
+            "Expanded": true,
+            "Enabled": true
+        }
+    ]
+}
