@@ -273,13 +273,7 @@ class NewRoutePage(QWidget):
                     recorder = "Unknown"
 
             item = QTreeWidgetItem([game_name, gen, platform, recorder])
-            hex_color = const.VERSION_COLORS.get(game_name)
-            if hex_color:
-                bg = QColor(hex_color)
-                item.setBackground(0, QBrush(bg))
-                # Use white text on dark backgrounds, black on light
-                lum = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
-                item.setForeground(0, QBrush(QColor("black") if lum > 128 else QColor("white")))
+            # Version colors removed for cleaner appearance
             self.game_treeview.addTopLevelItem(item)
 
     # ------------------------------------------------------------------
@@ -433,6 +427,8 @@ class NewRoutePage(QWidget):
             self._pkmn_list_cache[cache_key] = pkmn_list
 
         self.solo_selector.new_values(pkmn_list)
+        # Signals are blocked during new_values, so explicitly update the DV/ability frame
+        self._pkmn_selector_callback()
 
     def _pkmn_selector_callback(self):
         if not self._selected_game or not self._selected_gen_obj:

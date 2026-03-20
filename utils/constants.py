@@ -452,27 +452,27 @@ class Constants:
         ]
         # not configurable, just for the version indicator
         self.VERSION_COLORS = {
-            self.RED_VERSION: "#ff1111",
-            self.BLUE_VERSION: "#1111ff",
-            self.YELLOW_VERSION: "#ffd733",
+            self.RED_VERSION: "#b34444",
+            self.BLUE_VERSION: "#4444a8",
+            self.YELLOW_VERSION: "#b8a040",
 
-            self.GOLD_VERSION: "#daa520",
-            self.SILVER_VERSION: "#c0c0c0",
-            self.CRYSTAL_VERSION: "#4FFFFF",
+            self.GOLD_VERSION: "#a8842a",
+            self.SILVER_VERSION: "#909898",
+            self.CRYSTAL_VERSION: "#50a8b0",
 
-            self.RUBY_VERSION: "#a00000",
-            self.SAPPHIRE_VERSION: "#0000a0",
-            self.EMERALD_VERSION: "#00a000",
+            self.RUBY_VERSION: "#904040",
+            self.SAPPHIRE_VERSION: "#404890",
+            self.EMERALD_VERSION: "#408040",
 
-            self.FIRE_RED_VERSION: "#ff7327",
-            self.LEAF_GREEN_VERSION: "#00dd00",
+            self.FIRE_RED_VERSION: "#b06838",
+            self.LEAF_GREEN_VERSION: "#48904a",
 
-            self.DIAMOND_VERSION: "#90beed",
-            self.PEARL_VERSION: "#e9aacc",
-            self.PLATINUM_VERSION: "#a0a08d",
+            self.DIAMOND_VERSION: "#7090a8",
+            self.PEARL_VERSION: "#a08898",
+            self.PLATINUM_VERSION: "#808078",
 
-            self.HEART_GOLD_VERSION: "#e8b502",
-            self.SOUL_SILVER_VERSION: "#c8d2e0",
+            self.HEART_GOLD_VERSION: "#a89030",
+            self.SOUL_SILVER_VERSION: "#8898a0",
         }
 
         self.NO_SAVED_ROUTES = "No Saved Routes"

@@ -384,9 +384,9 @@ class Config:
     def get_highlight_color(self, idx):
         colors = getattr(self, '_highlight_colors', {})
         defaults = {
-            1: "#5a3a7a", 2: "#8b4513", 3: "#1e4a72",
-            4: "#2d5a3d", 5: "#8b1a1a", 6: "#4a4a00",
-            7: "#006060", 8: "#4a2060", 9: "#605030",
+            1: "#903858", 2: "#388038", 3: "#887828",
+            4: "#983030", 5: "#787878", 6: "#5028a0",
+            7: "#c83838", 8: "#389080", 9: "#606060",
         }
         return colors.get(idx, defaults.get(idx, "#444444"))
 
@@ -398,13 +398,13 @@ class Config:
 
     # --- Fight category colors ---
     FIGHT_CATEGORY_COLOR_DEFAULTS = {
-        "rival": "#121299",
-        "gym_leader": "#828427",
-        "elite_four": "#5a3f82",
-        "champion": "#1d6464",
-        "post_game": "#327032",
-        "boss": "#8c3f3f",
-        "team_leader": "#7d4d7d",
+        "rival": "#2848a0",
+        "gym_leader": "#909090",
+        "elite_four": "#7030a0",
+        "champion": "#383838",
+        "post_game": "#30a030",
+        "boss": "#808080",
+        "team_leader": "#702060",
     }
 
     def get_fight_category_color(self, category):

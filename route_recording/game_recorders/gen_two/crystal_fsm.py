@@ -223,10 +223,10 @@ class Machine:
                 found_evolutions = []
                 for test_mon in gained_mons:
                     if test_mon.get_dvs() == self._solo_mon_key.get_dvs():
-                        cur_mon_obj = current_gen_info().pkmn_db().get_pkmn(test_mon[0])
+                        cur_mon_obj = current_gen_info().pkmn_db().get_pkmn(test_mon.species)
                         if not cur_mon_obj is None and cur_mon_obj.name == self._solo_mon_key.species:
                             found_matches.append(test_mon)
-                        elif self._controller._controller.can_evolve_into(test_mon[0]):
+                        elif self._controller._controller.can_evolve_into(test_mon.species):
                             found_evolutions.append(test_mon)
                 
                 if len(found_matches) >= 1:

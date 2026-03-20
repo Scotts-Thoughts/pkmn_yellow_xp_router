@@ -2,12 +2,15 @@ from typing import List
 from dataclasses import dataclass
 import logging
 
+import os
+from datetime import datetime
+
 from PySide6.QtWidgets import (
     QWidget, QLabel, QGridLayout, QVBoxLayout, QHBoxLayout,
     QScrollArea, QSizePolicy, QFrame, QPushButton,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QPixmap, QShortcut
 
 from controllers.main_controller import MainController
 from pkmn.gen_factory import current_gen_info
@@ -196,10 +199,32 @@ class RouteSummaryPanel(QWidget):
     # Screenshot
     # ------------------------------------------------------------------
     def _export_screen_shot(self):
-        pos = self._scroll_area.mapToGlobal(self._scroll_area.rect().topLeft())
-        size = self._scroll_area.size()
-        bbox = (pos.x(), pos.y(), pos.x() + size.width(), pos.y() + size.height())
-        self._controller.take_screenshot("run_summary", bbox)
+        # Render the content widget to a QPixmap with transparent background
+        saved_content_ss = self._content_widget.styleSheet()
+        saved_scroll_ss = self._scroll_area.styleSheet()
+        self._content_widget.setStyleSheet("background: transparent;")
+        self._scroll_area.setStyleSheet("background: transparent;")
+
+        pixmap = QPixmap(self._content_widget.size())
+        pixmap.fill(Qt.transparent)
+        self._content_widget.render(pixmap)
+
+        self._content_widget.setStyleSheet(saved_content_ss)
+        self._scroll_area.setStyleSheet(saved_scroll_ss)
+
+        # Save the pixmap
+        date_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
+        save_dir = config.get_images_dir()
+        from utils.io_utils import get_safe_path_no_collision
+        route_name = self._controller.get_current_route_name()
+        out_path = get_safe_path_no_collision(
+            save_dir,
+            f"{date_prefix}-{route_name}_run_summary",
+            ext=".png",
+        )
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        pixmap.save(out_path)
+        self._controller.send_message(f"Saved screenshot to: {out_path}")
 
     # ------------------------------------------------------------------
     # Helpers for building styled cells

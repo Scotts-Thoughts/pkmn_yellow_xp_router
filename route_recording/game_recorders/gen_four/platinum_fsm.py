@@ -9,12 +9,23 @@ from pkmn.universal_data_objects import PokemonSpecies
 import route_recording.recorder
 from route_recording.gamehook_client import GameHookProperty
 from routing.route_events import EventDefinition, EvolutionEventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, RareCandyEventDefinition, SaveEventDefinition, VitaminEventDefinition
-from route_recording.game_recorders.gen_three.emerald_gamehook_constants import GameHookConstantConverter, gh_gen_three_const
+from route_recording.game_recorders.gen_four.platinum_gamehook_constants import GameHookConstantConverter, gh_gen_four_const
 from utils.constants import const
 from utils.config_manager import config
 from pkmn.gen_factory import current_gen_info
 
 logger = logging.getLogger(__name__)
+
+GOLDENROD_LOTTERY_MAP = "Goldenrod City - Map 12"
+GOLDENROD_LOTTERY_PRICE = 300
+GOLDENROD_LOTTERY_ITEMS = frozenset([
+    "Dragon Claw", "Shadow Claw", "Flash Cannon", "Charge Beam",
+    "Drain Punch", "Facade", "Silver Wind",
+    "Luxury Ball", "Nest Ball", "Repeat Ball", "Net Ball",
+    "Quick Ball", "Dusk Ball", "Timer Ball",
+    "Persim Berry", "Cheri Berry", "Chesto Berry", "Pecha Berry",
+    "Rawst Berry", "Aspear Berry", "Oran Berry",
+])
 
 
 class StateType(Enum):
@@ -82,9 +93,9 @@ class _MonKey:
 
 
 class Machine:
-    def __init__(self, controller:route_recording.recorder.RecorderController, gamehook_client:route_recording.recorder.RecorderGameHookClient, gh_converter:GameHookConstantConverter, is_frlg=False):
+    def __init__(self, controller:route_recording.recorder.RecorderController, gamehook_client:route_recording.recorder.RecorderGameHookClient, gh_converter:GameHookConstantConverter, is_hgss=False):
         self._controller = controller
-        self.is_frlg = is_frlg
+        self.is_hgss = is_hgss
         self._gamehook_client = gamehook_client
         self.gh_converter = gh_converter
         self.debug_mode = config.is_debug_mode()
@@ -96,6 +107,22 @@ class Machine:
         self._cached_items = {}
         self._cached_moves = [None, None, None, None]
         self._cached_money = 0
+        self._cached_evs = {}  # Cache EVs from overworld to detect vitamin usage
+
+        # Blackout detection flags and cached Pokemon (passed from BattleState to OverworldState)
+        self._potential_blackout_flag = False
+        self._blackout_cached_first_mon_species = ""
+        self._blackout_cached_first_mon_level = 0
+        self._blackout_cached_second_mon_species = ""
+        self._blackout_cached_second_mon_level = 0
+        self._blackout_defeated_trainer_mons = []
+        self._blackout_trainer_name = ""
+        self._blackout_initial_map = None
+
+        # Track evolution for delayed move checking
+        self._pending_evolution_level_check = None
+        self._pre_evolution_moves = None  # Cache moves before evolution to detect learned moves (set)
+        self._pre_evolution_move_list = None  # Cache moves before evolution to detect learned moves (list)
 
         self._cur_state:State = None
         self._registered_states:Dict[StateType, State] = {}
@@ -122,16 +149,16 @@ class Machine:
 
     def _get_mon_key(self, mon_idx) -> _MonKey:
         species_val = self.gh_converter.pkmn_name_convert(
-            self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_PLAYER_TEAM_SPECIES[mon_idx]).value
+            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_SPECIES[mon_idx]).value
         )
         return _MonKey(
             species_val,
-            self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_PLAYER_TEAM_IV_ATTACK[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_PLAYER_TEAM_IV_DEFENSE[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_PLAYER_TEAM_IV_SPEED[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_ATTACK[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_DEFENSE[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_PLAYER_TEAM_LEVEL[mon_idx]).value,
+            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_IV_ATTACK[mon_idx]).value,
+            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_IV_DEFENSE[mon_idx]).value,
+            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_IV_SPEED[mon_idx]).value,
+            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_ATTACK[mon_idx]).value,
+            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_DEFENSE[mon_idx]).value,
+            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_LEVEL[mon_idx]).value,
         )
 
     def _load_level_up_moves(self):
@@ -255,6 +282,22 @@ class Machine:
             else:
                 self._move_cache_update(generate_events=False)
         
+        # Check for moves learned during evolution if we're in overworld
+        # This handles the case where evolution happens while already in overworld
+        # (in which case _on_enter won't be called again)
+        # Only check if we're generating events (to avoid duplicate checks in _on_enter)
+        if self._pending_evolution_level_check is not None and generate_events:
+            cur_state_type = self._controller.get_game_state()
+            if cur_state_type == StateType.OVERWORLD:
+                # Update move cache to get accurate post-evolution moves
+                self._move_cache_update(generate_events=False)
+                # Now check level-up moves with accurate move data
+                pre_moves = self._pre_evolution_moves if self._pre_evolution_moves is not None else set()
+                self._solo_mon_levelup(self._pending_evolution_level_check, pre_evolution_moves=pre_moves)
+                self._pending_evolution_level_check = None
+                self._pre_evolution_moves = None
+                self._pre_evolution_move_list = None
+        
         logger.info(f"after team cache update, valid_solo_mon: {self.valid_solo_mon}")
         self._cached_team = new_cache
     
@@ -264,41 +307,82 @@ class Machine:
         self._item_cache_update(generate_events=False)
         self._money_cache_update()
         self._controller.entered_new_area(
-            f"{self._gamehook_client.get(gh_gen_three_const.KEY_OVERWORLD_MAP).value}"
+            f"{self._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value}"
         )
     
-    def _solo_mon_levelup(self, new_level):
+    def _solo_mon_levelup(self, new_level, pre_evolution_moves=None):
         logger.info(f"levelup detected. {self._solo_mon_key.species} leveling up to {new_level}")
+        # Get current moves to check if any level-up moves were actually taught
+        current_moves = set([x for x in self._cached_moves if x is not None])
+        pre_moves = pre_evolution_moves if pre_evolution_moves is not None else set()
+        
+        # Also get the actual move lists (not just sets) to determine slot placement
+        # Pre-evolution move list - reconstruct from cached moves at evolution time
+        # For now, we'll use None for pre_move_list if not provided, and detect slot from current
+        current_move_list = [x for x in self._cached_moves]
+        
         for move_name in self._level_up_moves.get((self._solo_mon_key.species, new_level), []):
-            logger.info(f"queueing up ignore event of move: {move_name}")
-            self._queue_new_event(
-                EventDefinition(learn_move=LearnMoveEventDefinition(move_name, None, const.MOVE_SOURCE_LEVELUP, level=new_level, mon=self._solo_mon_key.species))
-            )
+            if move_name in current_moves:
+                # Move is in current moves - check if it was newly learned during evolution
+                if move_name not in pre_moves:
+                    # Move was learned during evolution - create a learn event
+                    logger.info(f"move {move_name} was learned during evolution/level-up, creating learn event")
+                    # Find which move was replaced by comparing pre and post evolution move lists
+                    replaced_move = None
+                    if hasattr(self, '_pre_evolution_move_list') and self._pre_evolution_move_list:
+                        pre_move_list = self._pre_evolution_move_list
+                        # Find moves that were in pre-evolution but not in post-evolution at the same slot
+                        for idx in range(4):
+                            if idx < len(pre_move_list) and idx < len(current_move_list):
+                                pre_move = pre_move_list[idx]
+                                post_move = current_move_list[idx]
+                                if pre_move != post_move and post_move == move_name:
+                                    # This slot changed from pre_move to move_name (Crunch)
+                                    replaced_move = pre_move
+                                    break
+                    self._queue_new_event(
+                        EventDefinition(learn_move=LearnMoveEventDefinition(move_name, replaced_move, const.MOVE_SOURCE_LEVELUP, level=new_level, mon=self._solo_mon_key.species))
+                    )
+                else:
+                    # Move was already learned before evolution, skip
+                    logger.info(f"move {move_name} was already learned before evolution, skipping")
+            else:
+                # Move is not in current moves - create ignore event
+                logger.info(f"queueing up ignore event of move: {move_name}")
+                self._queue_new_event(
+                    EventDefinition(learn_move=LearnMoveEventDefinition(move_name, None, const.MOVE_SOURCE_LEVELUP, level=new_level, mon=self._solo_mon_key.species))
+                )
     
     def _trigger_evolution(self, new_mon_key:_MonKey):
         logger.info(f"Evolving into: {new_mon_key.species}")
+        # Capture moves before evolution to detect newly learned moves (both set and list for comparison)
+        self._pre_evolution_moves = set([x for x in self._cached_moves if x is not None])
+        self._pre_evolution_move_list = [x for x in self._cached_moves]  # Keep the full list to determine replacements
         self._solo_mon_key = new_mon_key
         self._load_level_up_moves()
+        # Don't check moves here - party data may not be updated yet
+        # Instead, flag that we need to check moves when returning to overworld
+        self._pending_evolution_level_check = new_mon_key.level
         self._queue_new_event(
             EventDefinition(evolution=EvolutionEventDefinition(new_mon_key.species))
         )
-        self._solo_mon_levelup(new_mon_key.level)
+        # Don't call _solo_mon_levelup here - moves will be checked when entering overworld
     
     def _money_cache_update(self):
-        new_cache = self._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MONEY).value
+        new_cache = self._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MONEY).value
         if new_cache == self._cached_money:
             return None
         
-        result = new_cache > self._cached_money
+        money_change = new_cache - self._cached_money
         self._cached_money = new_cache
-        return result
+        return money_change
     
     def _move_cache_update(self, generate_events=True, tm_name=None, hm_expected=False, tutor_expected=False, levelup_source=False):
         new_cache = []
-        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MON_MOVE_1).value))
-        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MON_MOVE_2).value))
-        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MON_MOVE_3).value))
-        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MON_MOVE_4).value))
+        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_MOVE_1).value))
+        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_MOVE_2).value))
+        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_MOVE_3).value))
+        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_MOVE_4).value))
 
         if generate_events:
             old_moves = set([x for x in self._cached_moves if x is not None])
@@ -333,7 +417,7 @@ class Machine:
             elif to_learn_move is not None:
                 if levelup_source:
                     source = const.MOVE_SOURCE_LEVELUP
-                    level = self._gamehook_client.get(gh_gen_three_const.KEY_PLAYER_MON_LEVEL).value
+                    level = self._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_LEVEL).value
                     mon = self._solo_mon_key.species
                 elif tutor_expected:
                     source = const.MOVE_SOURCE_TUTOR
@@ -366,29 +450,34 @@ class Machine:
         result = {}
 
         # start with the normal pocket
-        for i in range(len(gh_gen_three_const.ALL_KEYS_ITEM_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_ITEM_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_ITEM_QUANTITY[i]).value
+        for i in range(len(gh_gen_four_const.ALL_KEYS_ITEM_TYPE)):
+            item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_ITEM_TYPE[i]).value
+            result[item_type] = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_ITEM_QUANTITY[i]).value
+        
+        # load the medicine pocket
+        for i in range(len(gh_gen_four_const.ALL_KEYS_MEDICINE_TYPE)):
+            item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_MEDICINE_TYPE[i]).value
+            result[item_type] = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_MEDICINE_QUANTITY[i]).value
         
         # load the ball pocket
-        for i in range(len(gh_gen_three_const.ALL_KEYS_BALL_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_BALL_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_BALL_QUANTITY[i]).value
+        for i in range(len(gh_gen_four_const.ALL_KEYS_BALL_TYPE)):
+            item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_BALL_TYPE[i]).value
+            result[item_type] = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_BALL_QUANTITY[i]).value
         
         # load the berries pocket
-        for i in range(len(gh_gen_three_const.ALL_KEYS_BERRY_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_BERRY_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_BERRY_QUANTITY[i]).value
+        for i in range(len(gh_gen_four_const.ALL_KEYS_BERRY_TYPE)):
+            item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_BERRY_TYPE[i]).value
+            result[item_type] = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_BERRY_QUANTITY[i]).value
 
         # load the key items pocket
-        for i in range(len(gh_gen_three_const.ALL_KEYS_KEY_ITEMS)):
-            item_type = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_KEY_ITEMS[i]).value
-            result[item_type] = 1
+        # for i in range(len(gh_gen_four_const.ALL_KEYS_KEY_ITEMS)):
+        #     item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_KEY_ITEMS[i]).value
+        #     result[item_type] = 1
 
         # load the tms pocket
-        for i in range(len(gh_gen_three_const.ALL_KEYS_TMHM_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_TMHM_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_three_const.ALL_KEYS_TMHM_QUANTITY[i]).value
+        for i in range(len(gh_gen_four_const.ALL_KEYS_TMHM_TYPE)):
+            item_type = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_TMHM_TYPE[i]).value
+            result[item_type] = self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_TMHM_QUANTITY[i]).value
 
         return result
 
@@ -397,6 +486,7 @@ class Machine:
             generate_events=True,
             purchase_expected=False,
             sale_expected=False,
+            money_change_amount=None,
             vitamin_flag=False,
             candy_flag=False,
             tm_flag=False,
@@ -404,6 +494,7 @@ class Machine:
         ):
         new_cache = self._get_item_cache()
         old_cache = self._cached_items
+        logger.info(f"_item_cache_update: old_cache = {old_cache}, new_cache = {new_cache}")
         self._cached_items = new_cache
 
         if not generate_events:
@@ -431,9 +522,20 @@ class Machine:
                 gained_items[new_item] = new_count - cur_count
             elif cur_count > new_count:
                 lost_items[new_item] = cur_count - new_count
+        
+        logger.info(f"_item_cache_update: gained_items = {gained_items}, lost_items = {lost_items}")
 
         if len(gained_items) > 0 and sale_expected:
             logger.error(f"Gained the following items when expecting to be losing items to selling... {gained_items}")
+
+        # Check if there's a qualifying ball purchase (10+ Poke/Great/Ultra Balls) that would grant a free Premier Ball
+        free_premier_ball_eligible = False
+        if purchase_expected and not held_item_changed:
+            for cur_gained_item, cur_gain_num in gained_items.items():
+                app_item_name = self.gh_converter.item_name_convert(cur_gained_item)
+                if cur_gain_num >= 10 and app_item_name in ["Poke Ball", "Great Ball", "Ultra Ball"]:
+                    free_premier_ball_eligible = True
+                    break
 
         if not held_item_changed:
             for cur_gained_item, cur_gain_num in gained_items.items():
@@ -443,18 +545,90 @@ class Machine:
                     logger.error(f"#" * 50)
                     logger.error(f"Ignoring attempt to gain the above item, due to excessive number. Assuming this is happening due to DMA issues")
                     continue
+                
+                # Skip creating purchase event for Premier Ball if it's eligible as a free ball
+                if app_item_name == "Premier Ball" and free_premier_ball_eligible and purchase_expected:
+                    logger.info(f"Skipping purchase event for Premier Ball (will be added as free acquire)")
+                    continue
+
+                # Check if this is a lottery desk purchase in Goldenrod City
+                custom_price = None
+                if purchase_expected:
+                    current_map = self._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
+                    if current_map == GOLDENROD_LOTTERY_MAP:
+                        # For TMs, check by move name (e.g. "Dragon Claw") since they come through as "TM02" etc.
+                        item_match_name = app_item_name
+                        if app_item_name.startswith("TM") or app_item_name.startswith("HM"):
+                            item_obj = current_gen_info().item_db().get_item(app_item_name)
+                            if item_obj is None:
+                                for test_name in current_gen_info().item_db().get_filtered_names(item_type=const.ITEM_TYPE_TM):
+                                    if test_name.startswith(app_item_name):
+                                        item_obj = current_gen_info().item_db().get_item(test_name)
+                                        break
+                            if item_obj is not None and item_obj.move_name is not None:
+                                item_match_name = item_obj.move_name
+                        if item_match_name in GOLDENROD_LOTTERY_ITEMS:
+                            custom_price = GOLDENROD_LOTTERY_PRICE
+                            logger.info(f"Lottery desk purchase detected: {app_item_name} at ${GOLDENROD_LOTTERY_PRICE}")
+
                 self._queue_new_event(
                     EventDefinition(
-                        item_event_def=InventoryEventDefinition(app_item_name, cur_gain_num, True, purchase_expected)
+                        item_event_def=InventoryEventDefinition(app_item_name, cur_gain_num, True, purchase_expected, custom_price=custom_price)
                     )
                 )
-                
+                # If purchasing Pokeballs, Greatballs, or Ultraballs in quantities of 10 or greater, then add a free Premier Ball as an acquire event (not a purchase)
+                # add a free Premier Ball as an acquire event (not a purchase)
+                if purchase_expected and cur_gain_num >= 10:
+                    if app_item_name in ["Poke Ball", "Great Ball", "Ultra Ball"]:
+                        logger.info(f"Adding free Premier Ball for purchasing {cur_gain_num} {app_item_name}")
+                        self._queue_new_event(
+                            EventDefinition(
+                                item_event_def=InventoryEventDefinition("Premier Ball", 1, True, False)
+                            )
+                        )
+                        
         if len(lost_items) > 0:
             if purchase_expected:
                 logger.error(f"Lost the following items when expecting to be gain items to purchasing... {lost_items}")
         if len(lost_items) > 1:
             if held_item_changed:
                 logger.error(f"Lost multiple items when trying to change the held item... {lost_items}")
+
+        # If sale_expected is True, validate that the money change matches the expected sell price
+        # This prevents incorrectly recording use/drop as sales when money is tracked incorrectly
+        actual_is_sale = sale_expected
+        if sale_expected and money_change_amount is not None and len(lost_items) > 0:
+            expected_money_from_sale = 0
+            for cur_lost_item, cur_lost_num in lost_items.items():
+                app_item_name = self.gh_converter.item_name_convert(cur_lost_item)
+                # Skip validation for vitamins, rare candy, and TMs as they're handled separately
+                if vitamin_flag and self.gh_converter.is_game_vitamin(cur_lost_item):
+                    continue
+                if candy_flag and self.gh_converter.is_game_rare_candy(cur_lost_item):
+                    continue
+                if tm_flag and self.gh_converter.is_game_tm(cur_lost_item):
+                    continue
+                if held_item_changed:
+                    continue
+                
+                # Get item from database to check sell price
+                item = current_gen_info().item_db().get_item(app_item_name)
+                if item is None:
+                    # Try to find TM/HM if it's a TM/HM
+                    for test_tm_hm_name in current_gen_info().item_db().get_filtered_names(item_type=const.ITEM_TYPE_TM):
+                        if test_tm_hm_name.startswith(app_item_name):
+                            item = current_gen_info().item_db().get_item(test_tm_hm_name)
+                            break
+                
+                if item is not None:
+                    expected_money_from_sale += item.sell_price * cur_lost_num
+                else:
+                    logger.warning(f"Could not find item {app_item_name} in database for sale validation")
+            
+            # Only treat as sale if money change matches expected sell price
+            if expected_money_from_sale > 0 and money_change_amount != expected_money_from_sale:
+                logger.warning(f"Money change ({money_change_amount}) does not match expected sell price ({expected_money_from_sale}) for lost items. Treating as use/drop instead of sale.")
+                actual_is_sale = False
 
         for cur_lost_item, cur_lost_num in lost_items.items():
             app_item_name = self.gh_converter.item_name_convert(cur_lost_item)
@@ -494,7 +668,7 @@ class Machine:
             else:
                 self._queue_new_event(
                     EventDefinition(
-                        item_event_def=InventoryEventDefinition(app_item_name, cur_lost_num, False, sale_expected)
+                        item_event_def=InventoryEventDefinition(app_item_name, cur_lost_num, False, actual_is_sale)
                     )
                 )
 
@@ -515,7 +689,7 @@ class Machine:
     def handle_event(self, new_prop:GameHookProperty, prev_prop:GameHookProperty):
         if (
             self.debug_mode and
-            new_prop.path != gh_gen_three_const.KEY_GAMETIME_SECONDS and
+            new_prop.path != gh_gen_four_const.KEY_GAMETIME_SECONDS and
             'audio' not in new_prop.path
         ):
             logger.info(f"Change of {new_prop.path} from {prev_prop.value} to {new_prop.value} for state {self._cur_state.state_type}")
@@ -549,12 +723,13 @@ class Machine:
             if len(self._events_to_generate) != 0:
                 cur_event = self._events_to_generate.pop(0)
                 try:
-                    if cur_event.notes == gh_gen_three_const.RESET_FLAG:
+                    if cur_event.notes == gh_gen_four_const.RESET_FLAG:
                         logger.info(f"Resetting to last save...")
                         self._controller.game_reset()
                         continue
                     elif None is not cur_event.trainer_def:
                         trainer_id = int(cur_event.trainer_def.trainer_name)
+                        logger.info(f"[BLACKOUT DEBUG] Processing trainer event with ID: {trainer_id}, notes: {cur_event.notes}")
                         trainer = current_gen_info().trainer_db().get_trainer_by_id(trainer_id)
                         if trainer is None:
                             msg = f"Failed to find trainer from GameHook: ({type(trainer_id)}) {trainer_id}"
@@ -563,7 +738,10 @@ class Machine:
                                 EventDefinition(notes=const.RECORDING_ERROR_FRAGMENT + msg)
                             )
                             continue
+                        trainer_name_before = cur_event.trainer_def.trainer_name
                         cur_event.trainer_def.trainer_name = trainer.name
+                        logger.info(f"[BLACKOUT DEBUG] Converted trainer ID {trainer_id} ({trainer_name_before}) to name: {trainer.name}")
+                        second_trainer = None
                         if cur_event.trainer_def.second_trainer_name:
                             second_trainer_id = int(cur_event.trainer_def.second_trainer_name)
                             second_trainer = current_gen_info().trainer_db().get_trainer_by_id(second_trainer_id)
@@ -575,39 +753,51 @@ class Machine:
                                 )
                                 continue
                             cur_event.trainer_def.second_trainer_name = second_trainer.name
-                        if cur_event.notes == gh_gen_three_const.TRAINER_LOSS_FLAG:
-                            logger.info(f"Handling trainer loss: {cur_event.trainer_def.trainer_name}")
-                            self._controller.lost_trainer_battle(cur_event.trainer_def.trainer_name)
+                        if cur_event.notes == gh_gen_four_const.TRAINER_LOSS_FLAG:
+                            # Trainer name has already been converted above
+                            trainer_name = cur_event.trainer_def.trainer_name
+                            logger.info(f"[BLACKOUT DEBUG] Processing TRAINER_LOSS_FLAG event for trainer: {trainer_name}")
+                            self._controller.lost_trainer_battle(trainer_name)
                             continue
-                        elif cur_event.notes == gh_gen_three_const.ROAR_FLAG:
+                        elif cur_event.notes == gh_gen_four_const.ROAR_FLAG:
+                            logger.info(f"[BLACKOUT DEBUG] Processing ROAR_FLAG event for trainer: {cur_event.trainer_def.trainer_name}")
                             logger.info(f"Updating full trainer event: {cur_event}")
                             logger.info(f"Updating split exp for trainer {cur_event.trainer_def.trainer_name} to {cur_event.trainer_def.exp_split}")
 
                             test_obj = self._controller._controller.get_previous_event()
+                            logger.info(f"[BLACKOUT DEBUG] ROAR_FLAG: Starting search from last event: {test_obj}")
+                            search_count = 0
                             while not self._controller.is_trainer_event(test_obj, cur_event.trainer_def.trainer_name):
                                 if test_obj is None:
+                                    logger.info(f"[BLACKOUT DEBUG] ROAR_FLAG: Reached None while searching (searched {search_count} events)")
                                     break
                                 test_obj = self._controller._controller.get_previous_event(test_obj.group_id)
+                                search_count += 1
+                                if search_count > 20:  # Safety limit
+                                    logger.error(f"[BLACKOUT DEBUG] ROAR_FLAG: Search limit reached")
+                                    break
                             
                             if test_obj is None:
-                                logger.error(f"Failed to find trainer fight to update for exp split behavior")
+                                logger.error(f"[BLACKOUT DEBUG] ROAR_FLAG: Failed to find trainer fight to update for exp split behavior")
+                                logger.error(f"[BLACKOUT DEBUG] ROAR_FLAG: Searched {search_count} events for trainer: {cur_event.trainer_def.trainer_name}")
                             else:
                                 cur_event.notes = ""
                                 expected_money = trainer.money
                                 logger.info(f"held item: {test_obj.final_state.solo_pkmn.held_item}")
                                 if test_obj.final_state.solo_pkmn.held_item == const.AMULET_COIN_ITEM_NAME:
                                     expected_money *= 2
+                                # Account for second trainer's money in multi-battles
+                                if second_trainer is not None:
+                                    second_trainer_money = second_trainer.money
+                                    if test_obj.final_state.solo_pkmn.held_item == const.AMULET_COIN_ITEM_NAME:
+                                        second_trainer_money *= 2
+                                    expected_money += second_trainer_money
                                 cur_event.trainer_def.pay_day_amount = max(0, cur_event.trainer_def.pay_day_amount - expected_money)
                                 self._controller._controller.update_existing_event(test_obj.group_id, cur_event)
                             
                             continue
 
                     elif None is not cur_event.item_event_def:
-                        # Skip item events during tutorial battles
-                        if hasattr(gh_gen_three_const, 'KEY_TUTORIAL_BATTLE_FLAG'):
-                            if self._gamehook_client.get(gh_gen_three_const.KEY_TUTORIAL_BATTLE_FLAG).value:
-                                logger.info(f"Skipping item event during tutorial battle: {cur_event.item_event_def}")
-                                continue
                         logger.info(f"getting item from {cur_event.item_event_def.item_name}")
                         item = current_gen_info().item_db().get_item(cur_event.item_event_def.item_name)
                         if item is None:
@@ -640,7 +830,11 @@ class Machine:
                                 continue
                     elif None is not cur_event.learn_move:
                         to_learn = current_gen_info().move_db().get_move(cur_event.learn_move.move_to_learn)
-                        to_forget = current_gen_info().move_db().get_move(cur_event.learn_move.destination)
+                        # destination can be either a move name (string) or a slot number (int)
+                        to_forget = None
+                        if cur_event.learn_move.destination is not None:
+                            if isinstance(cur_event.learn_move.destination, str):
+                                to_forget = current_gen_info().move_db().get_move(cur_event.learn_move.destination)
                         if cur_event.learn_move.move_to_learn is not None and to_learn is None:
                             msg = f"Failed to find move from GameHook: {cur_event.learn_move.move_to_learn} for event {cur_event}"
                             logger.error(msg)
@@ -648,7 +842,7 @@ class Machine:
                                 EventDefinition(notes=const.RECORDING_ERROR_FRAGMENT + msg)
                             )
                             continue
-                        elif cur_event.learn_move.destination is not None and to_forget is None:
+                        elif cur_event.learn_move.destination is not None and isinstance(cur_event.learn_move.destination, str) and to_forget is None:
                             msg = f"Failed to find move from GameHook: {cur_event.learn_move.destination} for event {cur_event}"
                             logger.error(msg)
                             self._controller.add_event(
@@ -677,7 +871,7 @@ class Machine:
                                     cur_event.learn_move.source = const.MOVE_SOURCE_TUTOR
 
                     elif None is not cur_event.hold_item:
-                        if cur_event.notes == gh_gen_three_const.HELD_CHECK_FLAG:
+                        if cur_event.notes == gh_gen_four_const.HELD_CHECK_FLAG:
                             cur_event.notes = ""
                             list_of_prev_events = [self._controller._controller.get_previous_event()]
                             if list_of_prev_events[0] is not None:
