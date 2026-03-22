@@ -1,12 +1,17 @@
+import logging
+
 from PySide6.QtWidgets import (
-    QVBoxLayout, QGridLayout, QLabel, QWidget, QPushButton,
+    QVBoxLayout, QGridLayout, QLabel, QWidget, QPushButton, QFileDialog, QInputDialog, QMessageBox,
 )
 from PySide6.QtCore import Qt
 
 from gui_qt.dialogs.base_dialog import BaseDialog
 from gui_qt.components.custom_components import SimpleButton, SimpleEntry, SimpleOptionMenu
 from utils import io_utils
+from utils.backport_parser import import_backport, get_backport_name, BACKPORT_FORMAT_ERROR
 from pkmn.gen_factory import _gen_factory as gen_factory
+
+logger = logging.getLogger(__name__)
 
 
 class CustomGenDialog(BaseDialog):
@@ -78,7 +83,7 @@ class CustomGenDialog(BaseDialog):
 
         self.loaded_gens_label = QLabel("All Custom Gens")
         self.loaded_gens_label.setAlignment(Qt.AlignCenter)
-        self._gens_grid.addWidget(self.loaded_gens_label, 0, 0, 1, 2)
+        self._gens_grid.addWidget(self.loaded_gens_label, 0, 0, 1, 3)
 
         self._dynamic_widgets = []
         self._populate_custom_gens()
@@ -113,6 +118,11 @@ class CustomGenDialog(BaseDialog):
             self._gens_grid.addWidget(cur_button, cur_idx + 1, 1)
             self._dynamic_widgets.append(cur_button)
 
+            import_button = QPushButton("Import Backport")
+            import_button.clicked.connect(self._curry_import_backport(cur_path, cur_custom_gen_name))
+            self._gens_grid.addWidget(import_button, cur_idx + 1, 2)
+            self._dynamic_widgets.append(import_button)
+
     def on_custom_name_change(self, *args, **kwargs):
         if self._verify_custom_gen_name(self.custom_name_value.get()):
             self.custom_create_button.enable()
@@ -136,3 +146,62 @@ class CustomGenDialog(BaseDialog):
         def inner():
             io_utils.open_explorer(path_to_open)
         return inner
+
+    def _curry_import_backport(self, custom_gen_path, custom_gen_name):
+        def inner():
+            self._do_import_backport(custom_gen_path, custom_gen_name)
+        return inner
+
+    def _do_import_backport(self, custom_gen_path, custom_gen_name):
+        backport_path, _ = QFileDialog.getOpenFileName(
+            self, "Select backports.asm", "", "ASM Files (*.asm);;All Files (*)"
+        )
+        if not backport_path:
+            return
+
+        moves_path, _ = QFileDialog.getOpenFileName(
+            self, "Select backport_moves.asm (Cancel to skip)", "", "ASM Files (*.asm);;All Files (*)"
+        )
+
+        try:
+            with open(backport_path, 'r') as f:
+                backport_content = f.read()
+
+            moves_content = None
+            if moves_path:
+                with open(moves_path, 'r') as f:
+                    moves_content = f.read()
+
+            default_name = get_backport_name(backport_content)
+            species_name, ok = QInputDialog.getText(
+                self, "Species Name", "Enter the species name:", text=default_name
+            )
+            if not ok or not species_name.strip():
+                return
+            species_name = species_name.strip()
+
+            result = import_backport(custom_gen_path, backport_content, moves_content, species_name=species_name)
+            try:
+                self._controller.load_all_custom_versions()
+            except ValueError as reload_err:
+                result += f"\n\nWarning during reload:\n{reload_err}"
+
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Import Successful")
+            msg_box.setText(result)
+            msg_box.setIcon(QMessageBox.Information)
+            msg_box.addButton(QMessageBox.Ok)
+            create_route_button = msg_box.addButton("Create Route for Backport", QMessageBox.ActionRole)
+            msg_box.exec()
+
+            if msg_box.clickedButton() == create_route_button:
+                self._controller.create_new_route(
+                    species_name, None, custom_gen_name,
+                )
+                self.close()
+
+        except ValueError as e:
+            QMessageBox.critical(self, "Import Error", str(e))
+        except Exception as e:
+            logger.exception("Error importing backport")
+            QMessageBox.critical(self, "Import Error", f"Unexpected error: {e}")

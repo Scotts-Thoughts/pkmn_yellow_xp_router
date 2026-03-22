@@ -1,11 +1,15 @@
+import logging
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog, messagebox, simpledialog
 from controllers.main_controller import MainController
 
 from gui import custom_components
 from gui.popups.base_popup import Popup
 from utils import io_utils
+from utils.backport_parser import import_backport, get_backport_name, BACKPORT_FORMAT_ERROR
 from pkmn.gen_factory import _gen_factory as gen_factory
+
+logger = logging.getLogger(__name__)
 
 class CustomGenWindow(Popup):
     def __init__(self, main_window, controller:MainController, *args, **kwargs):
@@ -57,7 +61,7 @@ but any custom gens with errors detected will not be loaded
         self.cur_custom_gens_frame = ttk.Frame(self)
         self.cur_custom_gens_frame.pack(padx=self.padx, pady=(4 * self.pady, 2 * self.pady))
         self.loaded_gens_label = tk.Label(self.cur_custom_gens_frame, text="All Custom Gens")
-        self.loaded_gens_label.grid(row=0, column=0, columnspan=2)
+        self.loaded_gens_label.grid(row=0, column=0, columnspan=3)
         self._dynamic_frame_contents = []
         self._populate_custom_gens()
 
@@ -80,6 +84,10 @@ but any custom gens with errors detected will not be loaded
             cur_button = tk.Button(self.cur_custom_gens_frame, text="Open Custom Gen", command=self.curry_open_dialog(cur_path))
             cur_button.grid(row=cur_idx + 1, column=1)
             self._dynamic_frame_contents.append(cur_button)
+
+            import_button = tk.Button(self.cur_custom_gens_frame, text="Import Backport", command=self._curry_import_backport(cur_path, cur_custom_gen_name))
+            import_button.grid(row=cur_idx + 1, column=2)
+            self._dynamic_frame_contents.append(import_button)
     
     def on_custom_name_change(self, *args, **kwargs):
         if self._verify_custom_gen_name(self.custom_name_value.get()):
@@ -104,5 +112,62 @@ but any custom gens with errors detected will not be loaded
     def curry_open_dialog(self, path_to_open):
         def inner(*args, **kwargs):
             io_utils.open_explorer(path_to_open)
-        
+
         return inner
+
+    def _curry_import_backport(self, custom_gen_path, custom_gen_name):
+        def inner(*args, **kwargs):
+            self._do_import_backport(custom_gen_path, custom_gen_name)
+        return inner
+
+    def _do_import_backport(self, custom_gen_path, custom_gen_name):
+        backport_path = filedialog.askopenfilename(
+            title="Select backports.asm",
+            filetypes=[("ASM Files", "*.asm"), ("All Files", "*.*")]
+        )
+        if not backport_path:
+            return
+
+        moves_path = filedialog.askopenfilename(
+            title="Select backport_moves.asm (Cancel to skip)",
+            filetypes=[("ASM Files", "*.asm"), ("All Files", "*.*")]
+        )
+
+        try:
+            with open(backport_path, 'r') as f:
+                backport_content = f.read()
+
+            moves_content = None
+            if moves_path:
+                with open(moves_path, 'r') as f:
+                    moves_content = f.read()
+
+            default_name = get_backport_name(backport_content)
+            species_name = simpledialog.askstring(
+                "Species Name", "Enter the species name:", initialvalue=default_name, parent=self
+            )
+            if not species_name or not species_name.strip():
+                return
+            species_name = species_name.strip()
+
+            result = import_backport(custom_gen_path, backport_content, moves_content, species_name=species_name)
+            try:
+                self._controller.load_all_custom_versions()
+            except ValueError as reload_err:
+                result += f"\n\nWarning during reload:\n{reload_err}"
+
+            create_route = messagebox.askyesno(
+                "Import Successful",
+                f"{result}\n\nCreate a route for this backport?",
+            )
+            if create_route:
+                self._controller.create_new_route(
+                    species_name, None, custom_gen_name,
+                )
+                self.close()
+
+        except ValueError as e:
+            messagebox.showerror("Import Error", str(e))
+        except Exception as e:
+            logger.exception("Error importing backport")
+            messagebox.showerror("Import Error", f"Unexpected error: {e}")

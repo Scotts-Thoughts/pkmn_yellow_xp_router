@@ -15,29 +15,60 @@ class Gen2GameHookConstants:
         self.ROAR_FLAG = const.RECORDING_ERROR_FRAGMENT + "FLAG TO SIGNAL ROARS NEED TO BE HANDLED. USER SHOULD NEVER SEE THIS"
         self.HELD_CHECK_FLAG = const.RECORDING_ERROR_FRAGMENT + "FLAG TO SIGNAL FOR DEEPER HELD ITEM CHECKING. USER SHOULD NEVER SEE THIS"
 
-        self.KEY_OVERWORLD_MAP = "overworld.mapGroup"
-        self.KEY_OVERWORLD_MAP_NUM = "overworld.mapNumber"
+        self.PKMN_CENTER_HEAL_SOUND_ID = 18
+        self.SAVE_HEAL_SOUND_ID = 37
+        self.TRAINER_BATTLE_TYPE = "Trainer"
+        self.WILD_BATTLE_TYPE = "Wild"
+        self.BATTLE_RESULT_DRAW = "DRAW"
+
+        # default to deprecated mapper paths
+        self.configure_for_mapper(None)
+
+    def configure_for_mapper(self, game_name=None):
+        deprecated = game_name is None or "Deprecated" in game_name
+
+        # Overworld
+        self.KEY_OVERWORLD_MAP = "overworld.mapGroup" if deprecated else "overworld.map_group"
+        self.KEY_OVERWORLD_MAP_NUM = "overworld.mapNumber" if deprecated else "overworld.map_index"
         self.KEY_OVERWORLD_X_POS = "overworld.x"
         self.KEY_OVERWORLD_Y_POS = "overworld.y"
-        self.KEY_PLAYER_PLAYERID = "player.playerId"
-        self.KEY_PLAYER_MONEY = "player.money"
-        self.KEY_PLAYER_MON_EXPPOINTS = "player.team.0.expPoints"
+
+        # Player
+        self.KEY_PLAYER_PLAYERID = "player.playerId" if deprecated else "player.player_id"
+        self.KEY_PLAYER_MONEY = "player.money" if deprecated else "bag.money"
+        self.KEY_PLAYER_MON_EXPPOINTS = "player.team.0.expPoints" if deprecated else "player.team.0.exp"
         self.KEY_PLAYER_MON_LEVEL = "player.team.0.level"
         self.KEY_PLAYER_MON_SPECIES = "player.team.0.species"
-        self.KEY_PLAYER_MON_HELD_ITEM = "player.team.0.heldItem"
+        self.KEY_PLAYER_MON_HELD_ITEM = "player.team.0.heldItem" if deprecated else "player.team.0.held_item"
         self.KEY_PLAYER_MON_FRIENDSHIP = "player.team.0.friendship"
 
+        # Team species/level (same in both)
         self.ALL_KEYS_PLAYER_TEAM_SPECIES = [f"player.team.{i}.species" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_LEVEL = [f"player.team.{i}.level" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_DV_ATTACK = [f"player.team.{i}.dvAttack" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_DV_DEFENSE = [f"player.team.{i}.dvDefense" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_DV_SPEED = [f"player.team.{i}.dvSpeed" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_DV_SPECIAL = [f"player.team.{i}.dvSpecial" for i in range(0, 6)]
 
-        self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.move1"
-        self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.move2"
-        self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.move3"
-        self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.move4"
+        # DVs/IVs
+        if deprecated:
+            self.ALL_KEYS_PLAYER_TEAM_DV_ATTACK = [f"player.team.{i}.dvAttack" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_DEFENSE = [f"player.team.{i}.dvDefense" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_SPEED = [f"player.team.{i}.dvSpeed" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_SPECIAL = [f"player.team.{i}.dvSpecial" for i in range(0, 6)]
+        else:
+            self.ALL_KEYS_PLAYER_TEAM_DV_ATTACK = [f"player.team.{i}.ivs.attack" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_DEFENSE = [f"player.team.{i}.ivs.defense" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_SPEED = [f"player.team.{i}.ivs.speed" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_SPECIAL = [f"player.team.{i}.ivs.special" for i in range(0, 6)]
+
+        # Moves
+        if deprecated:
+            self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.move1"
+            self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.move2"
+            self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.move3"
+            self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.move4"
+        else:
+            self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.moves.0.move"
+            self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.moves.1.move"
+            self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.moves.2.move"
+            self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.moves.3.move"
         self.ALL_KEYS_PLAYER_MOVES = [
             self.KEY_PLAYER_MON_MOVE_1,
             self.KEY_PLAYER_MON_MOVE_2,
@@ -45,11 +76,19 @@ class Gen2GameHookConstants:
             self.KEY_PLAYER_MON_MOVE_4,
         ]
 
-        self.KEY_PLAYER_MON_STAT_EXP_HP = "player.team.0.statExpHp"
-        self.KEY_PLAYER_MON_STAT_EXP_ATTACK = "player.team.0.statExpAttack"
-        self.KEY_PLAYER_MON_STAT_EXP_DEFENSE = "player.team.0.statExpDefense"
-        self.KEY_PLAYER_MON_STAT_EXP_SPEED = "player.team.0.statExpSpeed"
-        self.KEY_PLAYER_MON_STAT_EXP_SPECIAL = "player.team.0.statExpSpecial"
+        # Stat Exp / EVs
+        if deprecated:
+            self.KEY_PLAYER_MON_STAT_EXP_HP = "player.team.0.statExpHp"
+            self.KEY_PLAYER_MON_STAT_EXP_ATTACK = "player.team.0.statExpAttack"
+            self.KEY_PLAYER_MON_STAT_EXP_DEFENSE = "player.team.0.statExpDefense"
+            self.KEY_PLAYER_MON_STAT_EXP_SPEED = "player.team.0.statExpSpeed"
+            self.KEY_PLAYER_MON_STAT_EXP_SPECIAL = "player.team.0.statExpSpecial"
+        else:
+            self.KEY_PLAYER_MON_STAT_EXP_HP = "player.team.0.evs.hp"
+            self.KEY_PLAYER_MON_STAT_EXP_ATTACK = "player.team.0.evs.attack"
+            self.KEY_PLAYER_MON_STAT_EXP_DEFENSE = "player.team.0.evs.defense"
+            self.KEY_PLAYER_MON_STAT_EXP_SPEED = "player.team.0.evs.speed"
+            self.KEY_PLAYER_MON_STAT_EXP_SPECIAL = "player.team.0.evs.special"
         self.ALL_KEYS_STAT_EXP = [
             self.KEY_PLAYER_MON_STAT_EXP_HP,
             self.KEY_PLAYER_MON_STAT_EXP_ATTACK,
@@ -58,100 +97,182 @@ class Gen2GameHookConstants:
             self.KEY_PLAYER_MON_STAT_EXP_SPECIAL,
         ]
 
-        self.KEY_GAMETIME_SECONDS = "gameTime.seconds"
-        self.KEY_GAMETIME_FRAMES = "gameTime.frames"
-        self.KEY_AUDIO_CURRENT_SOUND = "audio.currentSound"
-        self.PKMN_CENTER_HEAL_SOUND_ID = 18
-        self.SAVE_HEAL_SOUND_ID = 37
+        # Game time
+        self.KEY_GAMETIME_SECONDS = "gameTime.seconds" if deprecated else "game_time.seconds"
+        self.KEY_GAMETIME_FRAMES = "gameTime.frames" if deprecated else "game_time.frames"
+
+        # Audio
+        self.KEY_AUDIO_CURRENT_SOUND = "audio.currentSound" if deprecated else "audio.current_sound"
+
+        # Battle
         self.KEY_BATTLE_MODE = "battle.mode"
         self.KEY_BATTLE_TYPE = "battle.type"
-        self.KEY_BATTLE_TEXT_BUFFER = "battle.textBuffer"
-        self.KEY_BATTLE_RESULT = "battle.result"
-        self.KEY_BATTLE_START = "battle.battleStart"
-        self.KEY_BATTLE_TRAINER_CLASS = "battle.trainer.class"
-        self.KEY_BATTLE_TRAINER_NAME = "battle.trainer.name"
-        self.KEY_BATTLE_TRAINER_NUMBER = "battle.trainer.id"
-        self.KEY_BATTLE_TRAINER_TOTAL_POKEMON = "battle.trainer.totalPokemon"
-        self.KEY_BATTLE_PLAYER_MON_PARTY_POS = "battle.yourPokemon.partyPos"
-        self.KEY_BATTLE_PLAYER_MON_SPECIES = "battle.yourPokemon.species"
-        self.KEY_BATTLE_PLAYER_MON_HP = "battle.yourPokemon.hp"
-        self.KEY_BATTLE_ENEMY_SPECIES = "battle.enemyPokemon.species"
-        self.KEY_BATTLE_ENEMY_LEVEL = "battle.enemyPokemon.level"
-        self.KEY_BATTLE_ENEMY_HP = "battle.enemyPokemon.hp"
-        self.KEY_BATTLE_ENEMY_MON_PARTY_POS = "battle.enemyPokemon.partyPos"
+        self.KEY_BATTLE_TEXT_BUFFER = "battle.textBuffer" if deprecated else "battle.other.text_buffer"
+        self.KEY_BATTLE_RESULT = "battle.result" if deprecated else "battle.outcome"
+        self.KEY_BATTLE_START = "battle.battleStart" if deprecated else "battle.other.battle_start"
+        self.KEY_BATTLE_TRAINER_CLASS = "battle.trainer.class" if deprecated else "battle.opponent.trainer"
+        self.KEY_BATTLE_TRAINER_NAME = "battle.trainer.name" if deprecated else "battle.opponent.name"
+        self.KEY_BATTLE_TRAINER_NUMBER = "battle.trainer.id" if deprecated else "battle.opponent.id"
+        self.KEY_BATTLE_TRAINER_TOTAL_POKEMON = "battle.trainer.totalPokemon" if deprecated else "battle.opponent.team_count"
+        self.KEY_BATTLE_PLAYER_MON_PARTY_POS = "battle.yourPokemon.partyPos" if deprecated else "battle.player.party_position"
+        self.KEY_BATTLE_PLAYER_MON_SPECIES = "battle.yourPokemon.species" if deprecated else "battle.player.active_pokemon.species"
+        self.KEY_BATTLE_PLAYER_MON_HP = "battle.yourPokemon.hp" if deprecated else "battle.player.active_pokemon.stats.hp"
+        self.KEY_BATTLE_ENEMY_SPECIES = "battle.enemyPokemon.species" if deprecated else "battle.opponent.active_pokemon.species"
+        self.KEY_BATTLE_ENEMY_LEVEL = "battle.enemyPokemon.level" if deprecated else "battle.opponent.active_pokemon.level"
+        self.KEY_BATTLE_ENEMY_HP = "battle.enemyPokemon.hp" if deprecated else "battle.opponent.active_pokemon.stats.hp"
+        self.KEY_BATTLE_ENEMY_MON_PARTY_POS = "battle.enemyPokemon.partyPos" if deprecated else "battle.opponent.party_position"
 
-        self.KEY_ITEM_COUNT = "player.itemCount"
-        self.ALL_KEYS_ITEM_TYPE = [f"player.items.{i}.item" for i in range(0, 20)]
-        self.ALL_KEYS_ITEM_QUANTITY = [f"player.items.{i}.quantity" for i in range(0, 20)]
-        self.KEY_BALL_COUNT = "player.pokeBallCount"
-        self.ALL_KEYS_BALL_TYPE = [f"player.pokeBalls.{i}.item" for i in range(0, 12)]
-        self.ALL_KEYS_BALL_QUANTITY = [f"player.pokeBalls.{i}.quantity" for i in range(0, 12)]
-        self.KEY_KEY_ITEM_COUNT = "player.totalKeyItems"
-        self.ALL_KEYS_KEY_ITEMS = [f"player.keyItems.{i}" for i in range(0, 26)]
+        # Items
+        if deprecated:
+            self.KEY_ITEM_COUNT = "player.itemCount"
+            self.ALL_KEYS_ITEM_TYPE = [f"player.items.{i}.item" for i in range(0, 20)]
+            self.ALL_KEYS_ITEM_QUANTITY = [f"player.items.{i}.quantity" for i in range(0, 20)]
+            self.KEY_BALL_COUNT = "player.pokeBallCount"
+            self.ALL_KEYS_BALL_TYPE = [f"player.pokeBalls.{i}.item" for i in range(0, 12)]
+            self.ALL_KEYS_BALL_QUANTITY = [f"player.pokeBalls.{i}.quantity" for i in range(0, 12)]
+            self.KEY_KEY_ITEM_COUNT = "player.totalKeyItems"
+            self.ALL_KEYS_KEY_ITEMS = [f"player.keyItems.{i}" for i in range(0, 26)]
+        else:
+            self.KEY_ITEM_COUNT = "bag.item_count"
+            self.ALL_KEYS_ITEM_TYPE = [f"bag.items.{i}.item" for i in range(0, 21)]
+            self.ALL_KEYS_ITEM_QUANTITY = [f"bag.items.{i}.quantity" for i in range(0, 21)]
+            self.KEY_BALL_COUNT = "bag.ball_count"
+            self.ALL_KEYS_BALL_TYPE = [f"bag.balls.{i}.item" for i in range(0, 12)]
+            self.ALL_KEYS_BALL_QUANTITY = [f"bag.balls.{i}.quantity" for i in range(0, 12)]
+            self.KEY_KEY_ITEM_COUNT = "bag.key_count"
+            self.ALL_KEYS_KEY_ITEMS = [f"bag.key_items.{i}" for i in range(0, 26)]
 
-        self.ALL_TM_KEYS = [
-            "player.tms.TM01-DynamicPunch",
-            "player.tms.TM02-Headbutt",
-            "player.tms.TM03-Curse",
-            "player.tms.TM04-Rollout",
-            "player.tms.TM05-Roar",
-            "player.tms.TM06-Toxic",
-            "player.tms.TM07-Zap Cannon",
-            "player.tms.TM08-Rock Smash",
-            "player.tms.TM09-Psych Up",
-            "player.tms.TM10-Hidden Power",
-            "player.tms.TM11-Sunny Day",
-            "player.tms.TM12-Sweet Scent",
-            "player.tms.TM13-Snore",
-            "player.tms.TM14-Blizzard",
-            "player.tms.TM15-Hyper Beam",
-            "player.tms.TM16-Icy Wind",
-            "player.tms.TM17-Protect",
-            "player.tms.TM18-Rain Dance",
-            "player.tms.TM19-Giga Drain",
-            "player.tms.TM20-Endure",
-            "player.tms.TM21-Frustration",
-            "player.tms.TM22-SolarBeam",
-            "player.tms.TM23-Iron Tail",
-            "player.tms.TM24-Dragonbreath",
-            "player.tms.TM25-Thunder",
-            "player.tms.TM26-Earthquake",
-            "player.tms.TM27-Return",
-            "player.tms.TM28-Dig",
-            "player.tms.TM29-Psychic",
-            "player.tms.TM30-Shadow Ball",
-            "player.tms.TM31-Mud-Slap",
-            "player.tms.TM32-Double Team",
-            "player.tms.TM33-Ice Punch",
-            "player.tms.TM34-Swagger",
-            "player.tms.TM35-Sleep Talk",
-            "player.tms.TM36-Sludge Bomb",
-            "player.tms.TM37-Sandstorm",
-            "player.tms.TM38-Fire Blast",
-            "player.tms.TM39-Swift",
-            "player.tms.TM40-Defense Curl",
-            "player.tms.TM41-ThunderPunch",
-            "player.tms.TM42-Dream Eater",
-            "player.tms.TM43-Detect",
-            "player.tms.TM44-Rest",
-            "player.tms.TM45-Attract",
-            "player.tms.TM46-Thief",
-            "player.tms.TM47-Steel Wing",
-            "player.tms.TM48-Fire Punch",
-            "player.tms.TM49-Fury Cutter",
-            "player.tms.TM50-Nightmare",
-        ]
+        # TMs
+        if deprecated:
+            self.ALL_TM_KEYS = [
+                "player.tms.TM01-DynamicPunch",
+                "player.tms.TM02-Headbutt",
+                "player.tms.TM03-Curse",
+                "player.tms.TM04-Rollout",
+                "player.tms.TM05-Roar",
+                "player.tms.TM06-Toxic",
+                "player.tms.TM07-Zap Cannon",
+                "player.tms.TM08-Rock Smash",
+                "player.tms.TM09-Psych Up",
+                "player.tms.TM10-Hidden Power",
+                "player.tms.TM11-Sunny Day",
+                "player.tms.TM12-Sweet Scent",
+                "player.tms.TM13-Snore",
+                "player.tms.TM14-Blizzard",
+                "player.tms.TM15-Hyper Beam",
+                "player.tms.TM16-Icy Wind",
+                "player.tms.TM17-Protect",
+                "player.tms.TM18-Rain Dance",
+                "player.tms.TM19-Giga Drain",
+                "player.tms.TM20-Endure",
+                "player.tms.TM21-Frustration",
+                "player.tms.TM22-SolarBeam",
+                "player.tms.TM23-Iron Tail",
+                "player.tms.TM24-Dragonbreath",
+                "player.tms.TM25-Thunder",
+                "player.tms.TM26-Earthquake",
+                "player.tms.TM27-Return",
+                "player.tms.TM28-Dig",
+                "player.tms.TM29-Psychic",
+                "player.tms.TM30-Shadow Ball",
+                "player.tms.TM31-Mud-Slap",
+                "player.tms.TM32-Double Team",
+                "player.tms.TM33-Ice Punch",
+                "player.tms.TM34-Swagger",
+                "player.tms.TM35-Sleep Talk",
+                "player.tms.TM36-Sludge Bomb",
+                "player.tms.TM37-Sandstorm",
+                "player.tms.TM38-Fire Blast",
+                "player.tms.TM39-Swift",
+                "player.tms.TM40-Defense Curl",
+                "player.tms.TM41-ThunderPunch",
+                "player.tms.TM42-Dream Eater",
+                "player.tms.TM43-Detect",
+                "player.tms.TM44-Rest",
+                "player.tms.TM45-Attract",
+                "player.tms.TM46-Thief",
+                "player.tms.TM47-Steel Wing",
+                "player.tms.TM48-Fire Punch",
+                "player.tms.TM49-Fury Cutter",
+                "player.tms.TM50-Nightmare",
+            ]
+        else:
+            self.ALL_TM_KEYS = [
+                "bag.tms.TM01-DynamicPunch",
+                "bag.tms.TM02-Headbutt",
+                "bag.tms.TM03-Curse",
+                "bag.tms.TM04-Rollout",
+                "bag.tms.TM05-Roar",
+                "bag.tms.TM06-Toxic",
+                "bag.tms.TM07-Zap Cannon",
+                "bag.tms.TM08-Rock Smash",
+                "bag.tms.TM09-Psych Up",
+                "bag.tms.TM10-Hidden Power",
+                "bag.tms.TM11-Sunny Day",
+                "bag.tms.TM12-Sweet Scent",
+                "bag.tms.TM13-Snore",
+                "bag.tms.TM14-Blizzard",
+                "bag.tms.TM15-Hyperbeam",
+                "bag.tms.TM16-Icy Wind",
+                "bag.tms.TM17-Protect",
+                "bag.tms.TM18-Rain Dance",
+                "bag.tms.TM19-Giga Drain",
+                "bag.tms.TM20-Endure",
+                "bag.tms.TM21-Frustration",
+                "bag.tms.TM22-SolarBeam",
+                "bag.tms.TM23-Iron Tail",
+                "bag.tms.TM24-DragonBreath",
+                "bag.tms.TM25-Thunder",
+                "bag.tms.TM26-Earthquake",
+                "bag.tms.TM27-Return",
+                "bag.tms.TM28-Dig",
+                "bag.tms.TM29-Psychic",
+                "bag.tms.TM30-Shadow Ball",
+                "bag.tms.TM31-Mud-Slap",
+                "bag.tms.TM32-Double Team",
+                "bag.tms.TM33-Ice Punch",
+                "bag.tms.TM34-Swagger",
+                "bag.tms.TM35-Sleep Talk",
+                "bag.tms.TM36-Sludge Bomb",
+                "bag.tms.TM37-Sandstorm",
+                "bag.tms.TM38-Fireblast",
+                "bag.tms.TM39-Swift",
+                "bag.tms.TM40-Defense Curl",
+                "bag.tms.TM41-ThunderPunch",
+                "bag.tms.TM42-Dream Eater",
+                "bag.tms.TM43-Detect",
+                "bag.tms.TM44-Rest",
+                "bag.tms.TM45-Attract",
+                "bag.tms.TM46-Thief",
+                "bag.tms.TM47-Steel Wing",
+                "bag.tms.TM48-Fire Punch",
+                "bag.tms.TM49-Fury Cutter",
+                "bag.tms.TM50-Nightmare",
+            ]
 
-        self.ALL_HM_KEYS = [
-            "player.hms.HM01-Cut",
-            "player.hms.HM02-Fly",
-            "player.hms.HM03-Surf",
-            "player.hms.HM04-Strength",
-            "player.hms.HM05-Flash",
-            "player.hms.HM06-Whirlpool",
-            "player.hms.HM07-Waterfall",
-        ]
+        # HMs
+        if deprecated:
+            self.ALL_HM_KEYS = [
+                "player.hms.HM01-Cut",
+                "player.hms.HM02-Fly",
+                "player.hms.HM03-Surf",
+                "player.hms.HM04-Strength",
+                "player.hms.HM05-Flash",
+                "player.hms.HM06-Whirlpool",
+                "player.hms.HM07-Waterfall",
+            ]
+        else:
+            self.ALL_HM_KEYS = [
+                "bag.hms.HM01",
+                "bag.hms.HM02",
+                "bag.hms.HM03",
+                "bag.hms.HM04",
+                "bag.hms.HM05",
+                "bag.hms.HM06",
+                "bag.hms.HM07",
+            ]
 
+        # Derived item fields
         #self.ALL_KEYS_ALL_ITEM_FIELDS = set([self.KEY_ITEM_COUNT, self.KEY_BALL_COUNT, self.KEY_KEY_ITEM_COUNT])
         self.ALL_KEYS_ALL_ITEM_FIELDS = set([self.KEY_ITEM_COUNT, self.KEY_KEY_ITEM_COUNT])
         self.ALL_KEYS_ALL_ITEM_FIELDS.update(self.ALL_KEYS_ITEM_TYPE)
@@ -190,10 +311,6 @@ class Gen2GameHookConstants:
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_STAT_EXP)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_ALL_ITEM_FIELDS)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_TEAM_SPECIES)
-
-        self.TRAINER_BATTLE_TYPE = "Trainer"
-        self.WILD_BATTLE_TYPE = "Wild"
-        self.BATTLE_RESULT_DRAW = "DRAW"
 
 
 class GameHookConstantConverter:

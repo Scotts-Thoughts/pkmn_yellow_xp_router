@@ -33,6 +33,7 @@ class CrystalRecorder(route_recording.recorder.RecorderGameHookClient):
         result = super().on_mapper_loaded()
 
         if self._controller.is_ready():
+            gh_gen_two_const.configure_for_mapper(self.meta.get("gameName"))
             self.validate_constants(gh_gen_two_const)
 
             for cur_key in gh_gen_two_const.ALL_KEYS_TO_REGISTER:

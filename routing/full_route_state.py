@@ -296,22 +296,30 @@ class RouteState:
     def add_item(self, item_name, amount, is_purchase, custom_price=None):
         error_message = ""
 
+        base_item = pkmn.gen_factory.current_gen_info().item_db().get_item(item_name)
+        if base_item is None:
+            return RouteState(self.solo_pkmn, self.badges, self.inventory), f"Unknown item: {item_name}"
+
         try:
-            inv = self.inventory.add_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, custom_price=custom_price)
+            inv = self.inventory.add_item(base_item, amount, is_purchase, custom_price=custom_price)
         except Exception as e:
             error_message = str(e)
-            inv = self.inventory.add_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, force=True, custom_price=custom_price)
+            inv = self.inventory.add_item(base_item, amount, is_purchase, force=True, custom_price=custom_price)
 
         return RouteState(self.solo_pkmn, self.badges, inv), error_message
 
     def remove_item(self, item_name, amount, is_purchase, custom_price=None):
         error_message = ""
 
+        base_item = pkmn.gen_factory.current_gen_info().item_db().get_item(item_name)
+        if base_item is None:
+            return RouteState(self.solo_pkmn, self.badges, self.inventory), f"Unknown item: {item_name}"
+
         try:
-            inv = self.inventory.remove_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, custom_price=custom_price)
+            inv = self.inventory.remove_item(base_item, amount, is_purchase, custom_price=custom_price)
         except Exception as e:
             error_message = str(e)
-            inv = self.inventory.remove_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), amount, is_purchase, force=True, custom_price=custom_price)
+            inv = self.inventory.remove_item(base_item, amount, is_purchase, force=True, custom_price=custom_price)
 
         return RouteState(self.solo_pkmn, self.badges, inv), error_message
 
@@ -321,14 +329,22 @@ class RouteState:
         inv = self.inventory
         existing_held = self.solo_pkmn.held_item
         if existing_held is not None and existing_held != "None" and existing_held != const.NO_ITEM and not consumed:
-            inv = inv.add_item(pkmn.gen_factory.current_gen_info().item_db().get_item(existing_held), 1)
-        
+            existing_item = pkmn.gen_factory.current_gen_info().item_db().get_item(existing_held)
+            if existing_item is not None:
+                inv = inv.add_item(existing_item, 1)
+            else:
+                error_message = f"Unknown existing held item: {existing_held}"
+
         if item_name is not None and item_name != "None" and item_name != const.NO_ITEM:
-            try:
-                inv = inv.remove_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), 1)
-            except Exception as e:
-                error_message = str(e)
-                inv = inv.remove_item(pkmn.gen_factory.current_gen_info().item_db().get_item(item_name), 1, force=True)
+            new_item = pkmn.gen_factory.current_gen_info().item_db().get_item(item_name)
+            if new_item is None:
+                error_message = f"Unknown item: {item_name}"
+            else:
+                try:
+                    inv = inv.remove_item(new_item, 1)
+                except Exception as e:
+                    error_message = str(e)
+                    inv = inv.remove_item(new_item, 1, force=True)
 
         return RouteState(
             _hold_item(self.solo_pkmn, item_name, self.badges),
