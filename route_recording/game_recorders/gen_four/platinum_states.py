@@ -439,6 +439,7 @@ class BattleState(WatchForResetState):
                 logger.info(f"[BLACKOUT DEBUG] Cached second mon: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
                 logger.info(f"[BLACKOUT DEBUG] Defeated trainer mons count: {len(self._defeated_trainer_mons)}")
                 self.machine._potential_blackout_flag = True
+                self.machine._blackout_all_team_fainted = self._team_hp_zero
                 self.machine._blackout_cached_first_mon_species = self._cached_first_mon_species
                 self.machine._blackout_cached_first_mon_level = self._cached_first_mon_level
                 self.machine._blackout_cached_second_mon_species = self._cached_second_mon_species
@@ -1335,65 +1336,15 @@ class OverworldState(WatchForResetState):
         if self.machine._potential_blackout_flag and self.machine._blackout_initial_map is not None:
             current_map = self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
             if current_map != self.machine._blackout_initial_map:
-                # Map has already changed, check team HP
-                all_team_hp_zero = True
-                for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
-                    hp_value = self.machine._gamehook_client.get(hp_key).value
-                    if hp_value is not None and hp_value > 0:
-                        all_team_hp_zero = False
-                        break
-                
-                if all_team_hp_zero:
-                    logger.info(f"[BLACKOUT DEBUG] Entered OVERWORLD with blackout flag set, map already changed and team HP is 0 - blackout confirmed")
+                # Map has already changed - use the battle-determined team HP flag
+                # (overworld HP may have been healed by the game before the map change)
+                if self.machine._blackout_all_team_fainted:
+                    logger.info(f"[BLACKOUT DEBUG] Entered OVERWORLD with blackout flag set, map already changed and all team fainted in battle - blackout confirmed")
                     logger.info(f"[BLACKOUT DEBUG] Current map: {current_map}, Initial map: {self.machine._blackout_initial_map}")
-                    # Handle blackout
-                    if self.machine._blackout_trainer_name:
-                        logger.info(f"[BLACKOUT DEBUG] Queueing TRAINER_LOSS_FLAG event for trainer: {self.machine._blackout_trainer_name}")
-                        self.machine._queue_new_event(
-                            EventDefinition(trainer_def=TrainerEventDefinition(self.machine._blackout_trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
-                        )
-                    
-                    # Add any cached Pokemon that haven't been processed yet
-                    if self.machine._blackout_cached_first_mon_species or self.machine._blackout_cached_first_mon_level:
-                        self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
-                            self.machine._blackout_cached_first_mon_species,
-                            self.machine._blackout_cached_first_mon_level,
-                            trainer_pkmn=True
-                        )))
-                    if self.machine._blackout_cached_second_mon_species or self.machine._blackout_cached_second_mon_level:
-                        self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
-                            self.machine._blackout_cached_second_mon_species,
-                            self.machine._blackout_cached_second_mon_level,
-                            trainer_pkmn=True
-                        )))
-                    
-                    # Add all defeated trainer Pokemon
-                    for trainer_mon_event in self.machine._blackout_defeated_trainer_mons:
-                        self.machine._queue_new_event(trainer_mon_event)
-                    
-                    # Add blackout event
-                    self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
-                    
-                    # Clear blackout flags
-                    self.machine._potential_blackout_flag = False
-                    self.machine._blackout_cached_first_mon_species = ""
-                    self.machine._blackout_cached_first_mon_level = 0
-                    self.machine._blackout_cached_second_mon_species = ""
-                    self.machine._blackout_cached_second_mon_level = 0
-                    self.machine._blackout_defeated_trainer_mons = []
-                    self.machine._blackout_trainer_name = ""
-                    self.machine._blackout_initial_map = None
+                    self._confirm_blackout()
                 else:
-                    logger.info(f"Entered OVERWORLD with blackout flag set, but team HP is not 0 - not a blackout, clearing flag")
-                    # Clear blackout flags since it's not actually a blackout
-                    self.machine._potential_blackout_flag = False
-                    self.machine._blackout_cached_first_mon_species = ""
-                    self.machine._blackout_cached_first_mon_level = 0
-                    self.machine._blackout_cached_second_mon_species = ""
-                    self.machine._blackout_cached_second_mon_level = 0
-                    self.machine._blackout_defeated_trainer_mons = []
-                    self.machine._blackout_trainer_name = ""
-                    self.machine._blackout_initial_map = None
+                    logger.info(f"Entered OVERWORLD with blackout flag set, but not all team fainted - not a blackout, clearing flag")
+                    self._clear_blackout_flags()
         
         # Cache current EVs for vitamin detection (cache early in overworld, before inventory changes)
         self._update_ev_cache()
@@ -1408,6 +1359,45 @@ class OverworldState(WatchForResetState):
             'special_attack': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]).value,
             'special_defense': self.machine._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]).value,
         }
+
+    def _confirm_blackout(self):
+        """Queue trainer loss, defeated Pokemon, and blackout events, then clear flags."""
+        if self.machine._blackout_trainer_name:
+            logger.info(f"[BLACKOUT DEBUG] Queueing TRAINER_LOSS_FLAG event for trainer: {self.machine._blackout_trainer_name}")
+            self.machine._queue_new_event(
+                EventDefinition(trainer_def=TrainerEventDefinition(self.machine._blackout_trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
+            )
+
+        if self.machine._blackout_cached_first_mon_species or self.machine._blackout_cached_first_mon_level:
+            self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                self.machine._blackout_cached_first_mon_species,
+                self.machine._blackout_cached_first_mon_level,
+                trainer_pkmn=True
+            )))
+        if self.machine._blackout_cached_second_mon_species or self.machine._blackout_cached_second_mon_level:
+            self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
+                self.machine._blackout_cached_second_mon_species,
+                self.machine._blackout_cached_second_mon_level,
+                trainer_pkmn=True
+            )))
+
+        for trainer_mon_event in self.machine._blackout_defeated_trainer_mons:
+            self.machine._queue_new_event(trainer_mon_event)
+
+        self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
+        self._clear_blackout_flags()
+
+    def _clear_blackout_flags(self):
+        """Reset all machine-level blackout tracking state."""
+        self.machine._potential_blackout_flag = False
+        self.machine._blackout_all_team_fainted = False
+        self.machine._blackout_cached_first_mon_species = ""
+        self.machine._blackout_cached_first_mon_level = 0
+        self.machine._blackout_cached_second_mon_species = ""
+        self.machine._blackout_cached_second_mon_level = 0
+        self.machine._blackout_defeated_trainer_mons = []
+        self.machine._blackout_trainer_name = ""
+        self.machine._blackout_initial_map = None
     
     def _on_exit(self, next_state: State):
         if isinstance(next_state, InventoryChangeState):
@@ -1491,68 +1481,16 @@ class OverworldState(WatchForResetState):
                 logger.info(f"[BLACKOUT DEBUG] Map changed, checking for blackout. Old map: {prev_prop.value}, New map: {new_prop.value}")
                 logger.info(f"[BLACKOUT DEBUG] Initial map was: {self.machine._blackout_initial_map}")
                 logger.info(f"[BLACKOUT DEBUG] Trainer name: {self.machine._blackout_trainer_name}")
-                
-                # Verify that team HP is actually 0 before confirming blackout
-                all_team_hp_zero = True
-                team_hp_values = []
-                for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
-                    hp_value = self.machine._gamehook_client.get(hp_key).value
-                    team_hp_values.append(hp_value)
-                    if hp_value is not None and hp_value > 0:
-                        all_team_hp_zero = False
-                
-                logger.info(f"[BLACKOUT DEBUG] Team HP values: {team_hp_values}, all_zero: {all_team_hp_zero}")
-                
-                if all_team_hp_zero:
-                    logger.info(f"[BLACKOUT DEBUG] Map changed and team HP is 0 - blackout confirmed")
-                    # Handle blackout: remove trainer event, add defeated Pokemon, add blackout event
-                    if self.machine._blackout_trainer_name:
-                        logger.info(f"[BLACKOUT DEBUG] Queueing TRAINER_LOSS_FLAG event for trainer: {self.machine._blackout_trainer_name}")
-                        self.machine._queue_new_event(
-                            EventDefinition(trainer_def=TrainerEventDefinition(self.machine._blackout_trainer_name), notes=gh_gen_four_const.TRAINER_LOSS_FLAG)
-                        )
-                    
-                    # Add any cached Pokemon that haven't been processed yet
-                    if self.machine._blackout_cached_first_mon_species or self.machine._blackout_cached_first_mon_level:
-                        self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
-                            self.machine._blackout_cached_first_mon_species,
-                            self.machine._blackout_cached_first_mon_level,
-                            trainer_pkmn=True
-                        )))
-                    if self.machine._blackout_cached_second_mon_species or self.machine._blackout_cached_second_mon_level:
-                        self.machine._blackout_defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
-                            self.machine._blackout_cached_second_mon_species,
-                            self.machine._blackout_cached_second_mon_level,
-                            trainer_pkmn=True
-                        )))
-                    
-                    # Add all defeated trainer Pokemon
-                    for trainer_mon_event in self.machine._blackout_defeated_trainer_mons:
-                        self.machine._queue_new_event(trainer_mon_event)
-                    
-                    # Add blackout event
-                    self.machine._queue_new_event(EventDefinition(blackout=BlackoutEventDefinition()))
-                    
-                    # Clear blackout flags
-                    self.machine._potential_blackout_flag = False
-                    self.machine._blackout_cached_first_mon_species = ""
-                    self.machine._blackout_cached_first_mon_level = 0
-                    self.machine._blackout_cached_second_mon_species = ""
-                    self.machine._blackout_cached_second_mon_level = 0
-                    self.machine._blackout_defeated_trainer_mons = []
-                    self.machine._blackout_trainer_name = ""
-                    self.machine._blackout_initial_map = None
+                logger.info(f"[BLACKOUT DEBUG] All team fainted in battle: {self.machine._blackout_all_team_fainted}")
+
+                # Use the battle-determined team HP flag instead of re-reading overworld HP
+                # (the game may heal the party before/during the map transition)
+                if self.machine._blackout_all_team_fainted:
+                    logger.info(f"[BLACKOUT DEBUG] Map changed and all team fainted in battle - blackout confirmed")
+                    self._confirm_blackout()
                 else:
-                    logger.info(f"Map changed but team HP is not 0 - not a blackout, clearing flag")
-                    # Clear blackout flags since it's not actually a blackout
-                    self.machine._potential_blackout_flag = False
-                    self.machine._blackout_cached_first_mon_species = ""
-                    self.machine._blackout_cached_first_mon_level = 0
-                    self.machine._blackout_cached_second_mon_species = ""
-                    self.machine._blackout_cached_second_mon_level = 0
-                    self.machine._blackout_defeated_trainer_mons = []
-                    self.machine._blackout_trainer_name = ""
-                    self.machine._blackout_initial_map = None
+                    logger.info(f"Map changed but not all team fainted in battle - not a blackout, clearing flag")
+                    self._clear_blackout_flags()
         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_PLAYERID:
             if prev_prop.value and self.machine._player_id != self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_PLAYERID).value:
                 self._waiting_for_new_file = True

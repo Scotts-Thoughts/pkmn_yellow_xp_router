@@ -833,7 +833,8 @@ class MainWindow(QMainWindow):
     def _on_exception(self):
         msg = self._controller.get_next_exception_info()
         while msg is not None:
-            QMessageBox.critical(self, "Error!", msg)
+            logger.error(f"Application error: {msg}")
+            self.message_label.set_message(f"Error: {msg}")
             msg = self._controller.get_next_exception_info()
 
     def _on_name_change(self):

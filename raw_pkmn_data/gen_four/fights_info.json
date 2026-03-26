@@ -55,6 +55,9 @@
             "Rival May 4 Torchic",
             "Rival Steven",
             "Rival",
+            "Rival Chimchar 7",
+            "Rival Piplup 7",
+            "Rival Turtwig 7",
             "Leader Blue"
         ],
         "gym_leader": [
@@ -103,12 +106,20 @@
             "Elite Four Will",
             "Elite Four Koga",
             "Elite Four Bruno",
-            "Elite Four Karen"
+            "Elite Four Karen",
+            "Elite Four Will Rematch 2",
+            "Elite Four Koga Rematch 2",
+            "Elite Four Bruno Rematch 2",
+            "Elite Four Karen Rematch 2"
         ],
         "champion": [
             "Champion Wallace",
             "Champion Cynthia",
-            "Champion Lance"
+            "Champion Lance",
+            "Champion Lance Rematch 2"
+        ],
+        "post_game": [
+            "Pokemon Trainer Red"
         ],
         "boss": [
             "Galactic Boss Cyrus",
@@ -135,23 +146,32 @@
         ]
     },
     "fight_rewards": {
-        "Leader Roxanne": "TM39 Rock Tomb",
-        "Leader Brawly": "TM08 Bulk Up",
-        "Leader Wattson": "TM34 Shock Wave",
-        "Leader Flannery": "TM50 Overheat",
-        "Leader Norman": "TM42 Facade",
-        "Leader Winona": "TM40 Aerial Ace",
-        "Leader Tate & Liza": "TM04 Calm Mind",
-        "Leader Wallace": "TM03 Water Pulse",
+        "Leader Roark": "TM76 Stealth Rock",
+        "Leader Gardenia": "TM86 Grass Knot",
+        "Leader Maylene": "TM60 Drain Punch",
+        "Leader Wake": "TM55 Brine",
+        "Leader Fantina": "TM65 Shadow Claw",
+        "Leader Byron": "TM91 Flash Cannon",
+        "Leader Candice": "TM72 Avalanche",
+        "Leader Volkner": "TM57 Charge Beam",
 
-        "Leader Brock": "TM39 Rock Tomb",
+        "Leader Falkner": "TM51 Roost",
+        "Leader Bugsy": "TM89 U-Turn",
+        "Leader Whitney": "TM45 Attract",
+        "Leader Morty": "TM30 Shadow Ball",
+        "Leader Chuck": "TM01 Focus Punch",
+        "Leader Jasmine": "TM23 Iron Tail",
+        "Leader Pryce": "TM07 Hail",
+        "Leader Clair": "TM59 Dragon Pulse",
+
+        "Leader Brock": "TM80 Rock Slide",
         "Leader Misty": "TM03 Water Pulse",
         "Leader Lt.Surge": "TM34 Shock Wave",
         "Leader Erika": "TM19 Giga Drain",
-        "Leader Koga": "TM06 Toxic",
-        "Leader Sabrina": "TM04 Calm Mind",
+        "Leader Koga": "TM84 Poison Jab",
+        "Leader Sabrina": "TM48 Skill Swap",
         "Leader Blaine": "TM50 Overheat",
-        "Leader Giovanni": "TM26 Earthquake"
+        "Leader Blue": "TM92 Trick Room"
     },
     "trainer_timing_info": {
         "intro_time": 4.69,

@@ -741,7 +741,12 @@ class Machine:
                 except Exception as e:
                     logger.error(f"Exception occurred trying to process event: {cur_event}")
                     logger.exception(e)
-                    self._controller._controller.trigger_exception(e)
+                    try:
+                        self._controller.add_event(
+                            EventDefinition(notes=f"{const.RECORDING_ERROR_FRAGMENT} Unexpected error: {type(e).__name__}: {e}")
+                        )
+                    except Exception:
+                        logger.error("Failed to add error event to route")
 
             elif self._active:
                 time.sleep(0.1)

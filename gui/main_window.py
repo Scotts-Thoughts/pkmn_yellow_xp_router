@@ -299,11 +299,8 @@ class MainWindow(tk.Tk):
     def _on_exception(self, *args, **kwargs):
         exception_message = self._controller.get_next_exception_info()
         while exception_message is not None:
-            threading.Thread(
-                target=messagebox.showerror,
-                args=("Error!", exception_message),
-                daemon=True
-            ).start()
+            logger.error(f"Application error: {exception_message}")
+            self.message_label.set_message(f"Error: {exception_message}")
             exception_message = self._controller.get_next_exception_info()
     
     def _on_name_change(self, *args, **kwargs):
