@@ -270,123 +270,81 @@ class MainWindow(QMainWindow):
     def _build_menu_bar(self):  # noqa: C901
         menu_bar = self.menuBar()
 
+        # Helper to read a shortcut from config
+        def _ks(action_id):
+            return QKeySequence(config.get_shortcut(action_id))
+
+        # Track menu actions by action_id for live rebinding
+        self._shortcut_actions = {}
+
+        def _add_action(menu, label, action_id, slot):
+            act = menu.addAction(label)
+            act.setShortcut(_ks(action_id))
+            act.triggered.connect(slot)
+            self._shortcut_actions[action_id] = act
+            return act
+
         # ---- File menu -----------------------------------------------
         self.file_menu = menu_bar.addMenu("&File")
 
-        self._act_customize_dvs = self.file_menu.addAction("Customize DVs")
-        self._act_customize_dvs.setShortcut(QKeySequence("Ctrl+X"))
-        self._act_customize_dvs.triggered.connect(self.open_customize_dvs_window)
-
-        self._act_new_route = self.file_menu.addAction("New Route")
-        self._act_new_route.setShortcut(QKeySequence("Ctrl+N"))
-        self._act_new_route.triggered.connect(self.open_new_route_window)
-
-        self._act_load_route = self.file_menu.addAction("Load Route")
-        self._act_load_route.setShortcut(QKeySequence("Ctrl+L"))
-        self._act_load_route.triggered.connect(self.open_load_route_window)
-
-        self._act_save_route = self.file_menu.addAction("Save Route")
-        self._act_save_route.setShortcut(QKeySequence("Ctrl+S"))
-        self._act_save_route.triggered.connect(self.save_route)
-
-        self._act_close_route = self.file_menu.addAction("Close Route")
-        self._act_close_route.setShortcut(QKeySequence("Ctrl+Shift+C"))
-        self._act_close_route.triggered.connect(self.close_route)
+        self._act_customize_dvs = _add_action(self.file_menu, "Customize DVs", "customize_dvs", self.open_customize_dvs_window)
+        self._act_new_route = _add_action(self.file_menu, "New Route", "new_route", self.open_new_route_window)
+        self._act_load_route = _add_action(self.file_menu, "Load Route", "load_route", self.open_load_route_window)
+        self._act_save_route = _add_action(self.file_menu, "Save Route", "save_route", self.save_route)
+        self._act_close_route = _add_action(self.file_menu, "Close Route", "close_route", self.close_route)
 
         self.file_menu.addSeparator()
 
         self._act_auto_load = self.file_menu.addAction("Automatically Load Most Recent Route on Startup")
-        self._act_auto_load.setShortcut(QKeySequence("F2"))
+        self._act_auto_load.setShortcut(_ks("auto_load_recent"))
+        self._shortcut_actions["auto_load_recent"] = self._act_auto_load
         self._act_auto_load.setCheckable(True)
         self._act_auto_load.setChecked(config.get_auto_load_most_recent_route())
         self._act_auto_load.triggered.connect(self.toggle_auto_load_most_recent_route)
 
-        self._act_export_notes = self.file_menu.addAction("Export Notes")
-        self._act_export_notes.setShortcut(QKeySequence("Ctrl+Shift+W"))
-        self._act_export_notes.triggered.connect(self.export_notes)
+        self._act_export_notes = _add_action(self.file_menu, "Export Notes", "export_notes", self.export_notes)
 
         self.file_menu.addSeparator()
 
-        self._act_screenshot_events = self.file_menu.addAction("Screenshot Event List")
-        self._act_screenshot_events.setShortcut(QKeySequence("F5"))
-        self._act_screenshot_events.triggered.connect(self.screenshot_event_list)
-
-        self._act_screenshot_battle = self.file_menu.addAction("Screenshot Battle Summary")
-        self._act_screenshot_battle.setShortcut(QKeySequence("F6"))
-        self._act_screenshot_battle.triggered.connect(self.screenshot_battle_summary)
-
-        self._act_screenshot_player = self.file_menu.addAction("Screenshot Player Ranges")
-        self._act_screenshot_player.setShortcut(QKeySequence("F7"))
-        self._act_screenshot_player.triggered.connect(self.export_player_ranges)
-
-        self._act_screenshot_enemy = self.file_menu.addAction("Screenshot Enemy Ranges")
-        self._act_screenshot_enemy.setShortcut(QKeySequence("F8"))
-        self._act_screenshot_enemy.triggered.connect(self.export_enemy_ranges)
-
-        self._act_open_image_folder = self.file_menu.addAction("Open Image Folder")
-        self._act_open_image_folder.setShortcut(QKeySequence("F12"))
-        self._act_open_image_folder.triggered.connect(self.open_image_folder)
+        self._act_screenshot_events = _add_action(self.file_menu, "Screenshot Event List", "screenshot_events", self.screenshot_event_list)
+        self._act_screenshot_battle = _add_action(self.file_menu, "Screenshot Battle Summary", "screenshot_battle", self.screenshot_battle_summary)
+        self._act_screenshot_player = _add_action(self.file_menu, "Screenshot Player Ranges", "screenshot_player", self.export_player_ranges)
+        self._act_screenshot_enemy = _add_action(self.file_menu, "Screenshot Enemy Ranges", "screenshot_enemy", self.export_enemy_ranges)
+        self._act_open_image_folder = _add_action(self.file_menu, "Open Image Folder", "open_image_folder", self.open_image_folder)
 
         self.file_menu.addSeparator()
 
-        self._act_config_font = self.file_menu.addAction("Config Font")
-        self._act_config_font.setShortcut(QKeySequence("Ctrl+Shift+D"))
-        self._act_config_font.triggered.connect(self.open_config_window)
+        self._act_config_font = _add_action(self.file_menu, "Config Font", "config_font", self.open_config_window)
+        self._act_custom_gens = _add_action(self.file_menu, "Custom Gens", "custom_gens", self.open_custom_gens_window)
+        self._act_app_config = _add_action(self.file_menu, "App Config", "app_config", self.open_app_config_window)
+        self._act_open_data_folder = _add_action(self.file_menu, "Open Data Folder", "open_data_folder", self.open_data_location)
 
-        self._act_custom_gens = self.file_menu.addAction("Custom Gens")
-        self._act_custom_gens.setShortcut(QKeySequence("Ctrl+Shift+E"))
-        self._act_custom_gens.triggered.connect(self.open_custom_gens_window)
+        self.file_menu.addSeparator()
 
-        self._act_app_config = self.file_menu.addAction("App Config")
-        self._act_app_config.setShortcut(QKeySequence("Ctrl+Shift+A"))
-        self._act_app_config.triggered.connect(self.open_app_config_window)
-
-        self._act_open_data_folder = self.file_menu.addAction("Open Data Folder")
-        self._act_open_data_folder.setShortcut(QKeySequence("Ctrl+Shift+O"))
-        self._act_open_data_folder.triggered.connect(self.open_data_location)
+        self._act_keyboard_shortcuts = _add_action(self.file_menu, "Keyboard Shortcuts...", "keyboard_shortcuts", self.open_keyboard_shortcuts_dialog)
 
         # ---- Events menu ---------------------------------------------
         self.event_menu = menu_bar.addMenu("&Events")
         self.event_menu.aboutToShow.connect(self._update_event_menu_state)
 
-        self._act_undo = self.event_menu.addAction("Undo")
-        self._act_undo.setShortcut(QKeySequence("Ctrl+Z"))
-        self._act_undo.triggered.connect(self.undo_event_list)
+        self._act_undo = _add_action(self.event_menu, "Undo", "undo", self.undo_event_list)
 
         self.event_menu.addSeparator()
 
-        self._act_move_up = self.event_menu.addAction("Move Event Up")
-        self._act_move_up.setShortcut(QKeySequence("Ctrl+E"))
-        self._act_move_up.triggered.connect(self.move_group_up)
-
-        self._act_move_down = self.event_menu.addAction("Move Event Down")
-        self._act_move_down.setShortcut(QKeySequence("Ctrl+D"))
-        self._act_move_down.triggered.connect(self.move_group_down)
-
-        self._act_move_up_folder = self.event_menu.addAction("Move Event Up To Next Folder")
-        self._act_move_up_folder.setShortcut(QKeySequence("Ctrl+Shift+E"))
-        self._act_move_up_folder.triggered.connect(self.move_group_to_adjacent_folder_up)
-
-        self._act_move_down_folder = self.event_menu.addAction("Move Event Down To Next Folder")
-        self._act_move_down_folder.setShortcut(QKeySequence("Ctrl+Shift+D"))
-        self._act_move_down_folder.triggered.connect(self.move_group_to_adjacent_folder_down)
+        self._act_move_up = _add_action(self.event_menu, "Move Event Up", "move_event_up", self.move_group_up)
+        self._act_move_down = _add_action(self.event_menu, "Move Event Down", "move_event_down", self.move_group_down)
+        self._act_move_up_folder = _add_action(self.event_menu, "Move Event Up To Next Folder", "move_event_up_folder", self.move_group_to_adjacent_folder_up)
+        self._act_move_down_folder = _add_action(self.event_menu, "Move Event Down To Next Folder", "move_event_down_folder", self.move_group_to_adjacent_folder_down)
 
         self.event_menu.addSeparator()
 
-        self._act_enable_disable = self.event_menu.addAction("Enable/Disable")
-        self._act_enable_disable.setShortcut(QKeySequence("Ctrl+C"))
-        self._act_enable_disable.triggered.connect(self.toggle_enable_disable)
-
-        self._act_toggle_highlight = self.event_menu.addAction("Toggle Highlight")
-        self._act_toggle_highlight.setShortcut(QKeySequence("Ctrl+V"))
-        self._act_toggle_highlight.triggered.connect(self.toggle_event_highlight)
+        self._act_enable_disable = _add_action(self.event_menu, "Enable/Disable", "enable_disable", self.toggle_enable_disable)
+        self._act_toggle_highlight = _add_action(self.event_menu, "Toggle Highlight", "toggle_highlight", self.toggle_event_highlight)
 
         self._act_transfer_event = self.event_menu.addAction("Transfer Event")
         self._act_transfer_event.triggered.connect(self.open_transfer_event_window)
 
-        self._act_delete_event = self.event_menu.addAction("Delete Event")
-        self._act_delete_event.setShortcut(QKeySequence("Ctrl+B"))
-        self._act_delete_event.triggered.connect(self.delete_group)
+        self._act_delete_event = _add_action(self.event_menu, "Delete Event", "delete_event", self.delete_group)
 
         self.event_menu.addSeparator()
 
@@ -411,9 +369,11 @@ class MainWindow(QMainWindow):
         # ---- Highlight menu ------------------------------------------
         self.highlight_menu = menu_bar.addMenu("&Highlight")
         for i in range(1, 10):
+            action_id = f"highlight_{i}"
             act = self.highlight_menu.addAction(f"Highlight {i}")
-            act.setShortcut(QKeySequence(f"Shift+{i}"))
+            act.setShortcut(_ks(action_id))
             act.triggered.connect(partial(self.set_event_highlight, i, None))
+            self._shortcut_actions[action_id] = act
         self.highlight_menu.addSeparator()
         self._act_config_highlight_colors = self.highlight_menu.addAction("Configure Colors")
         self._act_config_highlight_colors.triggered.connect(self.open_highlight_color_config_window)
@@ -421,24 +381,14 @@ class MainWindow(QMainWindow):
         # ---- Folders menu --------------------------------------------
         self.folder_menu = menu_bar.addMenu("F&olders")
 
-        self._act_new_folder = self.folder_menu.addAction("New Folder")
-        self._act_new_folder.setShortcut(QKeySequence("Ctrl+Shift+Alt+F"))
-        self._act_new_folder.triggered.connect(self.open_new_folder_window)
-
-        self._act_rename_folder = self.folder_menu.addAction("Rename Cur Folder")
-        self._act_rename_folder.setShortcut(QKeySequence("Ctrl+Shift+F"))
-        self._act_rename_folder.triggered.connect(self.rename_selected_folder)
-
-        self._act_split_folder = self.folder_menu.addAction("Split Folder")
-        self._act_split_folder.setShortcut(QKeySequence("Alt+X"))
-        self._act_split_folder.triggered.connect(self.split_folder_at_current_event)
+        self._act_new_folder = _add_action(self.folder_menu, "New Folder", "new_folder", self.open_new_folder_window)
+        self._act_rename_folder = _add_action(self.folder_menu, "Rename Cur Folder", "rename_folder", self.rename_selected_folder)
+        self._act_split_folder = _add_action(self.folder_menu, "Split Folder", "split_folder", self.split_folder_at_current_event)
 
         # ---- Recording menu ------------------------------------------
         self.recording_menu = menu_bar.addMenu("&Recording")
 
-        self._act_toggle_recording = self.recording_menu.addAction("Enable/Disable Recording")
-        self._act_toggle_recording.setShortcut(QKeySequence("F1"))
-        self._act_toggle_recording.triggered.connect(self.record_button_clicked)
+        self._act_toggle_recording = _add_action(self.recording_menu, "Enable/Disable Recording", "toggle_recording", self.record_button_clicked)
 
         # ---- Battle Summary menu -------------------------------------
         self.battle_summary_menu = menu_bar.addMenu("&Battle Summary")
@@ -473,19 +423,22 @@ class MainWindow(QMainWindow):
         self.battle_summary_menu.addSeparator()
 
         self._act_show_move_highlights = self.battle_summary_menu.addAction("Toggle Move Highlights")
-        self._act_show_move_highlights.setShortcut(QKeySequence("Shift+F2"))
+        self._act_show_move_highlights.setShortcut(_ks("toggle_move_highlights"))
+        self._shortcut_actions["toggle_move_highlights"] = self._act_show_move_highlights
         self._act_show_move_highlights.setCheckable(True)
         self._act_show_move_highlights.setChecked(config.get_show_move_highlights())
         self._act_show_move_highlights.triggered.connect(self._toggle_move_highlights)
 
         self._act_fade_no_highlight = self.battle_summary_menu.addAction("Toggle Fade Moves Without Highlight")
-        self._act_fade_no_highlight.setShortcut(QKeySequence("Shift+F3"))
+        self._act_fade_no_highlight.setShortcut(_ks("toggle_fade_no_highlight"))
+        self._shortcut_actions["toggle_fade_no_highlight"] = self._act_fade_no_highlight
         self._act_fade_no_highlight.setCheckable(True)
         self._act_fade_no_highlight.setChecked(config.get_fade_moves_without_highlight())
         self._act_fade_no_highlight.triggered.connect(self._toggle_fade_moves_without_highlight)
 
         self._act_test_moves = self.battle_summary_menu.addAction("Toggle Test Moves")
-        self._act_test_moves.setShortcut(QKeySequence("Shift+F1"))
+        self._act_test_moves.setShortcut(_ks("toggle_test_moves"))
+        self._shortcut_actions["toggle_test_moves"] = self._act_test_moves
         self._act_test_moves.setCheckable(True)
         self._act_test_moves.setChecked(config.get_test_moves_enabled())
         self._act_test_moves.triggered.connect(self._toggle_test_moves)
@@ -497,21 +450,10 @@ class MainWindow(QMainWindow):
         self._act_consistent_threshold = self.battle_summary_menu.addAction("Configure Consistent Threshold...")
         self._act_consistent_threshold.triggered.connect(self.open_config_window)
 
-        self._act_candy_dec = self.battle_summary_menu.addAction("Decrement Pre-Fight Candies")
-        self._act_candy_dec.setShortcut(QKeySequence("F3"))
-        self._act_candy_dec.triggered.connect(self.decrement_prefight_candies)
-
-        self._act_candy_inc = self.battle_summary_menu.addAction("Increment Pre-Fight Candies")
-        self._act_candy_inc.setShortcut(QKeySequence("F4"))
-        self._act_candy_inc.triggered.connect(self.increment_prefight_candies)
-
-        self._act_toggle_player_strat = self.battle_summary_menu.addAction("Toggle Player Highlight Strategy")
-        self._act_toggle_player_strat.setShortcut(QKeySequence("F9"))
-        self._act_toggle_player_strat.triggered.connect(self.toggle_player_highlight_strategy)
-
-        self._act_toggle_enemy_strat = self.battle_summary_menu.addAction("Toggle Enemy Highlight Strategy")
-        self._act_toggle_enemy_strat.setShortcut(QKeySequence("F10"))
-        self._act_toggle_enemy_strat.triggered.connect(self.toggle_enemy_highlight_strategy)
+        self._act_candy_dec = _add_action(self.battle_summary_menu, "Decrement Pre-Fight Candies", "candy_decrement", self.decrement_prefight_candies)
+        self._act_candy_inc = _add_action(self.battle_summary_menu, "Increment Pre-Fight Candies", "candy_increment", self.increment_prefight_candies)
+        self._act_toggle_player_strat = _add_action(self.battle_summary_menu, "Toggle Player Highlight Strategy", "toggle_player_strat", self.toggle_player_highlight_strategy)
+        self._act_toggle_enemy_strat = _add_action(self.battle_summary_menu, "Toggle Enemy Highlight Strategy", "toggle_enemy_strat", self.toggle_enemy_highlight_strategy)
 
         # ---- Update menu -------------------------------------------------
         self.update_menu = menu_bar.addMenu("&Update")
@@ -718,47 +660,53 @@ class MainWindow(QMainWindow):
     # Keyboard shortcuts (QShortcut-based, not menu actions)
     # ------------------------------------------------------------------
     def _build_shortcuts(self):
-        # Delete key
-        QShortcut(QKeySequence(Qt.Key_Delete), self, self.delete_group)
+        # Store QShortcut objects by action_id for live rebinding
+        self._qshortcuts = {}
 
-        # Home / End for scroll
-        QShortcut(QKeySequence(Qt.Key_Home), self, self.scroll_to_top)
-        QShortcut(QKeySequence(Qt.Key_End), self, self.scroll_to_bottom)
+        def _ks(action_id):
+            return QKeySequence(config.get_shortcut(action_id))
 
-        # Grave accent (`) to toggle tabs
-        QShortcut(QKeySequence(Qt.Key_QuoteLeft), self, self._toggle_event_tabs)
-
-        # Ctrl+` for summary window
-        QShortcut(QKeySequence("Ctrl+`"), self, self.open_summary_window)
-
-        # 1-8 for gym leaders (only act when event list has focus)
-        for i in range(1, 9):
-            sc = QShortcut(QKeySequence(str(i)), self)
-            sc.activated.connect(partial(self.select_gym_leader, i - 1))
-
-        # Ctrl+1-6 for E4/Champion
-        for i in range(1, 7):
-            sc = QShortcut(QKeySequence(f"Ctrl+{i}"), self)
-            sc.activated.connect(partial(self.select_elite_four_or_champion, i - 1))
-
-        # Add Events / Filters popovers
-        QShortcut(QKeySequence("Ctrl+F1"), self, self._toggle_add_events_dialog)
-        QShortcut(QKeySequence("Ctrl+F2"), self, self._toggle_filters_dialog)
-
-        # Filter toggles (application-wide)
-        def _app_shortcut(key_seq, slot):
-            sc = QShortcut(QKeySequence(key_seq), self)
-            sc.setContext(Qt.ApplicationShortcut)
+        def _sc(action_id, slot, context=Qt.WindowShortcut):
+            sc = QShortcut(_ks(action_id), self)
+            sc.setContext(context)
             sc.activated.connect(slot)
+            self._qshortcuts[action_id] = sc
             return sc
 
-        _app_shortcut("Ctrl+F", self.toggle_fight_trainer_filter)
-        _app_shortcut("Ctrl+R", self.toggle_rare_candy_filter)
-        _app_shortcut("Ctrl+T", self.toggle_tm_hm_filter)
-        _app_shortcut("Ctrl+G", self.toggle_vitamin_filter)
-        _app_shortcut("Ctrl+W", self.toggle_fight_wild_pkmn_filter)
-        _app_shortcut("Ctrl+A", self.toggle_common_filters)
-        _app_shortcut("Ctrl+Shift+R", self.reset_all_filters)
+        _sc("delete_key",       self.delete_group)
+        _sc("scroll_home",      self.scroll_to_top)
+        _sc("scroll_end",       self.scroll_to_bottom)
+        _sc("toggle_tabs",      self._toggle_event_tabs)
+        _sc("toggle_summary",   self.open_summary_window)
+
+        for i in range(1, 9):
+            _sc(f"gym_{i}", partial(self.select_gym_leader, i - 1))
+
+        for i in range(1, 7):
+            _sc(f"e4_{i}", partial(self.select_elite_four_or_champion, i - 1))
+
+        _sc("toggle_add_events", self._toggle_add_events_dialog)
+        _sc("toggle_filters",    self._toggle_filters_dialog)
+
+        # Filter toggles (application-wide context)
+        _sc("filter_trainer",       self.toggle_fight_trainer_filter,  Qt.ApplicationShortcut)
+        _sc("filter_rare_candy",    self.toggle_rare_candy_filter,     Qt.ApplicationShortcut)
+        _sc("filter_tm_hm",        self.toggle_tm_hm_filter,          Qt.ApplicationShortcut)
+        _sc("filter_vitamin",      self.toggle_vitamin_filter,         Qt.ApplicationShortcut)
+        _sc("filter_wild_pkmn",    self.toggle_fight_wild_pkmn_filter, Qt.ApplicationShortcut)
+        _sc("filter_acquire_item", self.toggle_acquire_item_filter,    Qt.ApplicationShortcut)
+        _sc("filter_purchase_item",self.toggle_purchase_item_filter,   Qt.ApplicationShortcut)
+        _sc("filter_use_item",     self.toggle_use_item_filter,        Qt.ApplicationShortcut)
+        _sc("filter_sell_item",    self.toggle_sell_item_filter,       Qt.ApplicationShortcut)
+        _sc("filter_hold_item",    self.toggle_hold_item_filter,       Qt.ApplicationShortcut)
+        _sc("filter_levelup_move", self.toggle_levelup_move_filter,    Qt.ApplicationShortcut)
+        _sc("filter_save",         self.toggle_save_filter,            Qt.ApplicationShortcut)
+        _sc("filter_heal",         self.toggle_heal_filter,            Qt.ApplicationShortcut)
+        _sc("filter_blackout",     self.toggle_blackout_filter,        Qt.ApplicationShortcut)
+        _sc("filter_evolution",    self.toggle_evolution_filter,        Qt.ApplicationShortcut)
+        _sc("filter_notes",        self.toggle_notes_filter,           Qt.ApplicationShortcut)
+        _sc("filter_common",       self.toggle_common_filters,         Qt.ApplicationShortcut)
+        _sc("filter_reset",        self.reset_all_filters,             Qt.ApplicationShortcut)
 
     # ------------------------------------------------------------------
     # Controller callback registration
@@ -1010,6 +958,18 @@ class MainWindow(QMainWindow):
         dlg = HighlightColorConfigDialog(self)
         dlg.exec()
         self.event_list.refresh()
+
+    def open_keyboard_shortcuts_dialog(self):
+        from gui_qt.dialogs import KeyboardShortcutsDialog
+        dlg = KeyboardShortcutsDialog(self, apply_callback=self._apply_shortcut_changes)
+        dlg.exec()
+
+    def _apply_shortcut_changes(self):
+        """Re-read all shortcuts from config and update menu actions + QShortcuts."""
+        for action_id, act in self._shortcut_actions.items():
+            act.setShortcut(QKeySequence(config.get_shortcut(action_id)))
+        for action_id, sc in self._qshortcuts.items():
+            sc.setKey(QKeySequence(config.get_shortcut(action_id)))
 
     def open_new_route_window(self):
         self._route_loaded_before_new_route = self._controller.get_version() is not None
@@ -1466,6 +1426,94 @@ class MainWindow(QMainWindow):
             self._get_route_search().toggle_filter_by_type(const.TASK_FIGHT_WILD_PKMN)
         except Exception as e:
             logger.error(f"Error toggling Wild Pkmn filter: {e}")
+
+    def toggle_acquire_item_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_GET_FREE_ITEM)
+        except Exception as e:
+            logger.error(f"Error toggling Acquire Item filter: {e}")
+
+    def toggle_purchase_item_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_PURCHASE_ITEM)
+        except Exception as e:
+            logger.error(f"Error toggling Purchase Item filter: {e}")
+
+    def toggle_use_item_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_USE_ITEM)
+        except Exception as e:
+            logger.error(f"Error toggling Use/Drop Item filter: {e}")
+
+    def toggle_sell_item_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_SELL_ITEM)
+        except Exception as e:
+            logger.error(f"Error toggling Sell Item filter: {e}")
+
+    def toggle_hold_item_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_HOLD_ITEM)
+        except Exception as e:
+            logger.error(f"Error toggling Hold Item filter: {e}")
+
+    def toggle_levelup_move_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_LEARN_MOVE_LEVELUP)
+        except Exception as e:
+            logger.error(f"Error toggling Levelup Move filter: {e}")
+
+    def toggle_save_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_SAVE)
+        except Exception as e:
+            logger.error(f"Error toggling Game Save filter: {e}")
+
+    def toggle_heal_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_HEAL)
+        except Exception as e:
+            logger.error(f"Error toggling Heal filter: {e}")
+
+    def toggle_blackout_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_BLACKOUT)
+        except Exception as e:
+            logger.error(f"Error toggling Blackout filter: {e}")
+
+    def toggle_evolution_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_EVOLUTION)
+        except Exception as e:
+            logger.error(f"Error toggling Evolution filter: {e}")
+
+    def toggle_notes_filter(self):
+        if self._text_field_has_focus:
+            return
+        try:
+            self._get_route_search().toggle_filter_by_type(const.TASK_NOTES_ONLY)
+        except Exception as e:
+            logger.error(f"Error toggling Notes Only filter: {e}")
 
     def toggle_common_filters(self):
         if self._text_field_has_focus:

@@ -269,13 +269,17 @@ class Router:
         if insert_after is not None:
             insert_after_obj = self.get_event_obj(insert_after)
             if isinstance(insert_after_obj, route_events.EventItem):
-                raise ValueError("Cannot insert an object into the middle of a group")
+                # Resolve EventItem to its parent EventGroup for insertion
+                insert_after_obj = insert_after_obj.parent
+                insert_after = insert_after_obj.group_id
 
             parent_obj = insert_after_obj.parent
         elif insert_before is not None:
             insert_before_obj = self.get_event_obj(insert_before)
             if isinstance(insert_before_obj, route_events.EventItem):
-                raise ValueError("Cannot insert an object into the middle of a group")
+                # Resolve EventItem to its parent EventGroup for insertion
+                insert_before_obj = insert_before_obj.parent
+                insert_before = insert_before_obj.group_id
 
             parent_obj = insert_before_obj.parent
         else:

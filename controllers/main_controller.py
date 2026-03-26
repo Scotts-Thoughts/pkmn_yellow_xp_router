@@ -708,8 +708,11 @@ class MainController:
         # The idea here is we want to get the current state to operate on
         # MOST of the time, this is just the final state of the selected event
         # (since we will insert after the selected event)
-        result = self.get_single_selected_event_obj(allow_event_items=False)
+        result = self.get_single_selected_event_obj()
         if result is not None:
+            # If an EventItem is selected, resolve to its parent EventGroup
+            if isinstance(result, EventItem):
+                result = result.parent
             return result.final_state
 
         # If no event is selected, because we are looking at an empty route
@@ -731,8 +734,8 @@ class MainController:
         if cur_obj is None:
             return False
 
-        # Can't insert after EventItems, only other event types
-        return not isinstance(cur_obj, EventItem)
+        # EventItems are fine -- we resolve to their parent group for insertion
+        return True
 
     def save_route(self, route_name):
         try:

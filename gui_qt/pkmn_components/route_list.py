@@ -46,6 +46,28 @@ _STATIC_TAG_COLORS = {
 }
 
 
+def _lighten_color(color: QColor, amount: float = 0.25) -> QColor:
+    """Return a lighter version of *color* by blending toward white."""
+    r = min(255, int(color.red()   + (255 - color.red())   * amount))
+    g = min(255, int(color.green() + (255 - color.green()) * amount))
+    b = min(255, int(color.blue()  + (255 - color.blue())  * amount))
+    return QColor(r, g, b, color.alpha())
+
+
+# Default hover color used when a row has no custom background.
+_DEFAULT_HOVER_COLOR = None  # Computed lazily from config background.
+
+
+def _get_default_hover_color() -> QColor:
+    global _DEFAULT_HOVER_COLOR
+    if _DEFAULT_HOVER_COLOR is None:
+        bg = QColor(config.get_background_color())
+        _DEFAULT_HOVER_COLOR = _lighten_color(bg, 0.10)
+    return _DEFAULT_HOVER_COLOR
+
+
+
+
 def _get_attr(obj, attr_name):
     """Retrieve an attribute from *obj*, calling it if callable."""
     val = getattr(obj, attr_name, None)
@@ -78,6 +100,11 @@ class RouteList(QTreeView):
 
         # --- scroll bars --------------------------------------------------
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+        # --- hover tracking -----------------------------------------------
+        self._init_hover_tracking()
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
 
         # --- selection mode -----------------------------------------------
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -123,6 +150,10 @@ class RouteList(QTreeView):
         self._update_highlight_colors()
         self._update_folder_text_color()
 
+        # --- popovers (created on first use) ------------------------------
+        self._quick_add_popover = None
+        self._filter_popover = None
+
         # --- signals / events ---------------------------------------------
         self.expanded.connect(self._on_item_expanded)
         self.collapsed.connect(self._on_item_collapsed)
@@ -160,6 +191,9 @@ class RouteList(QTreeView):
 
     def _update_highlight_colors(self):
         """Cache highlight colors from config."""
+        global _DEFAULT_HOVER_COLOR
+        _DEFAULT_HOVER_COLOR = None  # Reset so it re-derives from config
+
         self._highlight_colors.clear()
         for idx, label in enumerate(const.ALL_HIGHLIGHT_LABELS, 1):
             self._highlight_colors[label] = QColor(config.get_highlight_color(idx))
@@ -314,6 +348,70 @@ class RouteList(QTreeView):
         super().mousePressEvent(event)
 
     # ------------------------------------------------------------------
+    #  Quick-add popover (Space key)
+    # ------------------------------------------------------------------
+
+    _QUICK_ADD_KEYS = {
+        Qt.Key_Space: None,
+        Qt.Key_Q: 0,  # Trainer
+        Qt.Key_W: 1,  # Item
+        Qt.Key_E: 2,  # Move
+        Qt.Key_R: 3,  # Wild Pkmn
+        Qt.Key_T: 4,  # Misc
+    }
+
+    def keyPressEvent(self, event):
+        if not event.modifiers():
+            if event.key() in self._QUICK_ADD_KEYS:
+                if self._controller.can_insert_after_current_selection():
+                    indexes = self.selectionModel().selectedRows(_COL_NAME)
+                    if indexes:
+                        category = self._QUICK_ADD_KEYS[event.key()]
+                        self._show_quick_add_popover(indexes[-1], category)
+                        return
+            elif event.key() == Qt.Key_F:
+                self._show_filter_popover()
+                return
+        super().keyPressEvent(event)
+
+    def _show_quick_add_popover(self, index, category_idx=None):
+        """Show the quick-add popover above the row at *index*.
+
+        If *category_idx* is given, skip straight to that category's detail
+        panel.
+        """
+        rect = self.visualRect(index)
+        top_center = self.viewport().mapToGlobal(rect.topLeft())
+        top_center.setX(top_center.x() + rect.width() // 2)
+
+        if self._quick_add_popover is None:
+            from gui_qt.components.quick_add_popover import QuickAddPopover
+            self._quick_add_popover = QuickAddPopover(self._controller, self)
+
+        self._quick_add_popover.show_above(top_center, category_idx=category_idx)
+
+    # ------------------------------------------------------------------
+    #  Filter popover (F key)
+    # ------------------------------------------------------------------
+
+    def _show_filter_popover(self):
+        """Show the filter popover above the selected row or viewport center."""
+        indexes = self.selectionModel().selectedRows(_COL_NAME)
+        if indexes:
+            rect = self.visualRect(indexes[-1])
+            pos = self.viewport().mapToGlobal(rect.topLeft())
+            pos.setX(pos.x() + rect.width() // 2)
+        else:
+            vp = self.viewport()
+            pos = vp.mapToGlobal(vp.rect().center())
+
+        if self._filter_popover is None:
+            from gui_qt.components.filter_popover import FilterPopover
+            self._filter_popover = FilterPopover(self._controller, self)
+
+        self._filter_popover.show_above(pos)
+
+    # ------------------------------------------------------------------
     #  Drag-and-drop
     # ------------------------------------------------------------------
 
@@ -421,14 +519,121 @@ class RouteList(QTreeView):
 
     # ------------------------------------------------------------------
 
+    def _init_hover_tracking(self):
+        self._hovered_row = QModelIndex()
+
+    def mouseMoveEvent(self, event):
+        idx = self.indexAt(event.pos())
+        # Normalize to the name column so we can compare rows consistently.
+        row_idx = idx.sibling(idx.row(), _COL_NAME) if idx.isValid() else QModelIndex()
+        if row_idx != self._hovered_row:
+            self._hovered_row = row_idx
+            self.viewport().update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered_row = QModelIndex()
+        self.viewport().update()
+        super().leaveEvent(event)
+
+    def _row_bg_color(self, index):
+        """Compute the background color for a row given its state.
+
+        Returns a QColor to fill, or None for no custom fill.
+        """
+        name_index = index.sibling(index.row(), _COL_NAME)
+        item = self._model.itemFromIndex(name_index)
+        bg_data = item.data(Qt.BackgroundRole) if item is not None else None
+        has_custom_bg = isinstance(bg_data, QBrush)
+
+        is_selected = self.selectionModel().isSelected(name_index)
+        is_hovered = (self._hovered_row.isValid()
+                      and name_index.row() == self._hovered_row.row()
+                      and name_index.parent() == self._hovered_row.parent())
+
+        # Selection always shows as blue, overriding any custom highlight.
+        if is_selected and is_hovered:
+            return _lighten_color(QColor("#0078d4"), 0.20)
+        if is_selected:
+            return QColor("#0078d4")
+        if is_hovered:
+            if has_custom_bg:
+                return _lighten_color(bg_data.color(), 0.12)
+            return _get_default_hover_color()
+        if has_custom_bg:
+            return bg_data.color()
+        return None
+
+    def drawBranches(self, painter, rect, index):
+        """Paint the branch area using the color pre-computed by drawRow.
+
+        This is called from inside super().drawRow() -- by that point drawRow
+        has already temporarily deselected the row, so super().drawBranches()
+        won't draw selection chrome.  We just need to fill with the correct
+        color (stored by drawRow) so the branch area matches the item area.
+        """
+        color = getattr(self, '_draw_row_color', None)
+        if color is not None:
+            painter.fillRect(rect, color)
+        super().drawBranches(painter, rect, index)
+
     def drawRow(self, painter, option, index):
-        """Paint row background across full width so highlights span the indentation area."""
-        item = self._model.itemFromIndex(index)
+        """Paint row background across full width, handling highlight colors,
+        selection, and hover lightening uniformly for the entire row.
+
+        We temporarily deselect the row and strip BackgroundRole from items
+        so that super().drawRow() only paints text, icons, checkboxes, and
+        branch arrows -- no backgrounds or selection chrome at all.
+        """
+        name_index = index.sibling(index.row(), _COL_NAME)
+
+        # Compute the color BEFORE deselecting so selection state is visible.
+        color = self._row_bg_color(index)
+        # Store for drawBranches (called from within super().drawRow()).
+        self._draw_row_color = color
+
+        if color is not None:
+            painter.fillRect(option.rect, color)
+
+        # --- Temporarily strip BackgroundRole from all cells ---------------
+        item = self._model.itemFromIndex(name_index)
+        saved_bg = []
+        model_was_blocked = False
         if item is not None:
-            bg = item.data(Qt.BackgroundRole)
-            if isinstance(bg, QBrush):
-                painter.fillRect(option.rect, bg)
+            parent = item.parent() or self._model.invisibleRootItem()
+            row = item.row()
+            model_was_blocked = self._model.signalsBlocked()
+            self._model.blockSignals(True)
+            for col in range(self._model.columnCount()):
+                col_item = parent.child(row, col)
+                if col_item is not None:
+                    old_bg = col_item.data(Qt.BackgroundRole)
+                    if old_bg is not None:
+                        saved_bg.append((col_item, old_bg))
+                        col_item.setData(None, Qt.BackgroundRole)
+
+        # --- Temporarily deselect so super paints zero selection chrome ----
+        sel_model = self.selectionModel()
+        was_selected = sel_model.isSelected(name_index)
+        sel_was_blocked = sel_model.signalsBlocked()
+        if was_selected:
+            sel_model.blockSignals(True)
+            sel_model.select(name_index, QItemSelectionModel.Deselect | QItemSelectionModel.Rows)
+
         super().drawRow(painter, option, index)
+
+        # --- Restore selection ---------------------------------------------
+        if was_selected:
+            sel_model.select(name_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+            sel_model.blockSignals(sel_was_blocked)
+
+        # --- Restore BackgroundRole ----------------------------------------
+        for col_item, old_bg in saved_bg:
+            col_item.setData(old_bg, Qt.BackgroundRole)
+        if item is not None:
+            self._model.blockSignals(model_was_blocked)
+
+        self._draw_row_color = None
 
     def _unregister_text_field_focus(self):
         """Notify the top-level window to unregister text-field focus."""

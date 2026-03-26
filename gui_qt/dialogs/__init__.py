@@ -11,6 +11,7 @@ from gui_qt.dialogs.highlight_color_config_dialog import HighlightColorConfigDia
 from gui_qt.dialogs.data_dir_config_dialog import DataDirConfigDialog
 from gui_qt.dialogs.add_events_dialog import AddEventsDialog
 from gui_qt.dialogs.filters_dialog import FiltersDialog
+from gui_qt.dialogs.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
 
 __all__ = [
     "BaseDialog",
@@ -26,4 +27,5 @@ __all__ = [
     "DataDirConfigDialog",
     "AddEventsDialog",
     "FiltersDialog",
+    "KeyboardShortcutsDialog",
 ]

@@ -790,7 +790,11 @@ class LearnMoveEditor(EventEditorBase):
         self._move_selector.enable()
         self._destination.enable()
         # Re-run callback to correctly disable destination if needed
-        ignore_updates(self._move_selected_callback)()
+        self._ignoring_updates = True
+        try:
+            self._move_selected_callback()
+        finally:
+            self._ignoring_updates = False
 
     def disable(self):
         self._item_filter.disable()

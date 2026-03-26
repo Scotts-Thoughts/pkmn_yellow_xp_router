@@ -1,8 +1,229 @@
 import json
 import os
+import copy
 
 from utils.constants import const
 from utils import io_utils
+
+# -----------------------------------------------------------------------
+# Default keyboard shortcuts -- canonical source of truth
+# Keys are action IDs used internally; values are Qt key-sequence strings.
+# -----------------------------------------------------------------------
+DEFAULT_SHORTCUTS = {
+    # File menu
+    "customize_dvs":            "Ctrl+X",
+    "new_route":                "Ctrl+N",
+    "load_route":               "Ctrl+L",
+    "save_route":               "Ctrl+S",
+    "close_route":              "Ctrl+Shift+C",
+    "auto_load_recent":         "F2",
+    "export_notes":             "Ctrl+Shift+W",
+    "screenshot_events":        "F5",
+    "screenshot_battle":        "F6",
+    "screenshot_player":        "F7",
+    "screenshot_enemy":         "F8",
+    "open_image_folder":        "F12",
+    "config_font":              "Ctrl+Shift+D",
+    "custom_gens":              "Ctrl+Shift+E",
+    "app_config":               "Ctrl+Shift+A",
+    "open_data_folder":         "Ctrl+Shift+O",
+    "keyboard_shortcuts":       "Ctrl+Shift+K",
+    # Events menu
+    "undo":                     "Ctrl+Z",
+    "move_event_up":            "Ctrl+E",
+    "move_event_down":          "Ctrl+D",
+    "move_event_up_folder":     "Ctrl+Shift+E",
+    "move_event_down_folder":   "Ctrl+Shift+D",
+    "enable_disable":           "Ctrl+C",
+    "toggle_highlight":         "Ctrl+V",
+    "delete_event":             "Ctrl+B",
+    # Highlight menu
+    "highlight_1":              "Shift+1",
+    "highlight_2":              "Shift+2",
+    "highlight_3":              "Shift+3",
+    "highlight_4":              "Shift+4",
+    "highlight_5":              "Shift+5",
+    "highlight_6":              "Shift+6",
+    "highlight_7":              "Shift+7",
+    "highlight_8":              "Shift+8",
+    "highlight_9":              "Shift+9",
+    # Folders menu
+    "new_folder":               "Ctrl+Shift+Alt+F",
+    "rename_folder":            "Ctrl+Shift+F",
+    "split_folder":             "Alt+X",
+    # Recording menu
+    "toggle_recording":         "F1",
+    # Battle Summary menu
+    "toggle_move_highlights":   "Shift+F2",
+    "toggle_fade_no_highlight": "Shift+F3",
+    "toggle_test_moves":        "Shift+F1",
+    "candy_decrement":          "F3",
+    "candy_increment":          "F4",
+    "toggle_player_strat":      "F9",
+    "toggle_enemy_strat":       "F10",
+    # QShortcut-only (not in menus)
+    "delete_key":               "Delete",
+    "scroll_home":              "Home",
+    "scroll_end":               "End",
+    "toggle_tabs":              "`",
+    "toggle_summary":           "Ctrl+`",
+    "gym_1":                    "1",
+    "gym_2":                    "2",
+    "gym_3":                    "3",
+    "gym_4":                    "4",
+    "gym_5":                    "5",
+    "gym_6":                    "6",
+    "gym_7":                    "7",
+    "gym_8":                    "8",
+    "e4_1":                     "Ctrl+1",
+    "e4_2":                     "Ctrl+2",
+    "e4_3":                     "Ctrl+3",
+    "e4_4":                     "Ctrl+4",
+    "e4_5":                     "Ctrl+5",
+    "e4_6":                     "Ctrl+6",
+    "toggle_add_events":        "Ctrl+F1",
+    "toggle_filters":           "Ctrl+F2",
+    # Filter toggles (application-wide)
+    "filter_trainer":           "Ctrl+F",
+    "filter_rare_candy":        "Ctrl+R",
+    "filter_tm_hm":             "Ctrl+T",
+    "filter_vitamin":           "Ctrl+G",
+    "filter_wild_pkmn":         "Ctrl+W",
+    "filter_acquire_item":      "",
+    "filter_purchase_item":     "",
+    "filter_use_item":          "",
+    "filter_sell_item":         "",
+    "filter_hold_item":         "",
+    "filter_levelup_move":      "",
+    "filter_save":              "",
+    "filter_heal":              "",
+    "filter_blackout":          "",
+    "filter_evolution":         "",
+    "filter_notes":             "",
+    "filter_common":            "Ctrl+A",
+    "filter_reset":             "Ctrl+Shift+R",
+}
+
+# Human-readable labels for each shortcut action, grouped by category
+SHORTCUT_LABELS = {
+    # File menu
+    "customize_dvs":            "Customize DVs",
+    "new_route":                "New Route",
+    "load_route":               "Load Route",
+    "save_route":               "Save Route",
+    "close_route":              "Close Route",
+    "auto_load_recent":         "Auto-Load Most Recent Route",
+    "export_notes":             "Export Notes",
+    "screenshot_events":        "Screenshot Event List",
+    "screenshot_battle":        "Screenshot Battle Summary",
+    "screenshot_player":        "Screenshot Player Ranges",
+    "screenshot_enemy":         "Screenshot Enemy Ranges",
+    "open_image_folder":        "Open Image Folder",
+    "config_font":              "Config Font",
+    "custom_gens":              "Custom Gens",
+    "app_config":               "App Config",
+    "open_data_folder":         "Open Data Folder",
+    "keyboard_shortcuts":       "Keyboard Shortcuts",
+    # Events menu
+    "undo":                     "Undo",
+    "move_event_up":            "Move Event Up",
+    "move_event_down":          "Move Event Down",
+    "move_event_up_folder":     "Move Event Up To Next Folder",
+    "move_event_down_folder":   "Move Event Down To Next Folder",
+    "enable_disable":           "Enable/Disable",
+    "toggle_highlight":         "Toggle Highlight",
+    "delete_event":             "Delete Event",
+    # Highlight menu
+    "highlight_1":              "Highlight 1",
+    "highlight_2":              "Highlight 2",
+    "highlight_3":              "Highlight 3",
+    "highlight_4":              "Highlight 4",
+    "highlight_5":              "Highlight 5",
+    "highlight_6":              "Highlight 6",
+    "highlight_7":              "Highlight 7",
+    "highlight_8":              "Highlight 8",
+    "highlight_9":              "Highlight 9",
+    # Folders menu
+    "new_folder":               "New Folder",
+    "rename_folder":            "Rename Current Folder",
+    "split_folder":             "Split Folder",
+    # Recording menu
+    "toggle_recording":         "Toggle Recording",
+    # Battle Summary menu
+    "toggle_move_highlights":   "Toggle Move Highlights",
+    "toggle_fade_no_highlight": "Toggle Fade Moves Without Highlight",
+    "toggle_test_moves":        "Toggle Test Moves",
+    "candy_decrement":          "Decrement Pre-Fight Candies",
+    "candy_increment":          "Increment Pre-Fight Candies",
+    "toggle_player_strat":      "Toggle Player Highlight Strategy",
+    "toggle_enemy_strat":       "Toggle Enemy Highlight Strategy",
+    # QShortcut-only
+    "delete_key":               "Delete Event (Delete Key)",
+    "scroll_home":              "Scroll to Top",
+    "scroll_end":               "Scroll to Bottom",
+    "toggle_tabs":              "Toggle Event Tabs",
+    "toggle_summary":           "Toggle Summary Window",
+    "gym_1":                    "Select Gym Leader 1",
+    "gym_2":                    "Select Gym Leader 2",
+    "gym_3":                    "Select Gym Leader 3",
+    "gym_4":                    "Select Gym Leader 4",
+    "gym_5":                    "Select Gym Leader 5",
+    "gym_6":                    "Select Gym Leader 6",
+    "gym_7":                    "Select Gym Leader 7",
+    "gym_8":                    "Select Gym Leader 8",
+    "e4_1":                     "Select Elite Four 1",
+    "e4_2":                     "Select Elite Four 2",
+    "e4_3":                     "Select Elite Four 3",
+    "e4_4":                     "Select Elite Four 4",
+    "e4_5":                     "Select Elite Four 5",
+    "e4_6":                     "Select Elite Four/Champion 6",
+    "toggle_add_events":        "Toggle Add Events Dialog",
+    "toggle_filters":           "Toggle Filters Dialog",
+    # Filter toggles
+    "filter_trainer":           "Toggle Trainer Filter",
+    "filter_rare_candy":        "Toggle Rare Candy Filter",
+    "filter_tm_hm":             "Toggle TM/HM Filter",
+    "filter_vitamin":           "Toggle Vitamin Filter",
+    "filter_wild_pkmn":         "Toggle Wild Pkmn Filter",
+    "filter_acquire_item":      "Toggle Acquire Item Filter",
+    "filter_purchase_item":     "Toggle Purchase Item Filter",
+    "filter_use_item":          "Toggle Use/Drop Item Filter",
+    "filter_sell_item":         "Toggle Sell Item Filter",
+    "filter_hold_item":         "Toggle Hold Item Filter",
+    "filter_levelup_move":      "Toggle Levelup Move Filter",
+    "filter_save":              "Toggle Game Save Filter",
+    "filter_heal":              "Toggle Heal Filter",
+    "filter_blackout":          "Toggle Blackout Filter",
+    "filter_evolution":         "Toggle Evolution Filter",
+    "filter_notes":             "Toggle Notes Only Filter",
+    "filter_common":            "Toggle Common Filters",
+    "filter_reset":             "Reset All Filters",
+}
+
+SHORTCUT_CATEGORIES = {
+    "File":             ["customize_dvs", "new_route", "load_route", "save_route", "close_route",
+                         "auto_load_recent", "export_notes", "screenshot_events", "screenshot_battle",
+                         "screenshot_player", "screenshot_enemy", "open_image_folder",
+                         "config_font", "custom_gens", "app_config", "open_data_folder", "keyboard_shortcuts"],
+    "Events":           ["undo", "move_event_up", "move_event_down", "move_event_up_folder",
+                         "move_event_down_folder", "enable_disable", "toggle_highlight", "delete_event"],
+    "Highlight":        [f"highlight_{i}" for i in range(1, 10)],
+    "Folders":          ["new_folder", "rename_folder", "split_folder"],
+    "Recording":        ["toggle_recording"],
+    "Battle Summary":   ["toggle_move_highlights", "toggle_fade_no_highlight", "toggle_test_moves",
+                         "candy_decrement", "candy_increment", "toggle_player_strat", "toggle_enemy_strat"],
+    "Navigation":       ["delete_key", "scroll_home", "scroll_end", "toggle_tabs", "toggle_summary",
+                         "gym_1", "gym_2", "gym_3", "gym_4", "gym_5", "gym_6", "gym_7", "gym_8",
+                         "e4_1", "e4_2", "e4_3", "e4_4", "e4_5", "e4_6",
+                         "toggle_add_events", "toggle_filters"],
+    "Filters":          ["filter_trainer", "filter_rare_candy", "filter_tm_hm", "filter_vitamin",
+                         "filter_wild_pkmn", "filter_acquire_item", "filter_purchase_item",
+                         "filter_use_item", "filter_sell_item", "filter_hold_item",
+                         "filter_levelup_move", "filter_save", "filter_heal",
+                         "filter_blackout", "filter_evolution", "filter_notes",
+                         "filter_common", "filter_reset"],
+}
+
 
 class Config:
     DEFAULT_SUCCESS = "#4ec97a"
@@ -93,6 +314,9 @@ class Config:
             key = f"highlight_color_{i}"
             if key in raw:
                 self._highlight_colors[i] = raw[key]
+
+        # Keyboard shortcuts -- only store overrides (diff from defaults)
+        self._shortcut_overrides = raw.get("keyboard_shortcuts", {})
     
     def _save(self):
         if not os.path.exists(const.GLOBAL_CONFIG_DIR):
@@ -145,6 +369,9 @@ class Config:
         # Save fight category colors
         for cat, color in getattr(self, '_fight_category_colors', {}).items():
             data[f"fight_category_color_{cat}"] = color
+        # Save keyboard shortcut overrides
+        if self._shortcut_overrides:
+            data["keyboard_shortcuts"] = self._shortcut_overrides
 
         with open(const.GLOBAL_CONFIG_FILE, 'w') as f:
             json.dump(data, f, indent=4)
@@ -398,11 +625,11 @@ class Config:
 
     # --- Fight category colors ---
     FIGHT_CATEGORY_COLOR_DEFAULTS = {
-        "rival": "#2848a0",
-        "gym_leader": "#909090",
-        "elite_four": "#7030a0",
-        "champion": "#383838",
-        "post_game": "#30a030",
+        "rival": "#12196b",
+        "gym_leader": "#0d0d0d",
+        "elite_four": "#38084d",
+        "champion": "#8b6914",
+        "post_game": "#0c2a0c",
         "boss": "#808080",
         "team_leader": "#702060",
     }
@@ -508,6 +735,55 @@ class Config:
 
     def set_run_summary_docked(self, val):
         self._run_summary_docked = val
+        self._save()
+
+    # --- Keyboard shortcuts ---
+    def get_shortcut(self, action_id):
+        """Return the key sequence string for *action_id*, respecting overrides."""
+        return self._shortcut_overrides.get(action_id, DEFAULT_SHORTCUTS.get(action_id, ""))
+
+    def get_all_shortcuts(self):
+        """Return a merged dict of all shortcuts (defaults + overrides)."""
+        merged = copy.copy(DEFAULT_SHORTCUTS)
+        merged.update(self._shortcut_overrides)
+        return merged
+
+    def set_shortcut(self, action_id, key_sequence):
+        """Set a custom shortcut. If it matches the default, remove the override."""
+        default = DEFAULT_SHORTCUTS.get(action_id, "")
+        if key_sequence == default:
+            self._shortcut_overrides.pop(action_id, None)
+        else:
+            self._shortcut_overrides[action_id] = key_sequence
+        self._save()
+
+    def reset_shortcut(self, action_id):
+        """Reset a single shortcut to its default."""
+        self._shortcut_overrides.pop(action_id, None)
+        self._save()
+
+    def reset_all_shortcuts(self):
+        """Reset all shortcuts to defaults."""
+        self._shortcut_overrides.clear()
+        self._save()
+
+    def is_shortcut_customized(self, action_id):
+        return action_id in self._shortcut_overrides
+
+    def export_shortcuts(self, file_path):
+        """Export the current shortcut profile to a JSON file."""
+        data = self.get_all_shortcuts()
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=4)
+
+    def import_shortcuts(self, file_path):
+        """Import a shortcut profile from a JSON file. Only stores diffs from defaults."""
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+        self._shortcut_overrides = {}
+        for action_id, key_seq in data.items():
+            if action_id in DEFAULT_SHORTCUTS and key_seq != DEFAULT_SHORTCUTS[action_id]:
+                self._shortcut_overrides[action_id] = key_seq
         self._save()
 
 config = Config()

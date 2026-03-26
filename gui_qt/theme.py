@@ -350,7 +350,7 @@ QTreeView {{
     background-color: {bg_lighter};
     color: {text};
     border: 1px solid {border_color};
-    selection-background-color: {accent};
+    selection-background-color: transparent;
     outline: none;
 }}
 QTreeView::item {{
@@ -358,17 +358,17 @@ QTreeView::item {{
     min-height: 18px;
 }}
 QTreeView::item:selected {{
-    background-color: {accent};
+    background-color: transparent;
     color: #ffffff;
 }}
-QTreeView::item:hover:!selected {{
-    background-color: {hover_bg};
+QTreeView::item:hover {{
+    background-color: transparent;
 }}
 QTreeView::branch:selected {{
-    background-color: {accent};
+    background-color: transparent;
 }}
-QTreeView::branch:hover:!selected {{
-    background-color: {hover_bg};
+QTreeView::branch:hover {{
+    background-color: transparent;
 }}
 QTreeView::branch:has-children:!has-siblings:closed,
 QTreeView::branch:closed:has-children:has-siblings {{
