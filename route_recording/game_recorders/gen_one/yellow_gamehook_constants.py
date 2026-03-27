@@ -30,27 +30,65 @@ class Gen1GameHookConstants:
             "Rival1 Bulbasaur 1",
         ]
 
-        self.KEY_OVERWORLD_MAP = "overworld.map"
-        self.KEY_AUDIO_CHANNEL_4 = "audio.channel4"
-        self.KEY_AUDIO_CHANNEL_5 = "audio.channel5"
-        self.KEY_AUDIO_CHANNEL_7 = "audio.channel7"
-        self.KEY_PLAYER_PLAYERID = "player.playerId"
-        self.KEY_PLAYER_MONEY = "player.money"
-        self.KEY_PLAYER_MON_EXPPOINTS = "player.team.0.expPoints"
+        self.TRAINER_BATTLE_TYPE = "Trainer"
+        self.WILD_BATTLE_TYPE = "Wild"
+        self.END_OF_ITEM_LIST = "--End of list--"
+
+        self.MAP_GAME_CORNER = "Celadon City - Game Corner"
+
+        # default to deprecated mapper paths
+        self.configure_for_mapper(None)
+
+    def configure_for_mapper(self, game_name=None):
+        deprecated = game_name is None or "Deprecated" in game_name
+
+        # Overworld
+        self.KEY_OVERWORLD_MAP = "overworld.map" if deprecated else "overworld.map_name"
+
+        # Audio (deprecated is 1-indexed, standard is 0-indexed)
+        if deprecated:
+            self.KEY_AUDIO_CHANNEL_4 = "audio.channel4"
+            self.KEY_AUDIO_CHANNEL_5 = "audio.channel5"
+            self.KEY_AUDIO_CHANNEL_7 = "audio.channel7"
+        else:
+            self.KEY_AUDIO_CHANNEL_4 = "audio.channels.3"
+            self.KEY_AUDIO_CHANNEL_5 = "audio.channels.4"
+            self.KEY_AUDIO_CHANNEL_7 = "audio.channels.6"
+
+        # Player
+        self.KEY_PLAYER_PLAYERID = "player.playerId" if deprecated else "player.player_id"
+        self.KEY_PLAYER_MONEY = "player.money" if deprecated else "bag.money"
+        self.KEY_PLAYER_MON_EXPPOINTS = "player.team.0.expPoints" if deprecated else "player.team.0.exp"
         self.KEY_PLAYER_MON_LEVEL = "player.team.0.level"
         self.KEY_PLAYER_MON_SPECIES = "player.team.0.species"
 
+        # Team species/level (same in both)
         self.ALL_KEYS_PLAYER_TEAM_SPECIES = [f"player.team.{i}.species" for i in range(0, 6)]
         self.ALL_KEYS_PLAYER_TEAM_LEVEL = [f"player.team.{i}.level" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_DV_ATTACK = [f"player.team.{i}.dvAttack" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_DV_DEFENSE = [f"player.team.{i}.dvDefense" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_DV_SPEED = [f"player.team.{i}.dvSpeed" for i in range(0, 6)]
-        self.ALL_KEYS_PLAYER_TEAM_DV_SPECIAL = [f"player.team.{i}.dvSpecial" for i in range(0, 6)]
 
-        self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.move1"
-        self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.move2"
-        self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.move3"
-        self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.move4"
+        # DVs/IVs
+        if deprecated:
+            self.ALL_KEYS_PLAYER_TEAM_DV_ATTACK = [f"player.team.{i}.dvAttack" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_DEFENSE = [f"player.team.{i}.dvDefense" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_SPEED = [f"player.team.{i}.dvSpeed" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_SPECIAL = [f"player.team.{i}.dvSpecial" for i in range(0, 6)]
+        else:
+            self.ALL_KEYS_PLAYER_TEAM_DV_ATTACK = [f"player.team.{i}.ivs.attack" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_DEFENSE = [f"player.team.{i}.ivs.defense" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_SPEED = [f"player.team.{i}.ivs.speed" for i in range(0, 6)]
+            self.ALL_KEYS_PLAYER_TEAM_DV_SPECIAL = [f"player.team.{i}.ivs.special" for i in range(0, 6)]
+
+        # Moves
+        if deprecated:
+            self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.move1"
+            self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.move2"
+            self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.move3"
+            self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.move4"
+        else:
+            self.KEY_PLAYER_MON_MOVE_1 = "player.team.0.moves.0.move"
+            self.KEY_PLAYER_MON_MOVE_2 = "player.team.0.moves.1.move"
+            self.KEY_PLAYER_MON_MOVE_3 = "player.team.0.moves.2.move"
+            self.KEY_PLAYER_MON_MOVE_4 = "player.team.0.moves.3.move"
         self.ALL_KEYS_PLAYER_MOVES = [
             self.KEY_PLAYER_MON_MOVE_1,
             self.KEY_PLAYER_MON_MOVE_2,
@@ -58,11 +96,19 @@ class Gen1GameHookConstants:
             self.KEY_PLAYER_MON_MOVE_4,
         ]
 
-        self.KEY_PLAYER_MON_STAT_EXP_HP = "player.team.0.statExpHp"
-        self.KEY_PLAYER_MON_STAT_EXP_ATTACK = "player.team.0.statExpAttack"
-        self.KEY_PLAYER_MON_STAT_EXP_DEFENSE = "player.team.0.statExpDefense"
-        self.KEY_PLAYER_MON_STAT_EXP_SPEED = "player.team.0.statExpSpeed"
-        self.KEY_PLAYER_MON_STAT_EXP_SPECIAL = "player.team.0.statExpSpecial"
+        # Stat Exp / EVs
+        if deprecated:
+            self.KEY_PLAYER_MON_STAT_EXP_HP = "player.team.0.statExpHp"
+            self.KEY_PLAYER_MON_STAT_EXP_ATTACK = "player.team.0.statExpAttack"
+            self.KEY_PLAYER_MON_STAT_EXP_DEFENSE = "player.team.0.statExpDefense"
+            self.KEY_PLAYER_MON_STAT_EXP_SPEED = "player.team.0.statExpSpeed"
+            self.KEY_PLAYER_MON_STAT_EXP_SPECIAL = "player.team.0.statExpSpecial"
+        else:
+            self.KEY_PLAYER_MON_STAT_EXP_HP = "player.team.0.evs.hp"
+            self.KEY_PLAYER_MON_STAT_EXP_ATTACK = "player.team.0.evs.attack"
+            self.KEY_PLAYER_MON_STAT_EXP_DEFENSE = "player.team.0.evs.defense"
+            self.KEY_PLAYER_MON_STAT_EXP_SPEED = "player.team.0.evs.speed"
+            self.KEY_PLAYER_MON_STAT_EXP_SPECIAL = "player.team.0.evs.special"
         self.ALL_KEYS_STAT_EXP = [
             self.KEY_PLAYER_MON_STAT_EXP_HP,
             self.KEY_PLAYER_MON_STAT_EXP_ATTACK,
@@ -71,18 +117,28 @@ class Gen1GameHookConstants:
             self.KEY_PLAYER_MON_STAT_EXP_SPECIAL,
         ]
 
-        self.KEY_GAMETIME_SECONDS = "gameTime.seconds"
-        self.KEY_BATTLE_TYPE = "battle.type"
-        self.KEY_BATTLE_TRAINER_CLASS = "battle.trainer.class"
-        self.KEY_BATTLE_TRAINER_NUMBER = "battle.trainer.number"
-        self.KEY_BATTLE_PLAYER_MON_SPECIES = "battle.yourPokemon.species"
-        self.KEY_BATTLE_PLAYER_MON_HP = "battle.yourPokemon.battleStatHp"
-        self.KEY_BATTLE_ENEMY_SPECIES = "battle.enemyPokemon.species"
-        self.KEY_BATTLE_ENEMY_LEVEL = "battle.enemyPokemon.level"
+        # Game time
+        self.KEY_GAMETIME_SECONDS = "gameTime.seconds" if deprecated else "game_time.seconds"
 
-        self.KEY_ITEM_COUNT = "player.itemCount"
-        self.ALL_KEYS_ITEM_TYPE = [f"player.items.{i}.item" for i in range(0, 20)]
-        self.ALL_KEYS_ITEM_QUANTITY = [f"player.items.{i}.quantity" for i in range(0, 20)]
+        # Battle
+        self.KEY_BATTLE_TYPE = "battle.type" if deprecated else "battle.mode"
+        self.NONE_BATTLE_TYPE = "None" if deprecated else None
+        self.KEY_BATTLE_TRAINER_CLASS = "battle.trainer.class" if deprecated else "battle.opponent.trainer"
+        self.KEY_BATTLE_TRAINER_NUMBER = "battle.trainer.number" if deprecated else "battle.opponent.id"
+        self.KEY_BATTLE_PLAYER_MON_SPECIES = "battle.yourPokemon.species" if deprecated else "battle.player.active_pokemon.species"
+        self.KEY_BATTLE_PLAYER_MON_HP = "battle.yourPokemon.battleStatHp" if deprecated else "battle.player.active_pokemon.stats.hp"
+        self.KEY_BATTLE_ENEMY_SPECIES = "battle.enemyPokemon.species" if deprecated else "battle.opponent.active_pokemon.species"
+        self.KEY_BATTLE_ENEMY_LEVEL = "battle.enemyPokemon.level" if deprecated else "battle.opponent.active_pokemon.level"
+
+        # Items
+        if deprecated:
+            self.KEY_ITEM_COUNT = "player.itemCount"
+            self.ALL_KEYS_ITEM_TYPE = [f"player.items.{i}.item" for i in range(0, 20)]
+            self.ALL_KEYS_ITEM_QUANTITY = [f"player.items.{i}.quantity" for i in range(0, 20)]
+        else:
+            self.KEY_ITEM_COUNT = "bag.item_count"
+            self.ALL_KEYS_ITEM_TYPE = [f"bag.items.{i}.item" for i in range(0, 20)]
+            self.ALL_KEYS_ITEM_QUANTITY = [f"bag.items.{i}.quantity" for i in range(0, 20)]
 
         self.ALL_KEYS_TO_REGISTER = [
             self.KEY_OVERWORLD_MAP,
@@ -105,13 +161,6 @@ class Gen1GameHookConstants:
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_ITEM_TYPE)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_ITEM_QUANTITY)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_TEAM_SPECIES)
-
-        self.TRAINER_BATTLE_TYPE = "Trainer"
-        self.WILD_BATTLE_TYPE = "Wild"
-        self.NONE_BATTLE_TYPE = "None"
-        self.END_OF_ITEM_LIST = "--End of list--"
-
-        self.MAP_GAME_CORNER = "Celadon City - Game Corner"
 
 
 class GameHookConstantConverter:
