@@ -77,7 +77,7 @@ class PkmnViewer(QWidget):
         )
         self.stat_column.set_labels(["HP:", "Attack:", "Defense:", "Spc Atk:", "Spc Def:", "Speed:"])
         self.stat_column.set_header("")
-        layout.addWidget(self.stat_column, 5, 0, alignment=Qt.AlignLeft)
+        layout.addWidget(self.stat_column, 5, 0)
 
         # Move column (row 5, column 1)
         self.move_column = StatColumn(
@@ -91,7 +91,7 @@ class PkmnViewer(QWidget):
         self.move_column.set_header("")
 
         if not self.stats_only:
-            layout.addWidget(self.move_column, 5, 1, alignment=Qt.AlignRight)
+            layout.addWidget(self.move_column, 5, 1)
         else:
             self.move_column.setVisible(False)
 
@@ -100,8 +100,6 @@ class PkmnViewer(QWidget):
         layout.setColumnStretch(1, 1)
 
     def set_pkmn(self, pkmn: universal_data_objects.EnemyPkmn, badges: universal_data_objects.BadgeList = None, speed_style=None):
-        if speed_style is None:
-            speed_style = "Secondary"
 
         self._name_value.setText(pkmn.name)
 

@@ -1524,9 +1524,10 @@ class MainWindow(QMainWindow):
             candy_on = rs.is_filter_checked(const.TASK_RARE_CANDY)
             vitamin_on = rs.is_filter_checked(const.TASK_VITAMIN)
             new_state = not (trainer_on and candy_on and vitamin_on)
-            rs.set_filter_by_type(const.TASK_TRAINER_BATTLE, new_state)
-            rs.set_filter_by_type(const.TASK_RARE_CANDY, new_state)
-            rs.set_filter_by_type(const.TASK_VITAMIN, new_state)
+            rs.set_filter_by_type(const.TASK_TRAINER_BATTLE, new_state, notify=False)
+            rs.set_filter_by_type(const.TASK_RARE_CANDY, new_state, notify=False)
+            rs.set_filter_by_type(const.TASK_VITAMIN, new_state, notify=False)
+            rs.apply_filters()
         except Exception as e:
             logger.error(f"Error toggling common filters: {e}")
 

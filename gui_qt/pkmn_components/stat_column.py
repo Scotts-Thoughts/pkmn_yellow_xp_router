@@ -2,10 +2,10 @@ import logging
 from typing import List, Optional
 
 from PySide6.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QSizePolicy,
+    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QSizePolicy, QStyle, QStyleOption,
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette, QColor
+from PySide6.QtGui import QPainter
 
 from utils.config_manager import config
 
@@ -43,7 +43,18 @@ def tinted_bg_for_style(style_prefix: str, alpha=0.15) -> str:
     return f"#{mixed[0]:02x}{mixed[1]:02x}{mixed[2]:02x}"
 
 
-class StatColumn(QWidget):
+class RoundedSection(QWidget):
+    """QWidget that properly renders QSS backgrounds with border-radius."""
+    def paintEvent(self, event):
+        opt = QStyleOption()
+        opt.initFrom(self)
+        p = QPainter(self)
+        self.style().drawPrimitive(QStyle.PE_Widget, opt, p, self)
+
+
+class StatColumn(RoundedSection):
+    _instance_counter = 0
+
     def __init__(
         self,
         parent=None,
@@ -55,25 +66,24 @@ class StatColumn(QWidget):
     ):
         super().__init__(parent)
 
+        StatColumn._instance_counter += 1
+        obj_name = f"statCol{StatColumn._instance_counter}"
+
         self._style_prefix = style_prefix
         self._label_width = label_width
         self._val_width = val_width
 
-        # Subtle tinted background for visual section grouping
-        bg_tint = tinted_bg_for_style(style_prefix)
-        self.setAutoFillBackground(True)
-        pal = self.palette()
-        pal.setColor(QPalette.Window, QColor(bg_tint))
-        self.setPalette(pal)
+        self.setObjectName(obj_name)
+        self.setStyleSheet(f"#{obj_name} {{ border-radius: 6px; }}")
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(4, 2, 4, 2)
+        main_layout.setContentsMargins(8, 6, 8, 6)
         main_layout.setSpacing(0)
 
         # Header
         self._header = QLabel("")
         self._header.setAlignment(Qt.AlignCenter)
-        self._header.setStyleSheet(f"color: {_color_for_style(style_prefix)};")
+        self._header.setStyleSheet(f"color: {config.get_text_color()};")
         self._header.setVisible(False)
         main_layout.addWidget(self._header)
 
@@ -81,10 +91,11 @@ class StatColumn(QWidget):
         self._labels: List[QLabel] = []
         self._values: List[QLabel] = []
 
-        base_color = _color_for_style(style_prefix)
+        base_color = config.get_text_color()
 
         for idx in range(num_rows):
             row_widget = QWidget()
+            row_widget.setStyleSheet("background-color: transparent;")
             row_layout = QHBoxLayout(row_widget)
             row_layout.setContentsMargins(0, 2, 0, 0)
             row_layout.setSpacing(2)
@@ -133,18 +144,16 @@ class StatColumn(QWidget):
                 self._labels[idx].setText("")
 
     def set_values(self, value_text_iterable, style_iterable=None):
-        if style_iterable is None:
-            style_iterable = [self._style_prefix for _ in value_text_iterable]
-        else:
-            style_iterable = list(style_iterable)
-            for idx in range(len(style_iterable)):
-                if style_iterable[idx] is None:
-                    style_iterable[idx] = self._style_prefix
+        base_text_color = config.get_text_color()
 
         for idx, cur_value_text in enumerate(value_text_iterable):
             if idx >= len(self._values):
                 break
-            color = _color_for_style(style_iterable[idx])
+            # Use styled color only when explicitly overridden
+            if style_iterable is not None and idx < len(style_iterable) and style_iterable[idx] is not None:
+                color = _color_for_style(style_iterable[idx])
+            else:
+                color = base_text_color
             self._values[idx].setText(str(cur_value_text))
             self._values[idx].setStyleSheet(f"color: {color};")
             self._labels[idx].setStyleSheet(f"color: {color};")

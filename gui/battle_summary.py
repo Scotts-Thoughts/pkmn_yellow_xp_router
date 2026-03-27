@@ -145,11 +145,12 @@ class BattleSummary(ttk.Frame):
         enemy_pkmn:List[universal_data_objects.EnemyPkmn],
         cur_state:full_route_state.RouteState=None,
         event_group:route_events.EventGroup=None,
+        is_wild:bool=False,
     ):
         if event_group is not None:
             self._controller.load_from_event(event_group)
         elif cur_state is not None and enemy_pkmn is not None:
-            self._controller.load_from_state(cur_state, enemy_pkmn)
+            self._controller.load_from_state(cur_state, enemy_pkmn, is_wild=is_wild)
         else:
             self._controller.load_empty()
 

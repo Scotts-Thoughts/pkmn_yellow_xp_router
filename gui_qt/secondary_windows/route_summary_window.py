@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QGridLayout, QVBoxLayout, QHBoxLayout,
     QScrollArea, QSizePolicy, QFrame, QPushButton,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QKeySequence, QPixmap, QShortcut
 
 from controllers.main_controller import MainController
@@ -147,7 +147,7 @@ class RouteSummaryPanel(QWidget):
         self._scroll_area = QScrollArea()
         self._scroll_area.setWidgetResizable(True)
         self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self._scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         outer.addWidget(self._scroll_area)
 
         self._content_widget = QWidget()
@@ -194,6 +194,13 @@ class RouteSummaryPanel(QWidget):
             content_size.width() + scroll_frame + 16,
             content_size.height() + scroll_frame + toolbar_h + 16,
         )
+
+    def _update_scroll_min_height(self):
+        """Set the scroll area minimum height to its content so nothing is clipped."""
+        self._grid.activate()
+        content_h = self._content_widget.sizeHint().height()
+        scroll_frame = self._scroll_area.frameWidth() * 2
+        self._scroll_area.setMinimumHeight(content_h + scroll_frame)
 
     # ------------------------------------------------------------------
     # Screenshot
@@ -473,6 +480,11 @@ class RouteSummaryPanel(QWidget):
                     colspan,
                 )
 
+        # Set the scroll area's minimum height to match the content so
+        # the panel (and its parent window) cannot be resized smaller.
+        # Deferred so the grid layout has finished calculating sizes.
+        QTimer.singleShot(0, self._update_scroll_min_height)
+
         self.content_refreshed.emit()
 
 
@@ -511,3 +523,4 @@ class RouteSummaryWindow(QWidget):
         w, h = self.panel.get_content_size_hint()
         screen = self.screen().availableGeometry()
         self.resize(min(w, screen.width()), min(h, screen.height()))
+        self.setMinimumHeight(h)

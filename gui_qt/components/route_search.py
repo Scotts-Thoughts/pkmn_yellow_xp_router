@@ -83,7 +83,7 @@ class RouteSearch(QWidget):
                 checkbox.toggle_checked()
                 return
 
-    def set_filter_by_type(self, event_type, checked):
+    def set_filter_by_type(self, event_type, checked, notify=True):
         for checkbox in self._filter_components:
             if checkbox.text() == event_type:
                 # set_checked blocks signals, so manually sync filter state
@@ -92,8 +92,12 @@ class RouteSearch(QWidget):
                     self._filter_vals.append(event_type)
                 elif not checked and event_type in self._filter_vals:
                     self._filter_vals.remove(event_type)
-                self._controller.set_route_filter_types(self._filter_vals)
+                if notify:
+                    self._controller.set_route_filter_types(self._filter_vals)
                 return
+
+    def apply_filters(self):
+        self._controller.set_route_filter_types(self._filter_vals)
 
     def is_filter_checked(self, event_type):
         for checkbox in self._filter_components:

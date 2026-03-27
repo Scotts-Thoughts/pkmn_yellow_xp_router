@@ -226,6 +226,12 @@ SHORTCUT_CATEGORIES = {
 
 
 class Config:
+    # Bump this version any time the default color palette changes.
+    # When the stored version doesn't match, colours are reset to defaults
+    # (all other settings are preserved).
+    COLOR_SCHEME_VERSION = 1
+    COLOR_SCHEME_VERSION_KEY = "color_scheme_version"
+
     DEFAULT_SUCCESS = "#4ec97a"
     DEFAULT_WARNING = "#e8b730"
     DEFAULT_FAILURE = "#e05555"
@@ -266,16 +272,22 @@ class Config:
             os.path.join(self._user_data_dir, const.SAVED_IMAGES_FOLDER_NAME),
         )
 
-        self._success_color = raw.get(const.SUCCESS_COLOR_KEY, self.DEFAULT_SUCCESS)
-        self._warning_color = raw.get(const.WARNING_COLOR_KEY, self.DEFAULT_WARNING)
-        self._failure_color = raw.get(const.FAILURE_COLOR_KEY, self.DEFAULT_FAILURE)
-        self._divider_color = raw.get(const.DIVIDER_COLOR_KEY, self.DEFAULT_DIVIDER)
-        self._header_color = raw.get(const.HEADER_COLOR_KEY, self.DEFAULT_HEADER)
-        self._primary_color = raw.get(const.PRIMARY_COLOR_KEY, self.DEFAULT_PRIMARY)
-        self._secondary_color = raw.get(const.SECONDARY_COLOR_KEY, self.DEFAULT_SECONDARY)
-        self._contrast_color = raw.get(const.CONTRAST_COLOR_KEY, self.DEFAULT_CONTRAST)
-        self._background_color = raw.get(const.BACKGROUND_COLOR_KEY, self.DEFAULT_BACKGROUND)
-        self._text_color = raw.get(const.TEXT_COLOR_KEY, self.DEFAULT_TEXT_COLOR)
+        # If the stored color scheme version is outdated (or missing),
+        # ignore any persisted colours so the current dark-mode defaults win.
+        colors_outdated = raw.get(self.COLOR_SCHEME_VERSION_KEY, 0) != self.COLOR_SCHEME_VERSION
+        def _color(key, default):
+            return default if colors_outdated else raw.get(key, default)
+
+        self._success_color = _color(const.SUCCESS_COLOR_KEY, self.DEFAULT_SUCCESS)
+        self._warning_color = _color(const.WARNING_COLOR_KEY, self.DEFAULT_WARNING)
+        self._failure_color = _color(const.FAILURE_COLOR_KEY, self.DEFAULT_FAILURE)
+        self._divider_color = _color(const.DIVIDER_COLOR_KEY, self.DEFAULT_DIVIDER)
+        self._header_color = _color(const.HEADER_COLOR_KEY, self.DEFAULT_HEADER)
+        self._primary_color = _color(const.PRIMARY_COLOR_KEY, self.DEFAULT_PRIMARY)
+        self._secondary_color = _color(const.SECONDARY_COLOR_KEY, self.DEFAULT_SECONDARY)
+        self._contrast_color = _color(const.CONTRAST_COLOR_KEY, self.DEFAULT_CONTRAST)
+        self._background_color = _color(const.BACKGROUND_COLOR_KEY, self.DEFAULT_BACKGROUND)
+        self._text_color = _color(const.TEXT_COLOR_KEY, self.DEFAULT_TEXT_COLOR)
 
         self._player_highlight_strategy = raw.get(const.PLAYER_HIGHLIGHT_STRATEGY_KEY, self.DEFAULT_PLAYER_HIGHLIGHT_STRATEGY)
         self._enemy_highlight_strategy = raw.get(const.ENEMY_HIGHLIGHT_STRATEGY_KEY, self.DEFAULT_ENEMY_HIGHLIGHT_STRATEGY)
@@ -317,12 +329,18 @@ class Config:
 
         # Keyboard shortcuts -- only store overrides (diff from defaults)
         self._shortcut_overrides = raw.get("keyboard_shortcuts", {})
+
+        # Persist the reset so the user's config file is stamped with the
+        # current color scheme version (avoids resetting again next launch).
+        if colors_outdated and raw:
+            self._save()
     
     def _save(self):
         if not os.path.exists(const.GLOBAL_CONFIG_DIR):
             os.makedirs(const.GLOBAL_CONFIG_DIR)
 
         data = {
+                self.COLOR_SCHEME_VERSION_KEY: self.COLOR_SCHEME_VERSION,
                 const.CONFIG_WINDOW_GEOMETRY: self._window_geometry,
                 const.USER_LOCATION_DATA_KEY: self._user_data_dir,
                 const.SUCCESS_COLOR_KEY: self._success_color,

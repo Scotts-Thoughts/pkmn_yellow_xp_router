@@ -1,13 +1,14 @@
 import logging
 
 from PySide6.QtWidgets import (
-    QWidget, QLabel, QGridLayout,
+    QWidget, QLabel, QGridLayout, QVBoxLayout,
 )
 from PySide6.QtCore import Qt
 
 from gui_qt.pkmn_components.inventory_viewer import InventoryViewer
 from gui_qt.pkmn_components.pkmn_viewer import PkmnViewer
 from gui_qt.pkmn_components.stat_exp_viewer import StatExpViewer
+from gui_qt.pkmn_components.stat_column import RoundedSection
 
 from routing import full_route_state
 from utils.config_manager import config
@@ -15,34 +16,78 @@ from utils.config_manager import config
 logger = logging.getLogger(__name__)
 
 
+def _lighten_color(hex_color, amount):
+    h = hex_color.lstrip('#')
+    rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    lightened = tuple(min(255, int(c + (255 - c) * amount)) for c in rgb)
+    return f"#{lightened[0]:02x}{lightened[1]:02x}{lightened[2]:02x}"
+
+
+def _make_section(object_name, parent=None):
+    """Create a styled section with subtle background and rounded corners."""
+    section = RoundedSection(parent)
+    section.setObjectName(object_name)
+    bg = _lighten_color(config.get_background_color(), 0.06)
+    section.setStyleSheet(
+        f"#{object_name} {{"
+        f"  background-color: {bg};"
+        f"  border-radius: 6px;"
+        f"}}"
+    )
+    return section
+
+
 class StateViewer(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
         layout = QGridLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(5)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(6)
 
-        # Solo Pokemon stats at the top - expand horizontally to fill available space
-        self.pkmn = PkmnViewer(self, font_size=12)
-        layout.addWidget(self.pkmn, 0, 0, alignment=Qt.AlignTop)
+        # ---- Pokemon Stats Section ----
+        pkmn_section = _make_section("statePkmnSection", self)
+        pkmn_inner = QVBoxLayout(pkmn_section)
+        pkmn_inner.setContentsMargins(8, 6, 8, 6)
+        pkmn_inner.setSpacing(0)
 
-        # Stat experience underneath the main stats - expand horizontally
-        self.stat_xp = StatExpViewer(self)
-        layout.addWidget(self.stat_xp, 1, 0, alignment=Qt.AlignTop)
+        self.pkmn = PkmnViewer(pkmn_section, font_size=12)
+        pkmn_inner.addWidget(self.pkmn)
 
-        # Badge boost note in the main content area
+        layout.addWidget(pkmn_section, 0, 0, alignment=Qt.AlignTop)
+
+        # ---- Stat Experience Section ----
+        stat_section = _make_section("stateStatXpSection", self)
+        stat_inner = QVBoxLayout(stat_section)
+        stat_inner.setContentsMargins(8, 6, 8, 6)
+        stat_inner.setSpacing(4)
+
+        self.stat_xp = StatExpViewer(stat_section)
+        stat_inner.addWidget(self.stat_xp)
+
         self._badge_boost_label = QLabel("Stats with * are calculated with a badge boost")
-        self._badge_boost_label.setStyleSheet(f"color: {config.get_contrast_color()};")
-        layout.addWidget(self._badge_boost_label, 2, 0, alignment=Qt.AlignLeft)
+        self._badge_boost_label.setStyleSheet(
+            f"color: {config.get_contrast_color()}; font-style: italic;"
+        )
+        stat_inner.addWidget(self._badge_boost_label, alignment=Qt.AlignLeft)
 
-        # Inventory gets more space (spans all rows) - expand to fill
-        self.inventory = InventoryViewer(self)
-        layout.addWidget(self.inventory, 0, 1, 3, 1)
+        layout.addWidget(stat_section, 1, 0, alignment=Qt.AlignTop)
 
-        # Configure columns: both columns expand to fill horizontal space
-        layout.setColumnStretch(0, 1)  # Stats column expands
-        layout.setColumnStretch(1, 2)  # Inventory gets more space
+        # ---- Inventory Section ----
+        inv_section = _make_section("stateInvSection", self)
+        inv_inner = QVBoxLayout(inv_section)
+        inv_inner.setContentsMargins(8, 6, 8, 6)
+        inv_inner.setSpacing(0)
+
+        self.inventory = InventoryViewer(inv_section)
+        self.inventory.setAutoFillBackground(False)
+        inv_inner.addWidget(self.inventory)
+
+        layout.addWidget(inv_section, 0, 1, 2, 1, alignment=Qt.AlignTop)
+
+        # Column stretches
+        layout.setColumnStretch(0, 3)
+        layout.setColumnStretch(1, 2)
 
     def set_state(self, cur_state: full_route_state.RouteState):
         if cur_state is None:

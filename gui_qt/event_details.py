@@ -42,6 +42,7 @@ class EventDetails(QWidget):
         self._controller = controller
         self._battle_summary_controller = BattleSummaryController(self._controller)
         self._ignore_tab_switching = False
+        self._in_selection_handler = False
         self._cur_delayed_event_id = None
         self._cur_delayed_event_start = None
         self._unsubscribers: list = []
@@ -160,7 +161,7 @@ class EventDetails(QWidget):
 
     def _deferred_show_battle_summary(self):
         self.battle_summary.show_contents()
-        QTimer.singleShot(350, self._update_notes_visibility)
+        self._update_notes_visibility()
 
     def change_tabs(self):
         idx = self._tab_widget.currentIndex()
@@ -185,6 +186,8 @@ class EventDetails(QWidget):
             pass
 
     def _handle_route_change(self):
+        if self._in_selection_handler:
+            return  # _handle_selection_inner will update everything
         event_group = self._controller.get_single_selected_event_obj()
         if event_group is None:
             self.state_viewer.set_state(self._controller.get_init_state())
@@ -197,17 +200,31 @@ class EventDetails(QWidget):
                     cur_state=event_group.init_state,
                     event_group=event_group,
                 )
+            elif event_group.event_definition.wild_pkmn_info is not None:
+                wild_pkmn = event_group.event_definition.get_pokemon_list()
+                if wild_pkmn and event_group.init_state is not None:
+                    self.battle_summary.set_team(
+                        wild_pkmn,
+                        cur_state=event_group.init_state,
+                        is_wild=True,
+                    )
+                else:
+                    self.battle_summary.set_team(None)
             else:
                 self.battle_summary.set_team(None)
 
     def _handle_selection(self):
+        if self._in_selection_handler:
+            return
         # Suppress all intermediate repaints during the entire selection
         # transition (tab switch + data load + battle summary refresh).
+        self._in_selection_handler = True
         self.setUpdatesEnabled(False)
         try:
             self._handle_selection_inner()
         finally:
             self.setUpdatesEnabled(True)
+            self._in_selection_handler = False
 
     def _handle_selection_inner(self):
         # When recording starts, immediately show the battle summary tab
@@ -398,10 +415,10 @@ class EventDetails(QWidget):
     # ------------------------------------------------------------------
     def _update_notes_visibility(self):
         idx = self._tab_widget.currentIndex()
-        if idx == self.battle_summary_tab_index:
-            self._trainer_notes.setVisible(config.are_notes_visible_in_battle_summary())
+        if idx == self.battle_summary_tab_index and not config.are_notes_visible_in_battle_summary():
+            self._trainer_notes.force_collapsed(True)
         else:
-            self._trainer_notes.setVisible(True)
+            self._trainer_notes.force_collapsed(False)
 
     # ------------------------------------------------------------------
     # Screenshots / candy (delegated to battle_summary)

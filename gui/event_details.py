@@ -148,6 +148,16 @@ class EventDetails(ttk.Frame):
                     cur_state=event_group.init_state,
                     event_group=event_group
                 )
+            elif event_group.event_definition.wild_pkmn_info is not None:
+                wild_pkmn = event_group.event_definition.get_pokemon_list()
+                if wild_pkmn and event_group.init_state is not None:
+                    self.battle_summary_frame.set_team(
+                        wild_pkmn,
+                        cur_state=event_group.init_state,
+                        is_wild=True
+                    )
+                else:
+                    self.battle_summary_frame.set_team(None)
             else:
                 self.battle_summary_frame.set_team(None)
     
@@ -167,8 +177,12 @@ class EventDetails(ttk.Frame):
             if isinstance(trainer_event_group, EventItem) and event_group.event_definition.learn_move is None:
                 trainer_event_group = trainer_event_group.parent
             
+            has_battle = (
+                trainer_event_group.event_definition.trainer_def is not None
+                or trainer_event_group.event_definition.wild_pkmn_info is not None
+            )
             if self._ignore_tab_switching or self.auto_change_tab_checkbox.is_checked():
-                if trainer_event_group.event_definition.trainer_def is not None:
+                if has_battle:
                     self.tabbed_states.select(self.battle_summary_tab_index)
                 else:
                     self.tabbed_states.select(self.pre_state_tab_index)
@@ -191,6 +205,12 @@ class EventDetails(ttk.Frame):
             self.trainer_notes.load_event(event_def)
             if event_def.trainer_def is not None:
                 self.battle_summary_frame.set_team(event_def.get_pokemon_list(), cur_state=init_state, event_group=event_group)
+            elif event_def.wild_pkmn_info is not None:
+                wild_pkmn = event_def.get_pokemon_list()
+                if wild_pkmn and init_state is not None:
+                    self.battle_summary_frame.set_team(wild_pkmn, cur_state=init_state, is_wild=True)
+                else:
+                    self.battle_summary_frame.set_team(None)
             else:
                 self.battle_summary_frame.set_team(None)
 

@@ -3,7 +3,7 @@ import logging
 
 from PySide6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QPlainTextEdit, QSizePolicy, QFrame,
+    QPlainTextEdit, QSizePolicy,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -11,6 +11,7 @@ from gui_qt.components.custom_components import (
     SimpleEntry, SimpleOptionMenu, SimpleButton, AmountEntry, CheckboxLabel,
     DisclosureTriangle,
 )
+from gui_qt.pkmn_components.stat_column import RoundedSection
 from utils.constants import const
 from utils.config_manager import config
 from pkmn.gen_factory import current_gen_info
@@ -122,6 +123,7 @@ class NotesEditor(EventEditorBase):
         super().__init__(editor_params, notes_visibility_callback=notes_visibility_callback, parent=parent)
 
         self._collapsed = config.get_notes_collapsed()
+        self._force_collapsed = False
 
         # Row 0: clickable arrow + label, visibility dropdown
         header_widget = QWidget()
@@ -177,8 +179,22 @@ class NotesEditor(EventEditorBase):
             self._notes.setVisible(False)
 
     # ---- collapse/expand --------------------------------------------------
+    def force_collapsed(self, collapsed):
+        """Collapse or expand without changing the user's saved preference."""
+        if collapsed:
+            self._force_collapsed = True
+            self._disclosure.set_expanded(False)
+            self._notes_visibility_dropdown.setVisible(False)
+            self._notes.setVisible(False)
+        else:
+            self._force_collapsed = False
+            self._disclosure.set_expanded(not self._collapsed)
+            self._notes_visibility_dropdown.setVisible(not self._collapsed)
+            self._notes.setVisible(not self._collapsed)
+
     def _toggle_collapsed(self):
         self._collapsed = not self._collapsed
+        self._force_collapsed = False
         self._disclosure.set_expanded(not self._collapsed)
         self._notes_visibility_dropdown.setVisible(not self._collapsed)
         self._notes.setVisible(not self._collapsed)
@@ -219,6 +235,16 @@ class NotesEditor(EventEditorBase):
 
 
 # ---------------------------------------------------------------------------
+# Colour helper
+# ---------------------------------------------------------------------------
+def _lighten_color(hex_color, amount):
+    h = hex_color.lstrip('#')
+    rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    lightened = tuple(min(255, int(c + (255 - c) * amount)) for c in rgb)
+    return f"#{lightened[0]:02x}{lightened[1]:02x}{lightened[2]:02x}"
+
+
+# ---------------------------------------------------------------------------
 # TrainerFightEditor
 # ---------------------------------------------------------------------------
 class TrainerFightEditor(EventEditorBase):
@@ -255,44 +281,81 @@ class TrainerFightEditor(EventEditorBase):
         self._info_frame = QWidget()
         self._info_layout = QGridLayout(self._info_frame)
         self._info_layout.setContentsMargins(0, 0, 0, 0)
-        self._info_layout.setSpacing(4)
+        self._info_layout.setSpacing(6)
         self._layout.addWidget(self._info_frame, self._cur_row, 0, 1, 4)
         self._cur_row += 1
 
-        # Pre-create labels for up to 6 pokemon
+        # Pre-create card containers for up to 6 pokemon
+        self._all_wrappers: list[QWidget] = []
         self._all_pkmn_labels: list[QLabel] = []
         self._all_exp_labels: list[QLabel] = []
         self._all_exp_splits: list[SimpleOptionMenu] = []
         self._all_order_labels: list[QLabel] = []
         self._all_order_menus: list[SimpleOptionMenu] = []
 
+        card_bg = _lighten_color(config.get_background_color(), 0.06)
         for idx in range(6):
+            # Wrapper holds the card + controls below it
+            wrapper = QWidget()
+            wrapper_layout = QVBoxLayout(wrapper)
+            wrapper_layout.setContentsMargins(0, 0, 0, 0)
+            wrapper_layout.setSpacing(2)
+
+            # Card for pokemon stats
+            card = RoundedSection()
+            obj_name = f"trainerPkmn{idx}"
+            card.setObjectName(obj_name)
+            card.setStyleSheet(
+                f"#{obj_name} {{"
+                f"  background-color: {card_bg};"
+                f"  border-radius: 6px;"
+                f"}}"
+            )
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(8, 6, 8, 6)
+            card_layout.setSpacing(0)
+
             pkmn_lbl = QLabel()
             pkmn_lbl.setWordWrap(True)
-            pkmn_lbl.setMinimumWidth(160)
+            card_layout.addWidget(pkmn_lbl)
             self._all_pkmn_labels.append(pkmn_lbl)
 
-            exp_lbl = QLabel("Exp Split:")
-            self._all_exp_labels.append(exp_lbl)
+            wrapper_layout.addWidget(card)
 
-            exp_menu = SimpleOptionMenu(
-                option_list=["1", "2", "3", "4", "5", "6"],
-                callback=self._trigger_save,
-                parent=self,
-            )
-            exp_menu.setFixedWidth(55)
-            self._all_exp_splits.append(exp_menu)
+            # Controls row below the card
+            controls = QWidget()
+            controls_layout = QHBoxLayout(controls)
+            controls_layout.setContentsMargins(0, 0, 0, 0)
+            controls_layout.setSpacing(4)
 
             order_lbl = QLabel("Mon Order")
             self._all_order_labels.append(order_lbl)
+            controls_layout.addWidget(order_lbl)
 
             order_menu = SimpleOptionMenu(
                 option_list=["1", "2", "3", "4", "5", "6"],
                 callback=lambda _idx=idx: self._reorder_mons(_idx),
-                parent=self,
             )
             order_menu.setFixedWidth(55)
             self._all_order_menus.append(order_menu)
+            controls_layout.addWidget(order_menu)
+
+            exp_lbl = QLabel("Exp Split:")
+            self._all_exp_labels.append(exp_lbl)
+            controls_layout.addWidget(exp_lbl)
+
+            exp_menu = SimpleOptionMenu(
+                option_list=["1", "2", "3", "4", "5", "6"],
+                callback=self._trigger_save,
+            )
+            exp_menu.setFixedWidth(55)
+            self._all_exp_splits.append(exp_menu)
+            controls_layout.addWidget(exp_menu)
+            controls_layout.addStretch()
+
+            wrapper_layout.addWidget(controls)
+            wrapper.setVisible(False)
+            self._all_wrappers.append(wrapper)
 
         self._cached_definition_order = []
 
@@ -381,31 +444,18 @@ class TrainerFightEditor(EventEditorBase):
             html += '</table>'
             self._all_pkmn_labels[idx].setText(html)
 
-            row_idx = (2 * (idx // 3))
-            col_idx = 4 * (idx % 3)
+            row_idx = idx // 3
+            col_idx = idx % 3
 
-            self._all_pkmn_labels[idx].setVisible(True)
-            self._info_layout.addWidget(self._all_pkmn_labels[idx], row_idx, col_idx, 1, 4)
-
-            self._all_order_labels[idx].setVisible(True)
-            self._info_layout.addWidget(self._all_order_labels[idx], row_idx + 1, col_idx)
             self._all_order_menus[idx].new_values(order_values)
             self._all_order_menus[idx].set(str(cur_pkmn.mon_order))
-            self._all_order_menus[idx].setVisible(True)
-            self._info_layout.addWidget(self._all_order_menus[idx], row_idx + 1, col_idx + 1)
-
-            self._all_exp_labels[idx].setVisible(True)
-            self._info_layout.addWidget(self._all_exp_labels[idx], row_idx + 1, col_idx + 2)
             self._all_exp_splits[idx].set(str(cur_pkmn.exp_split))
-            self._all_exp_splits[idx].setVisible(True)
-            self._info_layout.addWidget(self._all_exp_splits[idx], row_idx + 1, col_idx + 3)
+
+            self._all_wrappers[idx].setVisible(True)
+            self._info_layout.addWidget(self._all_wrappers[idx], row_idx, col_idx)
 
         for missing_idx in range(idx + 1, 6):
-            self._all_pkmn_labels[missing_idx].setVisible(False)
-            self._all_exp_labels[missing_idx].setVisible(False)
-            self._all_exp_splits[missing_idx].setVisible(False)
-            self._all_order_labels[missing_idx].setVisible(False)
-            self._all_order_menus[missing_idx].setVisible(False)
+            self._all_wrappers[missing_idx].setVisible(False)
             self._all_order_menus[missing_idx].blockSignals(True)
             self._all_order_menus[missing_idx].set("-1")
             self._all_order_menus[missing_idx].blockSignals(False)
@@ -758,6 +808,7 @@ class LearnMoveEditor(EventEditorBase):
                 self._level = const.LEVEL_ANY
                 self._mon = None
 
+        self._move_source_callback()
         self._move_selected_callback()
         if event_def.learn_move.destination is None:
             self._destination.set(const.MOVE_DONT_LEARN)

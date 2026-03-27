@@ -3,10 +3,11 @@ from typing import List, Optional, Set, Dict
 
 from PySide6.QtWidgets import (
     QTreeView, QAbstractItemView, QHeaderView,
+    QLineEdit, QStyleOptionViewItem, QStyle, QStyledItemDelegate,
 )
-from PySide6.QtCore import Qt, QModelIndex, Signal, QItemSelectionModel
+from PySide6.QtCore import Qt, QModelIndex, Signal, QItemSelectionModel, QEvent, QRect
 from PySide6.QtGui import (
-    QStandardItemModel, QStandardItem, QColor, QBrush,
+    QStandardItemModel, QStandardItem, QColor, QBrush, QPalette,
 )
 
 from controllers.main_controller import MainController
@@ -78,6 +79,76 @@ def _get_attr(obj, attr_name):
     return val
 
 
+_QUANTITY_SUFFIX_ROLE = Qt.UserRole + 100
+
+
+class _QuantityDelegate(QStyledItemDelegate):
+    """Delegate for the Name column that styles quantity suffixes (e.g. 'x3')
+    in blue with an underline to indicate they are clickable."""
+
+    _SUFFIX_COLOR = QColor("#4da6ff")
+    _SUFFIX_COLOR_DIMMED = QColor("#5a7a99")
+
+    def paint(self, painter, option, index):
+        suffix = index.data(_QUANTITY_SUFFIX_ROLE)
+        if not suffix:
+            super().paint(painter, option, index)
+            return
+
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        style = opt.widget.style()
+
+        # Draw everything (background, checkbox, icon, focus) except text.
+        saved_text = opt.text
+        opt.text = ""
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, painter, opt.widget)
+        opt.text = saved_text
+
+        # Text bounding rect.
+        text_rect = style.subElementRect(
+            QStyle.SubElement.SE_ItemViewItemText, opt, opt.widget
+        )
+
+        full_text = opt.text
+        prefix = full_text[:-len(suffix)]
+        fm = painter.fontMetrics()
+        prefix_width = fm.horizontalAdvance(prefix)
+
+        # Determine base text color and whether it is dimmed (e.g. unchecked).
+        fg_data = index.data(Qt.ForegroundRole)
+        if isinstance(fg_data, QBrush):
+            base_color = fg_data.color()
+            is_dimmed = True
+        elif isinstance(fg_data, QColor):
+            base_color = fg_data
+            is_dimmed = True
+        else:
+            base_color = opt.palette.color(QPalette.ColorRole.Text)
+            is_dimmed = False
+
+        painter.save()
+
+        # Draw prefix in the normal text color.
+        painter.setPen(base_color)
+        painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, prefix)
+
+        # Draw suffix in blue + underline.
+        suffix_rect = QRect(
+            text_rect.x() + prefix_width,
+            text_rect.y(),
+            text_rect.width() - prefix_width,
+            text_rect.height(),
+        )
+        font = painter.font()
+        font.setUnderline(True)
+        painter.setFont(font)
+        painter.setPen(self._SUFFIX_COLOR_DIMMED if is_dimmed else self._SUFFIX_COLOR)
+        painter.drawText(suffix_rect, Qt.AlignVCenter | Qt.AlignLeft, suffix)
+
+        painter.restore()
+
+
 class RouteList(QTreeView):
     """QTreeView-based replacement for the Tk RouteList / CustomGridview / CheckboxTreeview."""
 
@@ -92,6 +163,7 @@ class RouteList(QTreeView):
         self._model = QStandardItemModel(self)
         self._model.setHorizontalHeaderLabels([c[0] for c in _COLUMN_DEFS])
         self.setModel(self._model)
+        self.setItemDelegateForColumn(_COL_NAME, _QuantityDelegate(self))
 
         # --- tree decoration & indentation --------------------------------
         self.setRootIsDecorated(True)
@@ -159,6 +231,12 @@ class RouteList(QTreeView):
         self.collapsed.connect(self._on_item_collapsed)
         self._model.itemChanged.connect(self._on_item_changed)
         self.selectionModel().selectionChanged.connect(self._on_selection_changed)
+
+        # --- inline quantity editor ----------------------------------------
+        self._quantity_editor: Optional[QLineEdit] = None
+        self._quantity_group_id: Optional[int] = None
+        self.verticalScrollBar().valueChanged.connect(self._cancel_quantity_edit)
+        self.horizontalScrollBar().valueChanged.connect(self._cancel_quantity_edit)
 
     # ------------------------------------------------------------------
     # Selection change → notify controller
@@ -300,13 +378,16 @@ class RouteList(QTreeView):
     # ------------------------------------------------------------------
 
     def mousePressEvent(self, event):
-        """Override to handle left-click focus and right-click toggle."""
+        """Override to handle left-click focus, quantity click, and right-click toggle."""
         if event.button() == Qt.LeftButton:
             self._unregister_text_field_focus()
+            self._close_quantity_editor()
             super().mousePressEvent(event)
+            self._check_quantity_click(event.pos())
             return
 
         if event.button() == Qt.RightButton:
+            self._close_quantity_editor()
             self._unregister_text_field_focus()
             index = self.indexAt(event.pos())
             if not index.isValid():
@@ -645,6 +726,165 @@ class RouteList(QTreeView):
             pass
 
     # ------------------------------------------------------------------
+    #  Inline quantity editor
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_event_quantity(event_obj):
+        """Return the current editable quantity for an event, or None."""
+        if not isinstance(event_obj, route_events.EventGroup):
+            return None
+        event_def = event_obj.event_definition
+        if event_def.item_event_def is not None:
+            return event_def.item_event_def.item_amount
+        if event_def.vitamin is not None:
+            return event_def.vitamin.amount
+        if event_def.rare_candy is not None:
+            return event_def.rare_candy.amount
+        return None
+
+    def _check_quantity_click(self, pos):
+        """If *pos* is over a quantity suffix, open the inline editor."""
+        index = self.indexAt(pos)
+        if not index.isValid():
+            return
+        name_index = index.sibling(index.row(), _COL_NAME)
+        name_item = self._model.itemFromIndex(name_index)
+        if name_item is None:
+            return
+        group_id = self._group_id_from_name_item(name_item)
+        if group_id is None:
+            return
+        event_obj = self._controller.get_event_by_id(group_id)
+        quantity = self._get_event_quantity(event_obj)
+        if quantity is None:
+            return
+
+        suffix_rect = self._compute_quantity_suffix_rect(name_index, name_item.text(), quantity)
+        if suffix_rect is None:
+            return
+
+        # Expand hit area slightly for easier clicking.
+        if suffix_rect.adjusted(-6, -2, 6, 2).contains(pos):
+            self._show_quantity_editor(suffix_rect, group_id, quantity)
+
+    def _compute_quantity_suffix_rect(self, index, text, quantity):
+        """Compute the viewport rect of the 'xN' quantity suffix."""
+        suffix = f"x{quantity}"
+        if not text.endswith(suffix):
+            return None
+
+        option = QStyleOptionViewItem()
+        option.initFrom(self)
+        option.rect = self.visualRect(index)
+        delegate = self.itemDelegate(index)
+        delegate.initStyleOption(option, index)
+
+        text_rect = self.style().subElementRect(
+            QStyle.SubElement.SE_ItemViewItemText, option, self
+        )
+
+        fm = self.fontMetrics()
+        prefix = text[:-len(suffix)]
+        prefix_width = fm.horizontalAdvance(prefix)
+        suffix_width = fm.horizontalAdvance(suffix)
+
+        return QRect(
+            text_rect.x() + prefix_width,
+            text_rect.y(),
+            suffix_width,
+            text_rect.height(),
+        )
+
+    def _show_quantity_editor(self, suffix_rect, group_id, current_qty):
+        """Create and show a QLineEdit over the quantity suffix."""
+        self._close_quantity_editor()
+
+        editor = QLineEdit(self.viewport())
+        editor.setFont(self.font())
+        editor.setText(str(current_qty))
+        editor.selectAll()
+        editor.setAlignment(Qt.AlignCenter)
+        editor.setStyleSheet(
+            "QLineEdit { padding: 0px 2px; border: 1px solid #0078d4; }"
+        )
+
+        # Size the editor so it's easy to type in.
+        min_width = 45
+        w = max(suffix_rect.width() + 16, min_width)
+        h = suffix_rect.height()
+        x = suffix_rect.x() + suffix_rect.width() // 2 - w // 2
+        y = suffix_rect.y()
+        editor.setGeometry(x, y, w, h)
+
+        editor.returnPressed.connect(self._accept_quantity_edit)
+        editor.installEventFilter(self)
+
+        self._quantity_editor = editor
+        self._quantity_group_id = group_id
+
+        editor.show()
+        editor.setFocus()
+
+    def _accept_quantity_edit(self):
+        """Apply the edited quantity and close the editor."""
+        if self._quantity_editor is None:
+            return
+        try:
+            new_qty = int(self._quantity_editor.text().strip())
+        except (ValueError, TypeError):
+            self._close_quantity_editor()
+            return
+
+        if new_qty < 1:
+            new_qty = 1
+
+        group_id = self._quantity_group_id
+        self._close_quantity_editor()
+
+        event_obj = self._controller.get_event_by_id(group_id)
+        if not isinstance(event_obj, route_events.EventGroup):
+            return
+
+        event_def = event_obj.event_definition
+        if event_def.item_event_def is not None:
+            event_def.item_event_def.item_amount = new_qty
+        elif event_def.vitamin is not None:
+            event_def.vitamin.amount = new_qty
+        elif event_def.rare_candy is not None:
+            event_def.rare_candy.amount = new_qty
+        else:
+            return
+
+        self._controller.update_existing_event(group_id, event_def)
+
+    def _cancel_quantity_edit(self, *args):
+        """Cancel the quantity edit (close without applying)."""
+        self._close_quantity_editor()
+
+    def _close_quantity_editor(self):
+        """Clean up the quantity editor widget."""
+        if self._quantity_editor is None:
+            return
+        editor = self._quantity_editor
+        self._quantity_editor = None
+        self._quantity_group_id = None
+        editor.removeEventFilter(self)
+        editor.hide()
+        editor.deleteLater()
+
+    def eventFilter(self, obj, event):
+        """Handle focus-out and Escape on the quantity editor."""
+        if obj is self._quantity_editor:
+            if event.type() == QEvent.Type.FocusOut:
+                self._accept_quantity_edit()
+                return True
+            if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key_Escape:
+                self._cancel_quantity_edit()
+                return True
+        return super().eventFilter(obj, event)
+
+    # ------------------------------------------------------------------
     #  Selection helpers
     # ------------------------------------------------------------------
 
@@ -788,6 +1028,7 @@ class RouteList(QTreeView):
         """Rebuild/update the tree from the controller's route data."""
         if self._refreshing:
             return
+        self._close_quantity_editor()
         self._refreshing = True
 
         # Save scroll position before any model changes.
@@ -964,6 +1205,10 @@ class RouteList(QTreeView):
         tags = _get_attr(event_obj, "get_tags") or []
         is_enabled = _get_attr(event_obj, "is_enabled")
 
+        # Quantity suffix for inline-editing indicator.
+        quantity = self._get_event_quantity(event_obj)
+        qty_suffix = f"x{quantity}" if quantity is not None and text_val.endswith(f"x{quantity}") else None
+
         # Determine checkbox state.
         if is_enabled is not None:
             check_state = Qt.Checked if is_enabled else Qt.Unchecked
@@ -1000,6 +1245,7 @@ class RouteList(QTreeView):
             self._model.blockSignals(True)
             try:
                 name_item.setText(text_val)
+                name_item.setData(qty_suffix, _QUANTITY_SUFFIX_ROLE)
                 if check_state is not None:
                     name_item.setCheckState(check_state)
                 self._apply_row_style(name_item, bg_brush, fg_brush)
@@ -1028,6 +1274,7 @@ class RouteList(QTreeView):
             # Create new row.
             name_item = QStandardItem(text_val)
             name_item.setEditable(False)
+            name_item.setData(qty_suffix, _QUANTITY_SUFFIX_ROLE)
             name_item.setDragEnabled(can_drag)
             name_item.setDropEnabled(can_drop)
             if check_state is not None:

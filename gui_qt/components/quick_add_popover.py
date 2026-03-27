@@ -1,11 +1,12 @@
 import logging
+import os
 
 from PySide6.QtWidgets import (
     QWidget, QPushButton, QHBoxLayout, QVBoxLayout,
     QStackedWidget, QGroupBox, QFrame,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QIcon
 
 from gui_qt.components.quick_trainer_add import QuickTrainerAdd
 from gui_qt.components.quick_item_add import QuickItemAdd
@@ -17,14 +18,15 @@ from utils.constants import const
 
 logger = logging.getLogger(__name__)
 
+_ICONS_DIR = os.path.join(const.SOURCE_ROOT_PATH, "icons")
 
-# (icon, tooltip, shortcut key)
+# (icon filename, tooltip, shortcut key)
 _CATEGORIES = [
-    ("\u2694", "Trainer (Q)",   Qt.Key_Q),
-    ("\u25C6", "Item (W)",      Qt.Key_W),
-    ("\u2605", "Move (E)",      Qt.Key_E),
-    ("\u2663", "Wild Pkmn (R)", Qt.Key_R),
-    ("\u2630", "Misc (T)",      Qt.Key_T),
+    ("trainer.png", "Trainer (Q)",   Qt.Key_Q),
+    ("item.png",    "Item (W)",      Qt.Key_W),
+    ("moves.png",   "Move (E)",      Qt.Key_E),
+    ("wild.png",    "Wild Pkmn (R)", Qt.Key_R),
+    ("misc.png",    "Misc (T)",      Qt.Key_T),
 ]
 
 
@@ -65,16 +67,14 @@ class QuickAddPopover(QWidget):
         cat_layout.setContentsMargins(0, 0, 0, 0)
         cat_layout.setSpacing(4)
 
-        icon_font = QFont()
-        icon_font.setPointSize(14)
-
         self._cat_buttons = []
         self._key_to_idx = {}
-        for idx, (icon, tooltip, key) in enumerate(_CATEGORIES):
-            btn = QPushButton(icon)
+        for idx, (icon_file, tooltip, key) in enumerate(_CATEGORIES):
+            btn = QPushButton()
             btn.setCheckable(True)
             btn.setFixedSize(36, 36)
-            btn.setFont(icon_font)
+            btn.setIcon(QIcon(os.path.join(_ICONS_DIR, icon_file)))
+            btn.setIconSize(QSize(24, 24))
             btn.setToolTip(tooltip)
             btn.setFocusPolicy(Qt.NoFocus)
             btn.clicked.connect(lambda _checked, i=idx: self._select_category(i))
@@ -140,12 +140,39 @@ class QuickAddPopover(QWidget):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(5, 5, 5, 5)
 
-        btn = QPushButton("Add Tutor Move")
-        btn.clicked.connect(self._add_tutor_move)
-        layout.addWidget(btn)
+        tm_btn = QPushButton("Add TM/HM Move")
+        tm_btn.clicked.connect(self._add_tm_hm_move)
+        layout.addWidget(tm_btn)
+
+        tutor_btn = QPushButton("Add Tutor Move")
+        tutor_btn.clicked.connect(self._add_tutor_move)
+        layout.addWidget(tutor_btn)
 
         layout.addStretch()
         return page
+
+    def _add_tm_hm_move(self):
+        try:
+            cur_state = self._controller.get_active_state()
+            if cur_state is None or cur_state.solo_pkmn is None:
+                return
+            tm_list = current_gen_info().item_db().get_filtered_names(item_type=const.ITEM_TYPE_TM)
+            if not tm_list or tm_list[0] == const.NO_ITEM:
+                return
+            first_tm = tm_list[0]
+            item_obj = current_gen_info().item_db().get_item(first_tm)
+            move_name = item_obj.move_name if item_obj is not None else None
+            dest = cur_state.solo_pkmn.get_move_destination(move_name, None)[0]
+            self._controller.new_event(
+                EventDefinition(
+                    learn_move=LearnMoveEventDefinition(
+                        move_name, dest, first_tm
+                    )
+                ),
+                insert_after=self._controller.get_single_selected_event_id(),
+            )
+        except Exception as e:
+            logger.error(f"Quick-add TM/HM move failed: {e}")
 
     def _add_tutor_move(self):
         try:
