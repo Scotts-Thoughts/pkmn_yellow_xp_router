@@ -690,11 +690,25 @@ class PrefightCandySummary(QWidget):
 
     def _increment_candy(self, event=None):
         if not self._loading:
+            self._loading = True
             self.candy_count._raise_amt()
+            self._loading = False
+            self._fire_candy_callback()
 
     def _decrement_candy(self, event=None):
         if not self._loading:
+            self._loading = True
             self.candy_count._lower_amt()
+            self._loading = False
+            self._fire_candy_callback()
+
+    def _fire_candy_callback(self):
+        """Cancel any pending debounce and fire the callback immediately."""
+        if self._candy_callback_timer is not None:
+            self._candy_callback_timer.stop()
+            self._candy_callback_timer = None
+        if self._outer_callback is not None:
+            self._outer_callback()
 
     def set_candy_count(self, new_amount):
         self._loading = True
