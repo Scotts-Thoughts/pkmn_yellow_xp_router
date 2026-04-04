@@ -41,6 +41,7 @@ if __name__ == "__main__":
         "--add-data", "assets\\theme\\*.tcl;assets\\theme",
         "--add-data", "assets\\theme\\dark\\*;assets\\theme\\dark",
         "--add-data", "icons\\*.png;icons",
+        "--add-data", "icons\\filter icons\\*.png;icons\\filter icons",
         "--add-data", "assets\\pkmn_icons\\*.png;assets\\pkmn_icons",
     ]
 
