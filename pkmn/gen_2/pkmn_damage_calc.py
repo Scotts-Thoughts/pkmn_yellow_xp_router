@@ -274,7 +274,7 @@ def calculate_gen_two_damage(
         
         move_modifier = math.pow(2, num_rollout_turns - 1)
     elif move.name == gen_two_const.FURY_CUTTER_MOVE_NAME:
-        move_modifier = math.pow(2, int(custom_move_data))
+        move_modifier = math.pow(2, int(custom_move_data) - 1)
     elif move.name == gen_two_const.RAGE_MOVE_NAME:
         move_modifier = int(custom_move_data)
     elif move.name == gen_two_const.TRIPLE_KICK_MOVE_NAME:

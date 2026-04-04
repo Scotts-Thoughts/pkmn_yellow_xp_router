@@ -108,8 +108,11 @@ class MainWindow(tk.Tk):
         self.run_status_frame = ttk.Frame(self.top_row, style="Success.TFrame")
         self.run_status_frame.grid(row=0, column=1, sticky=tk.W)
 
-        self.run_status_label = ttk.Label(self.run_status_frame, text="Run Status: Valid", style="Success.TLabel")
+        self.run_status_label = ttk.Label(self.run_status_frame, text="Run Status: Valid", style="Success.TLabel", cursor="hand2")
         self.run_status_label.pack(padx=10, pady=10)
+        self.run_status_label.bind("<Button-1>", self._cycle_invalid_events)
+        self._invalid_event_cycle_index = -1
+        self._invalid_event_cycle_ids = []
 
         # NOTE: Intentionally leaving this as a tk.Label so that we can just control the color in code
         self.route_version = tk.Label(self.top_row, text="RBY Version", anchor=tk.W, padx=10, pady=10, fg="black", bg="white")
@@ -343,6 +346,23 @@ class MainWindow(tk.Tk):
         else:
             self.run_status_frame.config(style="Success.TFrame")
             self.run_status_label.config(text="Run Status: Valid", style="Success.TLabel")
+        # Reset cycle when the invalid events change
+        self._invalid_event_cycle_ids = []
+        self._invalid_event_cycle_index = -1
+
+    def _cycle_invalid_events(self, *args, **kwargs):
+        if not self._controller.has_errors():
+            return
+        current_ids = self._controller.get_all_invalid_event_ids()
+        if not current_ids:
+            return
+        # Reset cycle if the set of invalid events changed
+        if current_ids != self._invalid_event_cycle_ids:
+            self._invalid_event_cycle_ids = current_ids
+            self._invalid_event_cycle_index = -1
+        self._invalid_event_cycle_index = (self._invalid_event_cycle_index + 1) % len(self._invalid_event_cycle_ids)
+        eid = self._invalid_event_cycle_ids[self._invalid_event_cycle_index]
+        self._controller.select_new_events([eid])
     
     def update_run_version(self, *args, **kwargs):
         self.route_version.config(

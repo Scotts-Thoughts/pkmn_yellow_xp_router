@@ -646,7 +646,7 @@ class Config:
         "rival": "#12196b",
         "gym_leader": "#0d0d0d",
         "elite_four": "#38084d",
-        "champion": "#8b6914",
+        "champion": "#054d3f",
         "post_game": "#0c2a0c",
         "boss": "#808080",
         "team_leader": "#702060",

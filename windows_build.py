@@ -40,6 +40,8 @@ if __name__ == "__main__":
         "--add-data", "assets\*.tcl;assets",
         "--add-data", "assets\\theme\\*.tcl;assets\\theme",
         "--add-data", "assets\\theme\\dark\\*;assets\\theme\\dark",
+        "--add-data", "icons\\*.png;icons",
+        "--add-data", "assets\\pkmn_icons\\*.png;assets\\pkmn_icons",
     ]
 
     root_path = os.path.dirname(os.path.abspath(__file__))

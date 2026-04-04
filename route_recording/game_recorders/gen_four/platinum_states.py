@@ -911,26 +911,11 @@ class BattleState(WatchForResetState):
                 if real_new_value not in self._enemy_mon_order:
                     self._enemy_mon_order.append(real_new_value)
                 
-                # When party position changes, check if HP is already 0 and cache it
-                # This handles cases where a new Pokemon is sent out and immediately faints
-                # If there's already a cached Pokemon, add it to defeated list before overwriting (for trainer battles)
-                current_hp = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_HP).value
-                if current_hp is not None and current_hp == 0:
-                    if (self._cached_first_mon_species or self._cached_first_mon_level) and self.is_trainer_battle == 'Trainer':
-                        self._defeated_trainer_mons.append(EventDefinition(wild_pkmn_info=WildPkmnEventDefinition(
-                            self._cached_first_mon_species,
-                            self._cached_first_mon_level,
-                            trainer_pkmn=True
-                        )))
-                        logger.info(f"Adding previously cached Pokemon to defeated list before overwriting (party pos change): {self._cached_first_mon_species} level {self._cached_first_mon_level}")
-                    
-                    species_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_SPECIES).value
-                    level_raw = self.machine._gamehook_client.get(gh_gen_four_const.KEY_BATTLE_FIRST_ENEMY_LEVEL).value
-                    if species_raw:
-                        self._cached_first_mon_species = self.machine.gh_converter.pkmn_name_convert(species_raw)
-                        self._cached_first_mon_level = level_raw
-                        logger.info(f"Cached wild Pokemon (from party pos change): {self._cached_first_mon_species} level {self._cached_first_mon_level}")
-                        self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_FRIENDSHIP).value)
+                # NOTE: Do NOT cache pokemon from HP=0 checks here.
+                # When a new pokemon enters the slot, the HP may still be 0 from the previous
+                # (already-processed) pokemon. Caching from stale slot data causes duplicates
+                # during blackouts. The HP=0 handler already covers all legitimate cases,
+                # including pokemon that faint immediately on entry from hazards.
             logger.info(f"[EXP_SPLIT] ===== END FIRST ENEMY SWITCHED =====")
         elif new_prop.path == gh_gen_four_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS:
             real_new_value = self._get_second_enemy_mon_pos(value=new_prop.value)
@@ -1336,14 +1321,20 @@ class OverworldState(WatchForResetState):
         if self.machine._potential_blackout_flag and self.machine._blackout_initial_map is not None:
             current_map = self.machine._gamehook_client.get(gh_gen_four_const.KEY_OVERWORLD_MAP).value
             if current_map != self.machine._blackout_initial_map:
-                # Map has already changed - use the battle-determined team HP flag
-                # (overworld HP may have been healed by the game before the map change)
-                if self.machine._blackout_all_team_fainted:
-                    logger.info(f"[BLACKOUT DEBUG] Entered OVERWORLD with blackout flag set, map already changed and all team fainted in battle - blackout confirmed")
+                # Map has already changed, check team HP
+                all_team_hp_zero = True
+                for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
+                    hp_value = self.machine._gamehook_client.get(hp_key).value
+                    if hp_value is not None and hp_value > 0:
+                        all_team_hp_zero = False
+                        break
+
+                if all_team_hp_zero or self.machine._blackout_all_team_fainted:
+                    logger.info(f"[BLACKOUT DEBUG] Entered OVERWORLD with blackout flag set, map already changed and team HP is 0 - blackout confirmed")
                     logger.info(f"[BLACKOUT DEBUG] Current map: {current_map}, Initial map: {self.machine._blackout_initial_map}")
                     self._confirm_blackout()
                 else:
-                    logger.info(f"Entered OVERWORLD with blackout flag set, but not all team fainted - not a blackout, clearing flag")
+                    logger.info(f"Entered OVERWORLD with blackout flag set, but team HP is not 0 - not a blackout, clearing flag")
                     self._clear_blackout_flags()
         
         # Cache current EVs for vitamin detection (cache early in overworld, before inventory changes)
@@ -1481,15 +1472,23 @@ class OverworldState(WatchForResetState):
                 logger.info(f"[BLACKOUT DEBUG] Map changed, checking for blackout. Old map: {prev_prop.value}, New map: {new_prop.value}")
                 logger.info(f"[BLACKOUT DEBUG] Initial map was: {self.machine._blackout_initial_map}")
                 logger.info(f"[BLACKOUT DEBUG] Trainer name: {self.machine._blackout_trainer_name}")
-                logger.info(f"[BLACKOUT DEBUG] All team fainted in battle: {self.machine._blackout_all_team_fainted}")
 
-                # Use the battle-determined team HP flag instead of re-reading overworld HP
-                # (the game may heal the party before/during the map transition)
-                if self.machine._blackout_all_team_fainted:
-                    logger.info(f"[BLACKOUT DEBUG] Map changed and all team fainted in battle - blackout confirmed")
+                # Verify that team HP is actually 0 before confirming blackout
+                all_team_hp_zero = True
+                team_hp_values = []
+                for hp_key in gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HP:
+                    hp_value = self.machine._gamehook_client.get(hp_key).value
+                    team_hp_values.append(hp_value)
+                    if hp_value is not None and hp_value > 0:
+                        all_team_hp_zero = False
+
+                logger.info(f"[BLACKOUT DEBUG] Team HP values: {team_hp_values}, all_zero: {all_team_hp_zero}")
+
+                if all_team_hp_zero or self.machine._blackout_all_team_fainted:
+                    logger.info(f"[BLACKOUT DEBUG] Map changed and team HP is 0 - blackout confirmed")
                     self._confirm_blackout()
                 else:
-                    logger.info(f"Map changed but not all team fainted in battle - not a blackout, clearing flag")
+                    logger.info(f"Map changed but team HP is not 0 - not a blackout, clearing flag")
                     self._clear_blackout_flags()
         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_PLAYERID:
             if prev_prop.value and self.machine._player_id != self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_PLAYERID).value:

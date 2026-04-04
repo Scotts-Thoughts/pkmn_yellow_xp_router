@@ -657,6 +657,19 @@ class MainController:
 
         return search_folder(self._data.root_folder)
 
+    def get_all_invalid_event_ids(self):
+        """Return a list of group_ids for all EventGroups that have errors, in route order."""
+        result = []
+        def collect_errors(folder):
+            for child in folder.children:
+                if isinstance(child, EventFolder):
+                    collect_errors(child)
+                elif isinstance(child, routing.route_events.EventGroup):
+                    if child.has_errors():
+                        result.append(child.group_id)
+        collect_errors(self._data.root_folder)
+        return result
+
     def has_unsaved_changes(self) -> routing.router.Router:
         return self._unsaved_changes
 

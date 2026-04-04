@@ -226,7 +226,16 @@ class EventDetails(QWidget):
             self.setUpdatesEnabled(True)
             self._in_selection_handler = False
 
+    def set_suppress_battle_summary(self, suppress):
+        """While *suppress* is True, auto-switching to the Battle Summary
+        tab is blocked and the Pre-Event State tab is forced instead."""
+        self._suppress_battle_summary = suppress
+        if suppress:
+            self._tab_widget.setCurrentIndex(self.pre_state_tab_index)
+
     def _handle_selection_inner(self):
+        force_pre = getattr(self, "_suppress_battle_summary", False)
+
         # When recording starts, immediately show the battle summary tab
         # so the right side stays stable throughout the recording session.
         if self._controller.is_record_mode_active():
@@ -260,7 +269,11 @@ class EventDetails(QWidget):
                 trainer_event_group.event_definition.trainer_def is not None
                 or trainer_event_group.event_definition.wild_pkmn_info is not None
             )
-            if self._ignore_tab_switching or self.auto_switch_checkbox.is_checked():
+            if force_pre:
+                # Inline editing requested pre-event view — honour it
+                # regardless of auto-switch or battle presence.
+                self._tab_widget.setCurrentIndex(self.pre_state_tab_index)
+            elif self._ignore_tab_switching or self.auto_switch_checkbox.is_checked():
                 if self._controller.is_record_mode_active():
                     # During recording, only switch TO battle summary, never
                     # away from it.  Constantly flipping to Pre-Event State

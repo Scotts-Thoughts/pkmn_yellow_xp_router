@@ -4,8 +4,9 @@ from typing import List, Optional, Set, Dict
 from PySide6.QtWidgets import (
     QTreeView, QAbstractItemView, QHeaderView,
     QLineEdit, QStyleOptionViewItem, QStyle, QStyledItemDelegate,
+    QPushButton,
 )
-from PySide6.QtCore import Qt, QModelIndex, Signal, QItemSelectionModel, QEvent, QRect
+from PySide6.QtCore import Qt, QModelIndex, Signal, QItemSelectionModel, QEvent, QRect, QTimer, QSize
 from PySide6.QtGui import (
     QStandardItemModel, QStandardItem, QColor, QBrush, QPalette,
 )
@@ -178,6 +179,32 @@ class RouteList(QTreeView):
         self.setMouseTracking(True)
         self.viewport().setMouseTracking(True)
 
+        # --- inline "+" button overlay ------------------------------------
+        self._plus_button = QPushButton("+", self.viewport())
+        self._plus_button.setFixedSize(16, 16)
+        self._plus_button.setCursor(Qt.PointingHandCursor)
+        self._plus_button.setFocusPolicy(Qt.NoFocus)
+        self._plus_button.setStyleSheet(
+            "QPushButton { background: #0078d4; color: white; border: none;"
+            " border-radius: 8px; font-size: 12px; font-weight: bold;"
+            " padding: 0; margin: 0; }"
+            "QPushButton:hover { background: #1a8ae8; }"
+        )
+        self._plus_button.hide()
+        self._plus_button.clicked.connect(self._on_plus_clicked)
+        self._plus_button.installEventFilter(self)
+        self._plus_btn_hide_timer = QTimer(self)
+        self._plus_btn_hide_timer.setSingleShot(True)
+        self._plus_btn_hide_timer.setInterval(150)
+        self._plus_btn_hide_timer.timeout.connect(self._maybe_hide_plus_button)
+
+        # --- inline event creator -----------------------------------------
+        self._inline_creator = None
+        self._inline_after_id = None
+        self._inline_row_item = None  # spacer row in model
+        self._editing_group_id = None
+        self._editing_original_enabled = None
+
         # --- selection mode -----------------------------------------------
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -237,6 +264,7 @@ class RouteList(QTreeView):
         self._quantity_group_id: Optional[int] = None
         self.verticalScrollBar().valueChanged.connect(self._cancel_quantity_edit)
         self.horizontalScrollBar().valueChanged.connect(self._cancel_quantity_edit)
+        self.verticalScrollBar().valueChanged.connect(self._reposition_inline_creator)
 
     # ------------------------------------------------------------------
     # Selection change → notify controller
@@ -428,12 +456,54 @@ class RouteList(QTreeView):
 
         super().mousePressEvent(event)
 
+    def mouseDoubleClickEvent(self, event):
+        """Double-click an EventGroup to edit it inline."""
+        if event.button() != Qt.LeftButton:
+            super().mouseDoubleClickEvent(event)
+            return
+
+        index = self.indexAt(event.pos())
+        if not index.isValid():
+            super().mouseDoubleClickEvent(event)
+            return
+
+        name_index = index.sibling(index.row(), _COL_NAME)
+        item = self._model.itemFromIndex(name_index)
+        if item is None:
+            super().mouseDoubleClickEvent(event)
+            return
+
+        group_id = self._group_id_from_name_item(item)
+        if group_id is None:
+            super().mouseDoubleClickEvent(event)
+            return
+
+        event_obj = self._controller.get_event_by_id(group_id)
+
+        # Only edit EventGroups — not folders or sub-items.
+        if not isinstance(event_obj, route_events.EventGroup):
+            super().mouseDoubleClickEvent(event)
+            return
+
+        # Skip levelup moves (auto-generated) and unmapped types.
+        from gui_qt.components.inline_event_creator import _EVENT_TYPE_TO_KEY
+        event_type = event_obj.event_definition.get_event_type()
+        if event_type not in _EVENT_TYPE_TO_KEY:
+            super().mouseDoubleClickEvent(event)
+            return
+
+        # Already editing this exact event — ignore.
+        if self._editing_group_id == group_id:
+            return
+
+        self._start_inline_edit(group_id, event_obj)
+        # Don't call super — prevent expand/collapse on double-click.
+
     # ------------------------------------------------------------------
     #  Quick-add popover (Space key)
     # ------------------------------------------------------------------
 
     _QUICK_ADD_KEYS = {
-        Qt.Key_Space: None,
         Qt.Key_Q: 0,  # Trainer
         Qt.Key_W: 1,  # Item
         Qt.Key_E: 2,  # Move
@@ -443,7 +513,15 @@ class RouteList(QTreeView):
 
     def keyPressEvent(self, event):
         if not event.modifiers():
-            if event.key() in self._QUICK_ADD_KEYS:
+            if event.key() == Qt.Key_Space:
+                # Space → open inline event creator after the selected row.
+                sel_id = self._controller.get_single_selected_event_id()
+                if sel_id is not None:
+                    self._restore_editing_state()
+                    self._remove_inline_creator()
+                    self._show_inline_creator(sel_id)
+                    return
+            elif event.key() in self._QUICK_ADD_KEYS:
                 if self._controller.can_insert_after_current_selection():
                     indexes = self.selectionModel().selectedRows(_COL_NAME)
                     if indexes:
@@ -610,10 +688,36 @@ class RouteList(QTreeView):
         if row_idx != self._hovered_row:
             self._hovered_row = row_idx
             self.viewport().update()
+
+        # Position "+" button on hovered row (skip EventItem rows).
+        if row_idx.isValid():
+            item = self._model.itemFromIndex(row_idx)
+            gid = self._group_id_from_name_item(item) if item else None
+            show = False
+            if gid is not None:
+                ev = self._controller.get_event_by_id(gid)
+                show = not isinstance(ev, route_events.EventItem)
+            if show:
+                rect = self.visualRect(row_idx)
+                self._plus_button.move(
+                    2,
+                    rect.top() + (rect.height() - self._plus_button.height()) // 2,
+                )
+                self._plus_button.show()
+                self._plus_button.raise_()
+                self._plus_btn_hide_timer.stop()
+            else:
+                self._plus_btn_hide_timer.start()
+        else:
+            self._plus_btn_hide_timer.start()
+
         super().mouseMoveEvent(event)
+
+
 
     def leaveEvent(self, event):
         self._hovered_row = QModelIndex()
+        self._plus_btn_hide_timer.start()
         self.viewport().update()
         super().leaveEvent(event)
 
@@ -874,7 +978,14 @@ class RouteList(QTreeView):
         editor.deleteLater()
 
     def eventFilter(self, obj, event):
-        """Handle focus-out and Escape on the quantity editor."""
+        """Handle focus-out and Escape on the quantity editor, and +button hover."""
+        if obj is self._plus_button:
+            if event.type() == QEvent.Type.Enter:
+                self._plus_btn_hide_timer.stop()
+                return False
+            if event.type() == QEvent.Type.Leave:
+                self._plus_btn_hide_timer.start()
+                return False
         if obj is self._quantity_editor:
             if event.type() == QEvent.Type.FocusOut:
                 self._accept_quantity_edit()
@@ -883,6 +994,209 @@ class RouteList(QTreeView):
                 self._cancel_quantity_edit()
                 return True
         return super().eventFilter(obj, event)
+
+    # ------------------------------------------------------------------
+    #  Inline event creation ("+" button)
+    # ------------------------------------------------------------------
+
+    def _maybe_hide_plus_button(self):
+        """Hide the + button unless the cursor is still over it."""
+        if self._plus_button.underMouse():
+            return
+        self._plus_button.hide()
+
+    def _on_plus_clicked(self):
+        if not self._hovered_row.isValid():
+            return
+        item = self._model.itemFromIndex(self._hovered_row)
+        if item is None:
+            return
+        group_id = self._group_id_from_name_item(item)
+        if group_id is None:
+            return
+        # Cancel any active edit, then replace any existing creator.
+        self._restore_editing_state()
+        self._remove_inline_creator()
+        self._show_inline_creator(group_id)
+        self._plus_button.hide()
+
+    def _show_inline_creator(self, insert_after_id):
+        from gui_qt.components.inline_event_creator import InlineEventCreator
+
+        self._inline_after_id = insert_after_id
+        self._inline_creator = InlineEventCreator(
+            self._controller, insert_after_id, parent=self.viewport(),
+        )
+        self._inline_creator.event_created.connect(self._on_inline_created)
+        self._inline_creator.discarded.connect(self._on_inline_discarded)
+        self._insert_inline_row()
+        self._inline_creator.focus_type_combo()
+
+    _INLINE_ROW_HEIGHT = 34
+
+    def _insert_inline_row(self):
+        """Insert a spacer row into the model and overlay the creator on it."""
+        target_item = self._item_lookup.get(self._inline_after_id)
+        if target_item is None:
+            self._remove_inline_creator()
+            return
+
+        parent = target_item.parent()
+        if parent is None:
+            parent = self._model.invisibleRootItem()
+        insert_pos = target_item.row() + 1
+
+        # Build a blank spacer row with a size hint tall enough for the
+        # creator widget.  Do NOT block model signals -- the view must
+        # receive ``rowsInserted`` so it allocates the correct row height.
+        h = self._INLINE_ROW_HEIGHT
+        self._inline_row_item = QStandardItem("")
+        self._inline_row_item.setEditable(False)
+        self._inline_row_item.setCheckable(False)
+        self._inline_row_item.setDragEnabled(False)
+        self._inline_row_item.setDropEnabled(False)
+        self._inline_row_item.setSelectable(False)
+        self._inline_row_item.setSizeHint(QSize(0, h))
+
+        row = [self._inline_row_item]
+        for _ in range(1, len(_COLUMN_DEFS)):
+            col = QStandardItem("")
+            col.setEditable(False)
+            col.setSizeHint(QSize(0, h))
+            row.append(col)
+
+        parent.insertRow(insert_pos, row)
+
+        # Span all columns so the widget fills the full width.
+        parent_idx = (
+            self._model.indexFromItem(parent)
+            if parent is not self._model.invisibleRootItem()
+            else QModelIndex()
+        )
+        self.setFirstColumnSpanned(insert_pos, parent_idx, True)
+
+        # Force the view to recalculate layout so the tall row is measured.
+        self.doItemsLayout()
+
+        self._reposition_inline_creator()
+
+    def _remove_inline_row(self):
+        """Remove the spacer row from the model."""
+        if self._inline_row_item is None:
+            return
+        try:
+            parent = self._inline_row_item.parent()
+            if parent is None:
+                parent = self._model.invisibleRootItem()
+            row = self._inline_row_item.row()
+            if row >= 0:
+                parent.removeRow(row)
+        except RuntimeError:
+            pass
+        self._inline_row_item = None
+
+    def _reposition_inline_creator(self, *args):
+        """Position the creator widget over the spacer row."""
+        if self._inline_creator is None or self._inline_row_item is None:
+            return
+        idx = self._model.indexFromItem(self._inline_row_item)
+        if not idx.isValid():
+            return
+        rect = self.visualRect(idx)
+        if not rect.isValid():
+            self._inline_creator.hide()
+            return
+        self._inline_creator.show()
+        self._inline_creator.raise_()
+        h = max(rect.height(), self._INLINE_ROW_HEIGHT)
+        self._inline_creator.setGeometry(
+            rect.x(), rect.y(), self.viewport().width(), h,
+        )
+
+    def _start_inline_edit(self, group_id, event_obj):
+        """Disable *event_obj*, open a pre-populated inline editor."""
+        # Cancel any prior edit / creator.
+        self._restore_editing_state()
+        self._remove_inline_creator()
+
+        # Suppress the battle summary for the duration of the edit so the
+        # user has room to work in the pre-event state tab.
+        self._set_suppress_battle_summary(True)
+
+        # Save original state.
+        self._editing_group_id = group_id
+        self._editing_original_enabled = event_obj.event_definition.enabled
+
+        # Disable the event so the route recalculates without it.
+        event_obj.set_enabled_status(False)
+        self._controller.update_existing_event(group_id, event_obj.event_definition)
+
+        # Show pre-populated inline editor after the disabled row.
+        from gui_qt.components.inline_event_creator import InlineEventCreator
+
+        self._inline_after_id = group_id
+        self._inline_creator = InlineEventCreator(
+            self._controller, group_id, parent=self.viewport(),
+            editing_group_id=group_id,
+            editing_event_def=event_obj.event_definition,
+        )
+        self._inline_creator.event_created.connect(self._on_inline_created)
+        self._inline_creator.discarded.connect(self._on_inline_discarded)
+        self._insert_inline_row()
+        self._inline_creator.focus_type_combo()
+
+    def _on_inline_created(self):
+        if self._editing_group_id is not None:
+            # Edit mode: apply the new definition and restore enabled state.
+            self._set_suppress_battle_summary(False)
+            new_def = self._inline_creator.result_event_def
+            if new_def is not None:
+                new_def.enabled = self._editing_original_enabled
+                event_obj = self._controller.get_event_by_id(self._editing_group_id)
+                if event_obj is not None:
+                    event_obj.set_enabled_status(self._editing_original_enabled)
+                self._controller.update_existing_event(self._editing_group_id, new_def)
+            else:
+                # Builder returned None — treat like discard.
+                self._restore_editing_state()
+            self._editing_group_id = None
+            self._editing_original_enabled = None
+        self._remove_inline_creator()
+
+    def _on_inline_discarded(self):
+        self._restore_editing_state()
+        self._remove_inline_creator()
+
+    def _restore_editing_state(self):
+        """Re-enable the event that was temporarily disabled for editing."""
+        if self._editing_group_id is None:
+            return
+        self._set_suppress_battle_summary(False)
+        event_obj = self._controller.get_event_by_id(self._editing_group_id)
+        if event_obj is not None:
+            event_obj.set_enabled_status(self._editing_original_enabled)
+            self._controller.update_existing_event(
+                self._editing_group_id, event_obj.event_definition,
+            )
+        self._editing_group_id = None
+        self._editing_original_enabled = None
+
+    def _set_suppress_battle_summary(self, suppress):
+        """Tell EventDetails to block/allow battle-summary auto-switching."""
+        try:
+            top = self.window()
+            if hasattr(top, "event_details"):
+                top.event_details.set_suppress_battle_summary(suppress)
+        except Exception:
+            pass
+
+    def _remove_inline_creator(self):
+        if self._inline_creator is not None:
+            self._inline_creator.hide()
+            self._inline_creator.deleteLater()
+            self._inline_creator = None
+        self._remove_inline_row()
+        self._inline_after_id = None
 
     # ------------------------------------------------------------------
     #  Selection helpers
@@ -1031,8 +1345,18 @@ class RouteList(QTreeView):
         self._close_quantity_editor()
         self._refreshing = True
 
+        # Temporarily remove the inline-creator spacer row so it doesn't
+        # interfere with the rebuild.  We'll re-insert it afterward.
+        had_inline = self._inline_creator is not None
+        if had_inline:
+            self._inline_creator.hide()
+            self._remove_inline_row()
+
         # Save scroll position before any model changes.
         saved_scroll = self.verticalScrollBar().value()
+
+        # Save current selection so it can be restored after the rebuild.
+        saved_selection = self.get_all_selected_event_ids()
 
         self.setUpdatesEnabled(False)
         try:
@@ -1070,9 +1394,17 @@ class RouteList(QTreeView):
                     # C++ object already deleted (parent was removed first)
                     pass
 
+            # Re-insert the inline-creator spacer row at the updated position.
+            if had_inline and self._inline_creator is not None:
+                self._insert_inline_row()
+
             # Restore expand state from before the rebuild.
             if saved_expand:
                 self._restore_expand_state(self._model.invisibleRootItem(), saved_expand)
+
+            # Restore selection from before the rebuild.
+            if saved_selection:
+                self.set_all_selected_event_ids(saved_selection)
         finally:
             self.setUpdatesEnabled(True)
             self._refreshing = False

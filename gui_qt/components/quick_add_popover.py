@@ -3,7 +3,7 @@ import os
 
 from PySide6.QtWidgets import (
     QWidget, QPushButton, QHBoxLayout, QVBoxLayout,
-    QStackedWidget, QGroupBox, QFrame,
+    QStackedWidget, QGroupBox, QFrame, QApplication,
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon
@@ -216,14 +216,28 @@ class QuickAddPopover(QWidget):
         self.show()
 
     def _reposition(self):
-        """(Re)compute window position so the bottom edge sits above the anchor."""
+        """(Re)compute window position so the popover stays on-screen."""
         self.adjustSize()
         if self._anchor is None:
             return
-        x = self._anchor.x() - self.width() // 2
-        y = self._anchor.y() - self.height() - 4
-        if y < 0:
+
+        screen = QApplication.screenAt(self._anchor)
+        if screen is None:
+            screen = QApplication.primaryScreen()
+        screen_rect = screen.availableGeometry()
+
+        w, h = self.width(), self.height()
+        x = self._anchor.x() - w // 2
+        y = self._anchor.y() - h - 4
+
+        # If clipped above, place below the anchor instead.
+        if y < screen_rect.top():
             y = self._anchor.y() + 22
+
+        # Clamp to screen edges.
+        x = max(screen_rect.left(), min(x, screen_rect.right() - w))
+        y = max(screen_rect.top(), min(y, screen_rect.bottom() - h))
+
         self.move(x, y)
 
     # ------------------------------------------------------------------

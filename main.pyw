@@ -5,7 +5,7 @@ import sys
 import concurrent.futures
 import logging
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle
 from PySide6.QtCore import QTimer
 
 from controllers.main_controller import MainController
@@ -34,6 +34,16 @@ if __name__ == '__main__':
 
     qt_app = QApplication(sys.argv)
     qt_app.setApplicationName("Pokemon RBY XP Router")
+
+    class _FastTooltipStyle(QProxyStyle):
+        def styleHint(self, hint, option=None, widget=None, returnData=None):
+            if hint == QStyle.SH_ToolTip_WakeUpDelay:
+                return 100  # milliseconds (default ~700)
+            if hint == QStyle.SH_ToolTip_FallAsleepDelay:
+                return 0    # hide immediately when mouse leaves
+            return super().styleHint(hint, option, widget, returnData)
+
+    qt_app.setStyle(_FastTooltipStyle(qt_app.style()))
     qt_app.setStyleSheet(generate_stylesheet())
 
     controller = MainController()

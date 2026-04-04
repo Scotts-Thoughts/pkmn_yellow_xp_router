@@ -787,10 +787,19 @@ class MonPairSummary(QWidget):
         # Configure column stretches so both halves share equal space
         for col in range(4):
             content_layout.setColumnStretch(col, 1)
-        content_layout.setColumnStretch(4, 0)  # spacer
+        content_layout.setColumnStretch(4, 0)  # divider column
         content_layout.setColumnMinimumWidth(4, 12)
         for col in range(5, 9):
             content_layout.setColumnStretch(col, 1)
+
+        # Divider widget between player (cols 0-3) and enemy (cols 5-8)
+        self.divider = QFrame(self._content)
+        self.divider.setFixedWidth(2)
+        self.divider.setStyleSheet(
+            f"background-color: {_darken(config.get_divider_color(), 0.3)};"
+        )
+        self.divider.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        content_layout.addWidget(self.divider, 0, 4, -1, 1, Qt.AlignCenter)
 
         outer_layout.addWidget(self._content)
 

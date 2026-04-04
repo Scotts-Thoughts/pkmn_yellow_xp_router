@@ -466,7 +466,7 @@ def _create_trainer(trainer_dict, pkmn_db:PkmnDB, extract_trainer_id=False) -> u
         trainer_dict[const.TRAINER_CLASS],
         trainer_dict[const.TRAINER_NAME],
         "",
-        trainer_dict[const.MONEY],
+        trainer_dict[const.MONEY] * 4,
         enemy_pkmn,
         rematch=("Rematch" in trainer_dict[const.TRAINER_NAME]),
         trainer_id=trainer_id,

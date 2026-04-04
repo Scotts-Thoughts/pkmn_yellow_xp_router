@@ -547,6 +547,11 @@ class MainWindow(QMainWindow):
         self.message_label.setMinimumWidth(200)
         left_layout.addWidget(self.message_label)
 
+        # ---- Filter toggle bar ----------------------------------------
+        from gui_qt.components.filter_toggle_bar import FilterToggleBar
+        self.filter_toggle_bar = FilterToggleBar(self._controller, left_panel)
+        left_layout.addWidget(self.filter_toggle_bar)
+
         # ---- Popover dialogs (created on first use) --------------------
         self._add_events_dialog = None
         self._filters_dialog = None
@@ -615,7 +620,7 @@ class MainWindow(QMainWindow):
 
         self.route_version_label = QLabel("Version")
         self.route_version_label.setStyleSheet(
-            "background-color: white; color: black; padding: 3px 8px;"
+            "background-color: white; color: black; padding: 3px 8px; border-radius: 3px;"
         )
         status_bar.addWidget(self.route_version_label)
 
@@ -623,6 +628,10 @@ class MainWindow(QMainWindow):
         self.run_status_label.setStyleSheet(
             "background-color: #abebc6; color: black; padding: 3px 8px; border-radius: 3px;"
         )
+        self.run_status_label.setCursor(Qt.PointingHandCursor)
+        self.run_status_label.mousePressEvent = lambda _: self._cycle_invalid_events()
+        self._invalid_event_cycle_index = -1
+        self._invalid_event_cycle_ids = []
         status_bar.addWidget(self.run_status_label)
 
         status_bar.addWidget(QLabel("Route Name:"))
@@ -649,8 +658,7 @@ class MainWindow(QMainWindow):
         self._sb_reconnect_btn.setVisible(False)
         status_bar.addPermanentWidget(self._sb_reconnect_btn)
 
-        self.record_button = QPushButton("\u25cf")
-        self.record_button.setFixedSize(24, 24)
+        self.record_button = QPushButton("\u25cf Record")
         self.record_button.setEnabled(False)
         self.record_button.clicked.connect(self.record_button_clicked)
         self._apply_record_button_style(active=False)
@@ -800,6 +808,11 @@ class MainWindow(QMainWindow):
             folder_path = None
             if message.startswith("Successfully saved route:"):
                 short_message = message.replace("Successfully saved route: ", "Route saved: ")
+                route_name = message.replace("Successfully saved route: ", "")
+                full_path = os.path.join(const.SAVED_ROUTES_DIR, f"{route_name}.json")
+                folder_path = os.path.dirname(os.path.normpath(full_path))
+                if not folder_path or not os.path.isdir(folder_path):
+                    folder_path = None
             else:
                 full_path = message.replace("Saved screenshot to: ", "")
                 folder_path = os.path.dirname(os.path.normpath(full_path))
@@ -812,6 +825,8 @@ class MainWindow(QMainWindow):
 
     def _on_route_change(self):
         self.event_list.refresh()
+        if hasattr(self, 'filter_toggle_bar'):
+            self.filter_toggle_bar.sync()
         if self._controller.get_version() is not None:
             self._show_route_controls()
         else:
@@ -874,13 +889,30 @@ class MainWindow(QMainWindow):
             self.run_status_label.setStyleSheet(
                 "background-color: #abebc6; color: black; padding: 6px 10px; border-radius: 3px;"
             )
+        # Reset cycle when the invalid events change
+        self._invalid_event_cycle_ids = []
+        self._invalid_event_cycle_index = -1
+
+    def _cycle_invalid_events(self):
+        if not self._controller.has_errors():
+            return
+        current_ids = self._controller.get_all_invalid_event_ids()
+        if not current_ids:
+            return
+        # Reset cycle if the set of invalid events changed
+        if current_ids != self._invalid_event_cycle_ids:
+            self._invalid_event_cycle_ids = current_ids
+            self._invalid_event_cycle_index = -1
+        self._invalid_event_cycle_index = (self._invalid_event_cycle_index + 1) % len(self._invalid_event_cycle_ids)
+        eid = self._invalid_event_cycle_ids[self._invalid_event_cycle_index]
+        self._controller.select_new_events([eid])
 
     def update_run_version(self):
         version = self._controller.get_version()
         color = const.VERSION_COLORS.get(version, "white")
         self.route_version_label.setText(f"{version} Version")
         self.route_version_label.setStyleSheet(
-            f"background-color: {color}; color: black; padding: 6px 10px;"
+            f"background-color: {color}; color: black; padding: 6px 10px; border-radius: 3px;"
         )
         self.record_button.setEnabled(True)
 
