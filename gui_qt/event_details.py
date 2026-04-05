@@ -188,30 +188,36 @@ class EventDetails(QWidget):
     def _handle_route_change(self):
         if self._in_selection_handler:
             return  # _handle_selection_inner will update everything
-        event_group = self._controller.get_single_selected_event_obj()
-        if event_group is None:
-            self.state_viewer.set_state(self._controller.get_init_state())
-            self.battle_summary.set_team(None)
-        else:
-            self.state_viewer.set_state(event_group.init_state)
-            if event_group.event_definition.trainer_def is not None:
-                self.battle_summary.set_team(
-                    event_group.event_definition.get_pokemon_list(),
-                    cur_state=event_group.init_state,
-                    event_group=event_group,
-                )
-            elif event_group.event_definition.wild_pkmn_info is not None:
-                wild_pkmn = event_group.event_definition.get_pokemon_list()
-                if wild_pkmn and event_group.init_state is not None:
+        try:
+            event_group = self._controller.get_single_selected_event_obj()
+            if event_group is None:
+                self.state_viewer.set_state(self._controller.get_init_state())
+                self.battle_summary.set_team(None)
+            else:
+                self.state_viewer.set_state(event_group.init_state)
+                if event_group.event_definition.trainer_def is not None:
                     self.battle_summary.set_team(
-                        wild_pkmn,
+                        event_group.event_definition.get_pokemon_list(),
                         cur_state=event_group.init_state,
-                        is_wild=True,
+                        event_group=event_group,
                     )
+                elif event_group.event_definition.wild_pkmn_info is not None:
+                    wild_pkmn = event_group.event_definition.get_pokemon_list()
+                    if wild_pkmn and event_group.init_state is not None:
+                        self.battle_summary.set_team(
+                            wild_pkmn,
+                            cur_state=event_group.init_state,
+                            is_wild=True,
+                        )
+                    else:
+                        self.battle_summary.set_team(None)
                 else:
                     self.battle_summary.set_team(None)
-            else:
-                self.battle_summary.set_team(None)
+        except Exception as e:
+            # Must not propagate — _safely_invoke_callbacks permanently
+            # removes any callback that raises, which would break all
+            # future battle-summary updates for the rest of the session.
+            logger.exception(f"Error handling route change: {e}")
 
     def _handle_selection(self):
         if self._in_selection_handler:
@@ -222,6 +228,11 @@ class EventDetails(QWidget):
         self.setUpdatesEnabled(False)
         try:
             self._handle_selection_inner()
+        except Exception as e:
+            # Must not propagate — _safely_invoke_callbacks permanently
+            # removes any callback that raises, which would break all
+            # future battle-summary updates for the rest of the session.
+            logger.exception(f"Error handling selection change: {e}")
         finally:
             self.setUpdatesEnabled(True)
             self._in_selection_handler = False
