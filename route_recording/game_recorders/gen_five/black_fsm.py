@@ -795,7 +795,20 @@ class Machine:
                                     expected_money += second_trainer_money
                                 cur_event.trainer_def.pay_day_amount = max(0, cur_event.trainer_def.pay_day_amount - expected_money)
                                 self._controller._controller.update_existing_event(test_obj.group_id, cur_event)
-                            
+
+                            # ROAR_FLAG is queued at battle exit even for losses (with a
+                            # TRAINER_LOSS_FLAG queued right after). Only treat this as a win
+                            # if there's no pending loss event for the same trainer.
+                            _trn = cur_event.trainer_def.trainer_name
+                            _has_pending_loss = any(
+                                e.trainer_def is not None and
+                                e.trainer_def.trainer_name == _trn and
+                                e.notes == gh_gen_five_const.TRAINER_LOSS_FLAG
+                                for e in self._events_to_generate
+                            )
+                            if not _has_pending_loss:
+                                self._controller.check_final_trainer(_trn)
+
                             continue
 
                     elif None is not cur_event.item_event_def:

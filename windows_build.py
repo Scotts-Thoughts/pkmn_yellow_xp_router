@@ -43,6 +43,7 @@ if __name__ == "__main__":
         "--add-data", "icons\\*.png;icons",
         "--add-data", "icons\\filter icons\\*.png;icons\\filter icons",
         "--add-data", "assets\\pkmn_icons\\*.png;assets\\pkmn_icons",
+        "--add-data", "assets\\box_art\\*.png;assets\\box_art",
     ]
 
     root_path = os.path.dirname(os.path.abspath(__file__))

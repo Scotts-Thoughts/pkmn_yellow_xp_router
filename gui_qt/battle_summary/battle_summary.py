@@ -5,7 +5,7 @@ from typing import List
 
 from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
-    QFrame, QCompleter, QLineEdit, QSizePolicy,
+    QFrame, QCompleter, QLineEdit, QSizePolicy, QPushButton,
 )
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QPixmap
@@ -163,6 +163,125 @@ class BattleSummary(QWidget):
         self._base_layout.setSpacing(2)
         self._scroll_area.setWidget(self._base_frame)
 
+        # ---- new controls bar (above legacy controls) ---------------------
+        self._controls_bar = QWidget()
+        controls_layout = QHBoxLayout(self._controls_bar)
+        controls_layout.setContentsMargins(6, 2, 6, 2)
+        controls_layout.setSpacing(6)
+
+        # Prefight rare candy control: [-] [icon] [count] [+]
+        self._candy_minus_btn = QPushButton("\u2212")
+        self._candy_minus_btn.setFixedSize(22, 22)
+        self._candy_minus_btn.setFocusPolicy(Qt.NoFocus)
+        self._candy_minus_btn.setToolTip("Decrement Pre-Fight Candies")
+        self._candy_minus_btn.clicked.connect(self._decrement_prefight_candies)
+        controls_layout.addWidget(self._candy_minus_btn)
+
+        self._candy_icon_label = QLabel()
+        _candy_icon_path = os.path.join(
+            const.SOURCE_ROOT_PATH, "icons", "filter icons", "TASK_RARE_CANDY.png"
+        )
+        if os.path.isfile(_candy_icon_path):
+            _pix = QPixmap(_candy_icon_path)
+            if not _pix.isNull():
+                self._candy_icon_label.setPixmap(
+                    _pix.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                )
+        self._candy_icon_label.setToolTip("Pre-Fight Rare Candies")
+        controls_layout.addWidget(self._candy_icon_label)
+
+        self._candy_count_label = QLabel("0")
+        self._candy_count_label.setAlignment(Qt.AlignCenter)
+        self._candy_count_label.setMinimumWidth(24)
+        self._candy_count_label.setStyleSheet("QLabel { border: none; font-weight: bold; }")
+        controls_layout.addWidget(self._candy_count_label)
+
+        self._candy_plus_btn = QPushButton("+")
+        self._candy_plus_btn.setFixedSize(22, 22)
+        self._candy_plus_btn.setFocusPolicy(Qt.NoFocus)
+        self._candy_plus_btn.setToolTip("Increment Pre-Fight Candies")
+        self._candy_plus_btn.clicked.connect(self._increment_prefight_candies)
+        controls_layout.addWidget(self._candy_plus_btn)
+
+        # Small gap before vitamin indicators
+        _spacer = QLabel("")
+        _spacer.setFixedWidth(10)
+        controls_layout.addWidget(_spacer)
+
+        # Vitamin-per-stat indicators: [-] [label] [+] per stat.
+        # Shows how many vitamins boosting that stat have been used before
+        # the currently-loaded battle.
+        self._vitamin_stat_widgets = {}  # stat_key -> (minus_btn, lbl, plus_btn, stat_label)
+        self._vitamin_pending_deltas = {}  # stat_key -> accumulated delta (int)
+        self._vitamin_debounce_timer = QTimer(self)
+        self._vitamin_debounce_timer.setSingleShot(True)
+        self._vitamin_debounce_timer.setInterval(300)
+        self._vitamin_debounce_timer.timeout.connect(self._flush_vitamin_adjustments)
+
+        _stat_display_order = [
+            (const.HP,  "HP"),
+            (const.ATK, "Atk"),
+            (const.DEF, "Def"),
+            (const.SPA, "SpA"),
+            (const.SPD, "SpD"),
+            (const.SPE, "Spe"),
+        ]
+        for stat_key, stat_label in _stat_display_order:
+            minus_btn = QPushButton("\u2212")
+            minus_btn.setFixedSize(18, 18)
+            minus_btn.setFocusPolicy(Qt.NoFocus)
+            minus_btn.setToolTip(f"Remove a vitamin for {stat_label}")
+            minus_btn.clicked.connect(
+                lambda checked, s=stat_key: self._on_vitamin_adjust(s, -1)
+            )
+            controls_layout.addWidget(minus_btn)
+
+            lbl = QLabel(f"{stat_label} 0")
+            lbl.setToolTip(f"Vitamins boosting {stat_label} used before this battle")
+            lbl.setStyleSheet(
+                "QLabel { border: 1px solid rgba(255, 255, 255, 0.15);"
+                " border-radius: 3px; padding: 1px 3px; }"
+            )
+            controls_layout.addWidget(lbl)
+
+            plus_btn = QPushButton("+")
+            plus_btn.setFixedSize(18, 18)
+            plus_btn.setFocusPolicy(Qt.NoFocus)
+            plus_btn.setToolTip(f"Add a vitamin for {stat_label}")
+            plus_btn.clicked.connect(
+                lambda checked, s=stat_key: self._on_vitamin_adjust(s, +1)
+            )
+            controls_layout.addWidget(plus_btn)
+
+            self._vitamin_stat_widgets[stat_key] = (minus_btn, lbl, plus_btn, stat_label)
+
+        controls_layout.addStretch(1)
+
+        self._base_layout.addWidget(self._controls_bar)
+
+        # ---- legacy controls (collapsible, hidden by default) -------------
+        self._legacy_section = QWidget()
+        legacy_section_layout = QVBoxLayout(self._legacy_section)
+        legacy_section_layout.setContentsMargins(0, 0, 0, 0)
+        legacy_section_layout.setSpacing(0)
+
+        self._legacy_header = QWidget()
+        self._legacy_header.setCursor(Qt.PointingHandCursor)
+        self._legacy_header.mousePressEvent = lambda e: self._toggle_legacy_controls()
+        legacy_header_row = QHBoxLayout(self._legacy_header)
+        legacy_header_row.setContentsMargins(6, 3, 6, 3)
+        legacy_header_row.setSpacing(4)
+
+        self._legacy_disclosure = DisclosureTriangle(size=14, color="#cccccc", parent=self._legacy_header)
+        legacy_header_row.addWidget(self._legacy_disclosure)
+
+        legacy_label = QLabel("Legacy Controls")
+        legacy_label.setStyleSheet("QLabel { font-weight: bold; border: none; }")
+        legacy_header_row.addWidget(legacy_label)
+        legacy_header_row.addStretch(1)
+
+        legacy_section_layout.addWidget(self._legacy_header)
+
         # ---- top bar (setup moves, weather, candy, config) ----------------
         self._top_bar = QWidget()
         top_bar_layout = QHBoxLayout(self._top_bar)
@@ -225,7 +344,17 @@ class BattleSummary(QWidget):
 
         top_bar_layout.addWidget(weather_half, 0)
 
-        self._base_layout.addWidget(self._top_bar)
+        legacy_section_layout.addWidget(self._top_bar)
+
+        # Collapsed by default; top-bar starts hidden.
+        self._legacy_expanded = False
+        self._top_bar.setVisible(False)
+        self._legacy_disclosure.set_expanded(False)
+
+        self._base_layout.addWidget(self._legacy_section)
+
+        # Honor the "Show Legacy Controls" toggle from config.
+        self._legacy_section.setVisible(config.get_show_legacy_controls())
 
         # ---- mon pair slots (up to 6) ------------------------------------
         self._mon_pairs: List[MonPairSummary] = []
@@ -259,6 +388,51 @@ class BattleSummary(QWidget):
     def configure_setup_moves(self, possible_setup_moves):
         self.setup_moves.configure_moves(possible_setup_moves)
         self.enemy_setup_moves.configure_moves(possible_setup_moves)
+
+    def _toggle_legacy_controls(self):
+        self._legacy_expanded = not self._legacy_expanded
+        self._top_bar.setVisible(self._legacy_expanded)
+        self._legacy_disclosure.set_expanded(self._legacy_expanded)
+
+    def set_legacy_controls_visible(self, visible: bool):
+        """Show or completely remove the Legacy Controls section."""
+        self._legacy_section.setVisible(bool(visible))
+
+    # ------------------------------------------------------------------
+    # Vitamin +/- with debounce
+    # ------------------------------------------------------------------
+
+    def _on_vitamin_adjust(self, stat, delta):
+        """Called on each +/- click. Updates the label immediately and
+        accumulates the delta.  The actual route modification is deferred
+        until the debounce timer fires."""
+        self._vitamin_pending_deltas[stat] = self._vitamin_pending_deltas.get(stat, 0) + delta
+
+        # Instantly update the label so the UI feels responsive.
+        widgets = self._vitamin_stat_widgets.get(stat)
+        if widgets:
+            _minus_btn, lbl, _plus_btn, stat_label = widgets
+            try:
+                cur_text = lbl.text()
+                cur_count = int(cur_text.split()[-1])
+            except (ValueError, IndexError):
+                cur_count = 0
+            lbl.setText(f"{stat_label} {max(0, cur_count + delta)}")
+
+        # Restart the debounce timer.
+        self._vitamin_debounce_timer.start()
+
+    def _flush_vitamin_adjustments(self):
+        """Apply all accumulated vitamin deltas to the route in one batch."""
+        pending = self._vitamin_pending_deltas.copy()
+        self._vitamin_pending_deltas.clear()
+        items = [(s, d) for s, d in pending.items() if d != 0]
+        if not items:
+            return
+        for stat, delta in items:
+            self._controller.adjust_vitamin_for_stat(stat, delta, _skip_refresh=True)
+        # Single refresh after all adjustments are applied.
+        self._controller._full_refresh()
 
     def hide_contents(self):
         self.should_render = False
@@ -452,11 +626,22 @@ class BattleSummary(QWidget):
         self._base_frame.setUpdatesEnabled(False)
         try:
             self._loading = True
-            self.candy_summary.set_candy_count(self._controller.get_prefight_candy_count())
-            if not self._controller.can_support_prefight_candies():
+            cur_candies = self._controller.get_prefight_candy_count()
+            self.candy_summary.set_candy_count(cur_candies)
+            can_candies = self._controller.can_support_prefight_candies()
+            if not can_candies:
                 self.candy_summary.disable()
             else:
                 self.candy_summary.enable()
+            # Mirror into the new controls-bar candy control
+            self._candy_count_label.setText(str(cur_candies))
+            self._candy_minus_btn.setEnabled(can_candies)
+            self._candy_plus_btn.setEnabled(can_candies)
+            # Vitamin-per-stat indicators
+            vit_counts = self._controller.get_vitamins_used_per_stat()
+            for stat_key, (minus_btn, lbl, plus_btn, stat_label) in self._vitamin_stat_widgets.items():
+                count = vit_counts.get(stat_key, 0)
+                lbl.setText(f"{stat_label} {count}")
 
             if self._controller.is_double_battle():
                 self.double_label.setText("Double Battle")
@@ -681,10 +866,23 @@ class PrefightCandySummary(QWidget):
             self._candy_callback_timer = QTimer(self)
             self._candy_callback_timer.setSingleShot(True)
             self._candy_callback_timer.timeout.connect(self._delayed_candy_callback)
-            self._candy_callback_timer.start(300)
+            self._candy_callback_timer.start(150)
 
     def _delayed_candy_callback(self):
         self._candy_callback_timer = None
+
+        # Drain any pending button clicks / key presses that arrived while a
+        # previous recalculation was blocking the event loop.  This ensures the
+        # displayed candy count incorporates ALL rapid changes before we start
+        # the next expensive recalculation.
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
+
+        # If draining those events started a new debounce timer (user is still
+        # clicking), skip this round — the new timer will handle it.
+        if self._candy_callback_timer is not None:
+            return
+
         if self._outer_callback is not None:
             self._outer_callback()
 
@@ -693,14 +891,14 @@ class PrefightCandySummary(QWidget):
             self._loading = True
             self.candy_count._raise_amt()
             self._loading = False
-            self._fire_candy_callback()
+            self._callback()
 
     def _decrement_candy(self, event=None):
         if not self._loading:
             self._loading = True
             self.candy_count._lower_amt()
             self._loading = False
-            self._fire_candy_callback()
+            self._callback()
 
     def _fire_candy_callback(self):
         """Cancel any pending debounce and fire the callback immediately."""

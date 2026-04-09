@@ -6,6 +6,7 @@ import controllers.main_controller
 import pkmn.gen_factory
 from route_recording.gamehook_client import GameHookClient
 import routing.route_events
+from utils.config_manager import config
 from utils.constants import const
 
 logger = logging.getLogger(__name__)
@@ -206,6 +207,51 @@ class RecorderController:
 
             logger.info(f"[BLACKOUT DEBUG] Deleting trainer event with group_id: {test_obj.group_id}")
             self._controller.delete_events([test_obj.group_id])
+
+    @skip_if_inactive
+    def check_final_trainer(self, trainer_name:str):
+        """Called by game-specific FSMs after a trainer battle has been confirmed
+        as a win (i.e. the player did not black out). If the defeated trainer is
+        configured as a 'final trainer' for the current game version, recording is
+        automatically turned off so further events aren't accidentally captured.
+
+        The actual stop is dispatched to the Qt main thread because this method
+        is called from the FSM's background processing thread, and stopping
+        recording would otherwise try to join that very thread (deadlock).
+
+        Does nothing when the user has disabled recording auto-stop in the
+        Recording menu."""
+        try:
+            if not config.get_recording_auto_stop_enabled():
+                return
+            version = self._controller.get_version()
+            if not version:
+                return
+            final_trainers = config.get_final_trainers(version)
+            if trainer_name not in final_trainers:
+                return
+
+            logger.info(
+                f"Final trainer '{trainer_name}' defeated for {version} - "
+                f"scheduling recording stop"
+            )
+
+            def _stop():
+                try:
+                    if self._controller.is_record_mode_active():
+                        self._controller.set_record_mode(False)
+                except Exception as inner:
+                    logger.error(f"Error while stopping recording for final trainer: {inner}")
+
+            try:
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(0, _stop)
+            except Exception as e:
+                # Fall back to a direct call if QTimer is unavailable for any reason.
+                logger.warning(f"QTimer unavailable, calling stop directly: {e}")
+                _stop()
+        except Exception as e:
+            logger.error(f"Error in check_final_trainer for {trainer_name}: {e}")
 
     @skip_if_inactive
     def add_event(self, event_def:routing.route_events.EventDefinition):

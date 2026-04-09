@@ -205,6 +205,10 @@ class CustomDVsFrame(ttk.Frame):
         if self.ability_vals is not None:
             self.ability_vals.grid(row=12, column=1, padx=self.padx, pady=self.pady)
 
+        # Populate the Hidden Power label with the initial DVs so it isn't blank
+        # until the user edits a DV (e.g. when opening the new route dialog for Crystal).
+        self.recalc_hidden_power()
+
 
     def recalc_hidden_power(self, *args, **kwargs):
         if self.hidden_power is None:

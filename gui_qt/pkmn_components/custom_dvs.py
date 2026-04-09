@@ -244,6 +244,10 @@ class CustomDVsFrame(QWidget):
         if self.ability_vals is not None:
             self._grid.addWidget(self.ability_vals, 12, 1)
 
+        # Populate the Hidden Power label with the initial DVs so it isn't blank
+        # until the user edits a DV (e.g. when opening the new route dialog for Crystal).
+        self.recalc_hidden_power()
+
     def _recalc_hp_dv(self):
         """Auto-calculate HP DV for Gen 1 & 2 from the other DVs."""
         try:

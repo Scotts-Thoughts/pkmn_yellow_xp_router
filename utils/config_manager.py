@@ -53,6 +53,7 @@ DEFAULT_SHORTCUTS = {
     "split_folder":             "Alt+X",
     # Recording menu
     "toggle_recording":         "F1",
+    "final_trainers":           "",
     # Battle Summary menu
     "toggle_move_highlights":   "Shift+F2",
     "toggle_fade_no_highlight": "Shift+F3",
@@ -81,8 +82,6 @@ DEFAULT_SHORTCUTS = {
     "e4_4":                     "Ctrl+4",
     "e4_5":                     "Ctrl+5",
     "e4_6":                     "Ctrl+6",
-    "toggle_add_events":        "Ctrl+F1",
-    "toggle_filters":           "Ctrl+F2",
     # Filter toggles (application-wide)
     "filter_trainer":           "Ctrl+F",
     "filter_rare_candy":        "Ctrl+R",
@@ -149,6 +148,7 @@ SHORTCUT_LABELS = {
     "split_folder":             "Split Folder",
     # Recording menu
     "toggle_recording":         "Toggle Recording",
+    "final_trainers":           "Configure Final Trainers",
     # Battle Summary menu
     "toggle_move_highlights":   "Toggle Move Highlights",
     "toggle_fade_no_highlight": "Toggle Fade Moves Without Highlight",
@@ -177,8 +177,6 @@ SHORTCUT_LABELS = {
     "e4_4":                     "Select Elite Four 4",
     "e4_5":                     "Select Elite Four 5",
     "e4_6":                     "Select Elite Four/Champion 6",
-    "toggle_add_events":        "Toggle Add Events Dialog",
-    "toggle_filters":           "Toggle Filters Dialog",
     # Filter toggles
     "filter_trainer":           "Toggle Trainer Filter",
     "filter_rare_candy":        "Toggle Rare Candy Filter",
@@ -209,19 +207,41 @@ SHORTCUT_CATEGORIES = {
                          "move_event_down_folder", "enable_disable", "toggle_highlight", "delete_event"],
     "Highlight":        [f"highlight_{i}" for i in range(1, 10)],
     "Folders":          ["new_folder", "rename_folder", "split_folder"],
-    "Recording":        ["toggle_recording"],
+    "Recording":        ["toggle_recording", "final_trainers"],
     "Battle Summary":   ["toggle_move_highlights", "toggle_fade_no_highlight", "toggle_test_moves",
                          "candy_decrement", "candy_increment", "toggle_player_strat", "toggle_enemy_strat"],
     "Navigation":       ["delete_key", "scroll_home", "scroll_end", "toggle_tabs", "toggle_summary",
                          "gym_1", "gym_2", "gym_3", "gym_4", "gym_5", "gym_6", "gym_7", "gym_8",
-                         "e4_1", "e4_2", "e4_3", "e4_4", "e4_5", "e4_6",
-                         "toggle_add_events", "toggle_filters"],
+                         "e4_1", "e4_2", "e4_3", "e4_4", "e4_5", "e4_6"],
     "Filters":          ["filter_trainer", "filter_rare_candy", "filter_tm_hm", "filter_vitamin",
                          "filter_wild_pkmn", "filter_acquire_item", "filter_purchase_item",
                          "filter_use_item", "filter_sell_item", "filter_hold_item",
                          "filter_levelup_move", "filter_save", "filter_heal",
                          "filter_blackout", "filter_evolution", "filter_notes",
                          "filter_common", "filter_reset"],
+}
+
+
+# Default "final trainer" lists per game version. Defeating any of these
+# trainers while recording (with auto-stop enabled) will turn recording off
+# automatically. Users can override these per-game in the Recording menu.
+DEFAULT_FINAL_TRAINERS_PER_GAME = {
+    "Red":        ["Rival3 Squirtle", "Rival3 Bulbasaur", "Rival3 Charmander"],
+    "Blue":       ["Rival3 Squirtle", "Rival3 Bulbasaur", "Rival3 Charmander"],
+    "Yellow":     ["Rival3 Jolteon", "Rival3 Flareon", "Rival3 Vaporeon"],
+    "Gold":       ["Leader Red"],
+    "Silver":     ["Leader Red"],
+    "Crystal":    ["Leader Red"],
+    "Ruby":       ["Champion Steven"],
+    "Sapphire":   ["Champion Steven"],
+    "Emerald":    ["Rival Steven"],
+    "FireRed":    ["Champion Squirtle", "Champion Bulbasaur", "Champion Charmander"],
+    "LeafGreen":  ["Champion Squirtle", "Champion Bulbasaur", "Champion Charmander"],
+    "Diamond":    ["Champion Cynthia"],
+    "Pearl":      ["Champion Cynthia"],
+    "Platinum":   ["Champion Cynthia"],
+    "HeartGold":  ["Pokemon Trainer Red"],
+    "SoulSilver": ["Pokemon Trainer Red"],
 }
 
 
@@ -307,6 +327,7 @@ class Config:
         self._fade_folder_text = raw.get("fade_folder_text", False)
         self._highlight_branched_mandatory = raw.get("highlight_branched_mandatory", False)
         self._show_move_highlights = raw.get("show_move_highlights", True)
+        self._show_legacy_controls = raw.get("show_legacy_controls", True)
         self._fade_moves_without_highlight = raw.get("fade_moves_without_highlight", False)
         self._test_moves_enabled = raw.get("test_moves_enabled", False)
         self._landing_search_filter = raw.get("landing_search_filter", "")
@@ -329,6 +350,15 @@ class Config:
 
         # Keyboard shortcuts -- only store overrides (diff from defaults)
         self._shortcut_overrides = raw.get("keyboard_shortcuts", {})
+
+        # Final trainers per game version (game_version -> list of trainer names)
+        # When recording, defeating any of these trainers automatically stops recording.
+        raw_final = raw.get("final_trainers_per_game", {})
+        self._final_trainers_per_game = {
+            str(k): list(v) for k, v in raw_final.items() if isinstance(v, (list, tuple))
+        }
+        # Whether the "final trainer auto-stop" logic is enabled at all
+        self._recording_auto_stop_enabled = bool(raw.get("recording_auto_stop_enabled", True))
 
         # Persist the reset so the user's config file is stamped with the
         # current color scheme version (avoids resetting again next launch).
@@ -369,6 +399,7 @@ class Config:
                 "fade_folder_text": getattr(self, '_fade_folder_text', False),
                 "highlight_branched_mandatory": getattr(self, '_highlight_branched_mandatory', False),
                 "show_move_highlights": getattr(self, '_show_move_highlights', True),
+                "show_legacy_controls": getattr(self, '_show_legacy_controls', True),
                 "fade_moves_without_highlight": getattr(self, '_fade_moves_without_highlight', False),
                 "test_moves_enabled": getattr(self, '_test_moves_enabled', False),
                 "landing_search_filter": getattr(self, '_landing_search_filter', ''),
@@ -390,6 +421,13 @@ class Config:
         # Save keyboard shortcut overrides
         if self._shortcut_overrides:
             data["keyboard_shortcuts"] = self._shortcut_overrides
+        # Save final trainers per game version
+        final_trainers = getattr(self, '_final_trainers_per_game', {})
+        if final_trainers:
+            data["final_trainers_per_game"] = final_trainers
+        # Save recording auto-stop toggle (only when non-default to keep file tidy)
+        if not getattr(self, '_recording_auto_stop_enabled', True):
+            data["recording_auto_stop_enabled"] = False
 
         with open(const.GLOBAL_CONFIG_FILE, 'w') as f:
             json.dump(data, f, indent=4)
@@ -693,6 +731,14 @@ class Config:
         self._show_move_highlights = val
         self._save()
 
+    # --- Show legacy battle-summary controls ---
+    def get_show_legacy_controls(self):
+        return getattr(self, '_show_legacy_controls', True)
+
+    def set_show_legacy_controls(self, val):
+        self._show_legacy_controls = bool(val)
+        self._save()
+
     # --- Fade moves without highlight ---
     def get_fade_moves_without_highlight(self):
         return getattr(self, '_fade_moves_without_highlight', False)
@@ -793,6 +839,42 @@ class Config:
         data = self.get_all_shortcuts()
         with open(file_path, 'w') as f:
             json.dump(data, f, indent=4)
+
+    # --- Final trainers per game version ---
+    def get_final_trainers(self, game_version):
+        """Return the list of trainer names configured as 'final trainers' for the given game version.
+        Defeating any of these trainers while recording will automatically stop recording.
+        Falls back to DEFAULT_FINAL_TRAINERS_PER_GAME when the user has not explicitly set
+        a list for this game (an explicit empty list is honored as 'user disabled all defaults')."""
+        per_game = getattr(self, '_final_trainers_per_game', {})
+        if game_version in per_game:
+            return list(per_game[game_version])
+        return list(DEFAULT_FINAL_TRAINERS_PER_GAME.get(game_version, []))
+
+    def set_final_trainers(self, game_version, trainer_list):
+        """Replace the final-trainer list for a given game version. Always persists,
+        even when the list is empty, so that the user clearing every default is
+        remembered (otherwise defaults would re-appear next launch)."""
+        if not hasattr(self, '_final_trainers_per_game'):
+            self._final_trainers_per_game = {}
+        self._final_trainers_per_game[game_version] = [str(t) for t in trainer_list]
+        self._save()
+
+    def reset_final_trainers(self, game_version):
+        """Forget any user override for this game version, restoring built-in defaults."""
+        per_game = getattr(self, '_final_trainers_per_game', None)
+        if per_game and game_version in per_game:
+            del per_game[game_version]
+            self._save()
+
+    # --- Recording auto-stop toggle ---
+    def get_recording_auto_stop_enabled(self):
+        """Whether recording should automatically stop when a configured 'final trainer' is defeated."""
+        return bool(getattr(self, '_recording_auto_stop_enabled', True))
+
+    def set_recording_auto_stop_enabled(self, enabled):
+        self._recording_auto_stop_enabled = bool(enabled)
+        self._save()
 
     def import_shortcuts(self, file_path):
         """Import a shortcut profile from a JSON file. Only stores diffs from defaults."""

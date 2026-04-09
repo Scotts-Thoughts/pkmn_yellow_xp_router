@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QComboBox, QPushButton, QWidget,
     QLabel, QLineEdit, QCompleter,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent, QObject, QTimer
 
 from gui_qt.components.custom_components import AmountEntry
 from pkmn.gen_factory import current_gen_info
@@ -61,10 +61,32 @@ _EVENT_TYPE_TO_KEY = {
 _KEY_TO_INDEX = {key: idx for idx, (_, key) in enumerate(_EVENT_TYPES)}
 
 
+class _SelectAllOnFocusFilter(QObject):
+    """Event filter that selects all text in a QLineEdit when it gains focus
+    or is clicked, so the user can immediately start typing to filter.
+
+    Qt runs the default mouse/focus handlers after the filter returns False,
+    and those handlers can clear the selection (e.g. mouse press positions
+    the cursor), so the ``selectAll`` call is deferred via a zero-delay
+    QTimer to run after the default behavior.
+    """
+
+    def eventFilter(self, obj, event):
+        etype = event.type()
+        if etype == QEvent.FocusIn or etype == QEvent.MouseButtonPress:
+            QTimer.singleShot(0, obj.selectAll)
+        return False
+
+
 def _make_searchable(combo):
     """Configure a QComboBox for type-to-filter searching."""
     combo.setEditable(True)
     combo.setInsertPolicy(QComboBox.NoInsert)
+    line_edit = combo.lineEdit()
+    if line_edit is not None:
+        # Parent the filter to the combo so it's cleaned up with it.
+        filt = _SelectAllOnFocusFilter(combo)
+        line_edit.installEventFilter(filt)
     completer = combo.completer()
     if completer:
         completer.setCompletionMode(QCompleter.PopupCompletion)
@@ -163,6 +185,40 @@ class InlineEventCreator(QFrame):
         self._type_combo.setFocus()
         if self._type_combo.lineEdit():
             self._type_combo.lineEdit().selectAll()
+
+    # Map from internal type key → the config-ref key for the "primary" field
+    # that the user most likely wants to change when double-click-editing.
+    _PRIMARY_FIELD_FOR_TYPE = {
+        "trainer":   "trainer",
+        "get_item":  "item",
+        "buy_item":  "item",
+        "sell_item": "item",
+        "use_item":  "item",
+        "hold_item": "item",
+        "wild_pkmn": "pkmn",
+        "vitamin":   "vitamin",
+        "rare_candy": "qty",
+        "tm_move":   "tm",
+        "notes":     "note",
+    }
+
+    def focus_primary_field(self):
+        """Focus the most relevant config field for the current event type.
+
+        For an item event this selects the item dropdown, for a trainer event
+        the trainer dropdown, etc.  Falls back to the type combo when no
+        specific field is identified (simple types like Save/Heal)."""
+        ref_key = self._PRIMARY_FIELD_FOR_TYPE.get(self._current_type_key)
+        widget = self._config_refs.get(ref_key) if ref_key else None
+        if widget is not None:
+            widget.setFocus()
+            # For QComboBox / searchable combos, selectAll is handled by the
+            # _SelectAllOnFocusFilter already installed. For QLineEdit we do
+            # it explicitly so the user can immediately start typing.
+            if hasattr(widget, 'selectAll'):
+                QTimer.singleShot(0, widget.selectAll)
+        else:
+            self.focus_type_combo()
 
     # ------------------------------------------------------------------
     # Type selection

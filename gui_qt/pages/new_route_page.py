@@ -7,11 +7,12 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem, QHeaderView, QAbstractItemView, QApplication,
     QMessageBox, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtCore import Qt, QTimer, QSize
+from PySide6.QtGui import QColor, QBrush, QIcon
 
 from gui_qt.components.custom_components import SimpleEntry, SimpleOptionMenu, SimpleButton
 from gui_qt.pkmn_components.custom_dvs import CustomDVsFrame
+from gui_qt import box_art
 from utils.constants import const
 from utils import io_utils
 from pkmn.gen_factory import _gen_factory as gen_factory, current_gen_info
@@ -94,23 +95,29 @@ class NewRoutePage(QWidget):
         version_row.addWidget(version_label, 0, Qt.AlignTop)
 
         self.game_treeview = QTreeWidget()
-        self.game_treeview.setHeaderLabels(["Game", "Generation", "Platform", "Recorder"])
+        self.game_treeview.setHeaderLabels(["Box Art", "Game", "Generation", "Platform", "Recorder"])
         self.game_treeview.setRootIsDecorated(False)
         self.game_treeview.setSelectionMode(QAbstractItemView.SingleSelection)
         self.game_treeview.setAlternatingRowColors(True)
         # Prefer showing all rows; shrink with scrollbar in small windows
         self.game_treeview.setMinimumHeight(100)
         self.game_treeview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Icon size for the box-art column. Rows grow to fit this height so
+        # box art is big enough to be recognizable at a glance.
+        self._box_art_size = QSize(72, 72)
+        self.game_treeview.setIconSize(self._box_art_size)
 
         header = self.game_treeview.header()
         header.setStretchLastSection(True)
-        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        header.setSectionResizeMode(0, QHeaderView.Fixed)
         header.setSectionResizeMode(1, QHeaderView.Interactive)
         header.setSectionResizeMode(2, QHeaderView.Interactive)
-        header.setSectionResizeMode(3, QHeaderView.Stretch)
-        self.game_treeview.setColumnWidth(0, 120)
+        header.setSectionResizeMode(3, QHeaderView.Interactive)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)
+        self.game_treeview.setColumnWidth(0, self._box_art_size.width() + 12)
         self.game_treeview.setColumnWidth(1, 120)
-        self.game_treeview.setColumnWidth(2, 100)
+        self.game_treeview.setColumnWidth(2, 120)
+        self.game_treeview.setColumnWidth(3, 100)
 
         self.game_treeview.itemSelectionChanged.connect(self._on_game_selection_changed)
 
@@ -272,7 +279,15 @@ class NewRoutePage(QWidget):
                     platform = "Unknown"
                     recorder = "Unknown"
 
-            item = QTreeWidgetItem([game_name, gen, platform, recorder])
+            item = QTreeWidgetItem(["", game_name, gen, platform, recorder])
+            # Attach box art (if available) to the leading column
+            pm = box_art.get_box_art(
+                game_name,
+                self._box_art_size.width(),
+                self._box_art_size.height(),
+            )
+            if pm is not None:
+                item.setIcon(0, QIcon(pm))
             # Version colors removed for cleaner appearance
             self.game_treeview.addTopLevelItem(item)
 
@@ -297,7 +312,7 @@ class NewRoutePage(QWidget):
         items = self.game_treeview.selectedItems()
         if not items:
             return
-        new_game = items[0].text(0)
+        new_game = items[0].text(1)
         if new_game == self._selected_game:
             return
 
@@ -509,7 +524,7 @@ class NewRoutePage(QWidget):
         current_selection = None
         items = self.game_treeview.selectedItems()
         if items:
-            current_selection = items[0].text(0)
+            current_selection = items[0].text(1)
 
         self._populate_game_table()
 
@@ -517,7 +532,7 @@ class NewRoutePage(QWidget):
         if current_selection:
             for idx in range(self.game_treeview.topLevelItemCount()):
                 item = self.game_treeview.topLevelItem(idx)
-                if item.text(0) == current_selection:
+                if item.text(1) == current_selection:
                     self.game_treeview.setCurrentItem(item)
                     break
         elif self.game_treeview.topLevelItemCount() > 0:

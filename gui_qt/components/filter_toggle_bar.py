@@ -1,9 +1,9 @@
 import logging
 import os
 
-from PySide6.QtWidgets import QWidget, QPushButton, QHBoxLayout
+from PySide6.QtWidgets import QWidget, QPushButton, QHBoxLayout, QLineEdit
 from PySide6.QtGui import QIcon, QImage, QPixmap
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer
 
 from utils.constants import const
 from utils.config_manager import config
@@ -191,6 +191,19 @@ class FilterToggleBar(QWidget):
         reset_btn.clicked.connect(self._reset_all)
         layout.addWidget(reset_btn)
 
+        # Text search box to the right of Clear Filters
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(300)
+        self._search_timer.timeout.connect(self._delayed_search_callback)
+
+        self._search_entry = QLineEdit(self)
+        self._search_entry.setPlaceholderText("Search events...")
+        self._search_entry.setClearButtonEnabled(True)
+        self._search_entry.setMaximumWidth(200)
+        self._search_entry.textChanged.connect(self._on_search_text_changed)
+        layout.addWidget(self._search_entry)
+
         layout.addStretch()
 
     # ------------------------------------------------------------------
@@ -211,6 +224,17 @@ class FilterToggleBar(QWidget):
     def _reset_all(self):
         self._controller.set_route_filter_types([])
         self.sync()
+
+    # ------------------------------------------------------------------
+    # Text search
+    # ------------------------------------------------------------------
+
+    def _on_search_text_changed(self, _text):
+        self._search_timer.stop()
+        self._search_timer.start()
+
+    def _delayed_search_callback(self):
+        self._controller.set_route_search(self._search_entry.text())
 
     # ------------------------------------------------------------------
     # State synchronization

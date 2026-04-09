@@ -508,7 +508,12 @@ class Machine:
                                 cur_event.trainer_def.pay_day_amount -= trainer.money
                                 logger.info(f"Updating pay day for trainer {cur_event.trainer_def.trainer_name} to {cur_event.trainer_def.pay_day_amount}")
                                 self._controller._controller.update_existing_event(test_obj.group_id, cur_event)
-                            
+
+                            # If this trainer is configured as a final trainer for the current
+                            # game, automatically stop recording. PAY_DAY_FLAG is only queued on
+                            # a win in gen 1, so reaching here means the player won the battle.
+                            self._controller.check_final_trainer(cur_event.trainer_def.trainer_name)
+
                             continue
                     elif None is not cur_event.item_event_def:
                         item = current_gen_info().item_db().get_item(cur_event.item_event_def.item_name)

@@ -390,6 +390,15 @@ class MainWindow(QMainWindow):
 
         self._act_toggle_recording = _add_action(self.recording_menu, "Enable/Disable Recording", "toggle_recording", self.record_button_clicked)
 
+        self.recording_menu.addSeparator()
+
+        self._act_auto_stop_recording = self.recording_menu.addAction("Automatically Stop Recording")
+        self._act_auto_stop_recording.setCheckable(True)
+        self._act_auto_stop_recording.setChecked(config.get_recording_auto_stop_enabled())
+        self._act_auto_stop_recording.triggered.connect(self._toggle_auto_stop_recording)
+
+        self._act_final_trainers = _add_action(self.recording_menu, "Final Trainers...", "final_trainers", self.open_final_trainers_dialog)
+
         # ---- Battle Summary menu -------------------------------------
         self.battle_summary_menu = menu_bar.addMenu("&Battle Summary")
         self.battle_summary_menu.aboutToShow.connect(self._update_battle_summary_menu_state)
@@ -399,6 +408,12 @@ class MainWindow(QMainWindow):
         self._act_show_notes.setCheckable(True)
         self._act_show_notes.setChecked(config.are_notes_visible_in_battle_summary())
         self._act_show_notes.triggered.connect(self._toggle_battle_summary_notes)
+
+        # Legacy controls visibility toggle
+        self._act_show_legacy_controls = self.battle_summary_menu.addAction("Show Legacy Controls")
+        self._act_show_legacy_controls.setCheckable(True)
+        self._act_show_legacy_controls.setChecked(config.get_show_legacy_controls())
+        self._act_show_legacy_controls.triggered.connect(self._toggle_legacy_controls_visible)
 
         # Player Highlight Strategy submenu
         self._player_strat_menu = self.battle_summary_menu.addMenu("Player Highlight Strategy")
@@ -552,10 +567,6 @@ class MainWindow(QMainWindow):
         self.filter_toggle_bar = FilterToggleBar(self._controller, left_panel)
         left_layout.addWidget(self.filter_toggle_bar)
 
-        # ---- Popover dialogs (created on first use) --------------------
-        self._add_events_dialog = None
-        self._filters_dialog = None
-
         # ---- Event list ----------------------------------------------
         event_list_frame = QWidget()
         el_layout = QHBoxLayout(event_list_frame)
@@ -692,9 +703,6 @@ class MainWindow(QMainWindow):
 
         for i in range(1, 7):
             _sc(f"e4_{i}", partial(self.select_elite_four_or_champion, i - 1))
-
-        _sc("toggle_add_events", self._toggle_add_events_dialog)
-        _sc("toggle_filters",    self._toggle_filters_dialog)
 
         # Filter toggles (application-wide context)
         _sc("filter_trainer",       self.toggle_fight_trainer_filter,  Qt.ApplicationShortcut)
@@ -1181,8 +1189,6 @@ class MainWindow(QMainWindow):
         else:
             self._controller.delete_events([all_ids[0]])
         self.event_list.refresh()
-        if self._add_events_dialog is not None:
-            self._add_events_dialog.trainer_add.trainer_filter_callback()
 
     def open_transfer_event_window(self):
         all_ids = self.event_list.get_all_selected_event_ids(allow_event_items=False)
@@ -1245,33 +1251,6 @@ class MainWindow(QMainWindow):
 
     def scroll_to_bottom(self):
         self.event_list.scroll_to_bottom()
-
-    # ------------------------------------------------------------------
-    # Add Events / Filters popovers
-    # ------------------------------------------------------------------
-    def _toggle_add_events_dialog(self):
-        if self._add_events_dialog is not None and self._add_events_dialog.isVisible():
-            self._add_events_dialog.close()
-            return
-        if self._filters_dialog is not None and self._filters_dialog.isVisible():
-            self._filters_dialog.close()
-        if self._add_events_dialog is None:
-            from gui_qt.dialogs import AddEventsDialog
-            self._add_events_dialog = AddEventsDialog(self._controller, self)
-        self._add_events_dialog.show()
-        self._add_events_dialog.raise_()
-
-    def _toggle_filters_dialog(self):
-        if self._filters_dialog is not None and self._filters_dialog.isVisible():
-            self._filters_dialog.close()
-            return
-        if self._add_events_dialog is not None and self._add_events_dialog.isVisible():
-            self._add_events_dialog.close()
-        if self._filters_dialog is None:
-            from gui_qt.dialogs import FiltersDialog
-            self._filters_dialog = FiltersDialog(self._controller, self)
-        self._filters_dialog.show()
-        self._filters_dialog.raise_()
 
     # ------------------------------------------------------------------
     # Summary windows
@@ -1409,21 +1388,33 @@ class MainWindow(QMainWindow):
     def record_button_clicked(self):
         self._controller.set_record_mode(not self._controller.is_record_mode_active())
 
+    def open_final_trainers_dialog(self):
+        from gui_qt.dialogs import FinalTrainersDialog
+        dlg = FinalTrainersDialog(self)
+        dlg.exec()
+
+    def _toggle_auto_stop_recording(self, *args, **kwargs):
+        config.set_recording_auto_stop_enabled(self._act_auto_stop_recording.isChecked())
+
     # ------------------------------------------------------------------
     # Filter toggles
     # ------------------------------------------------------------------
-    def _get_route_search(self):
-        """Return the RouteSearch widget from the filters dialog, creating it if needed."""
-        if self._filters_dialog is None:
-            from gui_qt.dialogs import FiltersDialog
-            self._filters_dialog = FiltersDialog(self._controller, self)
-        return self._filters_dialog.route_search
+    def _toggle_filter_type(self, event_type):
+        """Toggle a single filter type on the controller and sync the toggle bar."""
+        current = list(self._controller.get_route_filter_types() or [])
+        if event_type in current:
+            current.remove(event_type)
+        else:
+            current.append(event_type)
+        self._controller.set_route_filter_types(current)
+        if hasattr(self, 'filter_toggle_bar'):
+            self.filter_toggle_bar.sync()
 
     def toggle_fight_trainer_filter(self):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_TRAINER_BATTLE)
+            self._toggle_filter_type(const.TASK_TRAINER_BATTLE)
         except Exception as e:
             logger.error(f"Error toggling Fight Trainer filter: {e}")
 
@@ -1431,7 +1422,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_RARE_CANDY)
+            self._toggle_filter_type(const.TASK_RARE_CANDY)
         except Exception as e:
             logger.error(f"Error toggling Rare Candy filter: {e}")
 
@@ -1439,7 +1430,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_LEARN_MOVE_TM)
+            self._toggle_filter_type(const.TASK_LEARN_MOVE_TM)
         except Exception as e:
             logger.error(f"Error toggling TM/HM filter: {e}")
 
@@ -1447,7 +1438,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_VITAMIN)
+            self._toggle_filter_type(const.TASK_VITAMIN)
         except Exception as e:
             logger.error(f"Error toggling Vitamin filter: {e}")
 
@@ -1455,7 +1446,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_FIGHT_WILD_PKMN)
+            self._toggle_filter_type(const.TASK_FIGHT_WILD_PKMN)
         except Exception as e:
             logger.error(f"Error toggling Wild Pkmn filter: {e}")
 
@@ -1463,7 +1454,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_GET_FREE_ITEM)
+            self._toggle_filter_type(const.TASK_GET_FREE_ITEM)
         except Exception as e:
             logger.error(f"Error toggling Acquire Item filter: {e}")
 
@@ -1471,7 +1462,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_PURCHASE_ITEM)
+            self._toggle_filter_type(const.TASK_PURCHASE_ITEM)
         except Exception as e:
             logger.error(f"Error toggling Purchase Item filter: {e}")
 
@@ -1479,7 +1470,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_USE_ITEM)
+            self._toggle_filter_type(const.TASK_USE_ITEM)
         except Exception as e:
             logger.error(f"Error toggling Use/Drop Item filter: {e}")
 
@@ -1487,7 +1478,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_SELL_ITEM)
+            self._toggle_filter_type(const.TASK_SELL_ITEM)
         except Exception as e:
             logger.error(f"Error toggling Sell Item filter: {e}")
 
@@ -1495,7 +1486,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_HOLD_ITEM)
+            self._toggle_filter_type(const.TASK_HOLD_ITEM)
         except Exception as e:
             logger.error(f"Error toggling Hold Item filter: {e}")
 
@@ -1503,7 +1494,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_LEARN_MOVE_LEVELUP)
+            self._toggle_filter_type(const.TASK_LEARN_MOVE_LEVELUP)
         except Exception as e:
             logger.error(f"Error toggling Levelup Move filter: {e}")
 
@@ -1511,7 +1502,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_SAVE)
+            self._toggle_filter_type(const.TASK_SAVE)
         except Exception as e:
             logger.error(f"Error toggling Game Save filter: {e}")
 
@@ -1519,7 +1510,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_HEAL)
+            self._toggle_filter_type(const.TASK_HEAL)
         except Exception as e:
             logger.error(f"Error toggling Heal filter: {e}")
 
@@ -1527,7 +1518,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_BLACKOUT)
+            self._toggle_filter_type(const.TASK_BLACKOUT)
         except Exception as e:
             logger.error(f"Error toggling Blackout filter: {e}")
 
@@ -1535,7 +1526,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_EVOLUTION)
+            self._toggle_filter_type(const.TASK_EVOLUTION)
         except Exception as e:
             logger.error(f"Error toggling Evolution filter: {e}")
 
@@ -1543,7 +1534,7 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().toggle_filter_by_type(const.TASK_NOTES_ONLY)
+            self._toggle_filter_type(const.TASK_NOTES_ONLY)
         except Exception as e:
             logger.error(f"Error toggling Notes Only filter: {e}")
 
@@ -1551,15 +1542,18 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            rs = self._get_route_search()
-            trainer_on = rs.is_filter_checked(const.TASK_TRAINER_BATTLE)
-            candy_on = rs.is_filter_checked(const.TASK_RARE_CANDY)
-            vitamin_on = rs.is_filter_checked(const.TASK_VITAMIN)
-            new_state = not (trainer_on and candy_on and vitamin_on)
-            rs.set_filter_by_type(const.TASK_TRAINER_BATTLE, new_state, notify=False)
-            rs.set_filter_by_type(const.TASK_RARE_CANDY, new_state, notify=False)
-            rs.set_filter_by_type(const.TASK_VITAMIN, new_state, notify=False)
-            rs.apply_filters()
+            current = list(self._controller.get_route_filter_types() or [])
+            common = (const.TASK_TRAINER_BATTLE, const.TASK_RARE_CANDY, const.TASK_VITAMIN)
+            all_on = all(et in current for et in common)
+            if all_on:
+                current = [et for et in current if et not in common]
+            else:
+                for et in common:
+                    if et not in current:
+                        current.append(et)
+            self._controller.set_route_filter_types(current)
+            if hasattr(self, 'filter_toggle_bar'):
+                self.filter_toggle_bar.sync()
         except Exception as e:
             logger.error(f"Error toggling common filters: {e}")
 
@@ -1567,7 +1561,9 @@ class MainWindow(QMainWindow):
         if self._text_field_has_focus:
             return
         try:
-            self._get_route_search().reset_all_filters()
+            self._controller.set_route_filter_types([])
+            if hasattr(self, 'filter_toggle_bar'):
+                self.filter_toggle_bar.sync()
         except Exception as e:
             logger.error(f"Error resetting filters: {e}")
 
@@ -1603,6 +1599,12 @@ class MainWindow(QMainWindow):
         new_val = self._act_show_notes.isChecked()
         config.set_notes_visibility_in_battle_summary(new_val)
         self.event_details._update_notes_visibility_in_battle_summary()
+
+    def _toggle_legacy_controls_visible(self):
+        new_val = self._act_show_legacy_controls.isChecked()
+        config.set_show_legacy_controls(new_val)
+        if hasattr(self, 'battle_summary'):
+            self.battle_summary.set_legacy_controls_visible(new_val)
 
     def _sync_player_strat_checks(self):
         cur = config.get_player_highlight_strategy()
@@ -1674,6 +1676,7 @@ class MainWindow(QMainWindow):
         self._sync_player_strat_checks()
         self._sync_enemy_strat_checks()
         self._act_show_notes.setChecked(config.are_notes_visible_in_battle_summary())
+        self._act_show_legacy_controls.setChecked(config.get_show_legacy_controls())
 
     def _update_event_menu_state(self):
         self._act_undo.setEnabled(self._controller.can_undo())

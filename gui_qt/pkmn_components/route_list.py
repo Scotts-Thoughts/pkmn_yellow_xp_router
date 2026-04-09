@@ -251,7 +251,6 @@ class RouteList(QTreeView):
 
         # --- popovers (created on first use) ------------------------------
         self._quick_add_popover = None
-        self._filter_popover = None
 
         # --- signals / events ---------------------------------------------
         self.expanded.connect(self._on_item_expanded)
@@ -528,9 +527,6 @@ class RouteList(QTreeView):
                         category = self._QUICK_ADD_KEYS[event.key()]
                         self._show_quick_add_popover(indexes[-1], category)
                         return
-            elif event.key() == Qt.Key_F:
-                self._show_filter_popover()
-                return
         super().keyPressEvent(event)
 
     def _show_quick_add_popover(self, index, category_idx=None):
@@ -548,27 +544,6 @@ class RouteList(QTreeView):
             self._quick_add_popover = QuickAddPopover(self._controller, self)
 
         self._quick_add_popover.show_above(top_center, category_idx=category_idx)
-
-    # ------------------------------------------------------------------
-    #  Filter popover (F key)
-    # ------------------------------------------------------------------
-
-    def _show_filter_popover(self):
-        """Show the filter popover above the selected row or viewport center."""
-        indexes = self.selectionModel().selectedRows(_COL_NAME)
-        if indexes:
-            rect = self.visualRect(indexes[-1])
-            pos = self.viewport().mapToGlobal(rect.topLeft())
-            pos.setX(pos.x() + rect.width() // 2)
-        else:
-            vp = self.viewport()
-            pos = vp.mapToGlobal(vp.rect().center())
-
-        if self._filter_popover is None:
-            from gui_qt.components.filter_popover import FilterPopover
-            self._filter_popover = FilterPopover(self._controller, self)
-
-        self._filter_popover.show_above(pos)
 
     # ------------------------------------------------------------------
     #  Drag-and-drop
@@ -1023,6 +998,13 @@ class RouteList(QTreeView):
     def _show_inline_creator(self, insert_after_id):
         from gui_qt.components.inline_event_creator import InlineEventCreator
 
+        # Force the right panel to the Pre-Event State tab so the left panel
+        # gets its wider layout — the inline creator needs the horizontal room
+        # to lay out all of its fields. The user can still manually flip back
+        # to the Battle Summary tab; the suppress flag only blocks automatic
+        # selection-driven tab switches.
+        self._set_suppress_battle_summary(True)
+
         self._inline_after_id = insert_after_id
         self._inline_creator = InlineEventCreator(
             self._controller, insert_after_id, parent=self.viewport(),
@@ -1113,6 +1095,18 @@ class RouteList(QTreeView):
             rect.x(), rect.y(), self.viewport().width(), h,
         )
 
+    def resizeEvent(self, event):
+        """Re-anchor the inline creator when the viewport resizes.
+
+        The left panel width changes whenever the user flips between the
+        Pre-Event State and Battle Summary tabs (the splitter re-proportions
+        30/70 ↔ 75/25). Without this override the floating inline creator
+        overlay keeps its old geometry, so the "dummy event" spacer row
+        appears mis-sized until the user scrolls or reopens the creator.
+        """
+        super().resizeEvent(event)
+        self._reposition_inline_creator()
+
     def _start_inline_edit(self, group_id, event_obj):
         """Disable *event_obj*, open a pre-populated inline editor."""
         # Cancel any prior edit / creator.
@@ -1143,7 +1137,7 @@ class RouteList(QTreeView):
         self._inline_creator.event_created.connect(self._on_inline_created)
         self._inline_creator.discarded.connect(self._on_inline_discarded)
         self._insert_inline_row()
-        self._inline_creator.focus_type_combo()
+        self._inline_creator.focus_primary_field()
 
     def _on_inline_created(self):
         if self._editing_group_id is not None:
@@ -1197,6 +1191,8 @@ class RouteList(QTreeView):
             self._inline_creator = None
         self._remove_inline_row()
         self._inline_after_id = None
+        # Release the pre-state lock so normal auto-switch behavior resumes.
+        self._set_suppress_battle_summary(False)
 
     # ------------------------------------------------------------------
     #  Selection helpers

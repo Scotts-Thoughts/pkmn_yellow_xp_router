@@ -10,7 +10,7 @@ from routing.full_route_state import RouteState
 from utils.config_manager import config
 
 from utils.constants import const
-from routing.route_events import EventDefinition, EventGroup, RareCandyEventDefinition, TrainerEventDefinition
+from routing.route_events import EventDefinition, EventFolder, EventGroup, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition
 from pkmn.gen_factory import current_gen_info
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,9 @@ class BattleSummaryController:
         self._enemy_field_status:FieldStatus = None
         self._per_matchup_player_modifiers:List[StageModifiers] = []
         self._per_matchup_enemy_modifiers:List[StageModifiers] = []
+
+        # Shadow vitamin tracking: {stat: {'shadow_id': int, 'original_id': int|None}}
+        self._vitamin_shadows = {}
 
         # NOTE: and finally, the actual display information
         # first idx: idx of pkmn in team
@@ -235,24 +238,31 @@ class BattleSummaryController:
         saved_transformed = self._is_player_transformed
         saved_double = self._double_battle_flag
 
-        prev_event = self._main_controller.get_previous_event(self._event_group_id, enabled_only=True)
-        if prev_event is None or prev_event.event_definition is None or prev_event.event_definition.rare_candy is None:
-            # If num_candies is 0 and we don't have a number to update, don't create a pointless "use 0 candies" event
-            if num_candies <= 0:
-                return
-            self._main_controller.new_event(
-                EventDefinition(rare_candy=RareCandyEventDefinition(amount=num_candies)),
-                insert_before=self._event_group_id,
-                do_select=False
-            )
-        else:
-            if num_candies <= 0:
-                self._main_controller.delete_events([prev_event.group_id])
-            else:
-                self._main_controller.update_existing_event(
-                    prev_event.group_id,
+        # Suppress the _full_refresh that load_from_event triggers during the
+        # route change cascade — we will run a single _full_refresh at the end
+        # once transient state has been restored.
+        self._suppress_refresh = True
+        try:
+            prev_event = self._main_controller.get_previous_event(self._event_group_id, enabled_only=True)
+            if prev_event is None or prev_event.event_definition is None or prev_event.event_definition.rare_candy is None:
+                # If num_candies is 0 and we don't have a number to update, don't create a pointless "use 0 candies" event
+                if num_candies <= 0:
+                    return
+                self._main_controller.new_event(
                     EventDefinition(rare_candy=RareCandyEventDefinition(amount=num_candies)),
+                    insert_before=self._event_group_id,
+                    do_select=False
                 )
+            else:
+                if num_candies <= 0:
+                    self._main_controller.delete_events([prev_event.group_id])
+                else:
+                    self._main_controller.update_existing_event(
+                        prev_event.group_id,
+                        EventDefinition(rare_candy=RareCandyEventDefinition(amount=num_candies)),
+                    )
+        finally:
+            self._suppress_refresh = False
 
         # Restore transient state (overwritten by the route change -> load_from_event cascade).
         # The player mon list was correctly rebuilt with the new level from rare candies;
@@ -320,6 +330,11 @@ class BattleSummaryController:
 
 
     def _full_refresh(self, is_load=False):
+        # Skip when an outer operation (e.g. candy update) is going to call
+        # _full_refresh explicitly after restoring transient state.
+        if getattr(self, '_suppress_refresh', False):
+            return
+
         # Once the "true" state of the current battle has been updated, recalculate all the derived properties
 
         # Check if we're using global setup (which overrides per-move setup)
@@ -725,6 +740,7 @@ class BattleSummaryController:
             self.load_empty()
             return
 
+        self._vitamin_shadows = {}
         self._event_group_id = event_group.group_id
         trainer_def = event_group.event_definition.trainer_def
         trainer_obj = event_group.event_definition.get_first_trainer_obj()
@@ -861,6 +877,7 @@ class BattleSummaryController:
         self._full_refresh(is_load=True)
 
     def load_empty(self):
+        self._vitamin_shadows = {}
         self._event_group_id = None
         self._trainer_name = ""
         self._second_trainer_name = ""
@@ -1277,6 +1294,232 @@ class BattleSummaryController:
             return 0
 
         return prev_event.event_definition.rare_candy.amount
+
+    def get_vitamins_used_per_stat(self):
+        """Return a dict {stat: count} of vitamins used (by enabled events)
+        strictly before the currently-loaded battle. Returns zeros when no
+        battle is loaded or the route isn't available."""
+        counts = {
+            const.HP: 0,
+            const.ATK: 0,
+            const.DEF: 0,
+            const.SPA: 0,
+            const.SPD: 0,
+            const.SPE: 0,
+        }
+        if self._event_group_id is None:
+            return counts
+        try:
+            raw_route = self._main_controller.get_raw_route()
+        except Exception:
+            return counts
+        if raw_route is None or raw_route.root_folder is None:
+            return counts
+
+        gen_info = current_gen_info()
+        found = [False]
+
+        def _walk(folder):
+            for child in folder.children:
+                if found[0]:
+                    return
+                if isinstance(child, EventFolder):
+                    _walk(child)
+                elif isinstance(child, EventGroup):
+                    if child.group_id == self._event_group_id:
+                        found[0] = True
+                        return
+                    if not child.is_enabled():
+                        continue
+                    vit_def = child.event_definition.vitamin
+                    if vit_def is None:
+                        continue
+                    try:
+                        boosted = gen_info.get_stats_boosted_by_vitamin(vit_def.vitamin)
+                    except Exception:
+                        continue
+                    amount = getattr(vit_def, "amount", 1) or 1
+                    for stat in boosted:
+                        if stat in counts:
+                            counts[stat] += amount
+
+        _walk(raw_route.root_folder)
+        return counts
+
+    # ------------------------------------------------------------------
+    # Vitamin adjustment from the controls bar
+    # ------------------------------------------------------------------
+
+    def _stat_to_vitamin_name(self, stat):
+        """Map a stat constant (e.g. const.ATK) to the vitamin that boosts it."""
+        gen_info = current_gen_info()
+        for vit_name in gen_info.get_valid_vitamins():
+            try:
+                if stat in gen_info.get_stats_boosted_by_vitamin(vit_name):
+                    return vit_name
+            except Exception:
+                continue
+        return None
+
+    def _find_last_vitamins(self, target_stat):
+        """Walk the route before the current battle and return
+        (last_enabled_vitamin_for_stat, last_vitamin_any_type).
+        Both are EventGroup or None."""
+        if self._event_group_id is None:
+            return None, None
+        try:
+            root = self._main_controller.get_raw_route().root_folder
+        except Exception:
+            return None, None
+        gen_info = current_gen_info()
+        last_for_stat = None
+        last_any = None
+        found = [False]
+
+        def _walk(folder):
+            nonlocal last_for_stat, last_any
+            for child in folder.children:
+                if found[0]:
+                    return
+                if isinstance(child, EventFolder):
+                    _walk(child)
+                elif isinstance(child, EventGroup):
+                    if child.group_id == self._event_group_id:
+                        found[0] = True
+                        return
+                    vit_def = child.event_definition.vitamin
+                    if vit_def is not None:
+                        last_any = child
+                        if child.is_enabled():
+                            try:
+                                if target_stat in gen_info.get_stats_boosted_by_vitamin(vit_def.vitamin):
+                                    last_for_stat = child
+                            except Exception:
+                                pass
+
+        _walk(root)
+        return last_for_stat, last_any
+
+    def _save_transient_state(self):
+        return dict(
+            player_setup=self._player_setup_move_list.copy(),
+            player_field=self._player_field_move_list.copy(),
+            enemy_setup=self._enemy_setup_move_list.copy(),
+            enemy_field=self._enemy_field_move_list.copy(),
+            stat_stage=copy.deepcopy(self._stat_stage_setup),
+            custom_data=copy.deepcopy(self._custom_move_data),
+            weather=self._weather,
+            mimic=self._mimic_selection,
+            transformed=self._is_player_transformed,
+            double=self._double_battle_flag,
+        )
+
+    def _restore_transient_state(self, saved):
+        self._player_setup_move_list = saved['player_setup']
+        self._player_field_move_list = saved['player_field']
+        self._enemy_setup_move_list = saved['enemy_setup']
+        self._enemy_field_move_list = saved['enemy_field']
+        self._stat_stage_setup = saved['stat_stage']
+        self._custom_move_data = saved['custom_data']
+        self._weather = saved['weather']
+        self._mimic_selection = saved['mimic']
+        self._is_player_transformed = saved['transformed']
+        self._double_battle_flag = saved['double']
+
+    def adjust_vitamin_for_stat(self, stat, delta, _skip_refresh=False):
+        """Increment or decrement the vitamin count for *stat* by *delta*.
+
+        On first interaction, the original vitamin event is disabled and a
+        shadow replacement is created right after it.  Subsequent calls adjust
+        the shadow.  When the shadow reaches 0 the original is re-enabled.
+
+        Pass ``_skip_refresh=True`` when batching multiple adjustments — the
+        caller is responsible for calling ``_full_refresh()`` afterwards.
+        """
+        if self._event_group_id is None:
+            return
+
+        vit_name = self._stat_to_vitamin_name(stat)
+        if vit_name is None:
+            return
+
+        saved = self._save_transient_state()
+        shadow_info = self._vitamin_shadows.get(stat)
+
+        if shadow_info and shadow_info.get('shadow_id'):
+            # ---- existing shadow: just adjust it ----
+            shadow_event = self._main_controller.get_event_by_id(shadow_info['shadow_id'])
+            if shadow_event and shadow_event.event_definition.vitamin:
+                new_amount = shadow_event.event_definition.vitamin.amount + delta
+                if new_amount > 0:
+                    self._main_controller.update_existing_event(
+                        shadow_info['shadow_id'],
+                        EventDefinition(vitamin=VitaminEventDefinition(vit_name, new_amount)),
+                    )
+                else:
+                    # Shadow reaches 0 — delete it and re-enable original
+                    self._main_controller.delete_events([shadow_info['shadow_id']])
+                    orig_id = shadow_info.get('original_id')
+                    if orig_id:
+                        orig = self._main_controller.get_event_by_id(orig_id)
+                        if orig:
+                            orig.set_enabled_status(True)
+                            self._main_controller.update_existing_event(orig.group_id, orig.event_definition)
+                    del self._vitamin_shadows[stat]
+            else:
+                del self._vitamin_shadows[stat]
+        else:
+            # ---- no shadow yet ----
+            last_for_stat, last_any = self._find_last_vitamins(stat)
+
+            if last_for_stat:
+                orig_amount = last_for_stat.event_definition.vitamin.amount
+                new_amount = orig_amount + delta
+                if new_amount > 0:
+                    # Disable original, create shadow
+                    last_for_stat.set_enabled_status(False)
+                    self._main_controller.update_existing_event(
+                        last_for_stat.group_id, last_for_stat.event_definition
+                    )
+                    shadow_id = self._main_controller.new_event(
+                        EventDefinition(vitamin=VitaminEventDefinition(vit_name, new_amount)),
+                        insert_after=last_for_stat.group_id,
+                        do_select=False,
+                    )
+                    self._vitamin_shadows[stat] = {
+                        'shadow_id': shadow_id,
+                        'original_id': last_for_stat.group_id,
+                    }
+                else:
+                    # Disable the original entirely (user wants 0 of this vitamin)
+                    last_for_stat.set_enabled_status(False)
+                    self._main_controller.update_existing_event(
+                        last_for_stat.group_id, last_for_stat.event_definition
+                    )
+                    self._vitamin_shadows[stat] = {
+                        'shadow_id': None,
+                        'original_id': last_for_stat.group_id,
+                    }
+            elif delta > 0:
+                # No existing vitamin for this stat — create one fresh
+                if last_any:
+                    insert_kw = dict(insert_after=last_any.group_id)
+                else:
+                    insert_kw = dict(insert_before=self._event_group_id)
+                shadow_id = self._main_controller.new_event(
+                    EventDefinition(vitamin=VitaminEventDefinition(vit_name, delta)),
+                    do_select=False,
+                    **insert_kw,
+                )
+                self._vitamin_shadows[stat] = {
+                    'shadow_id': shadow_id,
+                    'original_id': None,
+                }
+            # else: delta <= 0 and no vitamin exists — nothing to do
+
+        self._restore_transient_state(saved)
+        if not _skip_refresh:
+            self._full_refresh()
 
     def take_screenshot(self, bbox):
         if not self._trainer_name:
