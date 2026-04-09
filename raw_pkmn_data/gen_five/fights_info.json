@@ -1,0 +1,80 @@
+{
+    "badge_rewards": {
+        "Cheren": "basic",
+        "Chili": "trio",
+        "Cilan": "trio",
+        "Cress": "trio",
+        "Lenora": "basic",
+        "Roxie": "toxic",
+        "Burgh": "insect",
+        "Elesa": "bolt",
+        "Clay": "quake",
+        "Skyla": "jet",
+        "Brycen": "freeze",
+        "Drayden": "legend",
+        "Iris": "legend",
+        "Marlon": "wave"
+    },
+    "major_fights": {
+        "rival": [
+            "Cheren",
+            "Bianca",
+            "Hugh"
+        ],
+        "gym_leader": [
+            "Chili",
+            "Cilan",
+            "Cress",
+            "Lenora",
+            "Roxie",
+            "Burgh",
+            "Elesa",
+            "Clay",
+            "Skyla",
+            "Brycen",
+            "Drayden",
+            "Iris",
+            "Marlon"
+        ],
+        "elite_four": [
+            "Shauntal",
+            "Marshal",
+            "Grimsley",
+            "Caitlin"
+        ],
+        "champion": [
+            "Alder"
+        ],
+        "post_game": [
+            "Pokemon Trainer Red"
+        ],
+        "boss": [
+            "Ghetsis"
+        ],
+        "team_leader": [
+            "N"
+        ]
+    },
+    "fight_rewards": {
+        "Leader Roark": "TM76 Stealth Rock",
+        "Leader Chili": "TM83 Work Up",
+        "Leader Cilan": "TM83 Work Up",
+        "Leader Cress": "TM83 Work Up",
+        "Leader Lenora": "TM67 Retaliate",
+        "Leader Roxie": "TM09 Venoshock",
+        "Leader Burgh": "TM76 Struggle Bug",
+        "Leader Elesa": "TM72 Volt Switch",
+        "Leader Clay": "TM78 Bulldoze",
+        "Leader Skyla": "TM62 Acrobatics",
+        "Leader Brycen": "TM79 Frost Breath",
+        "Leader Drayden": "TM82 Dragon Tail",
+        "Leader Iris": "TM82 Dragon Tail",
+        "Leader Marlon": "TM55 Scald"
+    },
+    "trainer_timing_info": {
+        "intro_time": 4.69,
+        "outro_time": 1.195,
+        "ko_time": 1.84,
+        "send_out_time": 0.75
+    }
+}
