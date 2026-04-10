@@ -240,6 +240,15 @@ class RouteList(QTreeView):
         # (parent_group_id_or_None, row) -- but we just keep QStandardItem refs.
         self._item_lookup: Dict[int, QStandardItem] = {}
 
+        # Persistent folder expand state, keyed by folder name path. Survives
+        # refreshes that drop/recreate folders (e.g. flatten-style filters).
+        self._persistent_expand_state: Dict[str, bool] = {}
+
+        # Tracks whether the last refresh ran in flatten mode (Major Battles
+        # filter active). Used by refresh_filter_only() to decide whether
+        # the tree structure changed and a full refresh is required.
+        self._last_used_flatten_filter: bool = False
+
         # Guard against recursive refresh (expand/collapse signals during rebuild).
         self._refreshing: bool = False
 
@@ -1356,8 +1365,13 @@ class RouteList(QTreeView):
 
         self.setUpdatesEnabled(False)
         try:
-            # Snapshot current expand state before rebuilding.
-            saved_expand = self._collect_expand_state(self._model.invisibleRootItem())
+            # Snapshot current expand state before rebuilding, then merge into
+            # the persistent map so state survives refreshes that drop folders
+            # (e.g. when the Major Battles flatten filter is toggled).
+            self._persistent_expand_state.update(
+                self._collect_expand_state(self._model.invisibleRootItem())
+            )
+            saved_expand = dict(self._persistent_expand_state)
 
             to_delete_ids: Set[int] = set(self._item_lookup.keys())
             root_item = self._model.invisibleRootItem()
@@ -1366,9 +1380,22 @@ class RouteList(QTreeView):
             if raw_route is None:
                 return
 
+            # When the Major Battles filter is active, flatten the tree so
+            # the matching events are shown directly under root with no
+            # surrounding folders.
+            cur_filter = self._controller.get_route_filter_types() or []
+            flatten_now = const.MAJOR_BATTLE_FILTER in cur_filter
+            self._last_used_flatten_filter = flatten_now
+            if flatten_now:
+                events_to_render = list(
+                    self._iter_flat_event_groups(raw_route.root_folder.children)
+                )
+            else:
+                events_to_render = raw_route.root_folder.children
+
             self._refresh_recursively(
                 root_item,
-                raw_route.root_folder.children,
+                events_to_render,
                 to_delete_ids,
             )
 
@@ -1409,6 +1436,97 @@ class RouteList(QTreeView):
         self.verticalScrollBar().setValue(saved_scroll)
 
         self.route_list_refreshed.emit()
+
+    def refresh_filter_only(self):
+        """Update only row visibility based on the current filter/search.
+
+        Skips the per-row data writes and re-parenting in refresh(). Falls
+        back to a full refresh for filters that change tree structure (e.g.
+        Major Battles, which flattens folders).
+        """
+        if self._refreshing:
+            return
+
+        cur_filter = self._controller.get_route_filter_types() or []
+        flatten_now = const.MAJOR_BATTLE_FILTER in cur_filter
+
+        # If we're entering or leaving flatten mode, the tree structure
+        # changes, so we have to do a full rebuild.
+        if flatten_now or self._last_used_flatten_filter:
+            self.refresh()
+            return
+
+        raw_route = self._controller.get_raw_route()
+        if raw_route is None:
+            return
+
+        self._refreshing = True
+        self.setUpdatesEnabled(False)
+        try:
+            self._refresh_visibility_recursive(raw_route.root_folder.children)
+        finally:
+            self.setUpdatesEnabled(True)
+            self._refreshing = False
+
+    def _refresh_visibility_recursive(self, event_list):
+        """Walk events and update only row visibility (no model writes)."""
+        cur_search = self._controller.get_route_search_string()
+        cur_filter = self._controller.get_route_filter_types()
+
+        for event_obj in event_list:
+            semantic_id = _get_attr(event_obj, "group_id")
+            if semantic_id is None:
+                continue
+            name_item = self._item_lookup.get(semantic_id)
+            if name_item is None:
+                continue
+
+            should_render = event_obj.do_render(search=cur_search, filter_types=cur_filter)
+
+            parent_item = name_item.parent()
+            if parent_item is None:
+                parent_idx = self.rootIndex()
+            else:
+                parent_idx = self._model.indexFromItem(parent_item)
+            self.setRowHidden(name_item.row(), parent_idx, not should_render)
+
+            is_folder = isinstance(event_obj, route_events.EventFolder)
+            if is_folder:
+                self._refresh_visibility_recursive(event_obj.children)
+            elif isinstance(event_obj, route_events.EventGroup):
+                # Level-up children inherit their parent EventGroup's visibility.
+                if len(event_obj.event_items) > 1:
+                    for item_obj in event_obj.event_items:
+                        is_level_up = (
+                            item_obj.event_definition.learn_move is not None
+                            and item_obj.event_definition.learn_move.source == const.MOVE_SOURCE_LEVELUP
+                        )
+                        if not is_level_up:
+                            continue
+                        item_id = _get_attr(item_obj, "group_id")
+                        if item_id is None:
+                            continue
+                        lu_item = self._item_lookup.get(item_id)
+                        if lu_item is None:
+                            continue
+                        lu_parent = lu_item.parent()
+                        if lu_parent is None:
+                            lu_parent_idx = self.rootIndex()
+                        else:
+                            lu_parent_idx = self._model.indexFromItem(lu_parent)
+                        self.setRowHidden(lu_item.row(), lu_parent_idx, not should_render)
+
+    def _iter_flat_event_groups(self, event_list):
+        """Yield all EventGroup descendants of *event_list*, skipping folders.
+
+        Used when a flatten-style filter (e.g. Major Battles) is active so
+        matching events render under root without their containing folders.
+        """
+        for event_obj in event_list:
+            if isinstance(event_obj, route_events.EventFolder):
+                yield from self._iter_flat_event_groups(event_obj.children)
+            else:
+                yield event_obj
 
     def _refresh_recursively(
         self,

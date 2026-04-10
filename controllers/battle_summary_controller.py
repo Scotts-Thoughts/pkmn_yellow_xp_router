@@ -10,7 +10,7 @@ from routing.full_route_state import RouteState
 from utils.config_manager import config
 
 from utils.constants import const
-from routing.route_events import EventDefinition, EventFolder, EventGroup, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition
+from routing.route_events import EventDefinition, EventFolder, EventGroup, HoldItemEventDefinition, InventoryEventDefinition, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition
 from pkmn.gen_factory import current_gen_info
 
 logger = logging.getLogger(__name__)
@@ -279,6 +279,184 @@ class BattleSummaryController:
         self._double_battle_flag = saved_double
 
         self._full_refresh()
+
+    def _find_existing_prefight_hold_event(self):
+        """Walk backwards from the current battle, skipping rare-candy events,
+        looking for an existing prefight Hold event. Returns
+        (hold_event, anchor_event) where hold_event is the existing Hold (or
+        None) and anchor_event is the closest preceding candy event (used as
+        the insertion target so a newly-inserted Hold lands before any candy
+        events that already precede the battle, preserving the candy lookup)."""
+        if self._event_group_id is None:
+            return None, None
+
+        cursor_id = self._event_group_id
+        anchor_event = None
+        while True:
+            prev_event = self._main_controller.get_previous_event(cursor_id, enabled_only=True)
+            if prev_event is None or prev_event.event_definition is None:
+                return None, anchor_event
+            if prev_event.event_definition.rare_candy is not None:
+                anchor_event = prev_event
+                cursor_id = prev_event.group_id
+                continue
+            if prev_event.event_definition.hold_item is not None:
+                return prev_event, anchor_event
+            return None, anchor_event
+
+    def _maybe_insert_find_for_held_item(self, item_name, init_state, insert_before_id):
+        """If *item_name* is not already in the bag at *init_state*, insert a
+        free 'Find Item' event for one of it immediately before *insert_before_id*.
+        No-ops on bad input or when the item is already present."""
+        if not item_name:
+            return
+        if init_state is None or init_state.inventory is None:
+            return
+        try:
+            already_in_bag = any(
+                bag_item.base_item is not None and bag_item.base_item.name == item_name
+                for bag_item in init_state.inventory.cur_items
+            )
+        except Exception:
+            already_in_bag = False
+        if already_in_bag:
+            return
+        try:
+            self._main_controller.new_event(
+                EventDefinition(
+                    item_event_def=InventoryEventDefinition(
+                        item_name=item_name,
+                        item_amount=1,
+                        is_acquire=True,
+                        with_money=False,
+                    )
+                ),
+                insert_before=insert_before_id,
+                do_select=False,
+            )
+        except Exception as e:
+            logger.error(f"Failed to insert auto Find event for held item {item_name!r}: {e}")
+
+    def update_player_held_item(self, new_item):
+        """Insert/update/delete a prefight Hold event for the currently-loaded
+        battle. Mirrors the transient-state save/restore pattern from
+        update_prefight_candies, since the route-change cascade calls
+        load_from_event which would otherwise wipe transient battle state."""
+        if self._event_group_id is None:
+            return
+
+        # Re-entry guard: a single QComboBox selection can fire both
+        # `activated` and `editingFinished` signals, and the second may fire
+        # synchronously while we're still mutating the route in this method.
+        # Without this guard, the re-entrant call sees a partially-inserted
+        # state (Find present, Hold not yet) and creates a duplicate Hold.
+        if getattr(self, "_held_item_update_in_flight", False):
+            return
+
+        normalized = new_item.strip() if isinstance(new_item, str) else None
+        if not normalized or normalized == const.NO_ITEM or normalized == "None":
+            normalized = None
+
+        # Early no-op: the controller's view of the player's current held item
+        # already matches the request. Cheap and avoids any walking/inserting.
+        current_held = ""
+        if self._original_player_mon_list:
+            cur = self._original_player_mon_list[0].held_item
+            if cur and cur != "None" and cur != const.NO_ITEM:
+                current_held = cur
+        if current_held == (normalized or ""):
+            return
+
+        existing_hold, anchor_event = self._find_existing_prefight_hold_event()
+
+        # No-op when nothing actually changes
+        if existing_hold is not None:
+            if existing_hold.event_definition.hold_item.item_name == normalized:
+                return
+        elif normalized is None:
+            return
+
+        self._held_item_update_in_flight = True
+        try:
+            # Save transient state that the route-change cascade would clobber.
+            saved_player_setup = self._player_setup_move_list.copy()
+            saved_player_field = self._player_field_move_list.copy()
+            saved_enemy_setup = self._enemy_setup_move_list.copy()
+            saved_enemy_field = self._enemy_field_move_list.copy()
+            saved_stat_stage = copy.deepcopy(self._stat_stage_setup)
+            saved_custom_data = copy.deepcopy(self._custom_move_data)
+            saved_weather = self._weather
+            saved_mimic = self._mimic_selection
+            saved_transformed = self._is_player_transformed
+            saved_double = self._double_battle_flag
+
+            self._suppress_refresh = True
+            try:
+                if existing_hold is not None:
+                    if normalized is None:
+                        self._main_controller.delete_events([existing_hold.group_id])
+                    else:
+                        # Auto-create a Find event for the new item if it isn't
+                        # already in the bag at the existing hold's position.
+                        self._maybe_insert_find_for_held_item(
+                            normalized, existing_hold.init_state, existing_hold.group_id
+                        )
+                        self._main_controller.update_existing_event(
+                            existing_hold.group_id,
+                            EventDefinition(hold_item=HoldItemEventDefinition(normalized)),
+                        )
+                else:
+                    insert_target = anchor_event.group_id if anchor_event is not None else self._event_group_id
+                    # The new hold will share insert_target's init_state, so we
+                    # check that inventory and add a Find first if needed. Inserting
+                    # the Find before the same target preserves [..., Find, Hold, target].
+                    target_event = self._main_controller.get_event_by_id(insert_target)
+                    target_init_state = target_event.init_state if target_event is not None else None
+                    self._maybe_insert_find_for_held_item(
+                        normalized, target_init_state, insert_target
+                    )
+                    self._main_controller.new_event(
+                        EventDefinition(hold_item=HoldItemEventDefinition(normalized)),
+                        insert_before=insert_target,
+                        do_select=False,
+                    )
+            finally:
+                self._suppress_refresh = False
+
+            # Restore transient state.
+            self._player_setup_move_list = saved_player_setup
+            self._player_field_move_list = saved_player_field
+            self._enemy_setup_move_list = saved_enemy_setup
+            self._enemy_field_move_list = saved_enemy_field
+            self._stat_stage_setup = saved_stat_stage
+            self._custom_move_data = saved_custom_data
+            self._weather = saved_weather
+            self._mimic_selection = saved_mimic
+            self._is_player_transformed = saved_transformed
+            self._double_battle_flag = saved_double
+
+            self._full_refresh()
+        finally:
+            self._held_item_update_in_flight = False
+
+    def get_held_item_options(self):
+        """Return the list of selectable items for the held item dropdown.
+        First entry is empty (== "no held item")."""
+        try:
+            items = current_gen_info().item_db().get_filtered_names(item_type=const.ITEM_TYPE_ALL_ITEMS)
+        except Exception:
+            items = []
+        return [""] + sorted(items)
+
+    def get_player_battle_hp(self):
+        if not self._original_player_mon_list:
+            return 0
+        return self._original_player_mon_list[0].cur_stats.hp
+
+    def get_player_battle_speed(self):
+        if not self._original_player_mon_list:
+            return 0
+        return self._original_player_mon_list[0].cur_stats.speed
 
     def update_player_strategy(self, strat):
         config.set_player_highlight_strategy(strat)
@@ -706,7 +884,17 @@ class BattleSummaryController:
             kill_ranges = []
 
         # Stat stage dropdown options
-        if self._using_global_setup:
+        # For Mimic, when there's no real selection (or the selection isn't on
+        # the enemy yet), the caller substitutes a placeholder move name (e.g.
+        # "Leer") just so damage calc has something to chew on. In that case
+        # we must NOT surface a stat-stage dropdown for the placeholder — the
+        # second dropdown should only appear once the user actually picks a
+        # setup move via the mimic dropdown.
+        is_mimic_placeholder = (
+            move_display_name == const.MIMIC_MOVE_NAME
+            and move.name != self._mimic_selection
+        )
+        if self._using_global_setup or is_mimic_placeholder:
             stat_stage_options = None
             stat_stage_info = {'has_stat_effect': False}
             stat_stage_selection = "0"
@@ -740,7 +928,12 @@ class BattleSummaryController:
             self.load_empty()
             return
 
-        self._vitamin_shadows = {}
+        # Only clear shadow tracking when actually switching to a different
+        # event group. Reloading the same event mid-update (e.g. from the
+        # route-change cascade triggered by adjust_vitamin_for_stat itself)
+        # must preserve shadows so subsequent +/- clicks find them.
+        if event_group.group_id != self._event_group_id:
+            self._vitamin_shadows = {}
         self._event_group_id = event_group.group_id
         trainer_def = event_group.event_definition.trainer_def
         trainer_obj = event_group.event_definition.get_first_trainer_obj()
@@ -1007,6 +1200,37 @@ class BattleSummaryController:
 
     def get_weather(self) -> str:
         return self._weather
+
+    def get_weather_for_move(self, move_name: str) -> str:
+        """If *move_name* is a weather-inducing move whose weather is supported by
+        the current generation, return that weather constant. Otherwise return None."""
+        if not move_name:
+            return None
+        weather = const.WEATHER_MOVE_MAP.get(move_name)
+        if weather is None:
+            return None
+        try:
+            valid_weather = current_gen_info().get_valid_weather()
+        except Exception:
+            return None
+        if weather not in valid_weather:
+            return None
+        return weather
+
+    def toggle_weather_from_move(self, move_name: str, enabled: bool):
+        """Set the active weather to *move_name*'s weather (when *enabled*),
+        or clear it back to WEATHER_NONE (when not). No-op for non-weather moves
+        or weather not supported by the current generation."""
+        weather = self.get_weather_for_move(move_name)
+        if weather is None:
+            return
+        if enabled:
+            self.update_weather(weather)
+        else:
+            # Only clear if the currently-active weather is the one this move
+            # would have set; otherwise leave the existing weather alone.
+            if self._weather == weather:
+                self.update_weather(const.WEATHER_NONE)
 
     def get_player_setup_moves(self) -> List[str]:
         return self._player_setup_move_list
@@ -1444,78 +1668,88 @@ class BattleSummaryController:
             return
 
         saved = self._save_transient_state()
-        shadow_info = self._vitamin_shadows.get(stat)
 
-        if shadow_info and shadow_info.get('shadow_id'):
-            # ---- existing shadow: just adjust it ----
-            shadow_event = self._main_controller.get_event_by_id(shadow_info['shadow_id'])
-            if shadow_event and shadow_event.event_definition.vitamin:
-                new_amount = shadow_event.event_definition.vitamin.amount + delta
-                if new_amount > 0:
-                    self._main_controller.update_existing_event(
-                        shadow_info['shadow_id'],
-                        EventDefinition(vitamin=VitaminEventDefinition(vit_name, new_amount)),
-                    )
+        # Suppress the _full_refresh that the route change cascade would
+        # otherwise trigger via load_from_event — we will run a single
+        # _full_refresh at the end once transient state has been restored.
+        # Without this, every +/- click pays the cost of a full battle
+        # recalculation during the cascade, plus another one at the end.
+        self._suppress_refresh = True
+        try:
+            shadow_info = self._vitamin_shadows.get(stat)
+
+            if shadow_info and shadow_info.get('shadow_id'):
+                # ---- existing shadow: just adjust it ----
+                shadow_event = self._main_controller.get_event_by_id(shadow_info['shadow_id'])
+                if shadow_event and shadow_event.event_definition.vitamin:
+                    new_amount = shadow_event.event_definition.vitamin.amount + delta
+                    if new_amount > 0:
+                        self._main_controller.update_existing_event(
+                            shadow_info['shadow_id'],
+                            EventDefinition(vitamin=VitaminEventDefinition(vit_name, new_amount)),
+                        )
+                    else:
+                        # Shadow reaches 0 — delete it and re-enable original
+                        self._main_controller.delete_events([shadow_info['shadow_id']])
+                        orig_id = shadow_info.get('original_id')
+                        if orig_id:
+                            orig = self._main_controller.get_event_by_id(orig_id)
+                            if orig:
+                                orig.set_enabled_status(True)
+                                self._main_controller.update_existing_event(orig.group_id, orig.event_definition)
+                        del self._vitamin_shadows[stat]
                 else:
-                    # Shadow reaches 0 — delete it and re-enable original
-                    self._main_controller.delete_events([shadow_info['shadow_id']])
-                    orig_id = shadow_info.get('original_id')
-                    if orig_id:
-                        orig = self._main_controller.get_event_by_id(orig_id)
-                        if orig:
-                            orig.set_enabled_status(True)
-                            self._main_controller.update_existing_event(orig.group_id, orig.event_definition)
                     del self._vitamin_shadows[stat]
             else:
-                del self._vitamin_shadows[stat]
-        else:
-            # ---- no shadow yet ----
-            last_for_stat, last_any = self._find_last_vitamins(stat)
+                # ---- no shadow yet ----
+                last_for_stat, last_any = self._find_last_vitamins(stat)
 
-            if last_for_stat:
-                orig_amount = last_for_stat.event_definition.vitamin.amount
-                new_amount = orig_amount + delta
-                if new_amount > 0:
-                    # Disable original, create shadow
-                    last_for_stat.set_enabled_status(False)
-                    self._main_controller.update_existing_event(
-                        last_for_stat.group_id, last_for_stat.event_definition
-                    )
+                if last_for_stat:
+                    orig_amount = last_for_stat.event_definition.vitamin.amount
+                    new_amount = orig_amount + delta
+                    if new_amount > 0:
+                        # Disable original, create shadow
+                        last_for_stat.set_enabled_status(False)
+                        self._main_controller.update_existing_event(
+                            last_for_stat.group_id, last_for_stat.event_definition
+                        )
+                        shadow_id = self._main_controller.new_event(
+                            EventDefinition(vitamin=VitaminEventDefinition(vit_name, new_amount)),
+                            insert_after=last_for_stat.group_id,
+                            do_select=False,
+                        )
+                        self._vitamin_shadows[stat] = {
+                            'shadow_id': shadow_id,
+                            'original_id': last_for_stat.group_id,
+                        }
+                    else:
+                        # Disable the original entirely (user wants 0 of this vitamin)
+                        last_for_stat.set_enabled_status(False)
+                        self._main_controller.update_existing_event(
+                            last_for_stat.group_id, last_for_stat.event_definition
+                        )
+                        self._vitamin_shadows[stat] = {
+                            'shadow_id': None,
+                            'original_id': last_for_stat.group_id,
+                        }
+                elif delta > 0:
+                    # No existing vitamin for this stat — create one fresh
+                    if last_any:
+                        insert_kw = dict(insert_after=last_any.group_id)
+                    else:
+                        insert_kw = dict(insert_before=self._event_group_id)
                     shadow_id = self._main_controller.new_event(
-                        EventDefinition(vitamin=VitaminEventDefinition(vit_name, new_amount)),
-                        insert_after=last_for_stat.group_id,
+                        EventDefinition(vitamin=VitaminEventDefinition(vit_name, delta)),
                         do_select=False,
+                        **insert_kw,
                     )
                     self._vitamin_shadows[stat] = {
                         'shadow_id': shadow_id,
-                        'original_id': last_for_stat.group_id,
+                        'original_id': None,
                     }
-                else:
-                    # Disable the original entirely (user wants 0 of this vitamin)
-                    last_for_stat.set_enabled_status(False)
-                    self._main_controller.update_existing_event(
-                        last_for_stat.group_id, last_for_stat.event_definition
-                    )
-                    self._vitamin_shadows[stat] = {
-                        'shadow_id': None,
-                        'original_id': last_for_stat.group_id,
-                    }
-            elif delta > 0:
-                # No existing vitamin for this stat — create one fresh
-                if last_any:
-                    insert_kw = dict(insert_after=last_any.group_id)
-                else:
-                    insert_kw = dict(insert_before=self._event_group_id)
-                shadow_id = self._main_controller.new_event(
-                    EventDefinition(vitamin=VitaminEventDefinition(vit_name, delta)),
-                    do_select=False,
-                    **insert_kw,
-                )
-                self._vitamin_shadows[stat] = {
-                    'shadow_id': shadow_id,
-                    'original_id': None,
-                }
-            # else: delta <= 0 and no vitamin exists — nothing to do
+                # else: delta <= 0 and no vitamin exists — nothing to do
+        finally:
+            self._suppress_refresh = False
 
         self._restore_transient_state(saved)
         if not _skip_refresh:

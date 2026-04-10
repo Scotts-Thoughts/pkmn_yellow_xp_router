@@ -32,6 +32,9 @@
             "Rival Brendan 4 Treecko",
             "Rival Brendan 4 Mudkip",
             "Rival Brendan 4 Torchic",
+            "Rival Brendan 5 Treecko",
+            "Rival Brendan 5 Mudkip",
+            "Rival Brendan 5 Torchic",
             "Rival May 1 Treecko",
             "Rival May 1 Mudkip",
             "Rival May 1 Torchic",
@@ -44,6 +47,9 @@
             "Rival May 4 Treecko",
             "Rival May 4 Mudkip",
             "Rival May 4 Torchic",
+            "Rival May 5 Treecko",
+            "Rival May 5 Mudkip",
+            "Rival May 5 Torchic",
             "Rival1 1 Squirtle",
             "Rival1 1 Bulbasaur",
             "Rival1 1 Charmander",
@@ -93,13 +99,20 @@
             "Elite Four Lorelei",
             "Elite Four Bruno",
             "Elite Four Agatha",
-            "Elite Four Lance"
+            "Elite Four Lance",
+            "Elite Four Lorelei 2",
+            "Elite Four Bruno 2",
+            "Elite Four Agatha 2",
+            "Elite Four Lance 2"
         ],
         "champion": [
             "Champion Wallace",
             "Champion Squirtle",
             "Champion Bulbasaur",
             "Champion Charmander",
+            "Champion Squirtle Rematch",
+            "Champion Bulbasaur Rematch",
+            "Champion Charmander Rematch",
             "Champion Terry"
         ],
         "post_game": [

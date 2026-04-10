@@ -229,6 +229,7 @@ class Constants:
         self.TASK_EVOLUTION = "Evolution"
         self.TASK_NOTES_ONLY = "Just Notes"
         self.ERROR_SEARCH = "Invalid Events"
+        self.MAJOR_BATTLE_FILTER = "Major Battles"
 
         self.ITEM_ROUTE_EVENT_TYPES = [
             self.TASK_GET_FREE_ITEM,
@@ -578,6 +579,14 @@ class Constants:
         self.WEATHER_SANDSTORM = "Sandstorm"
         self.WEATHER_HAIL = "Hail"
         self.WEATHER_FOG = "Fog"
+
+        # Map of weather-inducing move names to the weather they create.
+        self.WEATHER_MOVE_MAP = {
+            "Rain Dance": self.WEATHER_RAIN,
+            "Sunny Day": self.WEATHER_SUN,
+            "Sandstorm": self.WEATHER_SANDSTORM,
+            "Hail": self.WEATHER_HAIL,
+        }
 
         # timing defaults
         self.DEFAULT_INTRO_TIME = 4.69

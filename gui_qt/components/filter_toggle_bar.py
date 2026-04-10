@@ -14,6 +14,7 @@ _ICONS_DIR = os.path.join(const.SOURCE_ROOT_PATH, "icons", "filter icons")
 
 # Fallback text labels for filters without an icon file.
 _FILTER_SHORT_LABELS = {
+    const.MAJOR_BATTLE_FILTER:     "MB",
     const.TASK_TRAINER_BATTLE:     "Tr",
     const.TASK_LEARN_MOVE_LEVELUP: "Lv",
     const.TASK_SELL_ITEM:          "Se",
@@ -56,6 +57,7 @@ _FILTER_ICON_FILES = {
 
 # Tooltip labels for hover context.
 _FILTER_TOOLTIPS = {
+    const.MAJOR_BATTLE_FILTER:     "Major Battles",
     const.TASK_TRAINER_BATTLE:     "Trainer Battle",
     const.TASK_LEARN_MOVE_LEVELUP: "Level Up Move",
     const.TASK_SELL_ITEM:          "Sell Item",
@@ -118,6 +120,7 @@ class FilterToggleBar(QWidget):
 
         # Custom display order for the toggle bar.
         toggle_order = [
+            const.MAJOR_BATTLE_FILTER,
             const.TASK_TRAINER_BATTLE,
             const.TASK_RARE_CANDY,
             const.TASK_VITAMIN,

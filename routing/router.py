@@ -183,6 +183,16 @@ class Router:
         # TODO: wrapper for recursive function currently does nothing, may want to remove later
         self._recursive_recalc(self.root_folder, self.init_route_state)
 
+    def get_effective_defeated_trainers(self):
+        """Defeated-trainer set as seen by trainer-add filtering.
+
+        Starting in Gen 3 (FireRed/LeafGreen/Emerald) all trainers can be
+        re-battled, so we never filter them out of the trainer-add UI.
+        """
+        if current_gen_info().get_generation() >= 3:
+            return set()
+        return self.defeated_trainers
+
     def _recursive_recalc(self, obj, cur_state):
         obj.init_state = cur_state
 
@@ -228,7 +238,7 @@ class Router:
             self.event_item_lookup[cur_item.group_id] = cur_item
     
     def add_area(self, area_name, insert_after=None, dest_folder_name=const.ROOT_FOLDER_NAME, include_rematches=False):
-        trainers_to_add = current_gen_info().trainer_db().get_valid_trainers(trainer_loc=area_name, defeated_trainers=self.defeated_trainers, show_rematches=include_rematches)
+        trainers_to_add = current_gen_info().trainer_db().get_valid_trainers(trainer_loc=area_name, defeated_trainers=self.get_effective_defeated_trainers(), show_rematches=include_rematches)
         if len(trainers_to_add) == 0:
             return
 

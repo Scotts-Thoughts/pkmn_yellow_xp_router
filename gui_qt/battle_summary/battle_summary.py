@@ -5,7 +5,7 @@ from typing import List
 
 from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
-    QFrame, QCompleter, QLineEdit, QSizePolicy, QPushButton,
+    QFrame, QCompleter, QLineEdit, QSizePolicy, QPushButton, QCheckBox, QComboBox,
 )
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QPixmap
@@ -167,15 +167,80 @@ class BattleSummary(QWidget):
         self._controls_bar = QWidget()
         controls_layout = QHBoxLayout(self._controls_bar)
         controls_layout.setContentsMargins(6, 2, 6, 2)
-        controls_layout.setSpacing(6)
+        controls_layout.setSpacing(10)
+
+        # Unified "stepper" appearance: each [-] [center] [+] group renders as
+        # a single rounded control. Visual structure is built from background
+        # contrast (no outer border, since 1px QSS borders alias badly):
+        # - center area uses a subtle dark fill
+        # - buttons use a slightly lighter fill, giving them a clear affordance
+        #   and acting as their own dividers from the center area
+        self._controls_bar.setStyleSheet(
+            """
+            QWidget[class~="stepper-group"] {
+                background-color: rgba(255, 255, 255, 0.04);
+                border-radius: 6px;
+            }
+            QPushButton[class~="stepper-btn"] {
+                background-color: rgba(255, 255, 255, 0.11);
+                border: none;
+                border-radius: 0px;
+                padding: 0px;
+                margin: 0px;
+                font-weight: bold;
+                font-size: 13pt;
+                min-height: 0px;
+                min-width: 0px;
+                color: #cccccc;
+            }
+            QPushButton[class~="stepper-btn"]:hover {
+                background-color: rgba(120, 170, 255, 0.45);
+                color: #ffffff;
+            }
+            QPushButton[class~="stepper-btn"]:pressed {
+                background-color: rgba(80, 130, 220, 0.60);
+                color: #ffffff;
+            }
+            QPushButton[class~="stepper-btn-left"] {
+                border-top-left-radius: 6px;
+                border-bottom-left-radius: 6px;
+            }
+            QPushButton[class~="stepper-btn-right"] {
+                border-top-right-radius: 6px;
+                border-bottom-right-radius: 6px;
+            }
+            QWidget[class~="stepper-group"] QLabel {
+                background-color: transparent;
+                border: none;
+            }
+            """
+        )
 
         # Prefight rare candy control: [-] [icon] [count] [+]
+        candy_group = QWidget()
+        candy_group.setProperty("class", "stepper-group")
+        candy_group_layout = QHBoxLayout(candy_group)
+        candy_group_layout.setContentsMargins(0, 0, 0, 0)
+        candy_group_layout.setSpacing(0)
+
+        # ---- candy debounce state ----------------------------------------
+        # Mirrors the vitamin debounce pattern: clicks update the visible
+        # label immediately, the actual (expensive) route mutation is
+        # deferred until the user pauses.
+        self._candy_displayed_count = 0
+        self._candy_pending_target = None  # int when an apply is pending, else None
+        self._candy_debounce_timer = QTimer(self)
+        self._candy_debounce_timer.setSingleShot(True)
+        self._candy_debounce_timer.setInterval(250)
+        self._candy_debounce_timer.timeout.connect(self._flush_candy_adjustment)
+
         self._candy_minus_btn = QPushButton("\u2212")
-        self._candy_minus_btn.setFixedSize(22, 22)
+        self._candy_minus_btn.setProperty("class", "stepper-btn stepper-btn-left")
+        self._candy_minus_btn.setFixedSize(32, 26)
         self._candy_minus_btn.setFocusPolicy(Qt.NoFocus)
         self._candy_minus_btn.setToolTip("Decrement Pre-Fight Candies")
-        self._candy_minus_btn.clicked.connect(self._decrement_prefight_candies)
-        controls_layout.addWidget(self._candy_minus_btn)
+        self._candy_minus_btn.clicked.connect(lambda: self._on_candy_adjust(-1))
+        candy_group_layout.addWidget(self._candy_minus_btn)
 
         self._candy_icon_label = QLabel()
         _candy_icon_path = os.path.join(
@@ -188,25 +253,26 @@ class BattleSummary(QWidget):
                     _pix.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 )
         self._candy_icon_label.setToolTip("Pre-Fight Rare Candies")
-        controls_layout.addWidget(self._candy_icon_label)
+        self._candy_icon_label.setContentsMargins(8, 0, 4, 0)
+        candy_group_layout.addWidget(self._candy_icon_label)
 
         self._candy_count_label = QLabel("0")
         self._candy_count_label.setAlignment(Qt.AlignCenter)
-        self._candy_count_label.setMinimumWidth(24)
-        self._candy_count_label.setStyleSheet("QLabel { border: none; font-weight: bold; }")
-        controls_layout.addWidget(self._candy_count_label)
+        self._candy_count_label.setMinimumWidth(20)
+        self._candy_count_label.setStyleSheet(
+            "QLabel { color: #ffffff; font-weight: bold; font-size: 10pt; padding: 0px 8px 0px 4px; }"
+        )
+        candy_group_layout.addWidget(self._candy_count_label)
 
         self._candy_plus_btn = QPushButton("+")
-        self._candy_plus_btn.setFixedSize(22, 22)
+        self._candy_plus_btn.setProperty("class", "stepper-btn stepper-btn-right")
+        self._candy_plus_btn.setFixedSize(32, 26)
         self._candy_plus_btn.setFocusPolicy(Qt.NoFocus)
         self._candy_plus_btn.setToolTip("Increment Pre-Fight Candies")
-        self._candy_plus_btn.clicked.connect(self._increment_prefight_candies)
-        controls_layout.addWidget(self._candy_plus_btn)
+        self._candy_plus_btn.clicked.connect(lambda: self._on_candy_adjust(+1))
+        candy_group_layout.addWidget(self._candy_plus_btn)
 
-        # Small gap before vitamin indicators
-        _spacer = QLabel("")
-        _spacer.setFixedWidth(10)
-        controls_layout.addWidget(_spacer)
+        controls_layout.addWidget(candy_group)
 
         # Vitamin-per-stat indicators: [-] [label] [+] per stat.
         # Shows how many vitamins boosting that stat have been used before
@@ -227,33 +293,91 @@ class BattleSummary(QWidget):
             (const.SPE, "Spe"),
         ]
         for stat_key, stat_label in _stat_display_order:
+            stat_group = QWidget()
+            stat_group.setProperty("class", "stepper-group")
+            stat_group_layout = QHBoxLayout(stat_group)
+            stat_group_layout.setContentsMargins(0, 0, 0, 0)
+            stat_group_layout.setSpacing(0)
+
             minus_btn = QPushButton("\u2212")
-            minus_btn.setFixedSize(18, 18)
+            minus_btn.setProperty("class", "stepper-btn stepper-btn-left")
+            minus_btn.setFixedSize(30, 26)
             minus_btn.setFocusPolicy(Qt.NoFocus)
             minus_btn.setToolTip(f"Remove a vitamin for {stat_label}")
             minus_btn.clicked.connect(
                 lambda checked, s=stat_key: self._on_vitamin_adjust(s, -1)
             )
-            controls_layout.addWidget(minus_btn)
+            stat_group_layout.addWidget(minus_btn)
 
-            lbl = QLabel(f"{stat_label} 0")
+            lbl = QLabel()
+            lbl.setTextFormat(Qt.RichText)
+            lbl.setText(self._format_vitamin_label(stat_label, 0))
+            lbl.setProperty("count", 0)
             lbl.setToolTip(f"Vitamins boosting {stat_label} used before this battle")
-            lbl.setStyleSheet(
-                "QLabel { border: 1px solid rgba(255, 255, 255, 0.15);"
-                " border-radius: 3px; padding: 1px 3px; }"
-            )
-            controls_layout.addWidget(lbl)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setMinimumWidth(46)
+            lbl.setStyleSheet("QLabel { padding: 0px 8px; }")
+            stat_group_layout.addWidget(lbl)
 
             plus_btn = QPushButton("+")
-            plus_btn.setFixedSize(18, 18)
+            plus_btn.setProperty("class", "stepper-btn stepper-btn-right")
+            plus_btn.setFixedSize(30, 26)
             plus_btn.setFocusPolicy(Qt.NoFocus)
             plus_btn.setToolTip(f"Add a vitamin for {stat_label}")
             plus_btn.clicked.connect(
                 lambda checked, s=stat_key: self._on_vitamin_adjust(s, +1)
             )
-            controls_layout.addWidget(plus_btn)
+            stat_group_layout.addWidget(plus_btn)
+
+            controls_layout.addWidget(stat_group)
 
             self._vitamin_stat_widgets[stat_key] = (minus_btn, lbl, plus_btn, stat_label)
+
+        # Small gap before held item / stat readouts
+        _spacer2 = QLabel("")
+        _spacer2.setFixedWidth(10)
+        controls_layout.addWidget(_spacer2)
+
+        # Typable held-item dropdown. Selecting (or typing + Enter / focus-out)
+        # adds/updates a Hold event right before the battle.
+        held_lbl = QLabel("Held:")
+        held_lbl.setStyleSheet("QLabel { border: none; }")
+        controls_layout.addWidget(held_lbl)
+
+        self._held_item_combo = QComboBox()
+        self._held_item_combo.setEditable(True)
+        self._held_item_combo.setInsertPolicy(QComboBox.NoInsert)
+        self._held_item_combo.setMinimumContentsLength(14)
+        self._held_item_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self._held_item_combo.setToolTip(
+            "Item the player is holding entering this battle. "
+            "Changing this adds/updates a Hold event right before the battle."
+        )
+        self._held_item_completer = QCompleter([])
+        self._held_item_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self._held_item_completer.setFilterMode(Qt.MatchContains)
+        self._held_item_combo.setCompleter(self._held_item_completer)
+        self._held_item_combo.activated.connect(self._on_held_item_activated)
+        self._held_item_combo.lineEdit().editingFinished.connect(self._on_held_item_editing_finished)
+        self._held_item_options_cache = []
+        controls_layout.addWidget(self._held_item_combo)
+
+        # Player HP / Speed readouts (going into the battle)
+        self._player_hp_label = QLabel("HP -")
+        self._player_hp_label.setToolTip("Player HP entering this battle")
+        self._player_hp_label.setStyleSheet(
+            "QLabel { border: 1px solid rgba(255, 255, 255, 0.15);"
+            " border-radius: 3px; padding: 1px 3px; }"
+        )
+        controls_layout.addWidget(self._player_hp_label)
+
+        self._player_speed_label = QLabel("Spe -")
+        self._player_speed_label.setToolTip("Player Speed entering this battle")
+        self._player_speed_label.setStyleSheet(
+            "QLabel { border: 1px solid rgba(255, 255, 255, 0.15);"
+            " border-radius: 3px; padding: 1px 3px; }"
+        )
+        controls_layout.addWidget(self._player_speed_label)
 
         controls_layout.addStretch(1)
 
@@ -402,6 +526,14 @@ class BattleSummary(QWidget):
     # Vitamin +/- with debounce
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _format_vitamin_label(stat_label: str, count: int) -> str:
+        """Render the vitamin label as faded stat name + bright value."""
+        return (
+            f"<span style='color:#888888;'>{stat_label}</span>"
+            f"&nbsp;&nbsp;<span style='color:#ffffff;font-weight:bold;'>{int(count)}</span>"
+        )
+
     def _on_vitamin_adjust(self, stat, delta):
         """Called on each +/- click. Updates the label immediately and
         accumulates the delta.  The actual route modification is deferred
@@ -412,12 +544,10 @@ class BattleSummary(QWidget):
         widgets = self._vitamin_stat_widgets.get(stat)
         if widgets:
             _minus_btn, lbl, _plus_btn, stat_label = widgets
-            try:
-                cur_text = lbl.text()
-                cur_count = int(cur_text.split()[-1])
-            except (ValueError, IndexError):
-                cur_count = 0
-            lbl.setText(f"{stat_label} {max(0, cur_count + delta)}")
+            cur_count = lbl.property("count") or 0
+            new_count = max(0, int(cur_count) + delta)
+            lbl.setProperty("count", new_count)
+            lbl.setText(self._format_vitamin_label(stat_label, new_count))
 
         # Restart the debounce timer.
         self._vitamin_debounce_timer.start()
@@ -579,10 +709,56 @@ class BattleSummary(QWidget):
         self._save_pixmap(cropped, "enemy_ranges")
 
     def _increment_prefight_candies(self):
-        self.candy_summary._increment_candy()
+        if self._candy_plus_btn.isEnabled():
+            self._on_candy_adjust(+1)
 
     def _decrement_prefight_candies(self):
-        self.candy_summary._decrement_candy()
+        if self._candy_minus_btn.isEnabled() and self._candy_displayed_count > 0:
+            self._on_candy_adjust(-1)
+
+    # ------------------------------------------------------------------
+    # Candy +/- with debounce (mirrors vitamin pattern)
+    # ------------------------------------------------------------------
+
+    def _on_candy_adjust(self, delta):
+        """Called on each candy +/- click. Updates the label immediately and
+        accumulates the target value. The actual route mutation is deferred
+        until the debounce timer fires so rapid clicks coalesce into one
+        expensive recalculation."""
+        # Seed the displayed count from the controller on first click of a
+        # new burst — keeps us in sync if the route was changed externally.
+        if self._candy_pending_target is None:
+            try:
+                self._candy_displayed_count = int(self._controller.get_prefight_candy_count())
+            except Exception:
+                self._candy_displayed_count = 0
+
+        new_count = max(0, self._candy_displayed_count + delta)
+        if new_count == self._candy_displayed_count and self._candy_pending_target is None:
+            return
+
+        self._candy_displayed_count = new_count
+        self._candy_pending_target = new_count
+
+        # Instant UI feedback.
+        self._candy_count_label.setText(str(new_count))
+        self._candy_minus_btn.setEnabled(new_count > 0)
+        # Mirror to the legacy widget so the two stay consistent if visible.
+        try:
+            self.candy_summary.set_candy_count(new_count)
+        except Exception:
+            pass
+
+        # Restart the debounce timer.
+        self._candy_debounce_timer.start()
+
+    def _flush_candy_adjustment(self):
+        """Apply the pending candy target to the route in one batch."""
+        target = self._candy_pending_target
+        self._candy_pending_target = None
+        if target is None:
+            return
+        self._controller.update_prefight_candies(target)
 
     def _update_notes_visibility_in_battle_summary(self):
         # placeholder -- notes visibility handled at main_window level in Qt
@@ -614,6 +790,48 @@ class BattleSummary(QWidget):
     def _enemy_setup_move_callback(self, *args, **kwargs):
         self._controller.update_enemy_setup_moves(self.enemy_setup_moves._move_list.copy())
 
+    def _on_held_item_activated(self, *args, **kwargs):
+        # Fired when the user picks an item from the dropdown list.
+        if self._loading:
+            return
+        self._apply_held_item_change()
+
+    def _on_held_item_editing_finished(self, *args, **kwargs):
+        # Fired when the line edit loses focus or the user presses Enter.
+        if self._loading:
+            return
+        self._apply_held_item_change()
+
+    def _apply_held_item_change(self):
+        # Re-entry guard: a single dropdown selection can fire both `activated`
+        # and `editingFinished`, and the second may arrive while the first is
+        # still inside the route-change cascade.
+        if getattr(self, "_held_item_apply_in_flight", False):
+            return
+
+        new_text = self._held_item_combo.currentText().strip()
+        if new_text and new_text not in self._held_item_options_cache:
+            # Reject anything that isn't a real item; revert the visible value
+            # to whatever the controller currently believes is held.
+            self._loading = True
+            try:
+                cur = self._controller.get_player_held_item() or ""
+                self._held_item_combo.setEditText(cur)
+            finally:
+                self._loading = False
+            return
+
+        # Skip if the value already matches what the controller reports.
+        cur_held = self._controller.get_player_held_item() or ""
+        if cur_held == new_text:
+            return
+
+        self._held_item_apply_in_flight = True
+        try:
+            self._controller.update_player_held_item(new_text)
+        finally:
+            self._held_item_apply_in_flight = False
+
     # ------------------------------------------------------------------
     # Full refresh (called by controller)
     # ------------------------------------------------------------------
@@ -627,21 +845,28 @@ class BattleSummary(QWidget):
         try:
             self._loading = True
             cur_candies = self._controller.get_prefight_candy_count()
-            self.candy_summary.set_candy_count(cur_candies)
             can_candies = self._controller.can_support_prefight_candies()
             if not can_candies:
                 self.candy_summary.disable()
             else:
                 self.candy_summary.enable()
-            # Mirror into the new controls-bar candy control
-            self._candy_count_label.setText(str(cur_candies))
-            self._candy_minus_btn.setEnabled(can_candies)
+            # Mirror into the controls-bar candy control. If a debounced
+            # candy update is in flight, keep showing the user's intended
+            # value so the label doesn't snap back during the cascade.
+            if self._candy_pending_target is None:
+                self.candy_summary.set_candy_count(cur_candies)
+                self._candy_count_label.setText(str(cur_candies))
+                self._candy_displayed_count = cur_candies
+                self._candy_minus_btn.setEnabled(can_candies and cur_candies > 0)
+            else:
+                self._candy_minus_btn.setEnabled(can_candies and self._candy_displayed_count > 0)
             self._candy_plus_btn.setEnabled(can_candies)
             # Vitamin-per-stat indicators
             vit_counts = self._controller.get_vitamins_used_per_stat()
             for stat_key, (minus_btn, lbl, plus_btn, stat_label) in self._vitamin_stat_widgets.items():
                 count = vit_counts.get(stat_key, 0)
-                lbl.setText(f"{stat_label} {count}")
+                lbl.setProperty("count", count)
+                lbl.setText(self._format_vitamin_label(stat_label, count))
 
             if self._controller.is_double_battle():
                 self.double_label.setText("Double Battle")
@@ -651,6 +876,27 @@ class BattleSummary(QWidget):
             self.transform_checkbox.set_checked(self._controller.is_player_transformed())
             held = self._controller.get_player_held_item()
             self.held_item_label.setText(f"Held: {held}" if held else "")
+
+            # Controls-bar held item dropdown + HP/Speed readouts
+            options = self._controller.get_held_item_options()
+            if options != self._held_item_options_cache:
+                self._held_item_options_cache = options
+                self._held_item_combo.blockSignals(True)
+                try:
+                    self._held_item_combo.clear()
+                    self._held_item_combo.addItems(options)
+                finally:
+                    self._held_item_combo.blockSignals(False)
+                self._held_item_completer.setModel(self._held_item_combo.model())
+            self._held_item_combo.blockSignals(True)
+            try:
+                self._held_item_combo.setEditText(held or "")
+            finally:
+                self._held_item_combo.blockSignals(False)
+            self._held_item_combo.setEnabled(can_candies)
+
+            self._player_hp_label.setText(f"HP {self._controller.get_player_battle_hp()}")
+            self._player_speed_label.setText(f"Spe {self._controller.get_player_battle_speed()}")
             self.weather_status.set_weather(self._controller.get_weather())
             self.setup_moves.set_move_list(self._controller.get_player_setup_moves())
             self.enemy_setup_moves.set_move_list(self._controller.get_enemy_setup_moves())
@@ -870,19 +1116,12 @@ class PrefightCandySummary(QWidget):
 
     def _delayed_candy_callback(self):
         self._candy_callback_timer = None
-
-        # Drain any pending button clicks / key presses that arrived while a
-        # previous recalculation was blocking the event loop.  This ensures the
-        # displayed candy count incorporates ALL rapid changes before we start
-        # the next expensive recalculation.
-        from PySide6.QtWidgets import QApplication
-        QApplication.processEvents()
-
-        # If draining those events started a new debounce timer (user is still
-        # clicking), skip this round — the new timer will handle it.
-        if self._candy_callback_timer is not None:
-            return
-
+        # NOTE: do NOT call QApplication.processEvents() here. Re-entering
+        # the Qt event loop while the parent BattleSummary is mid-rebuild
+        # can momentarily flash a child widget as a top-level window
+        # (mirrors the QCompleter popup-flash issue handled in
+        # EditableOptionMenu.set). The 150ms debounce above is sufficient
+        # to coalesce rapid clicks on its own.
         if self._outer_callback is not None:
             self._outer_callback()
 
@@ -1267,6 +1506,17 @@ class DamageSummary(QWidget):
 
         header_layout.addWidget(self.move_name_label, 1)
 
+        # Weather toggle: shown only when this move is a weather-inducing move
+        # (Rain Dance / Sunny Day / Sandstorm / Hail) and the current generation
+        # supports that weather. Toggling it sets the active weather for damage
+        # calculations.
+        self.weather_checkbox = QCheckBox(parent=self.header)
+        self.weather_checkbox.setFocusPolicy(Qt.NoFocus)
+        self.weather_checkbox.setStyleSheet("QCheckBox { background: transparent; border: none; }")
+        self.weather_checkbox.stateChanged.connect(self._weather_checkbox_callback)
+        self.weather_checkbox.setVisible(False)
+        header_layout.addWidget(self.weather_checkbox)
+
         self.custom_data_dropdown = SimpleOptionMenu(option_list=[""], callback=self._custom_data_callback, parent=self.header)
         self.custom_data_dropdown.setVisible(False)
         header_layout.addWidget(self.custom_data_dropdown)
@@ -1384,6 +1634,15 @@ class DamageSummary(QWidget):
         new_value = self.stat_stage_dropdown.get()
         self._controller.update_stat_stage_setup(
             self._mon_idx, self._move_idx, self._is_player_mon, new_value,
+        )
+
+    def _weather_checkbox_callback(self, *args, **kwargs):
+        if self._is_loading:
+            return
+        if self._move_name is None:
+            return
+        self._controller.toggle_weather_from_move(
+            self._move_name, self.weather_checkbox.isChecked(),
         )
 
     def _on_test_move_changed(self, *args, **kwargs):
@@ -1655,6 +1914,21 @@ class DamageSummary(QWidget):
             self.move_name_label.setVisible(True)
             self.custom_data_dropdown.setVisible(False)
             self.stat_stage_dropdown.setVisible(False)
+
+        # ---- weather-move toggle --------------------------------------
+        weather_for_move = None
+        if move is not None:
+            weather_for_move = self._controller.get_weather_for_move(move.name)
+        if weather_for_move is not None:
+            cur_weather = self._controller.get_weather()
+            self.weather_checkbox.setChecked(cur_weather == weather_for_move)
+            self.weather_checkbox.setToolTip(
+                f"Set weather to {weather_for_move} for damage calculation"
+            )
+            self.weather_checkbox.setVisible(True)
+        else:
+            self.weather_checkbox.setChecked(False)
+            self.weather_checkbox.setVisible(False)
 
         # ---- populate values ------------------------------------------
         if move is None:

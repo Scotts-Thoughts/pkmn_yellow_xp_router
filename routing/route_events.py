@@ -1087,6 +1087,9 @@ class EventGroup:
         if filter_types is not None and self.has_errors() and const.ERROR_SEARCH in filter_types:
             # Workaround to preserve and-ing behavior of search string + filter types
             return self.event_definition.do_render(search=search)
+        if filter_types is not None and self.is_major_fight() and const.MAJOR_BATTLE_FILTER in filter_types:
+            # Major Battles is a virtual filter type — match any event flagged as a major fight
+            return self.event_definition.do_render(search=search)
 
         for learn_move in self.level_up_learn_event_defs:
             # TODO: pretty hacky, but fixing this requires updating the entire way we handle level-up moves

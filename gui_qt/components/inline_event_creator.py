@@ -164,6 +164,13 @@ class InlineEventCreator(QFrame):
         self._create_btn.clicked.connect(self._on_create)
         self._layout.addWidget(self._create_btn)
 
+        # Only relevant for trainer events with a real location selected.
+        self._add_all_btn = QPushButton("Add all trainers")
+        self._add_all_btn.setFixedWidth(110)
+        self._add_all_btn.setVisible(False)
+        self._add_all_btn.clicked.connect(self._on_add_all_trainers)
+        self._layout.addWidget(self._add_all_btn)
+
         self._discard_btn = QPushButton("Discard")
         self._discard_btn.setFixedWidth(60)
         self._discard_btn.clicked.connect(lambda: self.discarded.emit())
@@ -326,6 +333,7 @@ class InlineEventCreator(QFrame):
         self._event_builder = None
         self._create_validator = None
         self._config_refs = {}
+        self._add_all_btn.setVisible(False)
 
     def _lbl(self, text):
         lbl = QLabel(text)
@@ -391,6 +399,20 @@ class InlineEventCreator(QFrame):
         except Exception as e:
             logger.error(f"Inline event creation failed: {e}")
 
+    def _on_add_all_trainers(self):
+        """Add every trainer at the currently-selected location to the route."""
+        loc_widget = self._config_refs.get("loc")
+        if loc_widget is None:
+            return
+        location = loc_widget.currentText()
+        if not location or location == const.ALL_TRAINERS:
+            return
+        try:
+            self._controller.add_area(location, False, self._insert_after_id)
+            self.discarded.emit()
+        except Exception as e:
+            logger.error(f"Add all trainers failed: {e}")
+
     # ==================================================================
     # Config builders – one per event category
     # ==================================================================
@@ -426,6 +448,10 @@ class InlineEventCreator(QFrame):
             tr_c.clear()
             tr_c.addItems(trainers)
             tr_c.blockSignals(False)
+            self._add_all_btn.setVisible(
+                self._editing_group_id is None
+                and loc_c.currentText() != const.ALL_TRAINERS
+            )
             self._update_create_state()
 
         loc_c.currentIndexChanged.connect(refresh)

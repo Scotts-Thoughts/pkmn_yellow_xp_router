@@ -63,6 +63,7 @@ class MainController:
         self._name_change_callbacks = []
         self._version_change_callbacks = []
         self._route_change_callbacks = []
+        self._filter_change_callbacks = []
         self._event_change_callbacks = []
         self._event_selection_callbacks = []
         self._event_preview_callbacks = []
@@ -107,6 +108,16 @@ class MainController:
     def register_route_change(self, callback):
         self._route_change_callbacks.append(callback)
         return lambda: self._route_change_callbacks.remove(callback)
+
+    def register_filter_change(self, callback):
+        """Register a callback fired when the filter or search query changes.
+
+        Filter changes only affect the route-list view, not the underlying
+        route data, so they intentionally do NOT trigger the heavier
+        route_change handlers (summary windows, event details, etc.).
+        """
+        self._filter_change_callbacks.append(callback)
+        return lambda: self._filter_change_callbacks.remove(callback)
 
     def register_event_update(self, callback):
         self._event_change_callbacks.append(callback)
@@ -183,6 +194,9 @@ class MainController:
     def _on_route_change(self):
         self._unsaved_changes = True
         self._safely_invoke_callbacks(self._route_change_callbacks)
+
+    def _on_filter_change(self):
+        self._safely_invoke_callbacks(self._filter_change_callbacks)
 
     def _on_event_change(self):
         self._safely_invoke_callbacks(self._event_change_callbacks)
@@ -522,12 +536,12 @@ class MainController:
     @handle_exceptions
     def set_route_filter_types(self, filter_options):
         self._route_filter_types = filter_options
-        self._on_route_change()
+        self._on_filter_change()
 
     @handle_exceptions
     def set_route_search(self, search):
         self._route_search = search
-        self._on_route_change()
+        self._on_filter_change()
 
     @handle_exceptions
     def load_all_custom_versions(self):
@@ -616,7 +630,7 @@ class MainController:
         return self._data.init_route_state.solo_pkmn.nature
 
     def get_defeated_trainers(self):
-        return self._data.defeated_trainers
+        return self._data.get_effective_defeated_trainers()
 
     def get_route_search_string(self) -> str:
         if not self._route_search:

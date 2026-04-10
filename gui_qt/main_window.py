@@ -123,6 +123,13 @@ class MainWindow(QMainWindow):
         self._summary_panel = None
         self.setup_summary_window = None
 
+        # Splitter sizing state -- track pending splitter-fraction saves to debounce
+        # disk writes during a drag, and remember whether we have applied the
+        # initial sizing yet (the splitter has width 0 until the route editor is shown).
+        self._splitter_save_timer = None
+        self._pending_left_fraction = None
+        self._initial_splitter_applied = False
+
         # Update state
         self._deferred_update_version = None
         self._deferred_update_url = None
@@ -605,8 +612,20 @@ class MainWindow(QMainWindow):
         # Auto-resize splitter when switching between pre-state and battle summary
         self.event_details.battle_summary_visible.connect(self._on_battle_summary_tab_changed)
 
+        # Track manual splitter drags so we can remember the user's preferred
+        # widths separately for each tab.  splitterMoved fires only on user
+        # interaction (not on programmatic setSizes), so it cannot loop.
+        self._splitter.splitterMoved.connect(self._on_splitter_moved)
+
     def _on_battle_summary_tab_changed(self, is_battle_summary: bool):
-        """Adjust splitter proportions when switching tabs."""
+        """Adjust splitter proportions when switching tabs.
+
+        Each tab has its own remembered left/right split.  If the user has
+        previously dragged the divider while that tab was visible, we restore
+        their saved fraction; otherwise we fall back to a sensible default.
+        For the Pre-Event State tab the default is computed from the panel's
+        natural sizeHint so the contents fit on first launch.
+        """
         total = self._splitter.width()
         if total <= 0:
             return
@@ -614,13 +633,79 @@ class MainWindow(QMainWindow):
         if is_battle_summary:
             self._splitter.setStretchFactor(0, 1)
             self._splitter.setStretchFactor(1, 2)
-            left = int(total * 0.30)
+            saved = config.get_battle_summary_left_fraction()
+            if saved is None or saved <= 0:
+                saved = 0.30
+            left = max(200, int(total * saved))
         else:
-            self._splitter.setStretchFactor(0, 3)
+            self._splitter.setStretchFactor(0, 1)
             self._splitter.setStretchFactor(1, 1)
-            left = int(total * 0.75)
+            saved = config.get_pre_state_left_fraction()
+            if saved is None or saved <= 0:
+                # First-time default: size right panel to fit its natural content.
+                right = self._natural_pre_state_right_width()
+                # Clamp to reasonable bounds so the route list still has room.
+                right = max(right, int(total * 0.40))
+                right = min(right, int(total * 0.65))
+                left = max(200, total - right)
+            else:
+                left = max(200, int(total * saved))
 
         self._splitter.setSizes([left, total - left])
+
+    def _natural_pre_state_right_width(self) -> int:
+        """Width needed for the Pre-Event State panel to display its content."""
+        inner = getattr(self.event_details, '_pre_state_tab', None)
+        if inner is None:
+            return 0
+        hint = inner.sizeHint().width()
+        min_hint = inner.minimumSizeHint().width()
+        # Pad for tab chrome and an optional vertical scroll bar.
+        return max(hint, min_hint) + 30
+
+    def _on_splitter_moved(self, pos, index):
+        """Save the user's manual splitter position for the active tab."""
+        total = self._splitter.width()
+        if total <= 0:
+            return
+        sizes = self._splitter.sizes()
+        if len(sizes) < 2:
+            return
+        fraction = sizes[0] / total
+        if self._tab_widget.currentIndex() == self.event_details.battle_summary_tab_index:
+            self._pending_left_fraction = ('battle_summary', fraction)
+        else:
+            self._pending_left_fraction = ('pre_state', fraction)
+        # Debounce so a drag doesn't trigger a flood of config writes.
+        if self._splitter_save_timer is None:
+            self._splitter_save_timer = QTimer(self)
+            self._splitter_save_timer.setSingleShot(True)
+            self._splitter_save_timer.timeout.connect(self._flush_splitter_save)
+        self._splitter_save_timer.start(500)
+
+    def _flush_splitter_save(self):
+        if self._pending_left_fraction is None:
+            return
+        which, frac = self._pending_left_fraction
+        self._pending_left_fraction = None
+        if which == 'battle_summary':
+            config.set_battle_summary_left_fraction(frac)
+        else:
+            config.set_pre_state_left_fraction(frac)
+
+    def _apply_initial_splitter_sizes(self):
+        """Apply saved/default splitter sizes once the route editor has a real width."""
+        if self._initial_splitter_applied:
+            return
+        if not hasattr(self, '_splitter') or self._splitter.width() <= 0:
+            # Layout hasn't settled yet; try again on the next tick.
+            QTimer.singleShot(50, self._apply_initial_splitter_sizes)
+            return
+        is_battle = (
+            self._tab_widget.currentIndex() == self.event_details.battle_summary_tab_index
+        )
+        self._on_battle_summary_tab_changed(is_battle)
+        self._initial_splitter_applied = True
 
     # ------------------------------------------------------------------
     # Status bar
@@ -752,6 +837,9 @@ class MainWindow(QMainWindow):
         unsub = self._controller.register_route_change(self._on_route_change)
         self._unsubscribers.append(unsub)
 
+        unsub = self._controller.register_filter_change(self._on_filter_change)
+        self._unsubscribers.append(unsub)
+
     # ------------------------------------------------------------------
     # Thread-safe callback dispatching (replaces tkinter event_generate)
     # ------------------------------------------------------------------
@@ -790,6 +878,11 @@ class MainWindow(QMainWindow):
     def _show_route_controls(self):
         self._stacked.setCurrentIndex(2)
         self.setFocus()
+        # The splitter has width 0 until the route editor is shown for the
+        # first time, so apply the saved/default split now (deferred so the
+        # layout pass has a chance to run first).
+        if not self._initial_splitter_applied:
+            QTimer.singleShot(0, self._apply_initial_splitter_sizes)
 
     # ------------------------------------------------------------------
     # Controller callback handlers
@@ -839,6 +932,20 @@ class MainWindow(QMainWindow):
             self._show_route_controls()
         else:
             self._show_landing_page()
+
+    def _on_filter_change(self):
+        # Filter/search updates only affect the route-list view; skip the
+        # heavier route_change cascade (summary windows, event details, etc.).
+        # Use the fast visibility-only refresh; it falls back to a full refresh
+        # internally when the filter requires re-shaping the tree (e.g. Major
+        # Battles flatten mode).
+        self.event_list.refresh_filter_only()
+        if hasattr(self, 'filter_toggle_bar'):
+            self.filter_toggle_bar.sync()
+        # Keep the currently selected event in view after filter changes so the
+        # user doesn't have to hunt for it (especially when removing filters
+        # exposes a much longer list).
+        self.event_list.scroll_to_selected_events()
 
     def _apply_record_button_style(self, active=False):
         if active:

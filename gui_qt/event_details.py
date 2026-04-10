@@ -11,7 +11,7 @@ import time
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
-    QPlainTextEdit, QSizePolicy,
+    QPlainTextEdit, QSizePolicy, QScrollArea, QFrame,
 )
 from PySide6.QtCore import Qt, QTimer, Signal
 
@@ -56,8 +56,21 @@ class EventDetails(QWidget):
         self._tab_widget = QTabWidget()
         root_layout.addWidget(self._tab_widget, 1)
 
-        # Pre-state tab
+        # Pre-state tab -- wrapped in a QScrollArea so its minimum size hint
+        # does not force the surrounding layout to grow. Without this, the
+        # combined min-heights of StateViewer + event editor would propagate
+        # up through the splitter to the central widget; when the docked Run
+        # Summary is visible in a maximized window, that overflow pushes the
+        # docked panel and status bar below the visible area.
+        pre_state_scroll = QScrollArea()
+        pre_state_scroll.setWidgetResizable(True)
+        pre_state_scroll.setFrameShape(QFrame.NoFrame)
+        pre_state_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        pre_state_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
         pre_state_tab = QWidget()
+        # Exposed so MainWindow can query its sizeHint for default splitter sizing.
+        self._pre_state_tab = pre_state_tab
         ps_layout = QVBoxLayout(pre_state_tab)
         ps_layout.setContentsMargins(4, 4, 4, 4)
         ps_layout.setSpacing(4)
@@ -72,7 +85,8 @@ class EventDetails(QWidget):
         self._editor_layout.setSpacing(0)
         ps_layout.addWidget(self._editor_container, 1)
 
-        self._tab_widget.addTab(pre_state_tab, "Pre-Event State")
+        pre_state_scroll.setWidget(pre_state_tab)
+        self._tab_widget.addTab(pre_state_scroll, "Pre-Event State")
         self.pre_state_tab_index = 0
 
         # Battle-summary tab

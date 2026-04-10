@@ -337,6 +337,10 @@ class Config:
         self._color_major_battles = raw.get("color_major_battles", True)
         self._suppress_update_prompt = raw.get("suppress_update_prompt", False)
         self._notes_collapsed = raw.get("notes_collapsed", False)
+        # Splitter fractions: left-panel width / total splitter width, per tab.
+        # None means "no saved preference -- use the natural default".
+        self._pre_state_left_fraction = raw.get("pre_state_left_fraction", None)
+        self._battle_summary_left_fraction = raw.get("battle_summary_left_fraction", None)
         self._highlight_colors = {}
         self._fight_category_colors = {}
         for cat in ["rival", "gym_leader", "elite_four", "champion", "post_game", "boss", "team_leader"]:
@@ -409,6 +413,8 @@ class Config:
                 "color_major_battles": getattr(self, '_color_major_battles', True),
                 "suppress_update_prompt": getattr(self, '_suppress_update_prompt', False),
                 "notes_collapsed": getattr(self, '_notes_collapsed', False),
+                "pre_state_left_fraction": getattr(self, '_pre_state_left_fraction', None),
+                "battle_summary_left_fraction": getattr(self, '_battle_summary_left_fraction', None),
         }
         # Save highlight colors
         for i in range(1, 10):
@@ -518,6 +524,20 @@ class Config:
 
     def set_auto_switch(self, do_auto_switch):
         self._auto_switch = do_auto_switch
+        self._save()
+
+    def get_pre_state_left_fraction(self):
+        return getattr(self, '_pre_state_left_fraction', None)
+
+    def set_pre_state_left_fraction(self, val):
+        self._pre_state_left_fraction = val
+        self._save()
+
+    def get_battle_summary_left_fraction(self):
+        return getattr(self, '_battle_summary_left_fraction', None)
+
+    def set_battle_summary_left_fraction(self, val):
+        self._battle_summary_left_fraction = val
         self._save()
 
     def set_notes_visibility_in_battle_summary(self, are_notes_visible):
