@@ -1790,12 +1790,14 @@ class BattleSummaryController:
 
     def get_move_highlight_state(self, mon_idx, move_idx, is_player_mon):
         highlights = getattr(self, '_move_highlights', {})
-        return highlights.get((mon_idx, move_idx, is_player_mon), 0)
+        battle_highlights = highlights.get(self._event_group_id, {})
+        return battle_highlights.get((mon_idx, move_idx, is_player_mon), 0)
 
     def set_move_highlight_state(self, mon_idx, move_idx, is_player_mon, state):
         if not hasattr(self, '_move_highlights'):
             self._move_highlights = {}
-        self._move_highlights[(mon_idx, move_idx, is_player_mon)] = state
+        battle_highlights = self._move_highlights.setdefault(self._event_group_id, {})
+        battle_highlights[(mon_idx, move_idx, is_player_mon)] = state
         self._on_refresh()
         self._on_nonload_change()
 

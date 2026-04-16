@@ -334,6 +334,14 @@ class MainWindow(QMainWindow):
         self.event_menu = menu_bar.addMenu("&Events")
         self.event_menu.aboutToShow.connect(self._update_event_menu_state)
 
+        self._act_add_new_event = self.event_menu.addAction("Add New Event")
+        self._act_add_new_event.triggered.connect(self.add_new_event)
+
+        self._act_new_route_from_current = self.event_menu.addAction("New Route Based on Current Route")
+        self._act_new_route_from_current.triggered.connect(self.new_route_from_current)
+
+        self.event_menu.addSeparator()
+
         self._act_undo = _add_action(self.event_menu, "Undo", "undo", self.undo_event_list)
 
         self.event_menu.addSeparator()
@@ -786,6 +794,8 @@ class MainWindow(QMainWindow):
         for i in range(1, 9):
             _sc(f"gym_{i}", partial(self.select_gym_leader, i - 1))
 
+        _sc("gym_blue", self.select_blue)
+
         for i in range(1, 7):
             _sc(f"e4_{i}", partial(self.select_elite_four_or_champion, i - 1))
 
@@ -1122,6 +1132,27 @@ class MainWindow(QMainWindow):
         self._route_loaded_before_new_route = self._controller.get_version() is not None
         self._show_new_route_page()
 
+    def new_route_from_current(self):
+        if self._controller.get_version() is None or self._controller.get_init_state() is None:
+            return
+        if self._controller.has_unsaved_changes():
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Changes",
+                "Route has unsaved changes. Save before starting a new route?",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Cancel,
+            )
+            if reply == QMessageBox.Cancel:
+                return
+            if reply == QMessageBox.Yes:
+                route_name = self.route_name_entry.get()
+                if not route_name:
+                    QMessageBox.warning(self, "No Route Name", "Please enter a route name before saving.")
+                    return
+                self._controller.save_route(route_name)
+        self._controller.create_new_route_from_current()
+
     def open_load_route_window(self):
         from gui_qt.dialogs import LoadRouteDialog
         dlg = LoadRouteDialog(self, self._controller)
@@ -1132,8 +1163,6 @@ class MainWindow(QMainWindow):
                 self._show_route_controls()
 
     def open_customize_dvs_window(self):
-        if self._controller.is_empty():
-            return
         from gui_qt.dialogs import CustomDvsDialog
         from pkmn.gen_factory import current_gen_info
         init_state = self._controller.get_init_state()
@@ -1229,6 +1258,13 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Event actions
     # ------------------------------------------------------------------
+    def add_new_event(self):
+        """Open the inline event creator. Matches the spacebar shortcut for
+        non-empty routes, and bootstraps a folder + inline creator when the
+        route is currently empty."""
+        if hasattr(self.event_list, "start_add_new_event"):
+            self.event_list.start_add_new_event()
+
     def move_group_up(self):
         self._controller.move_groups_up(
             self.event_list.get_all_selected_event_ids(allow_event_items=False)
@@ -1466,6 +1502,22 @@ class MainWindow(QMainWindow):
                 self._controller.select_new_events([eid])
         except Exception as e:
             logger.error(f"Error selecting gym leader: {e}")
+
+    def select_blue(self):
+        if self._text_field_has_focus:
+            return
+        version = self._controller.get_version()
+        if version not in (
+            const.GOLD_VERSION, const.SILVER_VERSION, const.CRYSTAL_VERSION,
+            const.HEART_GOLD_VERSION, const.SOUL_SILVER_VERSION,
+        ):
+            return
+        try:
+            eid = self._controller.find_first_event_by_trainer_name("Leader Blue")
+            if eid is not None:
+                self._controller.select_new_events([eid])
+        except Exception as e:
+            logger.error(f"Error selecting Blue: {e}")
 
     def select_elite_four_or_champion(self, e4_idx):
         if self._controller.get_version() is None:
@@ -1787,6 +1839,12 @@ class MainWindow(QMainWindow):
 
     def _update_event_menu_state(self):
         self._act_undo.setEnabled(self._controller.can_undo())
+
+        has_route = (
+            self._controller.get_version() is not None
+            and self._controller.get_init_state() is not None
+        )
+        self._act_new_route_from_current.setEnabled(has_route)
 
         # Split folder availability
         eid = self._controller.get_single_selected_event_id(allow_event_items=False)

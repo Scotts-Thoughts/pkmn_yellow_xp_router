@@ -3,7 +3,7 @@ import logging
 
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QComboBox, QPushButton, QWidget,
-    QLabel, QLineEdit, QCompleter,
+    QLabel, QLineEdit, QCompleter, QAbstractItemView,
 )
 from PySide6.QtCore import Qt, Signal, QEvent, QObject, QTimer
 
@@ -78,19 +78,307 @@ class _SelectAllOnFocusFilter(QObject):
         return False
 
 
+def _best_match_index(combo):
+    """Return the index of the combo item that best matches what's on screen.
+
+    When the completer popup is visible, its currently-highlighted row wins —
+    the user may have arrow-navigated away from the first match.  Otherwise
+    fall back to the line-edit text (exact match > startswith > substring).
+    Returns -1 when nothing reasonable matches.
+    """
+    completer = combo.completer()
+    if completer is not None:
+        popup = completer.popup()
+        if popup is not None and popup.isVisible():
+            popup_idx = popup.currentIndex()
+            if popup_idx.isValid():
+                matched = popup_idx.data(Qt.DisplayRole)
+                if matched:
+                    found = combo.findText(matched)
+                    if found >= 0:
+                        return found
+    line_edit = combo.lineEdit()
+    if line_edit is None:
+        return -1
+    text = line_edit.text().strip()
+    if not text:
+        return -1
+    exact = combo.findText(text, Qt.MatchFixedString)
+    if exact >= 0:
+        return exact
+    lower = text.lower()
+    for i in range(combo.count()):
+        if combo.itemText(i).lower().startswith(lower):
+            return i
+    for i in range(combo.count()):
+        if lower in combo.itemText(i).lower():
+            return i
+    return -1
+
+
+def _commit_best_match(combo):
+    """Set the combo's selection to whichever item best matches its typed text."""
+    idx = _best_match_index(combo)
+    if idx < 0:
+        return
+    completer = combo.completer()
+    if completer is not None:
+        popup = completer.popup()
+        if popup is not None and popup.isVisible():
+            popup.hide()
+    combo.setCurrentIndex(idx)
+
+
+def _get_focusable_fields(creator):
+    """Return the ordered list of focus targets inside the inline event
+    creator: the line edits of editable QComboBoxes, the internal line edits
+    of AmountEntry widgets, and standalone QLineEdits (the notes field).
+    Widgets are visited in layout order so the list matches visual
+    left-to-right order.
+    """
+    fields = []
+
+    def _visit(widget):
+        if widget is None:
+            return
+        if isinstance(widget, QComboBox):
+            if widget.isEditable():
+                le = widget.lineEdit()
+                if le is not None:
+                    fields.append(le)
+            return
+        if isinstance(widget, AmountEntry):
+            le = widget.findChild(QLineEdit)
+            if le is not None:
+                fields.append(le)
+            return
+        if isinstance(widget, QLineEdit):
+            fields.append(widget)
+            return
+        layout = widget.layout()
+        if layout is None:
+            return
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            child = item.widget() if item is not None else None
+            _visit(child)
+
+    _visit(creator)
+    return fields
+
+
+def _advance_focus(current_widget, forward=True, trigger_create_at_end=False):
+    """Move keyboard focus to the next/previous entry field inside the same
+    inline event creator.  When *trigger_create_at_end* is True and we are
+    advancing forward off the last field, click the Create button instead of
+    wrapping — this is what makes Enter on the final field submit the event.
+
+    Returns True if any action was taken.
+    """
+    creator = current_widget
+    while creator is not None and creator.objectName() != "inlineEventCreator":
+        creator = creator.parentWidget()
+    if creator is None:
+        return False
+    fields = _get_focusable_fields(creator)
+    if not fields:
+        return False
+    try:
+        cur = fields.index(current_widget)
+    except ValueError:
+        return False
+    if forward and trigger_create_at_end and cur == len(fields) - 1:
+        btn = getattr(creator, '_create_btn', None)
+        if btn is not None and btn.isEnabled():
+            btn.click()
+        return True
+    if len(fields) < 2:
+        return False
+    step = 1 if forward else -1
+    nxt = fields[(cur + step) % len(fields)]
+    # Qt requires a widget to be visible for setFocus() to work.  When
+    # picking an event type rebuilds the config container, new widgets are
+    # in the tree but their queued show events may not have been delivered
+    # yet — force them through now so setFocus isn't a silent no-op.
+    parent = nxt.parentWidget()
+    if parent is not None:
+        parent.show()
+        parent.ensurePolished()
+    nxt.show()
+    nxt.ensurePolished()
+    nxt.setFocus(Qt.TabFocusReason)
+    QTimer.singleShot(0, nxt.selectAll)
+    return True
+
+
+class _EnterCommitFilter(QObject):
+    """Event filter that commits the best-matching combo item and advances
+    focus to the next searchable field for Enter/Return/Tab (or the previous
+    one for Backtab).
+
+    Enter on the last field triggers Create (submits the event); Tab still
+    wraps through the form.  Without this filter, QCompleter swallows
+    Enter/Tab to accept the completion without moving focus.
+    """
+
+    def __init__(self, combo):
+        super().__init__(combo)
+        self._combo = combo
+
+    def _hide_popup(self):
+        completer = self._combo.completer()
+        if completer is not None:
+            popup = completer.popup()
+            if popup is not None:
+                popup.hide()
+
+    def eventFilter(self, obj, event):
+        if event.type() != QEvent.KeyPress:
+            return False
+        key = event.key()
+        if key not in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Tab, Qt.Key_Backtab):
+            return False
+        idx = _best_match_index(self._combo)
+        if idx >= 0:
+            self._hide_popup()
+            self._combo.setCurrentIndex(idx)
+        forward = (key != Qt.Key_Backtab)
+        trigger_create = key in (Qt.Key_Return, Qt.Key_Enter)
+        line_edit = self._combo.lineEdit()
+        # Defer until after any widget tree changes triggered by
+        # setCurrentIndex are in place (e.g., picking "TM/HM Move"
+        # swaps new combos into the config container).
+        QTimer.singleShot(
+            0, lambda: _advance_focus(line_edit, forward, trigger_create)
+        )
+        return True
+
+
+class _EnterAdvanceFilter(QObject):
+    """Event filter for QLineEdits that are NOT inside a QComboBox — the
+    inner line edit of AmountEntry widgets and the standalone notes field.
+    Enter/Tab advances focus to the next field; Enter on the last field
+    submits the event by clicking Create.
+    """
+
+    def eventFilter(self, obj, event):
+        if event.type() != QEvent.KeyPress:
+            return False
+        key = event.key()
+        if key not in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Tab, Qt.Key_Backtab):
+            return False
+        forward = (key != Qt.Key_Backtab)
+        trigger_create = key in (Qt.Key_Return, Qt.Key_Enter)
+        QTimer.singleShot(
+            0, lambda: _advance_focus(obj, forward, trigger_create)
+        )
+        return True
+
+
+def _install_entry_filters(widget):
+    """Install the select-all-on-focus and Enter-advance filters on the
+    internal line edit of *widget* (an AmountEntry), or on *widget* itself
+    if it is already a QLineEdit (the notes field)."""
+    line_edit = widget if isinstance(widget, QLineEdit) else widget.findChild(QLineEdit)
+    if line_edit is None:
+        return
+    line_edit.installEventFilter(_SelectAllOnFocusFilter(line_edit))
+    line_edit.installEventFilter(_EnterAdvanceFilter(line_edit))
+
+
+# Stylesheet applied to the QCompleter popup.  The popup is a top-level
+# QListView that is NOT a child of the combo, so the theme's
+# `QComboBox QAbstractItemView` rules do not reach it — we style it here so
+# the currently-highlighted row (what Enter will commit) is obvious.
+#
+# Note the `:selected:!active` rule: the popup never takes keyboard focus
+# (the line edit keeps focus), so its selection is always in the "inactive"
+# state.  Without this rule Qt falls back to a muted system color that is
+# nearly invisible against the dark theme.
+_COMPLETER_POPUP_STYLE = """
+QListView {
+    background-color: #1a1f2a;
+    color: #c8c8c8;
+    border: 1px solid #444;
+    outline: 0;
+    padding: 2px;
+}
+QListView::item {
+    padding: 4px 8px;
+    min-height: 22px;
+    background-color: transparent;
+    color: #c8c8c8;
+}
+QListView::item:selected,
+QListView::item:selected:active,
+QListView::item:selected:!active {
+    background-color: #1a8ae8;
+    color: #ffffff;
+    font-weight: bold;
+}
+QListView::item:hover {
+    background-color: #3a4a5e;
+    color: #ffffff;
+}
+"""
+
+
 def _make_searchable(combo):
     """Configure a QComboBox for type-to-filter searching."""
     combo.setEditable(True)
     combo.setInsertPolicy(QComboBox.NoInsert)
     line_edit = combo.lineEdit()
     if line_edit is not None:
-        # Parent the filter to the combo so it's cleaned up with it.
-        filt = _SelectAllOnFocusFilter(combo)
-        line_edit.installEventFilter(filt)
+        # Parent the filters to the combo so they're cleaned up with it.
+        focus_filt = _SelectAllOnFocusFilter(combo)
+        line_edit.installEventFilter(focus_filt)
+        enter_filt = _EnterCommitFilter(combo)
+        line_edit.installEventFilter(enter_filt)
+        # Fallback in case Qt consumes the KeyPress before our filter runs
+        # (e.g., QCompleter's own handling of Enter with a visible popup):
+        # commit the match and advance focus (or submit on the last field).
+        def _on_return_pressed(c=combo):
+            _commit_best_match(c)
+            le = c.lineEdit()
+            if le is not None:
+                QTimer.singleShot(0, lambda: _advance_focus(le, True, True))
+        line_edit.returnPressed.connect(_on_return_pressed)
     completer = combo.completer()
     if completer:
         completer.setCompletionMode(QCompleter.PopupCompletion)
         completer.setFilterMode(Qt.MatchContains)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        popup = completer.popup()
+        if popup is not None:
+            popup.setStyleSheet(_COMPLETER_POPUP_STYLE)
+            popup.setSelectionMode(QAbstractItemView.SingleSelection)
+        if line_edit is not None:
+            # As the user types, force the popup's first row to be visibly
+            # selected so they can see what Enter will commit.
+            #
+            # We MUST block QCompleter's signals around this setCurrentIndex:
+            # otherwise QCompleter.highlighted fires, and QComboBox's
+            # built-in slot for that signal overwrites the line-edit text
+            # with the completion — which destroys the user's in-progress
+            # typing.  Blocking signals on the completer leaves the popup's
+            # visual selection intact (the CSS `:selected:!active` rule
+            # still paints it) while suppressing the text overwrite.
+            def _highlight_first():
+                pop = completer.popup()
+                if pop is None or not pop.isVisible():
+                    return
+                model = completer.completionModel()
+                if model is None or model.rowCount() <= 0:
+                    return
+                was_blocked = completer.signalsBlocked()
+                completer.blockSignals(True)
+                try:
+                    pop.setCurrentIndex(model.index(0, 0))
+                finally:
+                    completer.blockSignals(was_blocked)
+            line_edit.textEdited.connect(
+                lambda _: QTimer.singleShot(0, _highlight_first)
+            )
 
 
 class InlineEventCreator(QFrame):
@@ -109,10 +397,12 @@ class InlineEventCreator(QFrame):
     discarded = Signal()
 
     def __init__(self, controller, insert_after_id, parent=None,
-                 editing_group_id=None, editing_event_def=None):
+                 editing_group_id=None, editing_event_def=None,
+                 dest_folder_name=None):
         super().__init__(parent)
         self._controller = controller
         self._insert_after_id = insert_after_id
+        self._dest_folder_name = dest_folder_name
         self._current_type_key = None
         self._event_builder = None
         self._create_validator = None
@@ -226,6 +516,19 @@ class InlineEventCreator(QFrame):
                 QTimer.singleShot(0, widget.selectAll)
         else:
             self.focus_type_combo()
+
+    def _state_at_insertion_point(self):
+        """Return the route state at this creator's insertion point.
+
+        Must not use controller.get_active_state(), which tracks the current
+        selection — the creator is bound to a specific row whose id may differ.
+        """
+        if self._insert_after_id is None:
+            return self._controller.get_init_state()
+        prev_event = self._controller.get_event_by_id(self._insert_after_id)
+        if prev_event is None:
+            return self._controller.get_init_state()
+        return prev_event.final_state
 
     # ------------------------------------------------------------------
     # Type selection
@@ -353,6 +656,7 @@ class InlineEventCreator(QFrame):
     def _spin(self, lo=1, hi=999, val=1):
         s = AmountEntry(min_val=lo, max_val=hi, init_val=val)
         self._config_layout.addWidget(s)
+        _install_entry_filters(s)
         return s
 
     def _build_config(self, key):
@@ -394,7 +698,14 @@ class InlineEventCreator(QFrame):
                 self.result_event_def = ev
             else:
                 # Create mode — insert directly.
-                self._controller.new_event(ev, insert_after=self._insert_after_id)
+                if self._dest_folder_name is not None:
+                    self._controller.new_event(
+                        ev,
+                        insert_after=self._insert_after_id,
+                        dest_folder_name=self._dest_folder_name,
+                    )
+                else:
+                    self._controller.new_event(ev, insert_after=self._insert_after_id)
             self.event_created.emit()
         except Exception as e:
             logger.error(f"Inline event creation failed: {e}")
@@ -594,7 +905,7 @@ class InlineEventCreator(QFrame):
 
         def _refresh_dest():
             """Rebuild the destination dropdown from the current moveset."""
-            st = self._controller.get_active_state()
+            st = self._state_at_insertion_point()
             move_list = st.solo_pkmn.move_list if st and st.solo_pkmn else []
             options = [const.MOVE_DONT_LEARN] + [
                 const.MOVE_SLOT_TEMPLATE.format(idx + 1, m)
@@ -658,6 +969,7 @@ class InlineEventCreator(QFrame):
         entry.setMinimumWidth(200)
         entry.setPlaceholderText("Enter note...")
         self._config_layout.addWidget(entry)
+        _install_entry_filters(entry)
 
         self._config_refs = {"note": entry}
         self._event_builder = lambda: EventDefinition(notes=entry.text())
@@ -675,7 +987,7 @@ class InlineEventCreator(QFrame):
             if key == "blackout":
                 return EventDefinition(blackout=BlackoutEventDefinition())
             if key == "evolve":
-                st = self._controller.get_active_state()
+                st = self._state_at_insertion_point()
                 species = st.solo_pkmn.name if st and st.solo_pkmn else ""
                 return EventDefinition(
                     evolution=EvolutionEventDefinition(species)

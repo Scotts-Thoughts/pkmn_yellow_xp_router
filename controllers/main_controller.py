@@ -279,6 +279,38 @@ class MainController:
         self._on_route_change()
 
     @handle_exceptions
+    def create_new_route_from_current(self):
+        init_state = self._data.init_route_state
+        if init_state is None:
+            return
+
+        solo_mon = init_state.solo_pkmn.name
+        custom_dvs = init_state.solo_pkmn.dvs
+        custom_ability_idx = init_state.solo_pkmn.ability_idx
+        custom_nature = init_state.solo_pkmn.nature
+        pkmn_version = self._data.pkmn_version
+
+        self._route_name = ""
+        self._selected_ids = []
+        try:
+            self._data.new_route(
+                solo_mon,
+                base_route_path=None,
+                pkmn_version=pkmn_version,
+                custom_dvs=custom_dvs,
+                custom_ability_idx=custom_ability_idx,
+                custom_nature=custom_nature,
+            )
+        finally:
+            self._undo_manager.clear()
+            if self._data.init_route_state is not None:
+                self._undo_manager.save_state(self._data)
+            self._on_name_change()
+            self._on_version_change()
+            self._on_event_selection()
+            self._on_route_change()
+
+    @handle_exceptions
     def create_new_route(self, solo_mon, base_route_path, pkmn_version, custom_dvs=None, custom_ability_idx=None, custom_nature=None):
         if base_route_path == const.EMPTY_ROUTE_NAME:
             base_route_path = None

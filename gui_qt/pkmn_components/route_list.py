@@ -201,9 +201,25 @@ class RouteList(QTreeView):
         # --- inline event creator -----------------------------------------
         self._inline_creator = None
         self._inline_after_id = None
+        self._inline_inside_folder_id = None  # when set, inline creator is
+                                              # placed as first child of this
+                                              # folder instead of after a row.
         self._inline_row_item = None  # spacer row in model
         self._editing_group_id = None
         self._editing_original_enabled = None
+
+        # --- empty-state overlay ("Add New Event" button) -----------------
+        self._empty_state_btn = QPushButton("Add New Event", self.viewport())
+        self._empty_state_btn.setCursor(Qt.PointingHandCursor)
+        self._empty_state_btn.setFocusPolicy(Qt.NoFocus)
+        self._empty_state_btn.setStyleSheet(
+            "QPushButton { background: #0078d4; color: white; border: none;"
+            " border-radius: 4px; font-size: 14px; font-weight: bold;"
+            " padding: 10px 24px; }"
+            "QPushButton:hover { background: #1a8ae8; }"
+        )
+        self._empty_state_btn.hide()
+        self._empty_state_btn.clicked.connect(self.start_add_new_event)
 
         # --- selection mode -----------------------------------------------
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -537,6 +553,70 @@ class RouteList(QTreeView):
                         self._show_quick_add_popover(indexes[-1], category)
                         return
         super().keyPressEvent(event)
+
+    # ------------------------------------------------------------------
+    #  Public entry point for "Add New Event"
+    # ------------------------------------------------------------------
+
+    def start_add_new_event(self):
+        """Open the inline creator. Behaves like the spacebar shortcut for
+        non-empty routes. For an empty route, creates a new unnamed folder
+        and starts inline creation inside it so the user gets their first
+        event wrapped in a folder automatically."""
+        if self._controller.is_empty():
+            raw_route = self._controller.get_raw_route()
+            if raw_route is None:
+                return
+            folder_name = self._unique_unnamed_folder_name()
+            self._controller.finalize_new_folder(folder_name)
+            folder = self._controller.get_raw_route().folder_lookup.get(folder_name)
+            if folder is None:
+                return
+            self._restore_editing_state()
+            self._remove_inline_creator()
+            self._show_inline_creator(
+                insert_after_id=None,
+                dest_folder_name=folder_name,
+                inside_folder_id=folder.group_id,
+            )
+            return
+
+        sel_id = self._controller.get_single_selected_event_id()
+        if sel_id is not None:
+            self._restore_editing_state()
+            self._remove_inline_creator()
+            self._show_inline_creator(sel_id)
+            return
+
+        # Non-empty, no single selection: fall back to appending after the
+        # last top-level event so the menu works even without a selection.
+        last_id = self._last_top_level_event_id()
+        if last_id is None:
+            return
+        self._restore_editing_state()
+        self._remove_inline_creator()
+        self._show_inline_creator(last_id)
+
+    def _unique_unnamed_folder_name(self) -> str:
+        existing = set(self._controller.get_all_folder_names())
+        base = "New Folder"
+        if base not in existing:
+            return base
+        n = 2
+        while True:
+            candidate = f"{base} ({n})"
+            if candidate not in existing:
+                return candidate
+            n += 1
+
+    def _last_top_level_event_id(self):
+        raw_route = self._controller.get_raw_route()
+        if raw_route is None:
+            return None
+        children = raw_route.root_folder.children
+        if not children:
+            return None
+        return children[-1].group_id
 
     def _show_quick_add_popover(self, index, category_idx=None):
         """Show the quick-add popover above the row at *index*.
@@ -1004,7 +1084,8 @@ class RouteList(QTreeView):
         self._show_inline_creator(group_id)
         self._plus_button.hide()
 
-    def _show_inline_creator(self, insert_after_id):
+    def _show_inline_creator(self, insert_after_id, dest_folder_name=None,
+                             inside_folder_id=None):
         from gui_qt.components.inline_event_creator import InlineEventCreator
 
         # Force the right panel to the Pre-Event State tab so the left panel
@@ -1015,8 +1096,10 @@ class RouteList(QTreeView):
         self._set_suppress_battle_summary(True)
 
         self._inline_after_id = insert_after_id
+        self._inline_inside_folder_id = inside_folder_id
         self._inline_creator = InlineEventCreator(
             self._controller, insert_after_id, parent=self.viewport(),
+            dest_folder_name=dest_folder_name,
         )
         self._inline_creator.event_created.connect(self._on_inline_created)
         self._inline_creator.discarded.connect(self._on_inline_discarded)
@@ -1027,15 +1110,26 @@ class RouteList(QTreeView):
 
     def _insert_inline_row(self):
         """Insert a spacer row into the model and overlay the creator on it."""
-        target_item = self._item_lookup.get(self._inline_after_id)
-        if target_item is None:
-            self._remove_inline_creator()
-            return
-
-        parent = target_item.parent()
-        if parent is None:
-            parent = self._model.invisibleRootItem()
-        insert_pos = target_item.row() + 1
+        if self._inline_inside_folder_id is not None:
+            # Inside-folder mode: spacer row becomes the folder's first child.
+            folder_item = self._item_lookup.get(self._inline_inside_folder_id)
+            if folder_item is None:
+                self._remove_inline_creator()
+                return
+            folder_idx = self._model.indexFromItem(folder_item)
+            if folder_idx.isValid():
+                self.setExpanded(folder_idx, True)
+            parent = folder_item
+            insert_pos = 0
+        else:
+            target_item = self._item_lookup.get(self._inline_after_id)
+            if target_item is None:
+                self._remove_inline_creator()
+                return
+            parent = target_item.parent()
+            if parent is None:
+                parent = self._model.invisibleRootItem()
+            insert_pos = target_item.row() + 1
 
         # Build a blank spacer row with a size hint tall enough for the
         # creator widget.  Do NOT block model signals -- the view must
@@ -1115,6 +1209,8 @@ class RouteList(QTreeView):
         """
         super().resizeEvent(event)
         self._reposition_inline_creator()
+        if self._empty_state_btn.isVisible():
+            self._position_empty_state_button()
 
     def _start_inline_edit(self, group_id, event_obj):
         """Disable *event_obj*, open a pre-populated inline editor."""
@@ -1200,6 +1296,7 @@ class RouteList(QTreeView):
             self._inline_creator = None
         self._remove_inline_row()
         self._inline_after_id = None
+        self._inline_inside_folder_id = None
         # Release the pre-state lock so normal auto-switch behavior resumes.
         self._set_suppress_battle_summary(False)
 
@@ -1435,7 +1532,32 @@ class RouteList(QTreeView):
         # Restore scroll position so the viewport doesn't jump.
         self.verticalScrollBar().setValue(saved_scroll)
 
+        self._update_empty_state_button()
+
         self.route_list_refreshed.emit()
+
+    def _update_empty_state_button(self):
+        """Show the "Add New Event" prompt only when the route has no events."""
+        try:
+            is_empty = self._controller.is_empty()
+        except Exception:
+            is_empty = False
+        # Hide while the inline creator owns the viewport so the button
+        # doesn't float over the creator for the first event.
+        if is_empty and self._inline_creator is None:
+            self._position_empty_state_button()
+            self._empty_state_btn.show()
+            self._empty_state_btn.raise_()
+        else:
+            self._empty_state_btn.hide()
+
+    def _position_empty_state_button(self):
+        vp = self.viewport()
+        btn = self._empty_state_btn
+        btn.adjustSize()
+        x = max(0, (vp.width() - btn.width()) // 2)
+        y = max(20, (vp.height() - btn.height()) // 3)
+        btn.move(x, y)
 
     def refresh_filter_only(self):
         """Update only row visibility based on the current filter/search.
