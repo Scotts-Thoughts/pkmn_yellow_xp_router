@@ -220,6 +220,9 @@ class TrainerEventDefinition:
             enemy_field_moves=None,
             exp_split=None,
             weather=const.WEATHER_NONE,
+            weather_source_mon_idx=None,
+            player_screens=None,
+            enemy_screens=None,
             pay_day_amount=0,
             mon_order=None,
             transformed=False,
@@ -248,6 +251,16 @@ class TrainerEventDefinition:
             exp_split = []
         self.exp_split = exp_split
         self.weather = weather
+        self.weather_source_mon_idx = weather_source_mon_idx
+        # Per-side dicts mapping screen id (const.SCREEN_REFLECT / SCREEN_LIGHT_SCREEN)
+        # to the mon_idx where the screen was activated. Effect applies from that
+        # mon_idx onward in the battle.
+        if player_screens is None:
+            player_screens = {}
+        self.player_screens:Dict[str, int] = player_screens
+        if enemy_screens is None:
+            enemy_screens = {}
+        self.enemy_screens:Dict[str, int] = enemy_screens
         self.pay_day_amount = pay_day_amount
         if mon_order is None:
             mon_order = []
@@ -270,6 +283,9 @@ class TrainerEventDefinition:
             const.CUSTOM_MOVE_DATA: self.custom_move_data,
             const.EXP_SPLIT: self.exp_split,
             const.WEATHER: self.weather,
+            const.WEATHER_SOURCE_MON_IDX: self.weather_source_mon_idx,
+            const.PLAYER_SCREENS_KEY: self.player_screens if self.player_screens else None,
+            const.ENEMY_SCREENS_KEY: self.enemy_screens if self.enemy_screens else None,
             const.PAY_DAY_AMOUNT: self.pay_day_amount,
             const.MON_ORDER: self.mon_order,
             const.TRANSFORMED: self.transformed,
@@ -302,6 +318,9 @@ class TrainerEventDefinition:
             enemy_field_moves=raw_val.get(const.ENEMY_FIELD_MOVES_KEY),
             exp_split=raw_val.get(const.EXP_SPLIT),
             weather=raw_val.get(const.WEATHER, const.WEATHER_NONE),
+            weather_source_mon_idx=raw_val.get(const.WEATHER_SOURCE_MON_IDX),
+            player_screens=raw_val.get(const.PLAYER_SCREENS_KEY),
+            enemy_screens=raw_val.get(const.ENEMY_SCREENS_KEY),
             pay_day_amount=raw_val.get(const.PAY_DAY_AMOUNT, 0),
             mon_order=raw_val.get(const.MON_ORDER),
             second_trainer_name=raw_val.get(const.SECOND_TRAINER_NAME, ""),

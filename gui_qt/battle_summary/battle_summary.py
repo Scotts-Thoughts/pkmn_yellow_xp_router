@@ -1509,13 +1509,23 @@ class DamageSummary(QWidget):
         # Weather toggle: shown only when this move is a weather-inducing move
         # (Rain Dance / Sunny Day / Sandstorm / Hail) and the current generation
         # supports that weather. Toggling it sets the active weather for damage
-        # calculations.
+        # calculations, scoped from the current matchup onward.
         self.weather_checkbox = QCheckBox(parent=self.header)
         self.weather_checkbox.setFocusPolicy(Qt.NoFocus)
         self.weather_checkbox.setStyleSheet("QCheckBox { background: transparent; border: none; }")
         self.weather_checkbox.stateChanged.connect(self._weather_checkbox_callback)
         self.weather_checkbox.setVisible(False)
         header_layout.addWidget(self.weather_checkbox)
+
+        # Screen toggle: shown only when this move is Reflect or Light Screen.
+        # Toggling applies the screen to the side that owns the move (player or
+        # enemy) from the current matchup onward.
+        self.screen_checkbox = QCheckBox(parent=self.header)
+        self.screen_checkbox.setFocusPolicy(Qt.NoFocus)
+        self.screen_checkbox.setStyleSheet("QCheckBox { background: transparent; border: none; }")
+        self.screen_checkbox.stateChanged.connect(self._screen_checkbox_callback)
+        self.screen_checkbox.setVisible(False)
+        header_layout.addWidget(self.screen_checkbox)
 
         self.custom_data_dropdown = SimpleOptionMenu(option_list=[""], callback=self._custom_data_callback, parent=self.header)
         self.custom_data_dropdown.setVisible(False)
@@ -1643,6 +1653,17 @@ class DamageSummary(QWidget):
             return
         self._controller.toggle_weather_from_move(
             self._move_name, self.weather_checkbox.isChecked(),
+            mon_idx=self._mon_idx,
+        )
+
+    def _screen_checkbox_callback(self, *args, **kwargs):
+        if self._is_loading:
+            return
+        if self._move_name is None:
+            return
+        self._controller.toggle_screen_from_move(
+            self._move_name, self.screen_checkbox.isChecked(),
+            mon_idx=self._mon_idx, is_player=self._is_player_mon,
         )
 
     def _on_test_move_changed(self, *args, **kwargs):
@@ -1921,14 +1942,36 @@ class DamageSummary(QWidget):
             weather_for_move = self._controller.get_weather_for_move(move.name)
         if weather_for_move is not None:
             cur_weather = self._controller.get_weather()
-            self.weather_checkbox.setChecked(cur_weather == weather_for_move)
+            source_mon_idx = self._controller.get_weather_source_mon_idx()
+            is_active = (
+                cur_weather == weather_for_move
+                and source_mon_idx == self._mon_idx
+            )
+            self.weather_checkbox.setChecked(is_active)
             self.weather_checkbox.setToolTip(
-                f"Set weather to {weather_for_move} for damage calculation"
+                f"Set weather to {weather_for_move} for this matchup and later"
             )
             self.weather_checkbox.setVisible(True)
         else:
             self.weather_checkbox.setChecked(False)
             self.weather_checkbox.setVisible(False)
+
+        # ---- screen-move toggle (Reflect / Light Screen) ---------------
+        screen_for_move = None
+        if move is not None:
+            screen_for_move = self._controller.get_screen_for_move(move.name)
+        if screen_for_move is not None:
+            screen_src = self._controller.get_screen_source_mon_idx(
+                self._is_player_mon, screen_for_move,
+            )
+            self.screen_checkbox.setChecked(screen_src == self._mon_idx)
+            self.screen_checkbox.setToolTip(
+                f"Apply {move.name} for this matchup and later"
+            )
+            self.screen_checkbox.setVisible(True)
+        else:
+            self.screen_checkbox.setChecked(False)
+            self.screen_checkbox.setVisible(False)
 
         # ---- populate values ------------------------------------------
         if move is None:

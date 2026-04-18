@@ -88,6 +88,14 @@ class BattleSummaryController:
         self._custom_move_data:List[Dict[str, Dict[str, str]]] = []
         self._cached_definition_order = []
         self._weather = None
+        # mon_idx where the current weather was activated (from a move toggle). None
+        # means the weather was not scoped to a move (legacy / external source) and
+        # applies to all matchups.
+        self._weather_source_mon_idx:int = None
+        # Per-side dicts: { const.SCREEN_REFLECT / SCREEN_LIGHT_SCREEN : mon_idx }.
+        # A screen applies from its recorded mon_idx onward in the battle.
+        self._player_screens:Dict[str, int] = {}
+        self._enemy_screens:Dict[str, int] = {}
         self._double_battle_flag = False
         self._stat_stage_setup:List[Dict[str, Dict[str, str]]] = []
         self._is_wild_battle:bool = False
@@ -99,8 +107,10 @@ class BattleSummaryController:
         self._using_global_setup:bool = False
         self._player_stage_modifier:StageModifiers = None
         self._enemy_stage_modifier:StageModifiers = None
-        self._player_field_status:FieldStatus = None
-        self._enemy_field_status:FieldStatus = None
+        # Per-mon-idx field statuses. Screens scope to mon_idx where activated;
+        # the stat/speed display pulls from index 0 when needed.
+        self._player_field_statuses:List[FieldStatus] = []
+        self._enemy_field_statuses:List[FieldStatus] = []
         self._per_matchup_player_modifiers:List[StageModifiers] = []
         self._per_matchup_enemy_modifiers:List[StageModifiers] = []
 
@@ -195,8 +205,9 @@ class BattleSummaryController:
         except Exception as e:
             logger.error(f"encountered error updating custom move data: {pkmn_idx, move_idx, is_player_mon, new_value}")
 
-    def update_weather(self, new_weather):
+    def update_weather(self, new_weather, source_mon_idx:int=None):
         self._weather = new_weather
+        self._weather_source_mon_idx = source_mon_idx
         self._full_refresh()
 
     def update_enemy_setup_moves(self, new_setup_moves):
@@ -234,6 +245,9 @@ class BattleSummaryController:
         saved_stat_stage = copy.deepcopy(self._stat_stage_setup)
         saved_custom_data = copy.deepcopy(self._custom_move_data)
         saved_weather = self._weather
+        saved_weather_source_mon_idx = self._weather_source_mon_idx
+        saved_player_screens = copy.deepcopy(self._player_screens)
+        saved_enemy_screens = copy.deepcopy(self._enemy_screens)
         saved_mimic = self._mimic_selection
         saved_transformed = self._is_player_transformed
         saved_double = self._double_battle_flag
@@ -274,6 +288,9 @@ class BattleSummaryController:
         self._stat_stage_setup = saved_stat_stage
         self._custom_move_data = saved_custom_data
         self._weather = saved_weather
+        self._weather_source_mon_idx = saved_weather_source_mon_idx
+        self._player_screens = saved_player_screens
+        self._enemy_screens = saved_enemy_screens
         self._mimic_selection = saved_mimic
         self._is_player_transformed = saved_transformed
         self._double_battle_flag = saved_double
@@ -386,6 +403,9 @@ class BattleSummaryController:
             saved_stat_stage = copy.deepcopy(self._stat_stage_setup)
             saved_custom_data = copy.deepcopy(self._custom_move_data)
             saved_weather = self._weather
+            saved_weather_source_mon_idx = self._weather_source_mon_idx
+            saved_player_screens = copy.deepcopy(self._player_screens)
+            saved_enemy_screens = copy.deepcopy(self._enemy_screens)
             saved_mimic = self._mimic_selection
             saved_transformed = self._is_player_transformed
             saved_double = self._double_battle_flag
@@ -431,6 +451,9 @@ class BattleSummaryController:
             self._stat_stage_setup = saved_stat_stage
             self._custom_move_data = saved_custom_data
             self._weather = saved_weather
+            self._weather_source_mon_idx = saved_weather_source_mon_idx
+            self._player_screens = saved_player_screens
+            self._enemy_screens = saved_enemy_screens
             self._mimic_selection = saved_mimic
             self._is_player_transformed = saved_transformed
             self._double_battle_flag = saved_double
@@ -523,9 +546,11 @@ class BattleSummaryController:
 
         # Calculate global stage modifiers (used when global setup is enabled)
         self._player_stage_modifier = self._calc_stage_modifier(self._player_setup_move_list)
-        self._player_field_status = self._calc_field_status(True)
         self._enemy_stage_modifier = self._calc_stage_modifier(self._enemy_setup_move_list)
-        self._enemy_field_status = self._calc_field_status(False)
+        # Per-mon-idx field statuses: weather/screen toggles scope to source mon_idx
+        num_matchups = len(self._original_player_mon_list)
+        self._player_field_statuses = [self._calc_field_status(True, mon_idx) for mon_idx in range(num_matchups)]
+        self._enemy_field_statuses = [self._calc_field_status(False, mon_idx) for mon_idx in range(num_matchups)]
 
         # Calculate per-matchup stage modifiers based on stat_stage_setup
         # This is separate from global setup - if global setup is used, per-move setup is disabled
@@ -559,10 +584,10 @@ class BattleSummaryController:
                 player_stats = player_mon.cur_stats
             else:
                 player_mon = self._original_player_mon_list[mon_idx]
-                player_stats = player_mon.get_battle_stats(cur_player_stage_mod, mon_field=self._player_field_status)
+                player_stats = player_mon.get_battle_stats(cur_player_stage_mod, mon_field=self._player_field_statuses[mon_idx])
 
             enemy_mon = self._original_enemy_mon_list[mon_idx]
-            enemy_stats = enemy_mon.get_battle_stats(cur_enemy_stage_mod, mon_field=self._enemy_field_status)
+            enemy_stats = enemy_mon.get_battle_stats(cur_enemy_stage_mod, mon_field=self._enemy_field_statuses[mon_idx])
 
             self._player_pkmn_matchup_data.append(
                 PkmnRenderInfo(player_mon.name, player_mon.level, player_stats.speed, enemy_mon.name, enemy_mon.level, enemy_stats.speed, enemy_mon.cur_stats.hp)
@@ -644,6 +669,7 @@ class BattleSummaryController:
         move_name:str,
         move_display_name:str=None,
     ):
+        current_weather = self._get_weather_for_mon_idx(mon_idx)
         if is_player_mon:
             # TODO: gross hacky transform support. Somehow we should figure out how to offload some of this logic back into the generation objects...
             # but I'm not sure how, currently...
@@ -686,14 +712,14 @@ class BattleSummaryController:
                 attacking_stage_modifiers = self._per_matchup_player_modifiers[mon_idx]
             else:
                 attacking_stage_modifiers = self._player_stage_modifier
-            attacking_field_status = self._player_field_status
+            attacking_field_status = self._player_field_statuses[mon_idx] if mon_idx < len(self._player_field_statuses) else FieldStatus()
             defending_mon = self._original_enemy_mon_list[mon_idx]
             defending_mon_stats = None
             if mon_idx < len(self._per_matchup_enemy_modifiers):
                 defending_stage_modifiers = self._per_matchup_enemy_modifiers[mon_idx]
             else:
                 defending_stage_modifiers = self._enemy_stage_modifier
-            defending_field_status = self._enemy_field_status
+            defending_field_status = self._enemy_field_statuses[mon_idx] if mon_idx < len(self._enemy_field_statuses) else FieldStatus()
             custom_lookup_key = const.PLAYER_KEY
         else:
             attacking_mon = self._original_enemy_mon_list[mon_idx]
@@ -705,7 +731,7 @@ class BattleSummaryController:
                 attacking_stage_modifiers = self._per_matchup_enemy_modifiers[mon_idx]
             else:
                 attacking_stage_modifiers = self._enemy_stage_modifier
-            attacking_field_status = self._enemy_field_status
+            attacking_field_status = self._enemy_field_statuses[mon_idx] if mon_idx < len(self._enemy_field_statuses) else FieldStatus()
             if self._is_player_transformed:
                 defending_mon = self._transformed_mon_list[mon_idx]
                 defending_mon_stats = defending_mon.cur_stats
@@ -716,7 +742,7 @@ class BattleSummaryController:
                 defending_stage_modifiers = self._per_matchup_player_modifiers[mon_idx]
             else:
                 defending_stage_modifiers = self._player_stage_modifier
-            defending_field_status = self._player_field_status
+            defending_field_status = self._player_field_statuses[mon_idx] if mon_idx < len(self._player_field_statuses) else FieldStatus()
             custom_lookup_key = const.ENEMY_KEY
 
         if not move_name:
@@ -755,7 +781,7 @@ class BattleSummaryController:
                     attacking_stage_modifiers=attacking_stage_modifiers,
                     defending_stage_modifiers=defending_stage_modifiers,
                     attacking_field=attacking_field_status, defending_field=defending_field_status,
-                    custom_move_data=custom_data_selection, weather=self._weather,
+                    custom_move_data=custom_data_selection, weather=current_weather,
                     is_double_battle=self._double_battle_flag,
                     attacking_battle_stats=attacking_mon_stats,
                 )
@@ -764,7 +790,7 @@ class BattleSummaryController:
                     attacking_stage_modifiers=attacking_stage_modifiers,
                     defending_stage_modifiers=defending_stage_modifiers,
                     attacking_field=attacking_field_status, defending_field=defending_field_status,
-                    custom_move_data=custom_data_selection, weather=self._weather,
+                    custom_move_data=custom_data_selection, weather=current_weather,
                     is_double_battle=self._double_battle_flag,
                     attacking_battle_stats=attacking_mon_stats,
                 )
@@ -773,7 +799,7 @@ class BattleSummaryController:
                     attacking_stage_modifiers=attacking_stage_modifiers,
                     defending_stage_modifiers=defending_stage_modifiers,
                     attacking_field=attacking_field_status, defending_field=defending_field_status,
-                    custom_move_data=custom_data_selection, is_crit=True, weather=self._weather,
+                    custom_move_data=custom_data_selection, is_crit=True, weather=current_weather,
                     is_double_battle=self._double_battle_flag,
                     attacking_battle_stats=crit_mon_stats,
                 )
@@ -782,7 +808,7 @@ class BattleSummaryController:
                     attacking_stage_modifiers=attacking_stage_modifiers,
                     defending_stage_modifiers=defending_stage_modifiers,
                     attacking_field=attacking_field_status, defending_field=defending_field_status,
-                    custom_move_data=custom_data_selection, is_crit=True, weather=self._weather,
+                    custom_move_data=custom_data_selection, is_crit=True, weather=current_weather,
                     is_double_battle=self._double_battle_flag,
                     attacking_battle_stats=crit_mon_stats,
                 )
@@ -797,7 +823,7 @@ class BattleSummaryController:
                     attacking_stage_modifiers=attacking_stage_modifiers,
                     defending_stage_modifiers=defending_stage_modifiers,
                     attacking_field=attacking_field_status, defending_field=defending_field_status,
-                    custom_move_data=custom_data_selection, weather=self._weather,
+                    custom_move_data=custom_data_selection, weather=current_weather,
                     is_double_battle=self._double_battle_flag,
                     defending_battle_stats=defending_mon_stats,
                 )
@@ -806,7 +832,7 @@ class BattleSummaryController:
                     attacking_stage_modifiers=attacking_stage_modifiers,
                     defending_stage_modifiers=defending_stage_modifiers,
                     attacking_field=attacking_field_status, defending_field=defending_field_status,
-                    custom_move_data=custom_data_selection, weather=self._weather,
+                    custom_move_data=custom_data_selection, weather=current_weather,
                     is_double_battle=self._double_battle_flag,
                     defending_battle_stats=defending_mon_stats,
                 )
@@ -815,7 +841,7 @@ class BattleSummaryController:
                     attacking_stage_modifiers=attacking_stage_modifiers,
                     defending_stage_modifiers=defending_stage_modifiers,
                     attacking_field=attacking_field_status, defending_field=defending_field_status,
-                    custom_move_data=custom_data_selection, is_crit=True, weather=self._weather,
+                    custom_move_data=custom_data_selection, is_crit=True, weather=current_weather,
                     is_double_battle=self._double_battle_flag,
                     defending_battle_stats=defending_mon_stats,
                 )
@@ -824,7 +850,7 @@ class BattleSummaryController:
                     attacking_stage_modifiers=attacking_stage_modifiers,
                     defending_stage_modifiers=defending_stage_modifiers,
                     attacking_field=attacking_field_status, defending_field=defending_field_status,
-                    custom_move_data=custom_data_selection, is_crit=True, weather=self._weather,
+                    custom_move_data=custom_data_selection, is_crit=True, weather=current_weather,
                     is_double_battle=self._double_battle_flag,
                     defending_battle_stats=defending_mon_stats,
                 )
@@ -841,7 +867,7 @@ class BattleSummaryController:
                 attacking_field=attacking_field_status,
                 defending_field=defending_field_status,
                 custom_move_data=custom_data_selection,
-                weather=self._weather,
+                weather=current_weather,
                 is_double_battle=self._double_battle_flag,
                 attacking_battle_stats=attacking_mon_stats,
                 defending_battle_stats=defending_mon_stats,
@@ -856,7 +882,7 @@ class BattleSummaryController:
                 defending_field=defending_field_status,
                 custom_move_data=custom_data_selection,
                 is_crit=True,
-                weather=self._weather,
+                weather=current_weather,
                 is_double_battle=self._double_battle_flag,
                 attacking_battle_stats=crit_mon_stats,
                 defending_battle_stats=defending_mon_stats,
@@ -865,7 +891,7 @@ class BattleSummaryController:
             if config.do_ignore_accuracy():
                 accuracy = 100
             else:
-                accuracy = current_gen_info().get_move_accuracy(attacking_mon, move, custom_data_selection, defending_mon, self._weather)
+                accuracy = current_gen_info().get_move_accuracy(attacking_mon, move, custom_data_selection, defending_mon, current_weather)
                 if accuracy is None:
                     accuracy = 100
 
@@ -942,6 +968,9 @@ class BattleSummaryController:
         self._trainer_name = trainer_def.trainer_name
         self._second_trainer_name = trainer_def.second_trainer_name
         self._weather = trainer_def.weather
+        self._weather_source_mon_idx = trainer_def.weather_source_mon_idx
+        self._player_screens = copy.deepcopy(trainer_def.player_screens) if trainer_def.player_screens else {}
+        self._enemy_screens = copy.deepcopy(trainer_def.enemy_screens) if trainer_def.enemy_screens else {}
         self._double_battle_flag = trainer_obj.double_battle or second_trainer_obj is not None
         self._mimic_selection = trainer_def.mimic_selection
         self._is_player_transformed = trainer_def.transformed
@@ -951,11 +980,10 @@ class BattleSummaryController:
         self._player_setup_move_list = trainer_def.setup_moves.copy()
         self._player_field_move_list = trainer_def.player_field_moves.copy()
         self._player_stage_modifier = self._calc_stage_modifier(self._player_setup_move_list)
-        self._player_field_status = self._calc_field_status(True)
         self._enemy_setup_move_list = trainer_def.enemy_setup_moves.copy()
         self._enemy_field_move_list = trainer_def.enemy_field_moves.copy()
         self._enemy_stage_modifier = self._calc_stage_modifier(self._enemy_setup_move_list)
-        self._enemy_field_status = self._calc_field_status(False)
+        # Per-mon-idx field statuses get rebuilt in _full_refresh below.
         self._cached_definition_order = [x.mon_order - 1 for x in event_group.event_definition.get_pokemon_list(definition_order=True)]
         if not trainer_def.custom_move_data:
             self._custom_move_data = []
@@ -1022,6 +1050,9 @@ class BattleSummaryController:
         self._trainer_name = trainer_name
         self._second_trainer_name = ""
         self._weather = const.WEATHER_NONE
+        self._weather_source_mon_idx = None
+        self._player_screens = {}
+        self._enemy_screens = {}
         self._mimic_selection = ""
         self._is_player_transformed = False
         self._player_setup_move_list = []
@@ -1075,6 +1106,9 @@ class BattleSummaryController:
         self._trainer_name = ""
         self._second_trainer_name = ""
         self._weather = const.WEATHER_NONE
+        self._weather_source_mon_idx = None
+        self._player_screens = {}
+        self._enemy_screens = {}
         self._double_battle_flag = False
         self._mimic_selection = ""
         self._is_player_transformed = False
@@ -1157,6 +1191,9 @@ class BattleSummaryController:
             mimic_selection=self._mimic_selection,
             custom_move_data=final_custom_move_data,
             weather=self._weather,
+            weather_source_mon_idx=self._weather_source_mon_idx,
+            player_screens=copy.deepcopy(self._player_screens),
+            enemy_screens=copy.deepcopy(self._enemy_screens),
             transformed=self._is_player_transformed,
             stat_stage_setup=final_stat_stage_setup,
         )
@@ -1217,20 +1254,56 @@ class BattleSummaryController:
             return None
         return weather
 
-    def toggle_weather_from_move(self, move_name: str, enabled: bool):
+    def toggle_weather_from_move(self, move_name: str, enabled: bool, mon_idx:int=None):
         """Set the active weather to *move_name*'s weather (when *enabled*),
         or clear it back to WEATHER_NONE (when not). No-op for non-weather moves
-        or weather not supported by the current generation."""
+        or weather not supported by the current generation.
+
+        When *mon_idx* is provided, the weather applies from that matchup onward
+        (earlier matchups see WEATHER_NONE). When None, weather applies to all
+        matchups (legacy behavior)."""
         weather = self.get_weather_for_move(move_name)
         if weather is None:
             return
         if enabled:
-            self.update_weather(weather)
+            self.update_weather(weather, source_mon_idx=mon_idx)
         else:
             # Only clear if the currently-active weather is the one this move
             # would have set; otherwise leave the existing weather alone.
             if self._weather == weather:
-                self.update_weather(const.WEATHER_NONE)
+                self.update_weather(const.WEATHER_NONE, source_mon_idx=None)
+
+    def get_weather_source_mon_idx(self) -> int:
+        return self._weather_source_mon_idx
+
+    def get_screen_for_move(self, move_name:str) -> str:
+        """Returns the screen id (const.SCREEN_REFLECT / SCREEN_LIGHT_SCREEN) for a
+        Reflect / Light Screen move, or None otherwise."""
+        if not move_name:
+            return None
+        return const.SCREEN_MOVE_MAP.get(move_name)
+
+    def get_screen_source_mon_idx(self, is_player:bool, screen_id:str) -> int:
+        """Returns the mon_idx at which *screen_id* was activated for the given
+        side, or None if inactive."""
+        screens = self._player_screens if is_player else self._enemy_screens
+        return screens.get(screen_id)
+
+    def toggle_screen_from_move(self, move_name:str, enabled:bool, mon_idx:int, is_player:bool):
+        """Activate or deactivate Reflect / Light Screen for the given side, scoped
+        to *mon_idx* and later matchups. No-op for non-screen moves."""
+        screen_id = self.get_screen_for_move(move_name)
+        if screen_id is None:
+            return
+        screens = self._player_screens if is_player else self._enemy_screens
+        if enabled:
+            screens[screen_id] = mon_idx
+        else:
+            # Only clear when the stored source matches the mon_idx we're toggling
+            # off — keeps a distant toggle from clobbering an earlier activation.
+            if screens.get(screen_id) == mon_idx:
+                screens.pop(screen_id, None)
+        self._full_refresh()
 
     def get_player_setup_moves(self) -> List[str]:
         return self._player_setup_move_list
@@ -1345,18 +1418,43 @@ class BattleSummaryController:
 
         return result
 
-    def _calc_field_status(self, is_player:bool) -> FieldStatus:
+    def _calc_field_status(self, is_player:bool, mon_idx:int=0) -> FieldStatus:
         result = FieldStatus()
 
         if is_player:
             move_list = self._player_field_move_list + self._player_setup_move_list
+            screens = self._player_screens
         else:
             move_list = self._enemy_field_move_list + self._enemy_setup_move_list
+            screens = self._enemy_screens
 
+        # Legacy trainer-level field/setup moves still apply globally (preserves
+        # existing route behavior). The new per-mon-idx screen toggles below add
+        # on top for matchup-scoped activation.
         for cur_move_name in move_list:
             result = result.apply_move(cur_move_name)
 
+        # Apply per-mon-idx screen toggles (active when mon_idx >= source_idx).
+        reflect_idx = screens.get(const.SCREEN_REFLECT)
+        if reflect_idx is not None and mon_idx >= reflect_idx:
+            result.reflect = True
+        light_screen_idx = screens.get(const.SCREEN_LIGHT_SCREEN)
+        if light_screen_idx is not None and mon_idx >= light_screen_idx:
+            result.light_screen = True
+
         return result
+
+    def _get_weather_for_mon_idx(self, mon_idx:int) -> str:
+        """Returns the weather in effect for the given matchup. When the weather
+        has a source mon_idx (toggled from a move), earlier matchups see
+        WEATHER_NONE; otherwise the stored weather applies to all matchups."""
+        if self._weather is None:
+            return const.WEATHER_NONE
+        if self._weather_source_mon_idx is None:
+            return self._weather
+        if mon_idx < self._weather_source_mon_idx:
+            return const.WEATHER_NONE
+        return self._weather
 
     def _calc_per_matchup_stage_modifiers(self) -> Tuple[List[StageModifiers], List[StageModifiers]]:
         """Calculate stage modifiers for each matchup based on per-move stat stage setup.
@@ -1633,6 +1731,9 @@ class BattleSummaryController:
             stat_stage=copy.deepcopy(self._stat_stage_setup),
             custom_data=copy.deepcopy(self._custom_move_data),
             weather=self._weather,
+            weather_source_mon_idx=self._weather_source_mon_idx,
+            player_screens=copy.deepcopy(self._player_screens),
+            enemy_screens=copy.deepcopy(self._enemy_screens),
             mimic=self._mimic_selection,
             transformed=self._is_player_transformed,
             double=self._double_battle_flag,
@@ -1646,6 +1747,9 @@ class BattleSummaryController:
         self._stat_stage_setup = saved['stat_stage']
         self._custom_move_data = saved['custom_data']
         self._weather = saved['weather']
+        self._weather_source_mon_idx = saved.get('weather_source_mon_idx')
+        self._player_screens = saved.get('player_screens', {}) or {}
+        self._enemy_screens = saved.get('enemy_screens', {}) or {}
         self._mimic_selection = saved['mimic']
         self._is_player_transformed = saved['transformed']
         self._double_battle_flag = saved['double']

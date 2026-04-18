@@ -159,6 +159,9 @@ class Constants:
         self.STAT_STAGE_SETUP_KEY = "stat_stage_setup"
         self.EXP_SPLIT = "exp_split"
         self.WEATHER = "weather"
+        self.WEATHER_SOURCE_MON_IDX = "weather_source_mon_idx"
+        self.PLAYER_SCREENS_KEY = "player_screens"
+        self.ENEMY_SCREENS_KEY = "enemy_screens"
         self.PAY_DAY_AMOUNT = "pay_day_amount"
         self.MON_ORDER = "mon_order"
         self.TRANSFORMED = "transformed"
@@ -586,6 +589,14 @@ class Constants:
             "Sunny Day": self.WEATHER_SUN,
             "Sandstorm": self.WEATHER_SANDSTORM,
             "Hail": self.WEATHER_HAIL,
+        }
+
+        # Screen move names -> logical screen identifier (matches FieldStatus attributes).
+        self.SCREEN_REFLECT = "reflect"
+        self.SCREEN_LIGHT_SCREEN = "light_screen"
+        self.SCREEN_MOVE_MAP = {
+            "Reflect": self.SCREEN_REFLECT,
+            "Light Screen": self.SCREEN_LIGHT_SCREEN,
         }
 
         # timing defaults
