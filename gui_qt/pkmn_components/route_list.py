@@ -296,6 +296,8 @@ class RouteList(QTreeView):
 
     def _on_selection_changed(self, selected, deselected):
         """Report the new selection to the controller when the user clicks."""
+        if getattr(self, "_syncing_selection", False):
+            return
         cur_selected = self.get_all_selected_event_ids()
         if self._controller.get_all_selected_ids() != cur_selected:
             self._controller.select_new_events(cur_selected)
@@ -1338,17 +1340,27 @@ class RouteList(QTreeView):
 
     def set_all_selected_event_ids(self, event_ids):
         """Select the rows corresponding to the given semantic ids."""
-        sel_model = self.selectionModel()
-        sel_model.clearSelection()
-        for eid in event_ids:
-            name_item = self._item_lookup.get(eid)
-            if name_item is None:
-                continue
-            idx = self._model.indexFromItem(name_item)
-            sel_model.select(
-                idx,
-                QItemSelectionModel.Select | QItemSelectionModel.Rows,
-            )
+        # Suppress _on_selection_changed re-entry: clearSelection() emits
+        # selectionChanged with an empty selection, which would otherwise
+        # call controller.select_new_events([]) — clearing the controller's
+        # selection between the clear and our subsequent select(), and
+        # leaving downstream views (battle summary) populated with an
+        # empty trainer when shortcuts trigger this path.
+        self._syncing_selection = True
+        try:
+            sel_model = self.selectionModel()
+            sel_model.clearSelection()
+            for eid in event_ids:
+                name_item = self._item_lookup.get(eid)
+                if name_item is None:
+                    continue
+                idx = self._model.indexFromItem(name_item)
+                sel_model.select(
+                    idx,
+                    QItemSelectionModel.Select | QItemSelectionModel.Rows,
+                )
+        finally:
+            self._syncing_selection = False
 
     def _selected_name_items(self) -> List[QStandardItem]:
         """Return the name-column QStandardItem for every selected row."""
@@ -1380,7 +1392,16 @@ class RouteList(QTreeView):
             for anc in reversed(ancestors):
                 if not self.isExpanded(anc):
                     self.expand(anc)
-            self.setCurrentIndex(target)
+            # Update the current index without mutating selection. Plain
+            # QAbstractItemView.setCurrentIndex() runs through
+            # selectionCommand() which, in ExtendedSelection mode with no
+            # modifiers, returns ClearAndSelect|Rows — that wipes the
+            # multi-row selection just established by
+            # set_all_selected_event_ids() and re-enters the controller via
+            # selectionChanged.
+            self.selectionModel().setCurrentIndex(
+                target, QItemSelectionModel.NoUpdate
+            )
             self.scrollTo(target, QAbstractItemView.PositionAtCenter)
         except Exception:
             pass

@@ -30,6 +30,7 @@ class MoveRenderInfo:
     mimic_options:List[str]
     custom_data_options:List[str]
     custom_data_selection:str
+    attacking_mon_hp:int=0
     is_best_move:bool=False
     stat_stage_options:List[str]=None
     stat_stage_selection:str="0"
@@ -952,6 +953,7 @@ class BattleSummaryController:
             self._mimic_options,
             custom_data_options,
             custom_data_selection,
+            attacking_mon_hp=attacking_mon.cur_stats.hp,
             stat_stage_options=stat_stage_options,
             stat_stage_selection=stat_stage_selection,
             stat_stage_info=stat_stage_info,
@@ -1476,13 +1478,11 @@ class BattleSummaryController:
         for cur_move_name in move_list:
             result = result.apply_move(cur_move_name)
 
-        # Apply per-mon-idx screen toggles (active when mon_idx >= source_idx).
-        reflect_idx = screens.get(const.SCREEN_REFLECT)
-        if reflect_idx is not None and mon_idx >= reflect_idx:
-            result.reflect = True
-        light_screen_idx = screens.get(const.SCREEN_LIGHT_SCREEN)
-        if light_screen_idx is not None and mon_idx >= light_screen_idx:
-            result.light_screen = True
+        # Apply per-mon-idx field-toggle moves (active when mon_idx >= source_idx).
+        # Toggle ids in SCREEN_MOVE_MAP are FieldStatus attribute names.
+        for toggle_id, source_idx in screens.items():
+            if source_idx is not None and mon_idx >= source_idx and hasattr(result, toggle_id):
+                setattr(result, toggle_id, True)
 
         return result
 
@@ -1587,8 +1587,17 @@ class BattleSummaryController:
                         stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)
                         for _ in range(count):
                             cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(stat_mods)
+                    elif is_damaging and targets_self:
+                        # Damaging move whose secondary effect boosts the user
+                        # (e.g. Charge Beam): apply to player, persists for rest
+                        # of battle, mirroring self-targeting status moves.
+                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=True)
+                        for _ in range(count):
+                            persistent_player_modifier = persistent_player_modifier.apply_stat_mod(stat_mods)
+                            cur_player_modifier = cur_player_modifier.apply_stat_mod(stat_mods)
                     elif is_damaging:
-                        # Damage-dealing move with stat effect - apply to enemy, current matchup
+                        # Damaging move whose secondary effect debuffs the foe
+                        # (e.g. Crunch): apply to enemy, current matchup only.
                         stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)
                         for _ in range(count):
                             cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(stat_mods)
@@ -1634,8 +1643,15 @@ class BattleSummaryController:
                         for _ in range(count):
                             persistent_player_modifier = persistent_player_modifier.apply_stat_mod(stat_mods)
                             cur_player_modifier = cur_player_modifier.apply_stat_mod(stat_mods)
+                    elif is_damaging and targets_self:
+                        # Enemy damaging move that boosts itself (e.g. Charge Beam):
+                        # affects enemy, current matchup only (next enemy mon is fresh).
+                        stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=True)
+                        for _ in range(count):
+                            cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(stat_mods)
                     elif is_damaging:
-                        # Enemy damage-dealing with stat effect: affects player, persists
+                        # Enemy damaging move that debuffs the player (e.g. Crunch):
+                        # affects player, persists for rest of battle.
                         stat_mods = move_db.get_stat_mod_for_target(move_name, target_self=False)
                         for _ in range(count):
                             persistent_player_modifier = persistent_player_modifier.apply_stat_mod(stat_mods)

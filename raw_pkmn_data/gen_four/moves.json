@@ -298,7 +298,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user slams its rugged body into the foe to attack. The user also sustains serious damage.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "third_recoil"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -892,7 +894,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -1054,7 +1056,7 @@
             {
                 "chance": 10,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -1166,7 +1168,14 @@
         "affected_by_kings_rock": true,
         "description": "The user creates a gust of repulsive wind. It may also raise all the user\u2019s stats at once.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": 1,
+                "stat": "omni",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Scary Face": {
@@ -1193,7 +1202,7 @@
             {
                 "chance": 100,
                 "modifier": -2,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -1456,7 +1465,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "self"
             },
             {
@@ -1524,7 +1533,7 @@
         "affected_by_kings_rock": true,
         "description": "An attack that is used in desperation only if the user has no PP. It also hurts the user slightly.",
         "attack_flavor": [
-            "quarter_recoil"
+            "quarter_max_hp_recoil"
         ],
         "effects": [],
         "has_field_effect": false
@@ -2048,7 +2057,7 @@
             {
                 "chance": 100,
                 "modifier": -2,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -3478,7 +3487,7 @@
             {
                 "chance": 20,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "def",
                 "target": "enemy"
             }
         ],
@@ -4536,7 +4545,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user tucks in its wings and charges from a low altitude. The user also takes serious damage.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "third_recoil"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -4742,7 +4753,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -5146,7 +5157,7 @@
             {
                 "chance": 10,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -5380,7 +5391,7 @@
             {
                 "chance": 10,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -5559,7 +5570,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -6344,7 +6355,14 @@
         "affected_by_kings_rock": true,
         "description": "The user fires a concentrated bundle of electricity. It may also raise the user\u2019s Sp. Atk stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 70,
+                "modifier": 1,
+                "stat": "spa",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Headbutt": {
@@ -7548,7 +7566,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -7623,7 +7641,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
         "description": "The user cloaks itself in fire and charges at the foe. The user sustains serious damage, too.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "third_recoil"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -9687,7 +9707,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user delivers a life-endangering head butt at full power. The user also takes terrible damage.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "half_recoil"
+        ],
         "effects": [],
         "has_field_effect": false
     },

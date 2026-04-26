@@ -239,6 +239,9 @@ class MoveDB:
 
         # doing some weird stuff to make sure boosting moves appear at the top
         stat_reduction_moves = {}
+        # "omni" stat shorthand (Ancient Power / Silver Wind / Ominous Wind) expands
+        # to all five battle stats, since apply_stat_mod has no omni branch.
+        omni_stats = [const.ATK, const.DEF, const.SPA, const.SPD, const.SPE]
         for cur_move in self._data.values():
             cur_stat_mods = []
             is_reduction = False
@@ -246,8 +249,12 @@ class MoveDB:
                 if const.STAT_KEY in cur_effect and const.MODIFIER_KEY in cur_effect:
                     if cur_effect[const.MODIFIER_KEY] > 0:
                         is_reduction = True
-                    
-                    cur_stat_mods.append((cur_effect[const.STAT_KEY], cur_effect[const.MODIFIER_KEY]))
+
+                    if cur_effect[const.STAT_KEY] == "omni":
+                        for omni_stat in omni_stats:
+                            cur_stat_mods.append((omni_stat, cur_effect[const.MODIFIER_KEY]))
+                    else:
+                        cur_stat_mods.append((cur_effect[const.STAT_KEY], cur_effect[const.MODIFIER_KEY]))
 
             if cur_stat_mods:
                 if is_reduction:
@@ -334,8 +341,17 @@ class MoveDB:
             if const.STAT_KEY in cur_effect and const.MODIFIER_KEY in cur_effect:
                 effect_target = cur_effect.get(const.TARGET_KEY, "self")
                 targets_self = effect_target in ["self", "target_self"]
-                if targets_self == target_self:
-                    result.append((cur_effect[const.STAT_KEY], cur_effect[const.MODIFIER_KEY]))
+                if targets_self != target_self:
+                    continue
+                stat = cur_effect[const.STAT_KEY]
+                modifier = cur_effect[const.MODIFIER_KEY]
+                # "omni" expands to all five battle stats — apply_stat_mod has no
+                # omni branch, so we expand here (and in __init__).
+                if stat == "omni":
+                    for omni_stat in [const.ATK, const.DEF, const.SPA, const.SPD, const.SPE]:
+                        result.append((omni_stat, modifier))
+                else:
+                    result.append((stat, modifier))
 
         return result
 

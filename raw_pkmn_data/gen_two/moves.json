@@ -3319,7 +3319,8 @@
             "pp": 5,
             "base_power": 60,
             "type": "Rock",
-            "attack_flavor": [
+            "attack_flavor": [],
+            "effects": [
                 {
                     "chance": 20,
                     "modifier": 1,
@@ -3327,7 +3328,6 @@
                     "target": "self"
                 }
             ],
-            "effects": [],
             "rom_id": 246
         },
         {

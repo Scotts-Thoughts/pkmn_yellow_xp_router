@@ -7,8 +7,8 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
     QFrame, QCompleter, QLineEdit, QSizePolicy, QPushButton, QCheckBox, QComboBox,
 )
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtCore import Qt, QTimer, Signal, QRectF
+from PySide6.QtGui import QFont, QPixmap, QPainter, QPainterPath
 
 from controllers.battle_summary_controller import BattleSummaryController, MoveRenderInfo
 from gui_qt.components.custom_components import (
@@ -160,7 +160,7 @@ class BattleSummary(QWidget):
         self._base_frame = QWidget()
         self._base_layout = QVBoxLayout(self._base_frame)
         self._base_layout.setContentsMargins(2, 2, 2, 2)
-        self._base_layout.setSpacing(2)
+        self._base_layout.setSpacing(6)
         self._scroll_area.setWidget(self._base_frame)
 
         # ---- new controls bar (above legacy controls) ---------------------
@@ -734,6 +734,38 @@ class BattleSummary(QWidget):
                     bottom = mp_bottom
         return (top, bottom)
 
+    def _get_visible_mon_pair_rects(self):
+        """Return [(x, y, w, h), ...] for each visible MonPairSummary in _base_frame coords."""
+        rects = []
+        for idx in range(6):
+            if self._did_draw_mon_pairs[idx] and self._mon_pairs[idx].isVisible():
+                mp = self._mon_pairs[idx]
+                pos = mp.mapTo(self._base_frame, mp.rect().topLeft())
+                rects.append((pos.x(), pos.y(), mp.width(), mp.height()))
+        return rects
+
+    def _round_container_corners(self, pixmap: QPixmap, container_rects, radius: int = 6):
+        """Erase the four corner triangles of each container so the cut edge of a
+        cropped half-screenshot picks up the same border-radius the full widget had.
+        Corners that were already rounded (left side) are unaffected since those
+        pixels are already transparent."""
+        if not container_rects:
+            return pixmap
+        result = QPixmap(pixmap.size())
+        result.fill(Qt.transparent)
+        painter = QPainter(result)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.drawPixmap(0, 0, pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode_DestinationOut)
+        for x, y, w, h in container_rects:
+            full_path = QPainterPath()
+            full_path.addRect(QRectF(x, y, w, h))
+            rounded_path = QPainterPath()
+            rounded_path.addRoundedRect(QRectF(x, y, w, h), radius, radius)
+            painter.fillPath(full_path.subtracted(rounded_path), Qt.black)
+        painter.end()
+        return result
+
     def take_player_ranges_screenshot(self):
         """Capture only the left (player) half of the mon-pair grids."""
         restore = self._hide_defaults_for_screenshot()
@@ -750,6 +782,12 @@ class BattleSummary(QWidget):
             else:
                 y_top, y_bottom = 0, pixmap.height()
             cropped = pixmap.copy(0, y_top, split_x, y_bottom - y_top)
+            cropped_rects = []
+            for x, y, w, h in self._get_visible_mon_pair_rects():
+                cw = min(w, split_x - x)
+                if cw > 0:
+                    cropped_rects.append((x, y - y_top, cw, h))
+            cropped = self._round_container_corners(cropped, cropped_rects)
             self._save_pixmap(cropped, "player_ranges")
         finally:
             self._restore_after_screenshot(restore)
@@ -771,6 +809,16 @@ class BattleSummary(QWidget):
             else:
                 y_top, y_bottom = 0, pixmap.height()
             cropped = pixmap.copy(split_x, y_top, w - split_x, y_bottom - y_top)
+            cropped_rects = []
+            for mp_x, mp_y, mp_w, mp_h in self._get_visible_mon_pair_rects():
+                container_right = mp_x + mp_w
+                if container_right <= split_x:
+                    continue
+                new_x = max(0, mp_x - split_x)
+                new_w = container_right - split_x - new_x
+                if new_w > 0:
+                    cropped_rects.append((new_x, mp_y - y_top, new_w, mp_h))
+            cropped = self._round_container_corners(cropped, cropped_rects)
             self._save_pixmap(cropped, "enemy_ranges")
         finally:
             self._restore_after_screenshot(restore)
@@ -1244,46 +1292,93 @@ class MonPairSummary(QWidget):
         self._mon_idx = mon_idx
         self._expanded = True
 
-        # Outer frame with a subtle border to separate each matchup visually
+        # Outer frame with a darker grey fill to separate each matchup visually.
+        # WA_StyledBackground is required for QSS backgrounds to paint on a QWidget subclass.
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        _matchup_bg = _darken(config.get_background_color(), 0.35)
         self.setStyleSheet(
-            f"MonPairSummary {{ border: 1px solid {_darken(config.get_divider_color(), 0.3)}; border-radius: 6px; }}"
+            f"MonPairSummary {{ background-color: {_matchup_bg}; border-radius: 6px; }}"
+            "QWidget#matchupHeader { background-color: transparent; border: none; }"
+            "QWidget#matchupContent { background-color: transparent; }"
         )
 
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setContentsMargins(2, 2, 2, 2)
         outer_layout.setSpacing(0)
 
         # ---- clickable header row -----------------------------------------
         self._header_widget = QWidget()
+        self._header_widget.setObjectName("matchupHeader")
         self._header_widget.setCursor(Qt.PointingHandCursor)
         self._header_widget.mousePressEvent = lambda e: self._toggle_expanded()
-        self._header_widget.setStyleSheet("QWidget { border: none; }")
-        header_row = QHBoxLayout(self._header_widget)
-        header_row.setContentsMargins(6, 3, 6, 3)
-        header_row.setSpacing(4)
+        header_grid = QGridLayout(self._header_widget)
+        header_grid.setContentsMargins(6, 3, 6, 3)
+        header_grid.setHorizontalSpacing(0)
+        header_grid.setVerticalSpacing(0)
 
-        self._disclosure = DisclosureTriangle(size=14, color="#cccccc", parent=self._header_widget)
-        header_row.addWidget(self._disclosure)
+        # Mirror the content's column structure so headers center over their move columns
+        for col in range(4):
+            header_grid.setColumnStretch(col, 1)
+        header_grid.setColumnStretch(4, 0)
+        header_grid.setColumnMinimumWidth(4, 12)
+        for col in range(5, 9):
+            header_grid.setColumnStretch(col, 1)
+
+        header_font = QFont()
+        header_font.setBold(True)
+
+        self._player_header = QLabel("")
+        self._player_header.setAlignment(Qt.AlignVCenter)
+        self._player_header.setStyleSheet(
+            "QLabel { font-weight: bold; border: none; }"
+        )
+        self._player_header.setFont(header_font)
+
+        self._enemy_header = QLabel("")
+        self._enemy_header.setAlignment(Qt.AlignVCenter)
+        self._enemy_header.setStyleSheet(
+            "QLabel { font-weight: bold; border: none; }"
+        )
+        self._enemy_header.setFont(header_font)
+
+        self._player_icon = QLabel()
+        self._player_icon.setFixedSize(28, 28)
+        self._player_icon.setStyleSheet("border: none;")
 
         self._enemy_icon = QLabel()
         self._enemy_icon.setFixedSize(28, 28)
         self._enemy_icon.setStyleSheet("border: none;")
-        header_row.addWidget(self._enemy_icon)
 
-        self._header = QLabel("")
-        self._header.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self._header.setStyleSheet(
-            "QLabel { font-weight: bold; border: none; }"
-        )
-        header_font = QFont()
-        header_font.setBold(True)
-        self._header.setFont(header_font)
-        header_row.addWidget(self._header, 1)
+        # Player icon+title centered over cols 0-3
+        player_section = QWidget()
+        player_section.setStyleSheet("background: transparent; border: none;")
+        player_section_layout = QHBoxLayout(player_section)
+        player_section_layout.setContentsMargins(0, 0, 0, 0)
+        player_section_layout.setSpacing(4)
+        player_section_layout.addWidget(self._player_icon)
+        player_section_layout.addWidget(self._player_header)
+        header_grid.addWidget(player_section, 0, 0, 1, 4, Qt.AlignCenter)
+
+        # Enemy icon+title centered over cols 5-8
+        enemy_section = QWidget()
+        enemy_section.setStyleSheet("background: transparent; border: none;")
+        enemy_section_layout = QHBoxLayout(enemy_section)
+        enemy_section_layout.setContentsMargins(0, 0, 0, 0)
+        enemy_section_layout.setSpacing(4)
+        enemy_section_layout.addWidget(self._enemy_icon)
+        enemy_section_layout.addWidget(self._enemy_header)
+        header_grid.addWidget(enemy_section, 0, 5, 1, 4, Qt.AlignCenter)
+
+        # Chevron pinned to the top-left corner so it doesn't push the title off-center
+        self._disclosure = DisclosureTriangle(size=14, color="#cccccc", parent=self._header_widget)
+        header_grid.addWidget(self._disclosure, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        self._disclosure.raise_()
 
         outer_layout.addWidget(self._header_widget)
 
         # ---- collapsible content area -------------------------------------
         self._content = QWidget()
+        self._content.setObjectName("matchupContent")
         content_layout = QGridLayout(self._content)
         content_layout.setContentsMargins(1, 1, 1, 1)
         content_layout.setSpacing(0)
@@ -1361,9 +1456,19 @@ class MonPairSummary(QWidget):
         enemy_info = self._controller.get_pkmn_info(self._mon_idx, False)
 
         if player_info is None or enemy_info is None:
-            self._header.setText("")
+            self._player_header.setText("")
+            self._enemy_header.setText("")
+            self._player_icon.clear()
             self._enemy_icon.clear()
             return
+
+        # Set player Pokemon icon
+        player_icon_pm = pkmn_icon.get_icon(player_info.attacking_mon_name, size=28)
+        if player_icon_pm is not None:
+            self._player_icon.setPixmap(player_icon_pm)
+            self._player_icon.setVisible(True)
+        else:
+            self._player_icon.setVisible(False)
 
         # Set enemy Pokemon icon
         icon_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=28)
@@ -1375,8 +1480,8 @@ class MonPairSummary(QWidget):
 
         self._disclosure.set_expanded(self._expanded)
 
-        player_text = f"{player_info.attacking_mon_name} Lv{player_info.attacking_mon_level}"
-        enemy_text = f"{enemy_info.attacking_mon_name} Lv{enemy_info.attacking_mon_level}"
+        player_text = f"{player_info.attacking_mon_name} Lv{player_info.attacking_mon_level} Damage Ranges"
+        enemy_text = f"{enemy_info.attacking_mon_name} Lv{enemy_info.attacking_mon_level} Damage Ranges"
 
         # Color matchup text based on speed comparison
         if player_info.attacking_mon_speed > player_info.defending_mon_speed:
@@ -1386,10 +1491,14 @@ class MonPairSummary(QWidget):
         else:
             text_color = "#e74c3c"  # Red - player underspeeds
 
-        self._header.setText(
-            f'<span style="color:{text_color}">{player_text} vs. {enemy_text}</span>'
+        self._player_header.setTextFormat(Qt.RichText)
+        self._player_header.setText(
+            f'<span style="color:{text_color}">{player_text}</span>'
         )
-        self._header.setTextFormat(Qt.RichText)
+        self._enemy_header.setTextFormat(Qt.RichText)
+        self._enemy_header.setText(
+            f'<span style="color:{text_color}">{enemy_text}</span>'
+        )
 
     def update_rendering(self):
         self._sync_expanded_from_controller()
@@ -1657,7 +1766,7 @@ class DamageSummary(QWidget):
 
         # ---- kill info row ------------------------------------------------
         self.kill_frame = QFrame()
-        self.kill_frame.setFixedHeight(52)
+        self.kill_frame.setMinimumHeight(52)
         self.kill_frame.setStyleSheet(
             f"QFrame {{ background-color: {kill_bg}; border: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }}"
         )
@@ -1929,6 +2038,48 @@ class DamageSummary(QWidget):
         if config.do_ignore_accuracy():
             return (f"{kill_info[0]}-hit kill:", f"{rendered_kill_pct} %")
         return (f"{kill_info[0]}-turn kill:", f"{rendered_kill_pct} %")
+
+    @staticmethod
+    def _format_recoil_line(move):
+        """Return ('Recoil: X - Y', 'P - Q %') for recoil moves, or None."""
+        if move is None or move.min_damage == -1:
+            return None
+        attacker_hp = getattr(move, "attacking_mon_hp", 0) or 0
+
+        max_hp_divisor = None
+        damage_divisor = None
+        for flavor in move.attack_flavor:
+            if flavor in const.RECOIL_MAX_HP_FLAVOR_DIVISORS:
+                max_hp_divisor = const.RECOIL_MAX_HP_FLAVOR_DIVISORS[flavor]
+                break
+            if flavor in const.RECOIL_FLAVOR_DIVISORS:
+                damage_divisor = const.RECOIL_FLAVOR_DIVISORS[flavor]
+                break
+
+        if max_hp_divisor is not None and attacker_hp > 0:
+            recoil_min = max(1, attacker_hp // max_hp_divisor)
+            recoil_max = recoil_min
+        elif damage_divisor is not None:
+            hp = move.defending_mon_hp
+            capped_min = min(move.min_damage, hp)
+            capped_max = min(move.max_damage, hp)
+            recoil_min = max(1, capped_min // damage_divisor)
+            recoil_max = max(1, capped_max // damage_divisor)
+        else:
+            return None
+
+        if recoil_min == recoil_max:
+            desc = f"Recoil: {recoil_min}"
+            pct_text = f"{round(recoil_min / attacker_hp * 100)} %" if attacker_hp > 0 else ""
+        else:
+            desc = f"Recoil: {recoil_min} - {recoil_max}"
+            if attacker_hp > 0:
+                pct_min = round(recoil_min / attacker_hp * 100)
+                pct_max = round(recoil_max / attacker_hp * 100)
+                pct_text = f"{pct_min} - {pct_max} %"
+            else:
+                pct_text = ""
+        return (desc, pct_text)
 
     # ------------------------------------------------------------------
     # Main rendering method
@@ -2235,8 +2386,23 @@ class DamageSummary(QWidget):
             if len(kill_ranges) > max_num_messages:
                 kill_ranges = kill_ranges[: max_num_messages - 1] + [kill_ranges[-1]]
             formatted = [self.format_message(x) for x in kill_ranges]
-            self.num_to_kill.setText("\n".join(desc for desc, _ in formatted))
-            self.kill_pct.setText("\n".join(pct for _, pct in formatted))
+
+            recoil_line = self._format_recoil_line(move)
+            if recoil_line is not None:
+                recoil_color = config.get_failure_color()
+                desc_lines = [desc for desc, _ in formatted]
+                pct_lines = [pct for _, pct in formatted]
+                desc_lines.append(
+                    f'<span style="color: {recoil_color};">{recoil_line[0]}</span>'
+                )
+                pct_lines.append(
+                    f'<span style="color: {recoil_color};">{recoil_line[1]}</span>'
+                )
+                self.num_to_kill.setText("<br>".join(desc_lines))
+                self.kill_pct.setText("<br>".join(pct_lines))
+            else:
+                self.num_to_kill.setText("\n".join(desc for desc, _ in formatted))
+                self.kill_pct.setText("\n".join(pct for _, pct in formatted))
 
         # Best-move flagging — must come AFTER damage range styling
         # so that it overrides the neutral kill_frame colors

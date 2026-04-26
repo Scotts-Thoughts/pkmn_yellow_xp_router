@@ -509,6 +509,19 @@ class Constants:
         self.FLAVOR_TWO_TURN_INVULN = "two_turn_semi_invlunerable"
         self.FLAVOR_TWO_TURN = "two_turn"
 
+        self.FLAVOR_RECOIL_QUARTER = "quarter_recoil"
+        self.FLAVOR_RECOIL_THIRD = "third_recoil"
+        self.FLAVOR_RECOIL_HALF = "half_recoil"
+        self.FLAVOR_RECOIL_QUARTER_MAX_HP = "quarter_max_hp_recoil"
+        self.RECOIL_FLAVOR_DIVISORS = {
+            self.FLAVOR_RECOIL_QUARTER: 4,
+            self.FLAVOR_RECOIL_THIRD: 3,
+            self.FLAVOR_RECOIL_HALF: 2,
+        }
+        self.RECOIL_MAX_HP_FLAVOR_DIVISORS = {
+            self.FLAVOR_RECOIL_QUARTER_MAX_HP: 4,
+        }
+
         self.STRUGGLE_MOVE_NAME = "Struggle"
         self.MIMIC_MOVE_NAME = "Mimic"
         self.EXPLOSION_MOVE_NAME = "Explosion"
@@ -593,12 +606,16 @@ class Constants:
             "Hail": self.WEATHER_HAIL,
         }
 
-        # Screen move names -> logical screen identifier (matches FieldStatus attributes).
+        # Self-applied field-status moves -> logical id (matches FieldStatus attributes).
+        # Originally just screens; now also covers Magnet Rise (Ground immunity).
+        # Save format keeps the historical "screens" naming.
         self.SCREEN_REFLECT = "reflect"
         self.SCREEN_LIGHT_SCREEN = "light_screen"
+        self.SCREEN_MAGNET_RISE = "magnet_rise"
         self.SCREEN_MOVE_MAP = {
             "Reflect": self.SCREEN_REFLECT,
             "Light Screen": self.SCREEN_LIGHT_SCREEN,
+            "Magnet Rise": self.SCREEN_MAGNET_RISE,
         }
 
         # timing defaults

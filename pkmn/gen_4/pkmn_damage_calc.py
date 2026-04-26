@@ -506,7 +506,14 @@ def calculate_gen_four_damage(
         weather == const.WEATHER_SUN
     ):
         attacking_battle_stats.special_attack = math.floor(attacking_battle_stats.special_attack * 1.5)
-    
+
+    if (
+        is_weather_active and
+        weather == const.WEATHER_SANDSTORM and
+        (defending_species.first_type == const.TYPE_ROCK or defending_species.second_type == const.TYPE_ROCK)
+    ):
+        defending_battle_stats.special_defense = math.floor(defending_battle_stats.special_defense * 1.5)
+
     # NOTE: ignoring plus/minus abilities. They would modify special attack here, if ever relevant
 
     # TODO: bunch of abilities below that have a conditional activation. Need to figure out how to implement them properly
