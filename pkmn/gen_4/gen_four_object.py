@@ -272,6 +272,13 @@ class GenFour(CurrentGen):
     def get_hidden_power(self, dvs: universal_data_objects.StatBlock) -> Tuple[str, int]:
         return get_hidden_power_type(dvs), get_hidden_power_base_power(dvs)
 
+    def get_natural_gift(self, held_item: str) -> Tuple[str, int]:
+        berry_data = gen_four_const.NATURAL_GIFT_BERRY_DATA.get(held_item)
+        if berry_data is None:
+            return None
+        base_power, move_type = berry_data
+        return move_type, base_power
+
     def get_valid_weather(self) -> List[str]:
         return [const.WEATHER_NONE, const.WEATHER_SUN, const.WEATHER_RAIN, const.WEATHER_SANDSTORM, const.WEATHER_HAIL, const.WEATHER_FOG]
     

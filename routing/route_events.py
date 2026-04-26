@@ -227,6 +227,7 @@ class TrainerEventDefinition:
             mon_order=None,
             transformed=False,
             stat_stage_setup=None,
+            collapsed_mons=None,
         ):
         self.trainer_name = trainer_name
         self.second_trainer_name = second_trainer_name
@@ -269,6 +270,11 @@ class TrainerEventDefinition:
         if stat_stage_setup is None:
             stat_stage_setup = []
         self.stat_stage_setup:List[Dict[str, Dict[str, str]]] = stat_stage_setup
+        if collapsed_mons is None:
+            collapsed_mons = []
+        # List of mon indices (in definition order) that the user has collapsed
+        # in the battle summary view. Per-battle so it persists with the route.
+        self.collapsed_mons:List[int] = list(collapsed_mons)
 
     def serialize(self):
         return {
@@ -290,6 +296,7 @@ class TrainerEventDefinition:
             const.MON_ORDER: self.mon_order,
             const.TRANSFORMED: self.transformed,
             const.STAT_STAGE_SETUP_KEY: self.stat_stage_setup if self.stat_stage_setup else None,
+            const.COLLAPSED_MONS_KEY: self.collapsed_mons if self.collapsed_mons else None,
         }
 
     @staticmethod
@@ -326,6 +333,7 @@ class TrainerEventDefinition:
             second_trainer_name=raw_val.get(const.SECOND_TRAINER_NAME, ""),
             transformed=raw_val.get(const.TRANSFORMED, False),
             stat_stage_setup=raw_val.get(const.STAT_STAGE_SETUP_KEY),
+            collapsed_mons=raw_val.get(const.COLLAPSED_MONS_KEY),
         )
 
     def __str__(self):

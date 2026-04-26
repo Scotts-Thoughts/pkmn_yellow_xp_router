@@ -150,7 +150,8 @@ class Machine:
 
     def _get_mon_key(self, mon_idx) -> _MonKey:
         species_val = self.gh_converter.pkmn_name_convert(
-            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_SPECIES[mon_idx]).value
+            self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_SPECIES[mon_idx]).value,
+            held_item_gh_value=self._gamehook_client.get(gh_gen_four_const.ALL_KEYS_PLAYER_TEAM_HELD_ITEM[mon_idx]).value,
         )
         return _MonKey(
             species_val,

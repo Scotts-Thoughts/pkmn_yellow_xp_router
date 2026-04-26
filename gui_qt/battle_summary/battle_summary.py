@@ -630,15 +630,74 @@ class BattleSummary(QWidget):
         self._base_frame.setStyleSheet(saved_base)
         return pixmap
 
+    def _hide_defaults_for_screenshot(self):
+        """Hide default-value dropdowns and unchecked toggles in all visible
+        damage summaries. Returns a list of widgets to re-show afterwards.
+
+        "Default" means the first option (index 0) — e.g., "No Bonus" for
+        custom-data dropdowns or "0" for stat-stage dropdowns. Forces a
+        synchronous relayout (on each affected header layout, and the base
+        frame) so the rendered pixmap reflects the tighter spacing — the
+        move name re-centers within the freed space.
+        """
+        restore = []
+        for idx, mp in enumerate(self._mon_pairs):
+            if not (self._did_draw_mon_pairs[idx] and mp.isVisible()):
+                continue
+            for ds in list(mp.move_list) + list(mp.test_move_slots):
+                if not ds.isVisible():
+                    continue
+                candidates = (
+                    (ds.custom_data_dropdown,
+                     ds.custom_data_dropdown.isVisible() and ds.custom_data_dropdown.currentIndex() == 0),
+                    (ds.stat_stage_dropdown,
+                     ds.stat_stage_dropdown.isVisible() and ds.stat_stage_dropdown.currentIndex() == 0),
+                    (ds.weather_checkbox,
+                     ds.weather_checkbox.isVisible() and not ds.weather_checkbox.isChecked()),
+                    (ds.screen_checkbox,
+                     ds.screen_checkbox.isVisible() and not ds.screen_checkbox.isChecked()),
+                )
+                for widget, should_hide in candidates:
+                    if should_hide:
+                        widget.setVisible(False)
+                        restore.append(widget)
+        if restore:
+            self._reactivate_layouts_for(restore)
+        return restore
+
+    def _restore_after_screenshot(self, restore):
+        if not restore:
+            return
+        for widget in restore:
+            widget.setVisible(True)
+        self._reactivate_layouts_for(restore)
+
+    def _reactivate_layouts_for(self, widgets):
+        """Synchronously re-run the header layouts that own *widgets*, then the
+        base frame layout, so a subsequent render() reflects the new geometry.
+        """
+        headers = {w.parent() for w in widgets if w.parent() is not None}
+        for header in headers:
+            layout = header.layout()
+            if layout is not None:
+                layout.activate()
+        self._base_frame.layout().activate()
+
     def take_battle_summary_screenshot(self):
-        pixmap = self._grab_transparent(self._base_frame)
-        # Crop tightly: include top bar through the last visible mon pair
-        mon_rect = self._get_mon_pairs_rect()
-        if mon_rect[0] is not None:
-            cropped = pixmap.copy(0, 0, pixmap.width(), mon_rect[1])
-            self._save_pixmap(cropped, "battle_summary")
-        else:
-            self._save_pixmap(pixmap, "battle_summary")
+        restore = self._hide_defaults_for_screenshot()
+        try:
+            pixmap = self._grab_transparent(self._base_frame)
+            # Crop tightly to just the mon-pair grids (damage ranges only); exclude
+            # the controls bar (rare candy, vitamins, held item, HP/Spe) above.
+            mon_rect = self._get_mon_pairs_rect()
+            if mon_rect[0] is not None:
+                y_top, y_bottom = mon_rect
+                cropped = pixmap.copy(0, y_top, pixmap.width(), y_bottom - y_top)
+                self._save_pixmap(cropped, "battle_summary")
+            else:
+                self._save_pixmap(pixmap, "battle_summary")
+        finally:
+            self._restore_after_screenshot(restore)
 
     def _get_divider_x_in_base_frame(self):
         """Return (left_edge_x, right_edge_x) of the divider relative to _base_frame.
@@ -677,36 +736,44 @@ class BattleSummary(QWidget):
 
     def take_player_ranges_screenshot(self):
         """Capture only the left (player) half of the mon-pair grids."""
-        pixmap = self._grab_transparent(self._base_frame)
-        divider_pos = self._get_divider_x_in_base_frame()
-        mon_rect = self._get_mon_pairs_rect()
-        if divider_pos is not None:
-            split_x = divider_pos[0]
-        else:
-            split_x = pixmap.width() // 2
-        if mon_rect[0] is not None:
-            y_top, y_bottom = mon_rect
-        else:
-            y_top, y_bottom = 0, pixmap.height()
-        cropped = pixmap.copy(0, y_top, split_x, y_bottom - y_top)
-        self._save_pixmap(cropped, "player_ranges")
+        restore = self._hide_defaults_for_screenshot()
+        try:
+            pixmap = self._grab_transparent(self._base_frame)
+            divider_pos = self._get_divider_x_in_base_frame()
+            mon_rect = self._get_mon_pairs_rect()
+            if divider_pos is not None:
+                split_x = divider_pos[0]
+            else:
+                split_x = pixmap.width() // 2
+            if mon_rect[0] is not None:
+                y_top, y_bottom = mon_rect
+            else:
+                y_top, y_bottom = 0, pixmap.height()
+            cropped = pixmap.copy(0, y_top, split_x, y_bottom - y_top)
+            self._save_pixmap(cropped, "player_ranges")
+        finally:
+            self._restore_after_screenshot(restore)
 
     def take_enemy_ranges_screenshot(self):
         """Capture only the right (enemy) half of the mon-pair grids."""
-        pixmap = self._grab_transparent(self._base_frame)
-        w = pixmap.width()
-        divider_pos = self._get_divider_x_in_base_frame()
-        mon_rect = self._get_mon_pairs_rect()
-        if divider_pos is not None:
-            split_x = divider_pos[1]
-        else:
-            split_x = w // 2
-        if mon_rect[0] is not None:
-            y_top, y_bottom = mon_rect
-        else:
-            y_top, y_bottom = 0, pixmap.height()
-        cropped = pixmap.copy(split_x, y_top, w - split_x, y_bottom - y_top)
-        self._save_pixmap(cropped, "enemy_ranges")
+        restore = self._hide_defaults_for_screenshot()
+        try:
+            pixmap = self._grab_transparent(self._base_frame)
+            w = pixmap.width()
+            divider_pos = self._get_divider_x_in_base_frame()
+            mon_rect = self._get_mon_pairs_rect()
+            if divider_pos is not None:
+                split_x = divider_pos[1]
+            else:
+                split_x = w // 2
+            if mon_rect[0] is not None:
+                y_top, y_bottom = mon_rect
+            else:
+                y_top, y_bottom = 0, pixmap.height()
+            cropped = pixmap.copy(split_x, y_top, w - split_x, y_bottom - y_top)
+            self._save_pixmap(cropped, "enemy_ranges")
+        finally:
+            self._restore_after_screenshot(restore)
 
     def _increment_prefight_candies(self):
         if self._candy_plus_btn.isEnabled():
@@ -1276,6 +1343,18 @@ class MonPairSummary(QWidget):
         self._expanded = not self._expanded
         self._content.setVisible(self._expanded)
         self._disclosure.set_expanded(self._expanded)
+        if hasattr(self._controller, "update_mon_collapsed"):
+            self._controller.update_mon_collapsed(self._mon_idx, not self._expanded)
+
+    def _sync_expanded_from_controller(self):
+        if not hasattr(self._controller, "is_mon_collapsed"):
+            return
+        expanded = not self._controller.is_mon_collapsed(self._mon_idx)
+        if expanded == self._expanded:
+            return
+        self._expanded = expanded
+        self._content.setVisible(self._expanded)
+        self._disclosure.set_expanded(self._expanded)
 
     def _update_header_text(self):
         player_info = self._controller.get_pkmn_info(self._mon_idx, True)
@@ -1313,6 +1392,7 @@ class MonPairSummary(QWidget):
         self._header.setTextFormat(Qt.RichText)
 
     def update_rendering(self):
+        self._sync_expanded_from_controller()
         self._update_header_text()
 
         test_moves_enabled = False
@@ -1528,10 +1608,12 @@ class DamageSummary(QWidget):
         header_layout.addWidget(self.screen_checkbox)
 
         self.custom_data_dropdown = SimpleOptionMenu(option_list=[""], callback=self._custom_data_callback, parent=self.header)
+        self.custom_data_dropdown.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.custom_data_dropdown.setVisible(False)
         header_layout.addWidget(self.custom_data_dropdown)
 
         self.stat_stage_dropdown = SimpleOptionMenu(option_list=["0"], callback=self._stat_stage_callback, parent=self.header)
+        self.stat_stage_dropdown.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.stat_stage_dropdown.setVisible(False)
         header_layout.addWidget(self.stat_stage_dropdown)
 

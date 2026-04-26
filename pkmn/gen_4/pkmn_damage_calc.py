@@ -185,6 +185,14 @@ def calculate_gen_four_damage(
             move_type = const.TYPE_ICE
         elif weather == const.WEATHER_SANDSTORM:
             move_type = const.TYPE_ROCK
+    elif move.name == gen_four_const.NATURAL_GIFT_MOVE_NAME:
+        # Klutz suppresses the held item, so Natural Gift fails
+        if attacking_ability == gen_four_const.KLUTZ_ABILITY:
+            return None
+        berry_data = gen_four_const.NATURAL_GIFT_BERRY_DATA.get(attacking_pkmn.held_item)
+        if berry_data is None:
+            return None
+        base_power, move_type = berry_data
 
     if (
         attacking_ability == gen_four_const.TECHNICIAN_ABILITY and

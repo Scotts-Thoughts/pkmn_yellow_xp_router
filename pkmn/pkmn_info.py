@@ -130,6 +130,10 @@ class CurrentGen:
     def get_hidden_power(self, dvs:universal_data_objects.StatBlock) -> Tuple[str, int]:
         raise NotImplementedError()
 
+    def get_natural_gift(self, held_item:str) -> Tuple[str, int]:
+        """Returns (type, base_power) for Natural Gift given the attacker's held berry, or None if the item is not a valid berry / the gen does not support Natural Gift."""
+        return None
+
     def get_valid_weather(self) -> List[str]:
         raise NotImplementedError()
     

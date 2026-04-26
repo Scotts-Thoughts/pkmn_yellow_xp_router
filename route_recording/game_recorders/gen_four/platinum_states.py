@@ -1293,7 +1293,10 @@ class OverworldState(WatchForResetState):
         if self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value == None:
             self._waiting_for_solo_mon_in_slot_1 = True
             self._wrong_mon_in_slot_1 = False
-        elif self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value != self.machine._solo_mon_key.species:
+        elif self.machine.gh_converter.pkmn_name_convert(
+            self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value,
+            held_item_gh_value=self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM).value,
+        ) != self.machine._solo_mon_key.species:
             self._waiting_for_solo_mon_in_slot_1 = False
             self._wrong_mon_in_slot_1 = True
         else:
@@ -1505,11 +1508,12 @@ class OverworldState(WatchForResetState):
         elif new_prop.path in gh_gen_four_const.ALL_KEYS_ALL_ITEM_FIELDS:
             return StateType.INVENTORY_CHANGE
         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_SPECIES:
+            held_item_value = self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM).value
             if not prev_prop.value:
                 self._waiting_for_registration = True
-            elif self.machine._solo_mon_key.species == self.machine.gh_converter.pkmn_name_convert(prev_prop.value):
+            elif self.machine._solo_mon_key.species == self.machine.gh_converter.pkmn_name_convert(prev_prop.value, held_item_gh_value=held_item_value):
                 self._wrong_mon_in_slot_1 = True
-            elif self.machine._solo_mon_key.species == self.machine.gh_converter.pkmn_name_convert(new_prop.value):
+            elif self.machine._solo_mon_key.species == self.machine.gh_converter.pkmn_name_convert(new_prop.value, held_item_gh_value=held_item_value):
                 self._wrong_mon_delay = self.BASE_DELAY
                 self._waiting_for_solo_mon_in_slot_1 = True
         elif new_prop.path == gh_gen_four_const.KEY_PLAYER_MON_LEVEL:
@@ -1569,8 +1573,11 @@ class OverworldState(WatchForResetState):
                 if self._wrong_mon_delay <= 0:
                     self.machine.update_team_cache(regenerate_move_cache=True)
                     self._wrong_mon_in_slot_1 = (
-                        self.machine._solo_mon_key.species != 
-                        self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value)
+                        self.machine._solo_mon_key.species !=
+                        self.machine.gh_converter.pkmn_name_convert(
+                            self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_SPECIES).value,
+                            held_item_gh_value=self.machine._gamehook_client.get(gh_gen_four_const.KEY_PLAYER_MON_HELD_ITEM).value,
+                        )
                     )
                 self._wrong_mon_delay -= 1
             

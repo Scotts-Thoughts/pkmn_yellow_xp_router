@@ -1367,8 +1367,21 @@ class RouteList(QTreeView):
     def scroll_to_selected_events(self):
         try:
             indexes = self.selectionModel().selectedRows(_COL_NAME)
-            if indexes:
-                self.scrollTo(indexes[-1], QAbstractItemView.EnsureVisible)
+            if not indexes:
+                return
+            target = indexes[-1]
+            # scrollTo() is a no-op when the row is hidden inside a collapsed
+            # parent, so walk up and expand ancestors first.
+            ancestors = []
+            parent = target.parent()
+            while parent.isValid():
+                ancestors.append(parent)
+                parent = parent.parent()
+            for anc in reversed(ancestors):
+                if not self.isExpanded(anc):
+                    self.expand(anc)
+            self.setCurrentIndex(target)
+            self.scrollTo(target, QAbstractItemView.PositionAtCenter)
         except Exception:
             pass
 

@@ -26,6 +26,7 @@ class Gen4GameHookConstants:
         self.KEY_PLAYER_MON_LEVEL      = "player.team.0.level"
         self.KEY_PLAYER_MON_SPECIES    = "player.team.0.species"
         self.KEY_PLAYER_MON_HELD_ITEM  = "player.team.0.held_item"
+        self.ALL_KEYS_PLAYER_TEAM_HELD_ITEM = [f"player.team.{i}.held_item" for i in range(0, 6)]
         self.KEY_PLAYER_MON_FRIENDSHIP = "player.team.0.friendship"
         self.KEY_PLAYER_MON_PID        = "player.team.0.internals.personality_value"
 
@@ -185,6 +186,7 @@ class Gen4GameHookConstants:
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_STAT_EXP)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_ALL_ITEM_FIELDS)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_TEAM_SPECIES)
+        self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_PLAYER_TEAM_HELD_ITEM)
         self.ALL_KEYS_TO_REGISTER.append(self.ALL_KEYS_BATTLE_SOLO_HP)
         self.ALL_KEYS_TO_REGISTER.extend(self.ALL_KEYS_BATTLE_TEAM_HP)
         self.ALL_KEYS_TO_REGISTER.append(self.META_STATE)
@@ -372,7 +374,7 @@ class GameHookConstantConverter:
 
         return converted_name
     
-    def pkmn_name_convert(self, gh_pkmn_name:str):
+    def pkmn_name_convert(self, gh_pkmn_name:str, held_item_gh_value:str=None):
         if gh_pkmn_name is None:
             return None
         converted_name = gh_pkmn_name
@@ -386,6 +388,13 @@ class GameHookConstantConverter:
             converted_name = "Mime Jr."
         elif converted_name == "Ho-oh":
             converted_name = "HoOh"
+        elif converted_name == "Giratina":
+            # The mapper collapses both Giratina forms (rom_id 487 / 501) to "Giratina".
+            # Disambiguate by held item: Griseous Orb forces Origin form, otherwise Altered.
+            if self.item_name_convert(held_item_gh_value) == "Griseous Orb":
+                converted_name = "Giratina (Origin)"
+            else:
+                converted_name = "Giratina (Altered)"
 
         return converted_name
     

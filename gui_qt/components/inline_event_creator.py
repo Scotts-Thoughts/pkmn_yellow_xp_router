@@ -686,10 +686,31 @@ class InlineEventCreator(QFrame):
         else:
             self._create_btn.setEnabled(True)
 
+    def _commit_all_searchable_combos(self):
+        """Force every searchable combo's text to a real list item. Enter/Tab
+        already do this via ``_EnterCommitFilter``, but clicking Create with
+        the mouse skips that step — without this, the builder can see raw
+        line-edit text that doesn't correspond to any DB entry, which then
+        crashes downstream lookups (e.g. ``get_trainer(x).refightable``)."""
+        for combo in self._config_refs.values():
+            if not isinstance(combo, QComboBox) or not combo.isEditable():
+                continue
+            _commit_best_match(combo)
+            # If no match was found, the line edit still has stale typed text.
+            # Fall back to the currently-selected item so the builder gets a
+            # string that actually exists in the list.
+            if combo.findText(combo.currentText(), Qt.MatchFixedString) < 0:
+                idx = combo.currentIndex()
+                if idx < 0 and combo.count() > 0:
+                    idx = 0
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+
     def _on_create(self):
         if self._event_builder is None:
             return
         try:
+            self._commit_all_searchable_combos()
             ev = self._event_builder()
             if ev is None:
                 return

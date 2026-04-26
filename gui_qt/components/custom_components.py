@@ -4,10 +4,11 @@ import logging
 from PySide6.QtWidgets import (
     QWidget, QLabel, QPushButton, QLineEdit, QComboBox, QCheckBox,
     QHBoxLayout, QVBoxLayout, QGridLayout, QSpinBox, QPlainTextEdit,
-    QColorDialog, QFrame, QSizePolicy,
+    QColorDialog, QFrame, QSizePolicy, QStyle, QStyleOptionComboBox,
+    QStylePainter,
 )
-from PySide6.QtCore import Qt, QTimer, QPointF, Signal, QPropertyAnimation, QPoint
-from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPolygonF
+from PySide6.QtCore import Qt, QTimer, QPointF, QSize, Signal, QPropertyAnimation, QPoint, QRect
+from PySide6.QtGui import QBrush, QColor, QPainter, QPalette, QPen, QPolygonF
 
 from utils.constants import const
 from utils.config_manager import config
@@ -70,6 +71,9 @@ class SimpleOptionMenu(QComboBox):
             self.new_values(option_list, default_val)
         if callback:
             self.currentIndexChanged.connect(self._on_index_changed)
+        # When the current selection changes, invalidate the cached sizeHint so
+        # the combo can shrink/grow to fit the new selection's text width.
+        self.currentTextChanged.connect(self.updateGeometry)
 
     def _on_index_changed(self, index):
         if self._callback:
@@ -95,6 +99,7 @@ class SimpleOptionMenu(QComboBox):
                 self.blockSignals(True)
                 self.setCurrentText(default_val)
                 self.blockSignals(False)
+            self.updateGeometry()
             return
         self.cur_options = list(option_list)
         self.blockSignals(True)
@@ -105,6 +110,70 @@ class SimpleOptionMenu(QComboBox):
         elif option_list:
             self.setCurrentIndex(0)
         self.blockSignals(False)
+        self.updateGeometry()
+
+    def sizeHint(self):
+        # Default QComboBox sizeHint (with AdjustToContents) returns the width
+        # of the widest option + chrome. That leaves large blank space inside
+        # the combo whenever the CURRENT selection is shorter. Override to
+        # size to the current selection.
+        #
+        # QStyleSheetStyle's sizeFromContents adds drop-down width on top of
+        # box (padding+border) chrome. With our QSS the drop-down has
+        # `subcontrol-origin: padding` and lives inside the right padding, so
+        # adding it on top double-counts ~arrow_width pixels. Subtract it out
+        # so chrome reflects the actually-occupied visual area, matching what
+        # paintEvent draws into.
+        base = super().sizeHint()
+        if not self.cur_options:
+            return base
+        fm = self.fontMetrics()
+        widest_advance = max(fm.horizontalAdvance(opt) for opt in self.cur_options)
+        opt = QStyleOptionComboBox()
+        self.initStyleOption(opt)
+        arrow_rect = self.style().subControlRect(
+            QStyle.CC_ComboBox, opt, QStyle.SC_ComboBoxArrow, self
+        )
+        chrome = base.width() - widest_advance - arrow_rect.width()
+        if chrome < 16:
+            chrome = 24
+        cur_w = fm.boundingRect(self.currentText() or "").width()
+        return QSize(max(cur_w + chrome, 40), base.height())
+
+    def paintEvent(self, event):
+        # We override the label drawing because QStyleSheetStyle's
+        # CE_ComboBoxLabel draws into SC_ComboBoxEditField, which subtracts
+        # the drop-down arrow's width from the contents rect — but with
+        # `subcontrol-origin: padding` the arrow already sits inside the
+        # right padding, so that subtraction leaves ~arrow_width pixels of
+        # dead space between the painted text and the visible arrow. Paint
+        # the text ourselves into the full rect from edit_rect.left() up to
+        # arrow_rect.left(), eliding to fit so we never hard-clip a glyph.
+        painter = QStylePainter(self)
+        opt = QStyleOptionComboBox()
+        self.initStyleOption(opt)
+        painter.drawComplexControl(QStyle.CC_ComboBox, opt)
+        if not opt.currentText:
+            return
+        edit_rect = self.style().subControlRect(
+            QStyle.CC_ComboBox, opt, QStyle.SC_ComboBoxEditField, self
+        )
+        arrow_rect = self.style().subControlRect(
+            QStyle.CC_ComboBox, opt, QStyle.SC_ComboBoxArrow, self
+        )
+        # 2px breathing room between text and arrow's border-left.
+        text_right = arrow_rect.left() - 2
+        text_width = max(text_right - edit_rect.left(), 0)
+        if text_width <= 0:
+            return
+        text_rect = QRect(
+            edit_rect.left(), edit_rect.top(), text_width, edit_rect.height()
+        )
+        elided = self.fontMetrics().elidedText(
+            opt.currentText, Qt.ElideRight, text_width
+        ) or opt.currentText
+        painter.setPen(self.palette().color(QPalette.Text))
+        painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, elided)
 
 
 class CheckboxLabel(QWidget):

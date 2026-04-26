@@ -232,7 +232,8 @@ class MainWindow(QMainWindow):
 
     def _save_geometry(self):
         geo = self.geometry()
-        geo_str = f"{geo.width()}x{geo.height()}+{geo.x()}+{geo.y()}"
+        frame = self.frameGeometry()
+        geo_str = f"{geo.width()}x{geo.height()}+{frame.x()}+{frame.y()}"
         config.set_window_geometry(geo_str)
         if self.isMaximized():
             config.set_window_state("zoomed")

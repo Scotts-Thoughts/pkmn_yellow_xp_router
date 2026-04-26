@@ -98,6 +98,9 @@ class BattleSummaryController:
         self._enemy_screens:Dict[str, int] = {}
         self._double_battle_flag = False
         self._stat_stage_setup:List[Dict[str, Dict[str, str]]] = []
+        # Per-battle set of mon indices (in display order) that the user has
+        # collapsed in the battle summary view.
+        self._collapsed_mons:set = set()
         self._is_wild_battle:bool = False
         self._wild_min_dv_mons:List[EnemyPkmn] = []
         self._wild_max_dv_mons:List[EnemyPkmn] = []
@@ -754,6 +757,11 @@ class BattleSummaryController:
         if move.name == const.HIDDEN_POWER_MOVE_NAME:
             hidden_power_type, hidden_power_base_power = current_gen_info().get_hidden_power(attacking_mon.dvs)
             move_display_name = f"{move.name} ({hidden_power_type}: {hidden_power_base_power})"
+        elif move.name == const.NATURAL_GIFT_MOVE_NAME:
+            natural_gift_data = current_gen_info().get_natural_gift(attacking_mon.held_item)
+            if natural_gift_data is not None:
+                natural_gift_type, natural_gift_base_power = natural_gift_data
+                move_display_name = f"{move.name} ({natural_gift_type}: {natural_gift_base_power})"
 
         if move_display_name is None:
             move_display_name = move.name
@@ -1009,6 +1017,14 @@ class BattleSummaryController:
             for _ in range(len(event_group.event_definition.get_pokemon_list())):
                 self._stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
 
+        # Convert collapsed_mons from definition order (storage) to display order (controller state)
+        self._collapsed_mons = set()
+        if trainer_def.collapsed_mons:
+            stored = set(trainer_def.collapsed_mons)
+            for display_idx, def_idx in enumerate(self._cached_definition_order):
+                if def_idx in stored:
+                    self._collapsed_mons.add(display_idx)
+
         self._original_player_mon_list = []
         self._transformed_mon_list = []
         self._original_enemy_mon_list = []
@@ -1061,6 +1077,7 @@ class BattleSummaryController:
         self._enemy_field_move_list = []
         self._custom_move_data = []
         self._stat_stage_setup = []
+        self._collapsed_mons = set()
         self._is_wild_battle = is_wild
         self._wild_min_dv_mons = []
         self._wild_max_dv_mons = []
@@ -1121,6 +1138,7 @@ class BattleSummaryController:
         self._enemy_field_move_list = []
         self._custom_move_data = []
         self._stat_stage_setup = []
+        self._collapsed_mons = set()
         self._original_player_mon_list = []
         self._transformed_mon_list = []
         self._original_enemy_mon_list = []
@@ -1181,6 +1199,13 @@ class BattleSummaryController:
         else:
             final_stat_stage_setup = None
 
+        # Convert collapsed_mons from display order (controller state) back to definition order (storage)
+        final_collapsed_mons = sorted({
+            self._cached_definition_order[display_idx]
+            for display_idx in self._collapsed_mons
+            if 0 <= display_idx < len(self._cached_definition_order)
+        })
+
         return TrainerEventDefinition(
             self._trainer_name,
             second_trainer_name=self._second_trainer_name,
@@ -1196,6 +1221,7 @@ class BattleSummaryController:
             enemy_screens=copy.deepcopy(self._enemy_screens),
             transformed=self._is_player_transformed,
             stat_stage_setup=final_stat_stage_setup,
+            collapsed_mons=final_collapsed_mons,
         )
 
     def get_pkmn_info(self, pkmn_idx, is_player_mon) -> PkmnRenderInfo:
@@ -1322,6 +1348,22 @@ class BattleSummaryController:
 
     def is_player_transformed(self) -> bool:
         return self._is_player_transformed
+
+    def is_mon_collapsed(self, mon_idx:int) -> bool:
+        return mon_idx in self._collapsed_mons
+
+    def update_mon_collapsed(self, mon_idx:int, collapsed:bool):
+        already = mon_idx in self._collapsed_mons
+        if collapsed == already:
+            return
+        if collapsed:
+            self._collapsed_mons.add(mon_idx)
+        else:
+            self._collapsed_mons.discard(mon_idx)
+        # Persist via the standard "non-load change" save path. Wild battles
+        # have no event_group_id so this is a no-op write for them, but the
+        # in-memory per-battle state still tracks correctly.
+        self._on_nonload_change()
 
     def get_player_held_item(self) -> str:
         if self._original_player_mon_list:
