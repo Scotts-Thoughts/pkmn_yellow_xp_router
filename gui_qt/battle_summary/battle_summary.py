@@ -7,8 +7,8 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
     QFrame, QCompleter, QLineEdit, QSizePolicy, QPushButton, QCheckBox, QComboBox,
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QRectF
-from PySide6.QtGui import QFont, QPixmap, QPainter, QPainterPath
+from PySide6.QtCore import Qt, QTimer, Signal, QRectF, QStringListModel, QEvent, QCoreApplication
+from PySide6.QtGui import QFont, QPixmap, QPainter, QPainterPath, QFocusEvent
 
 from controllers.battle_summary_controller import BattleSummaryController, MoveRenderInfo
 from gui_qt.components.custom_components import (
@@ -512,6 +512,13 @@ class BattleSummary(QWidget):
     def configure_setup_moves(self, possible_setup_moves):
         self.setup_moves.configure_moves(possible_setup_moves)
         self.enemy_setup_moves.configure_moves(possible_setup_moves)
+
+    def refresh_test_move_options(self):
+        all_moves = current_gen_info().move_db().get_filtered_names()
+        all_moves.insert(0, "")
+        for mp in self._mon_pairs:
+            for slot in mp.test_move_slots:
+                slot.set_test_move_options(all_moves)
 
     def _toggle_legacy_controls(self):
         self._legacy_expanded = not self._legacy_expanded
@@ -1584,6 +1591,31 @@ class AutocompleteEntry(QWidget):
         self._original_value = text
         if self._callback:
             self._callback()
+        # Defer focus teardown so the popup-close machinery finishes
+        # before we move focus. If we do this inline, Qt re-asserts
+        # focus on the entry as the popup unwinds.
+        QTimer.singleShot(0, self._finalize_activation)
+
+    def _finalize_activation(self):
+        popup = self._completer.popup()
+        if popup is not None and popup.isVisible():
+            popup.hide()
+        # Move focus off the entry. Required so keyboard input no
+        # longer goes here, but on its own this leaves a stuck blink
+        # cursor when the activation came from a mouse click on the
+        # popup -- QLineEdit's cursor-blink timer is started by the
+        # popup re-routing focus and never stopped because the
+        # FocusOut path was short-circuited.
+        win = self._entry.window()
+        if win is not None:
+            win.setFocus(Qt.OtherFocusReason)
+        self._entry.clearFocus()
+        # Synthesise a FocusOut so QLineEdit's blink timer is forced
+        # to stop even if Qt's own focus events did not deliver one.
+        if not self._entry.hasFocus():
+            QCoreApplication.sendEvent(
+                self._entry, QFocusEvent(QEvent.FocusOut, Qt.OtherFocusReason)
+            )
 
     def _on_editing_finished(self):
         current = self._entry.text()
@@ -1599,6 +1631,10 @@ class AutocompleteEntry(QWidget):
         self._entry.setText(value)
         self._entry.setCompleter(self._completer)
         self._original_value = value
+
+    def set_values(self, values):
+        self._all_values = values
+        self._completer.setModel(QStringListModel(values, self._completer))
 
     def enable(self):
         self._entry.setEnabled(True)
@@ -2080,6 +2116,10 @@ class DamageSummary(QWidget):
             else:
                 pct_text = ""
         return (desc, pct_text)
+
+    def set_test_move_options(self, values):
+        if self.test_move_dropdown is not None:
+            self.test_move_dropdown.set_values(values)
 
     # ------------------------------------------------------------------
     # Main rendering method

@@ -196,6 +196,7 @@ class EventDetails(QWidget):
         try:
             self.battle_summary.configure_weather(current_gen_info().get_valid_weather())
             self.battle_summary.configure_setup_moves(current_gen_info().get_stat_modifer_moves())
+            self.battle_summary.refresh_test_move_options()
         except Exception:
             pass
 
