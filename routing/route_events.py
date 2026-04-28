@@ -223,6 +223,8 @@ class TrainerEventDefinition:
             weather_source_mon_idx=None,
             player_screens=None,
             enemy_screens=None,
+            player_intimidate=None,
+            enemy_intimidate=None,
             pay_day_amount=0,
             mon_order=None,
             transformed=False,
@@ -262,6 +264,11 @@ class TrainerEventDefinition:
         if enemy_screens is None:
             enemy_screens = {}
         self.enemy_screens:Dict[str, int] = enemy_screens
+        # Per-side lists of mon indices (in definition order) where Intimidate is
+        # active. None = not yet recorded for this battle (apply defaults at
+        # load time based on which mons have the ability).
+        self.player_intimidate:List[int] = list(player_intimidate) if player_intimidate is not None else None
+        self.enemy_intimidate:List[int] = list(enemy_intimidate) if enemy_intimidate is not None else None
         self.pay_day_amount = pay_day_amount
         if mon_order is None:
             mon_order = []
@@ -292,6 +299,8 @@ class TrainerEventDefinition:
             const.WEATHER_SOURCE_MON_IDX: self.weather_source_mon_idx,
             const.PLAYER_SCREENS_KEY: self.player_screens if self.player_screens else None,
             const.ENEMY_SCREENS_KEY: self.enemy_screens if self.enemy_screens else None,
+            const.PLAYER_INTIMIDATE_KEY: self.player_intimidate if self.player_intimidate is not None else None,
+            const.ENEMY_INTIMIDATE_KEY: self.enemy_intimidate if self.enemy_intimidate is not None else None,
             const.PAY_DAY_AMOUNT: self.pay_day_amount,
             const.MON_ORDER: self.mon_order,
             const.TRANSFORMED: self.transformed,
@@ -328,6 +337,8 @@ class TrainerEventDefinition:
             weather_source_mon_idx=raw_val.get(const.WEATHER_SOURCE_MON_IDX),
             player_screens=raw_val.get(const.PLAYER_SCREENS_KEY),
             enemy_screens=raw_val.get(const.ENEMY_SCREENS_KEY),
+            player_intimidate=raw_val.get(const.PLAYER_INTIMIDATE_KEY),
+            enemy_intimidate=raw_val.get(const.ENEMY_INTIMIDATE_KEY),
             pay_day_amount=raw_val.get(const.PAY_DAY_AMOUNT, 0),
             mon_order=raw_val.get(const.MON_ORDER),
             second_trainer_name=raw_val.get(const.SECOND_TRAINER_NAME, ""),

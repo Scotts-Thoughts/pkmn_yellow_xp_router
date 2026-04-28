@@ -97,6 +97,11 @@ class BattleSummaryController:
         # A screen applies from its recorded mon_idx onward in the battle.
         self._player_screens:Dict[str, int] = {}
         self._enemy_screens:Dict[str, int] = {}
+        # Per-side sets of mon indices (display order) where Intimidate is "on"
+        # for that matchup. None means "not yet user-set"; defaults are derived
+        # on demand from the abilities of the player/enemy mons.
+        self._player_intimidate:set = None
+        self._enemy_intimidate:set = None
         self._double_battle_flag = False
         self._stat_stage_setup:List[Dict[str, Dict[str, str]]] = []
         # Per-battle set of mon indices (in display order) that the user has
@@ -252,6 +257,8 @@ class BattleSummaryController:
         saved_weather_source_mon_idx = self._weather_source_mon_idx
         saved_player_screens = copy.deepcopy(self._player_screens)
         saved_enemy_screens = copy.deepcopy(self._enemy_screens)
+        saved_player_intimidate = copy.deepcopy(self._player_intimidate)
+        saved_enemy_intimidate = copy.deepcopy(self._enemy_intimidate)
         saved_mimic = self._mimic_selection
         saved_transformed = self._is_player_transformed
         saved_double = self._double_battle_flag
@@ -295,6 +302,8 @@ class BattleSummaryController:
         self._weather_source_mon_idx = saved_weather_source_mon_idx
         self._player_screens = saved_player_screens
         self._enemy_screens = saved_enemy_screens
+        self._player_intimidate = saved_player_intimidate
+        self._enemy_intimidate = saved_enemy_intimidate
         self._mimic_selection = saved_mimic
         self._is_player_transformed = saved_transformed
         self._double_battle_flag = saved_double
@@ -410,6 +419,8 @@ class BattleSummaryController:
             saved_weather_source_mon_idx = self._weather_source_mon_idx
             saved_player_screens = copy.deepcopy(self._player_screens)
             saved_enemy_screens = copy.deepcopy(self._enemy_screens)
+            saved_player_intimidate = copy.deepcopy(self._player_intimidate)
+            saved_enemy_intimidate = copy.deepcopy(self._enemy_intimidate)
             saved_mimic = self._mimic_selection
             saved_transformed = self._is_player_transformed
             saved_double = self._double_battle_flag
@@ -458,6 +469,8 @@ class BattleSummaryController:
             self._weather_source_mon_idx = saved_weather_source_mon_idx
             self._player_screens = saved_player_screens
             self._enemy_screens = saved_enemy_screens
+            self._player_intimidate = saved_player_intimidate
+            self._enemy_intimidate = saved_enemy_intimidate
             self._mimic_selection = saved_mimic
             self._is_player_transformed = saved_transformed
             self._double_battle_flag = saved_double
@@ -981,6 +994,10 @@ class BattleSummaryController:
         self._weather_source_mon_idx = trainer_def.weather_source_mon_idx
         self._player_screens = copy.deepcopy(trainer_def.player_screens) if trainer_def.player_screens else {}
         self._enemy_screens = copy.deepcopy(trainer_def.enemy_screens) if trainer_def.enemy_screens else {}
+        # Intimidate sets (None means apply defaults based on ability presence).
+        # Stored in definition order; convert here to display order.
+        self._player_intimidate = self._intimidate_from_def_order(trainer_def.player_intimidate)
+        self._enemy_intimidate = self._intimidate_from_def_order(trainer_def.enemy_intimidate)
         self._double_battle_flag = trainer_obj.double_battle or second_trainer_obj is not None
         self._mimic_selection = trainer_def.mimic_selection
         self._is_player_transformed = trainer_def.transformed
@@ -1071,6 +1088,8 @@ class BattleSummaryController:
         self._weather_source_mon_idx = None
         self._player_screens = {}
         self._enemy_screens = {}
+        self._player_intimidate = None
+        self._enemy_intimidate = None
         self._mimic_selection = ""
         self._is_player_transformed = False
         self._player_setup_move_list = []
@@ -1128,6 +1147,8 @@ class BattleSummaryController:
         self._weather_source_mon_idx = None
         self._player_screens = {}
         self._enemy_screens = {}
+        self._player_intimidate = None
+        self._enemy_intimidate = None
         self._double_battle_flag = False
         self._mimic_selection = ""
         self._is_player_transformed = False
@@ -1221,6 +1242,8 @@ class BattleSummaryController:
             weather_source_mon_idx=self._weather_source_mon_idx,
             player_screens=copy.deepcopy(self._player_screens),
             enemy_screens=copy.deepcopy(self._enemy_screens),
+            player_intimidate=self._intimidate_to_def_order(self._player_intimidate),
+            enemy_intimidate=self._intimidate_to_def_order(self._enemy_intimidate),
             transformed=self._is_player_transformed,
             stat_stage_setup=final_stat_stage_setup,
             collapsed_mons=final_collapsed_mons,
@@ -1316,6 +1339,89 @@ class BattleSummaryController:
         side, or None if inactive."""
         screens = self._player_screens if is_player else self._enemy_screens
         return screens.get(screen_id)
+
+    # ------------------------------------------------------------------
+    # Intimidate ability handling
+    # ------------------------------------------------------------------
+
+    def _intimidate_from_def_order(self, raw):
+        """Convert a stored definition-order intimidate list to a display-order
+        set. Returns None when *raw* is None (apply defaults at use time)."""
+        if raw is None:
+            return None
+        def_to_display = {
+            def_idx: display_idx
+            for display_idx, def_idx in enumerate(self._cached_definition_order)
+        }
+        result = set()
+        for def_idx in raw:
+            display_idx = def_to_display.get(def_idx)
+            if display_idx is not None:
+                result.add(display_idx)
+        return result
+
+    def _intimidate_to_def_order(self, display_set):
+        """Convert a display-order intimidate set to a sorted list of definition
+        indices for storage. Returns None when *display_set* is None."""
+        if display_set is None:
+            return None
+        result = []
+        for display_idx in display_set:
+            if 0 <= display_idx < len(self._cached_definition_order):
+                result.append(self._cached_definition_order[display_idx])
+        return sorted(result)
+
+    def _player_has_intimidate(self, mon_idx:int) -> bool:
+        if mon_idx < 0 or mon_idx >= len(self._original_player_mon_list):
+            return False
+        return self._original_player_mon_list[mon_idx].ability == const.INTIMIDATE_ABILITY
+
+    def _enemy_has_intimidate(self, mon_idx:int) -> bool:
+        if mon_idx < 0 or mon_idx >= len(self._original_enemy_mon_list):
+            return False
+        return self._original_enemy_mon_list[mon_idx].ability == const.INTIMIDATE_ABILITY
+
+    def pokemon_has_intimidate(self, mon_idx:int, is_player:bool) -> bool:
+        return self._player_has_intimidate(mon_idx) if is_player else self._enemy_has_intimidate(mon_idx)
+
+    def _resolve_intimidate(self, is_player:bool) -> set:
+        """Returns the active set of intimidate matchups for this side. Falls
+        back to defaults if the user hasn't recorded an explicit choice yet."""
+        stored = self._player_intimidate if is_player else self._enemy_intimidate
+        if stored is not None:
+            return stored
+
+        # Defaults:
+        #   Player intimidates only the first enemy on switch-in (their mon
+        #     stays in for subsequent enemies).
+        #   Enemy intimidates whenever an enemy with the ability switches in.
+        result = set()
+        if is_player:
+            if self._original_player_mon_list and self._player_has_intimidate(0):
+                result.add(0)
+        else:
+            for idx in range(len(self._original_enemy_mon_list)):
+                if self._enemy_has_intimidate(idx):
+                    result.add(idx)
+        return result
+
+    def is_intimidate_active(self, mon_idx:int, is_player:bool) -> bool:
+        return mon_idx in self._resolve_intimidate(is_player)
+
+    def toggle_intimidate(self, mon_idx:int, is_player:bool, enabled:bool):
+        """Turn the Intimidate toggle on or off for *mon_idx* on the given side
+        (the side whose mon has the Intimidate ability)."""
+        current = self._resolve_intimidate(is_player)
+        new_set = set(current)
+        if enabled:
+            new_set.add(mon_idx)
+        else:
+            new_set.discard(mon_idx)
+        if is_player:
+            self._player_intimidate = new_set
+        else:
+            self._enemy_intimidate = new_set
+        self._full_refresh()
 
     def toggle_screen_from_move(self, move_name:str, enabled:bool, mon_idx:int, is_player:bool):
         """Activate or deactivate Reflect / Light Screen for the given side, scoped
@@ -1519,6 +1625,14 @@ class BattleSummaryController:
         # Track persistent modifiers that carry across matchups
         persistent_player_modifier = StageModifiers()
 
+        # Pre-resolve intimidate sets so the lookup is cheap inside the loop.
+        # Player intimidates the current enemy on switch-in (current matchup
+        # only — fresh enemy each time). Enemy intimidate debuffs the player's
+        # attack and persists from that matchup onward.
+        player_intimidate_active = self._resolve_intimidate(True)
+        enemy_intimidate_active = self._resolve_intimidate(False)
+        intimidate_drop = [(const.ATK, -1)]
+
         move_db = current_gen_info().move_db()
         gen = current_gen_info().get_generation()
         prev_player_level = None
@@ -1534,6 +1648,16 @@ class BattleSummaryController:
             # Start with persistent modifier from previous matchups
             cur_player_modifier = persistent_player_modifier._copy_constructor()
             cur_enemy_modifier = StageModifiers()
+
+            # Step 0: Apply Intimidate at switch-in. The enemy mon is fresh
+            # this matchup, so player intimidate only debuffs cur_enemy_modifier.
+            # Enemy intimidate debuffs the player and carries forward via
+            # persistent_player_modifier (stacks if multiple enemies have it).
+            if mon_idx in player_intimidate_active:
+                cur_enemy_modifier = cur_enemy_modifier.apply_stat_mod(intimidate_drop)
+            if mon_idx in enemy_intimidate_active:
+                persistent_player_modifier = persistent_player_modifier.apply_stat_mod(intimidate_drop)
+                cur_player_modifier = cur_player_modifier.apply_stat_mod(intimidate_drop)
 
             # Get stat stage setup for this matchup
             if mon_idx < len(self._stat_stage_setup):
@@ -1792,6 +1916,8 @@ class BattleSummaryController:
             weather_source_mon_idx=self._weather_source_mon_idx,
             player_screens=copy.deepcopy(self._player_screens),
             enemy_screens=copy.deepcopy(self._enemy_screens),
+            player_intimidate=copy.deepcopy(self._player_intimidate),
+            enemy_intimidate=copy.deepcopy(self._enemy_intimidate),
             mimic=self._mimic_selection,
             transformed=self._is_player_transformed,
             double=self._double_battle_flag,
@@ -1808,6 +1934,8 @@ class BattleSummaryController:
         self._weather_source_mon_idx = saved.get('weather_source_mon_idx')
         self._player_screens = saved.get('player_screens', {}) or {}
         self._enemy_screens = saved.get('enemy_screens', {}) or {}
+        self._player_intimidate = saved.get('player_intimidate')
+        self._enemy_intimidate = saved.get('enemy_intimidate')
         self._mimic_selection = saved['mimic']
         self._is_player_transformed = saved['transformed']
         self._double_battle_flag = saved['double']

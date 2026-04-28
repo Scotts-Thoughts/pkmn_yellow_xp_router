@@ -487,6 +487,7 @@ class BattleSummary(QWidget):
         for idx in range(6):
             mp = MonPairSummary(self._controller, idx, parent=self._base_frame)
             mp.setVisible(False)
+            mp.export_requested.connect(self.take_single_matchup_screenshot)
             self._mon_pairs.append(mp)
             self._base_layout.addWidget(mp)
             self._did_draw_mon_pairs.append(False)
@@ -668,16 +669,53 @@ class BattleSummary(QWidget):
                     if should_hide:
                         widget.setVisible(False)
                         restore.append(widget)
+            # Per-matchup intimidate toggles live on the MonPairSummary header.
+            # Hide any that are visible but unchecked so screenshots show only
+            # the intimidates that are actually applied.
+            for intimidate_widget in (mp._player_intimidate_widget, mp._enemy_intimidate_widget):
+                if intimidate_widget.isVisible() and not intimidate_widget._intimidate_checkbox.isChecked():
+                    intimidate_widget.setVisible(False)
+                    restore.append(intimidate_widget)
+            # The per-matchup Export button is a UI affordance, never part of
+            # the rendered output. Hiding it lets the enemy intimidate widget
+            # slide into its space inside the header's corner container.
+            if mp._export_button.isVisible():
+                mp._export_button.setVisible(False)
+                restore.append(mp._export_button)
+        # Swap matchup-header icons into screenshot layout: player icon next
+        # to player title, enemy icon next to enemy title, corner icon hidden.
+        self._set_screenshot_icon_mode(True)
         if restore:
             self._reactivate_layouts_for(restore)
+        # The icon swap also changes header geometry — re-activate the header
+        # layouts so render() reflects it even when no defaults were hidden.
+        self._reactivate_matchup_header_layouts()
         return restore
 
     def _restore_after_screenshot(self, restore):
-        if not restore:
-            return
-        for widget in restore:
-            widget.setVisible(True)
-        self._reactivate_layouts_for(restore)
+        # Always restore the viewing icon layout, even if nothing else changed.
+        self._set_screenshot_icon_mode(False)
+        if restore:
+            for widget in restore:
+                widget.setVisible(True)
+            self._reactivate_layouts_for(restore)
+        self._reactivate_matchup_header_layouts()
+
+    def _set_screenshot_icon_mode(self, enabled: bool):
+        for idx, mp in enumerate(self._mon_pairs):
+            if not (self._did_draw_mon_pairs[idx] and mp.isVisible()):
+                continue
+            mp.set_screenshot_icon_mode(enabled)
+
+    def _reactivate_matchup_header_layouts(self):
+        for idx, mp in enumerate(self._mon_pairs):
+            if not (self._did_draw_mon_pairs[idx] and mp.isVisible()):
+                continue
+            header_layout = mp._header_widget.layout()
+            if header_layout is not None:
+                header_layout.activate()
+        if self._base_frame.layout() is not None:
+            self._base_frame.layout().activate()
 
     def _reactivate_layouts_for(self, widgets):
         """Synchronously re-run the header layouts that own *widgets*, then the
@@ -689,6 +727,22 @@ class BattleSummary(QWidget):
             if layout is not None:
                 layout.activate()
         self._base_frame.layout().activate()
+
+    def take_single_matchup_screenshot(self, mon_idx: int):
+        """Capture a single matchup row as an image. The per-matchup Export
+        button is hidden during capture (handled by the shared defaults-hide
+        path) so the rendered image does not include it."""
+        if mon_idx < 0 or mon_idx >= len(self._mon_pairs):
+            return
+        mp = self._mon_pairs[mon_idx]
+        if not (self._did_draw_mon_pairs[mon_idx] and mp.isVisible()):
+            return
+        restore = self._hide_defaults_for_screenshot()
+        try:
+            pixmap = self._grab_transparent(mp)
+            self._save_pixmap(pixmap, f"matchup_{mon_idx + 1}")
+        finally:
+            self._restore_after_screenshot(restore)
 
     def take_battle_summary_screenshot(self):
         restore = self._hide_defaults_for_screenshot()
@@ -1293,6 +1347,8 @@ class PrefightCandySummary(QWidget):
 # ===================================================================
 
 class MonPairSummary(QWidget):
+    export_requested = Signal(int)
+
     def __init__(self, controller: BattleSummaryController, mon_idx: int, parent=None):
         super().__init__(parent)
         self._controller = controller
@@ -1351,10 +1407,17 @@ class MonPairSummary(QWidget):
         self._player_icon = QLabel()
         self._player_icon.setFixedSize(28, 28)
         self._player_icon.setStyleSheet("border: none;")
+        # Hidden during normal viewing; shown only for exported screenshots.
+        self._player_icon.setVisible(False)
+        self._has_player_icon = False
 
         self._enemy_icon = QLabel()
         self._enemy_icon.setFixedSize(28, 28)
         self._enemy_icon.setStyleSheet("border: none;")
+        # Hidden during normal viewing; shown only for exported screenshots.
+        self._enemy_icon.setVisible(False)
+        self._has_enemy_icon = False
+        self._has_corner_icon = False
 
         # Player icon+title centered over cols 0-3
         player_section = QWidget()
@@ -1376,10 +1439,22 @@ class MonPairSummary(QWidget):
         enemy_section_layout.addWidget(self._enemy_header)
         header_grid.addWidget(enemy_section, 0, 5, 1, 4, Qt.AlignCenter)
 
-        # Chevron pinned to the top-left corner so it doesn't push the title off-center
-        self._disclosure = DisclosureTriangle(size=14, color="#cccccc", parent=self._header_widget)
-        header_grid.addWidget(self._disclosure, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        self._disclosure.raise_()
+        # Top-left corner: chevron + enemy mon icon (viewing mode only).
+        # During screenshot export the corner icon is hidden and the original
+        # in-header player/enemy icons are shown instead.
+        self._corner_widget = QWidget(self._header_widget)
+        self._corner_widget.setStyleSheet("background: transparent; border: none;")
+        corner_layout = QHBoxLayout(self._corner_widget)
+        corner_layout.setContentsMargins(0, 0, 0, 0)
+        corner_layout.setSpacing(4)
+        self._disclosure = DisclosureTriangle(size=14, color="#cccccc")
+        self._enemy_icon_corner = QLabel()
+        self._enemy_icon_corner.setFixedSize(24, 24)
+        self._enemy_icon_corner.setStyleSheet("border: none;")
+        corner_layout.addWidget(self._disclosure, 0, Qt.AlignVCenter)
+        corner_layout.addWidget(self._enemy_icon_corner, 0, Qt.AlignVCenter)
+        header_grid.addWidget(self._corner_widget, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        self._corner_widget.raise_()
 
         outer_layout.addWidget(self._header_widget)
 
@@ -1441,6 +1516,65 @@ class MonPairSummary(QWidget):
             self.test_move_slots.append(ds)
             self._did_draw_test_moves.append(False)
 
+        # Intimidate toggles (one per side) sit in the matchup header,
+        # right-aligned next to the "Damage Ranges" title. Only shown when
+        # that side's mon has the ability. The enemy-side toggle shares its
+        # cell with a per-matchup Export button so the toggle slides into the
+        # button's space when the button is hidden during export.
+        self._player_intimidate_widget = self._build_intimidate_widget(is_player=True)
+        self._enemy_intimidate_widget = self._build_intimidate_widget(is_player=False)
+
+        self._export_button = QPushButton("Export", self._header_widget)
+        self._export_button.setFocusPolicy(Qt.NoFocus)
+        self._export_button.setCursor(Qt.PointingHandCursor)
+        self._export_button.setToolTip("Export this matchup as an image")
+        self._export_button.setFixedHeight(22)
+        self._export_button.clicked.connect(lambda: self.export_requested.emit(self._mon_idx))
+
+        self._enemy_corner_widget = QWidget(self._header_widget)
+        self._enemy_corner_widget.setStyleSheet("background: transparent; border: none;")
+        enemy_corner_layout = QHBoxLayout(self._enemy_corner_widget)
+        enemy_corner_layout.setContentsMargins(0, 0, 0, 0)
+        enemy_corner_layout.setSpacing(4)
+        enemy_corner_layout.addWidget(self._enemy_intimidate_widget)
+        enemy_corner_layout.addWidget(self._export_button)
+
+        header_grid.addWidget(self._player_intimidate_widget, 0, 3, Qt.AlignRight | Qt.AlignVCenter)
+        header_grid.addWidget(self._enemy_corner_widget, 0, 8, Qt.AlignRight | Qt.AlignVCenter)
+        self._player_intimidate_widget.raise_()
+        self._enemy_corner_widget.raise_()
+        self._player_intimidate_widget.setVisible(False)
+        self._enemy_intimidate_widget.setVisible(False)
+
+    def _build_intimidate_widget(self, is_player: bool) -> QWidget:
+        widget = QWidget(self._header_widget)
+        widget.setStyleSheet("background: transparent; border: none;")
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(4)
+        label = QLabel("Intimidate")
+        label.setStyleSheet("background: transparent; border: none;")
+        checkbox = QCheckBox()
+        checkbox.setFocusPolicy(Qt.NoFocus)
+        checkbox.setStyleSheet("QCheckBox { background: transparent; border: none; }")
+        checkbox.setToolTip(
+            "Lower the opposing Pokemon's Attack by 1 stage at switch-in"
+        )
+        checkbox.stateChanged.connect(
+            lambda _state, p=is_player, cb=checkbox: self._on_intimidate_toggled(p, cb)
+        )
+        layout.addWidget(label)
+        layout.addWidget(checkbox)
+        widget._intimidate_checkbox = checkbox
+        widget._intimidate_is_loading = False
+        return widget
+
+    def _on_intimidate_toggled(self, is_player: bool, checkbox):
+        widget = self._player_intimidate_widget if is_player else self._enemy_intimidate_widget
+        if widget._intimidate_is_loading:
+            return
+        self._controller.toggle_intimidate(self._mon_idx, is_player, checkbox.isChecked())
+
     def _toggle_expanded(self):
         self._expanded = not self._expanded
         self._content.setVisible(self._expanded)
@@ -1458,6 +1592,20 @@ class MonPairSummary(QWidget):
         self._content.setVisible(self._expanded)
         self._disclosure.set_expanded(self._expanded)
 
+    def set_screenshot_icon_mode(self, enabled: bool):
+        """Swap header icon layout between viewing and screenshot modes.
+
+        Viewing (enabled=False): player icon hidden, enemy icon shown next to
+        the chevron in the top-left corner.
+        Screenshot (enabled=True): both player and enemy icons shown next to
+        their respective headers; corner icon hidden.
+        """
+        self._player_icon.setVisible(enabled and self._has_player_icon)
+        self._enemy_icon.setVisible(enabled and self._has_enemy_icon)
+        self._enemy_icon_corner.setVisible((not enabled) and self._has_corner_icon)
+        # Hide the expand/contract chevron in exported screenshots.
+        self._disclosure.setVisible(not enabled)
+
     def _update_header_text(self):
         player_info = self._controller.get_pkmn_info(self._mon_idx, True)
         enemy_info = self._controller.get_pkmn_info(self._mon_idx, False)
@@ -1467,23 +1615,43 @@ class MonPairSummary(QWidget):
             self._enemy_header.setText("")
             self._player_icon.clear()
             self._enemy_icon.clear()
+            self._enemy_icon_corner.clear()
+            self._has_player_icon = False
+            self._has_enemy_icon = False
+            self._has_corner_icon = False
+            self._player_icon.setVisible(False)
+            self._enemy_icon.setVisible(False)
+            self._enemy_icon_corner.setVisible(False)
             return
 
-        # Set player Pokemon icon
+        # Pre-load both player and enemy icons (used for screenshot export).
         player_icon_pm = pkmn_icon.get_icon(player_info.attacking_mon_name, size=28)
         if player_icon_pm is not None:
             self._player_icon.setPixmap(player_icon_pm)
-            self._player_icon.setVisible(True)
+            self._has_player_icon = True
         else:
-            self._player_icon.setVisible(False)
+            self._player_icon.clear()
+            self._has_player_icon = False
 
-        # Set enemy Pokemon icon
-        icon_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=28)
-        if icon_pm is not None:
-            self._enemy_icon.setPixmap(icon_pm)
-            self._enemy_icon.setVisible(True)
+        enemy_icon_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=28)
+        if enemy_icon_pm is not None:
+            self._enemy_icon.setPixmap(enemy_icon_pm)
+            self._has_enemy_icon = True
         else:
-            self._enemy_icon.setVisible(False)
+            self._enemy_icon.clear()
+            self._has_enemy_icon = False
+
+        # Corner icon (viewing mode): the enemy mon, smaller to sit next to chevron.
+        corner_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=24)
+        if corner_pm is not None:
+            self._enemy_icon_corner.setPixmap(corner_pm)
+            self._has_corner_icon = True
+        else:
+            self._enemy_icon_corner.clear()
+            self._has_corner_icon = False
+
+        # Default to viewing mode; screenshot helpers flip this temporarily.
+        self.set_screenshot_icon_mode(False)
 
         self._disclosure.set_expanded(self._expanded)
 
@@ -1552,6 +1720,23 @@ class MonPairSummary(QWidget):
                 if self._did_draw_test_moves[slot_idx]:
                     test_move.setVisible(False)
                     self._did_draw_test_moves[slot_idx] = False
+
+        self._update_intimidate_toggle(is_player=True)
+        self._update_intimidate_toggle(is_player=False)
+
+    def _update_intimidate_toggle(self, is_player: bool):
+        widget = self._player_intimidate_widget if is_player else self._enemy_intimidate_widget
+        if not self._controller.pokemon_has_intimidate(self._mon_idx, is_player):
+            widget.setVisible(False)
+            return
+        widget._intimidate_is_loading = True
+        try:
+            widget._intimidate_checkbox.setChecked(
+                self._controller.is_intimidate_active(self._mon_idx, is_player)
+            )
+        finally:
+            widget._intimidate_is_loading = False
+        widget.setVisible(True)
 
 
 # ===================================================================
