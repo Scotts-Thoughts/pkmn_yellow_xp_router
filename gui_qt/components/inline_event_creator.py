@@ -31,6 +31,7 @@ _EVENT_TYPES = [
     ("Rare Candy",     "rare_candy"),
     ("Vitamin",        "vitamin"),
     ("TM/HM Move",    "tm_move"),
+    ("Tutor Move",    "tutor_move"),
     ("Save",           "save"),
     ("Heal",           "heal"),
     ("Blackout",       "blackout"),
@@ -496,6 +497,7 @@ class InlineEventCreator(QFrame):
         "vitamin":   "vitamin",
         "rare_candy": "qty",
         "tm_move":   "tm",
+        "tutor_move": "move",
         "notes":     "note",
     }
 
@@ -554,6 +556,12 @@ class InlineEventCreator(QFrame):
         """Select the correct type and populate config from *event_def*."""
         event_type = event_def.get_event_type()
         key = _EVENT_TYPE_TO_KEY.get(event_type)
+        if (
+            key == "tm_move"
+            and event_def.learn_move is not None
+            and event_def.learn_move.source == const.MOVE_SOURCE_TUTOR
+        ):
+            key = "tutor_move"
         if key is None:
             return
         idx = _KEY_TO_INDEX.get(key)
@@ -616,6 +624,15 @@ class InlineEventCreator(QFrame):
                 if idx < refs["dest"].count():
                     refs["dest"].setCurrentIndex(idx)
 
+        elif key == "tutor_move" and event_def.learn_move:
+            move = event_def.learn_move.move_to_learn
+            if "move" in refs and move is not None:
+                refs["move"].setCurrentText(move)
+            if "dest" in refs and event_def.learn_move.destination is not None:
+                idx = event_def.learn_move.destination + 1  # +1 for "Don't Learn"
+                if idx < refs["dest"].count():
+                    refs["dest"].setCurrentIndex(idx)
+
         elif key == "notes":
             if "note" in refs:
                 refs["note"].setText(event_def.notes or "")
@@ -671,6 +688,7 @@ class InlineEventCreator(QFrame):
             "rare_candy": self._cfg_rare_candy,
             "vitamin":    self._cfg_vitamin,
             "tm_move":    self._cfg_tm_move,
+            "tutor_move": self._cfg_tutor_move,
             "notes":      self._cfg_notes,
         }.get(key, self._cfg_simple)()
 
@@ -981,6 +999,67 @@ class InlineEventCreator(QFrame):
 
         self._event_builder = builder
         self._create_validator = lambda: tm_c.currentText() != const.NO_ITEM
+
+    # ---- Tutor Move --------------------------------------------------
+
+    def _cfg_tutor_move(self):
+        self._lbl("Move:")
+        moves = current_gen_info().move_db().get_filtered_names(filter="", include_delete_move=True)
+        move_c = self._combo(moves, 140)
+
+        self._lbl("Over:")
+        dest_c = self._combo([], 140)
+
+        def _refresh_dest():
+            st = self._state_at_insertion_point()
+            move_list = st.solo_pkmn.move_list if st and st.solo_pkmn else []
+            options = [const.MOVE_DONT_LEARN] + [
+                const.MOVE_SLOT_TEMPLATE.format(idx + 1, m)
+                for idx, m in enumerate(move_list)
+            ]
+            dest_c.blockSignals(True)
+            dest_c.clear()
+            dest_c.addItems(options)
+
+            move = move_c.currentText()
+            if move and move != const.DELETE_MOVE and st and st.solo_pkmn:
+                info = st.solo_pkmn.get_move_destination(move, None)
+                if info[0] is not None and info[0] + 1 < len(options):
+                    dest_c.setCurrentIndex(info[0] + 1)
+
+            dest_c.blockSignals(False)
+            self._update_create_state()
+
+        move_c.currentIndexChanged.connect(_refresh_dest)
+        move_c.currentIndexChanged.connect(lambda: self._update_create_state())
+        _refresh_dest()
+
+        self._config_refs = {"move": move_c, "dest": dest_c}
+
+        def builder():
+            move = move_c.currentText()
+            if not move:
+                return None
+            if move == const.DELETE_MOVE:
+                move = None
+
+            dest_text = dest_c.currentText()
+            if dest_text == const.MOVE_DONT_LEARN:
+                dest = None
+            else:
+                try:
+                    dest = int(dest_text.split("#")[1][0]) - 1
+                except Exception:
+                    dest = 0
+
+            return EventDefinition(
+                learn_move=LearnMoveEventDefinition(
+                    move, dest, const.MOVE_SOURCE_TUTOR,
+                )
+            )
+
+        self._event_builder = builder
+        self._create_validator = lambda: bool(move_c.currentText())
 
     # ---- Notes -------------------------------------------------------
 
