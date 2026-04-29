@@ -298,6 +298,15 @@ class RouteList(QTreeView):
         """Report the new selection to the controller when the user clicks."""
         if getattr(self, "_syncing_selection", False):
             return
+        # During refresh(), _refresh_recursively uses takeRow()+insertRow() to
+        # reposition rows whose index in the parent has shifted. takeRow fires
+        # selectionChanged (the row briefly leaves the model) — without this
+        # guard we'd report an empty selection to the controller mid-rebuild,
+        # wiping _selected_ids and clearing downstream views (battle summary,
+        # event details). The view selection is re-applied at the end of
+        # refresh(); skip until then.
+        if getattr(self, "_refreshing", False):
+            return
         cur_selected = self.get_all_selected_event_ids()
         if self._controller.get_all_selected_ids() != cur_selected:
             self._controller.select_new_events(cur_selected)
@@ -1350,6 +1359,7 @@ class RouteList(QTreeView):
         try:
             sel_model = self.selectionModel()
             sel_model.clearSelection()
+            last_idx = None
             for eid in event_ids:
                 name_item = self._item_lookup.get(eid)
                 if name_item is None:
@@ -1358,6 +1368,17 @@ class RouteList(QTreeView):
                 sel_model.select(
                     idx,
                     QItemSelectionModel.Select | QItemSelectionModel.Rows,
+                )
+                last_idx = idx
+            # Restore the current index too. _refresh_recursively detaches and
+            # re-inserts rows whose position shifts (takeRow + insertRow), which
+            # invalidates the selection model's current index. Without this the
+            # selected row keeps its highlight but loses the focus rectangle —
+            # visible after any route mutation that shifts the selected row
+            # (prefight candies, held item insertions, vitamins, etc.).
+            if last_idx is not None:
+                sel_model.setCurrentIndex(
+                    last_idx, QItemSelectionModel.NoUpdate
                 )
         finally:
             self._syncing_selection = False
