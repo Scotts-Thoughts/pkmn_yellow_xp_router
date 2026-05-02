@@ -328,6 +328,10 @@ class GameHookConstantConverter:
             converted_name = "Up Grade"
         elif converted_name == "Paralyze Heal":
             converted_name = "Parlyz Heal"
+        elif converted_name == "Dowsing Mchn":
+            converted_name = "Dowsing MCHN"
+        elif converted_name == "Gb Sounds":
+            converted_name = "GB Sounds"
 
         return converted_name
     

@@ -3114,6 +3114,489 @@
             "key_item": true,
             "pocket": "Key Items",
             "name": "Secret Key"
+        },
+        {
+            "rom_id": 468,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Apricorn Box"
+        },
+        {
+            "rom_id": 469,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Unown Report"
+        },
+        {
+            "rom_id": 470,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Berry Pots"
+        },
+        {
+            "rom_id": 471,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Dowsing MCHN"
+        },
+        {
+            "rom_id": 472,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Blue Card"
+        },
+        {
+            "rom_id": 473,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "Slowpoke Tail"
+        },
+        {
+            "rom_id": 474,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Clear Bell"
+        },
+        {
+            "rom_id": 475,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Card Key"
+        },
+        {
+            "rom_id": 476,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Basement Key"
+        },
+        {
+            "rom_id": 477,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Squirt Bottle"
+        },
+        {
+            "rom_id": 478,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Red Scale"
+        },
+        {
+            "rom_id": 479,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Lost Item"
+        },
+        {
+            "rom_id": 480,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Pass"
+        },
+        {
+            "rom_id": 481,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Machine Part"
+        },
+        {
+            "rom_id": 482,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Silver Wing"
+        },
+        {
+            "rom_id": 483,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Rainbow Wing"
+        },
+        {
+            "rom_id": 484,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Mystery Egg"
+        },
+        {
+            "rom_id": 485,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "Red Apricorn"
+        },
+        {
+            "rom_id": 486,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "Yellow Apricorn"
+        },
+        {
+            "rom_id": 487,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "Blue Apricorn"
+        },
+        {
+            "rom_id": 488,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "Green Apricorn"
+        },
+        {
+            "rom_id": 489,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "Pink Apricorn"
+        },
+        {
+            "rom_id": 490,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "White Apricorn"
+        },
+        {
+            "rom_id": 491,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "Black Apricorn"
+        },
+        {
+            "rom_id": 492,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Fast Ball"
+        },
+        {
+            "rom_id": 493,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Level Ball"
+        },
+        {
+            "rom_id": 494,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Lure Ball"
+        },
+        {
+            "rom_id": 495,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Heavy Ball"
+        },
+        {
+            "rom_id": 496,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Love Ball"
+        },
+        {
+            "rom_id": 497,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Friend Ball"
+        },
+        {
+            "rom_id": 498,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Moon Ball"
+        },
+        {
+            "rom_id": 499,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Sport Ball"
+        },
+        {
+            "rom_id": 500,
+            "purchase_price": 0,
+            "key_item": false,
+            "pocket": "Balls",
+            "name": "Park Ball"
+        },
+        {
+            "rom_id": 501,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Photo Album"
+        },
+        {
+            "rom_id": 502,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "GB Sounds"
+        },
+        {
+            "rom_id": 503,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Tidal Bell"
+        },
+        {
+            "rom_id": 504,
+            "purchase_price": 300,
+            "key_item": false,
+            "pocket": "Items",
+            "name": "Rage Candy Bar"
+        },
+        {
+            "rom_id": 505,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 01"
+        },
+        {
+            "rom_id": 506,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 02"
+        },
+        {
+            "rom_id": 507,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 03"
+        },
+        {
+            "rom_id": 508,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 04"
+        },
+        {
+            "rom_id": 509,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 05"
+        },
+        {
+            "rom_id": 510,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 06"
+        },
+        {
+            "rom_id": 511,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 07"
+        },
+        {
+            "rom_id": 512,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 08"
+        },
+        {
+            "rom_id": 513,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 09"
+        },
+        {
+            "rom_id": 514,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 10"
+        },
+        {
+            "rom_id": 515,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 11"
+        },
+        {
+            "rom_id": 516,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 12"
+        },
+        {
+            "rom_id": 517,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 13"
+        },
+        {
+            "rom_id": 518,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 14"
+        },
+        {
+            "rom_id": 519,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 15"
+        },
+        {
+            "rom_id": 520,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 16"
+        },
+        {
+            "rom_id": 521,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 17"
+        },
+        {
+            "rom_id": 522,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 18"
+        },
+        {
+            "rom_id": 523,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 19"
+        },
+        {
+            "rom_id": 524,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 20"
+        },
+        {
+            "rom_id": 525,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 21"
+        },
+        {
+            "rom_id": 526,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 22"
+        },
+        {
+            "rom_id": 527,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 23"
+        },
+        {
+            "rom_id": 528,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 24"
+        },
+        {
+            "rom_id": 529,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 25"
+        },
+        {
+            "rom_id": 530,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 26"
+        },
+        {
+            "rom_id": 531,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Data Card 27"
+        },
+        {
+            "rom_id": 532,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Jade Orb"
+        },
+        {
+            "rom_id": 533,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Lock Capsule"
+        },
+        {
+            "rom_id": 534,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Red Orb"
+        },
+        {
+            "rom_id": 535,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Blue Orb"
+        },
+        {
+            "rom_id": 536,
+            "purchase_price": 0,
+            "key_item": true,
+            "pocket": "Key Items",
+            "name": "Enigma Stone"
         }
     ]
 }
