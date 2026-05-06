@@ -797,7 +797,7 @@ class MainWindow(QMainWindow):
 
         _sc("gym_blue", self.select_blue)
 
-        for i in range(1, 7):
+        for i in range(1, 8):
             _sc(f"e4_{i}", partial(self.select_elite_four_or_champion, i - 1))
 
         # Filter toggles (application-wide context)

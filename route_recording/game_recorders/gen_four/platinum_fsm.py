@@ -745,16 +745,23 @@ class Machine:
                         logger.info(f"[BLACKOUT DEBUG] Converted trainer ID {trainer_id} ({trainer_name_before}) to name: {trainer.name}")
                         second_trainer = None
                         if cur_event.trainer_def.second_trainer_name:
-                            second_trainer_id = int(cur_event.trainer_def.second_trainer_name)
-                            second_trainer = current_gen_info().trainer_db().get_trainer_by_id(second_trainer_id)
-                            if second_trainer is None:
-                                msg = f"Failed to find second trainer from GameHook: ({type(second_trainer_id)}) {second_trainer_id}"
-                                logger.error(msg)
-                                self._controller.add_event(
-                                    EventDefinition(notes=const.RECORDING_ERROR_FRAGMENT + msg)
-                                )
-                                continue
-                            cur_event.trainer_def.second_trainer_name = second_trainer.name
+                            # Twins like "Clea & Gil" are one DB entry whose team already
+                            # contains both opponents' Pokemon. Skip the B-slot lookup so we
+                            # don't interleave and double the team.
+                            if trainer.double_battle:
+                                logger.info(f"First trainer {trainer.name} is a merged double-battle entry; ignoring second trainer slot {cur_event.trainer_def.second_trainer_name}")
+                                cur_event.trainer_def.second_trainer_name = ""
+                            else:
+                                second_trainer_id = int(cur_event.trainer_def.second_trainer_name)
+                                second_trainer = current_gen_info().trainer_db().get_trainer_by_id(second_trainer_id)
+                                if second_trainer is None:
+                                    msg = f"Failed to find second trainer from GameHook: ({type(second_trainer_id)}) {second_trainer_id}"
+                                    logger.error(msg)
+                                    self._controller.add_event(
+                                        EventDefinition(notes=const.RECORDING_ERROR_FRAGMENT + msg)
+                                    )
+                                    continue
+                                cur_event.trainer_def.second_trainer_name = second_trainer.name
                         if cur_event.notes == gh_gen_four_const.TRAINER_LOSS_FLAG:
                             # Trainer name has already been converted above
                             trainer_name = cur_event.trainer_def.trainer_name

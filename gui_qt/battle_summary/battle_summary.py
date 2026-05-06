@@ -7,8 +7,8 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
     QFrame, QCompleter, QLineEdit, QSizePolicy, QPushButton, QCheckBox, QComboBox,
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QRectF, QStringListModel, QEvent, QCoreApplication
-from PySide6.QtGui import QFont, QPixmap, QPainter, QPainterPath, QFocusEvent
+from PySide6.QtCore import Qt, QTimer, Signal, QRectF, QStringListModel, QEvent, QCoreApplication, QMimeData, QPoint
+from PySide6.QtGui import QFont, QPixmap, QPainter, QPainterPath, QFocusEvent, QDrag, QColor
 
 from controllers.battle_summary_controller import BattleSummaryController, MoveRenderInfo
 from gui_qt.components.custom_components import (
@@ -140,6 +140,8 @@ class BattleSummary(QWidget):
     kill ranges, move highlighting, setup-move / weather / candy
     configuration, and screenshot capability.
     """
+
+    matchup_reorder_requested = Signal(int, int)
 
     def __init__(self, controller: BattleSummaryController, parent=None):
         super().__init__(parent)
@@ -488,6 +490,7 @@ class BattleSummary(QWidget):
             mp = MonPairSummary(self._controller, idx, parent=self._base_frame)
             mp.setVisible(False)
             mp.export_requested.connect(self.take_single_matchup_screenshot)
+            mp.reorder_requested.connect(self._on_matchup_reorder_requested)
             self._mon_pairs.append(mp)
             self._base_layout.addWidget(mp)
             self._did_draw_mon_pairs.append(False)
@@ -620,22 +623,28 @@ class BattleSummary(QWidget):
     def _grab_transparent(self, widget):
         """Render *widget* into a QPixmap with a transparent background.
 
-        The widget and _base_frame backgrounds are temporarily made
-        transparent so that individual move/mon-pair frames keep their
-        own backgrounds while the overall canvas is see-through — ideal
-        for compositing into video footage.
+        The _base_frame background is temporarily made transparent so the
+        overall canvas is see-through while individual move/mon-pair frames
+        keep their own backgrounds — ideal for compositing into video footage.
+        Only the base frame's stylesheet is overridden; widgets nested inside
+        (e.g. a single MonPairSummary in the per-matchup export path) keep
+        their own background/border-radius styling.
         """
-        saved_widget = widget.styleSheet()
         saved_base = self._base_frame.styleSheet()
-        widget.setStyleSheet("background: transparent;")
-        self._base_frame.setStyleSheet("background: transparent;")
+        is_base = widget is self._base_frame
+        if is_base:
+            widget.setStyleSheet("background: transparent;")
+        else:
+            self._base_frame.setStyleSheet("background: transparent;")
 
         pixmap = QPixmap(widget.size())
         pixmap.fill(Qt.transparent)
         widget.render(pixmap)
 
-        widget.setStyleSheet(saved_widget)
-        self._base_frame.setStyleSheet(saved_base)
+        if is_base:
+            widget.setStyleSheet(saved_base)
+        else:
+            self._base_frame.setStyleSheet(saved_base)
         return pixmap
 
     def _hide_defaults_for_screenshot(self):
@@ -728,6 +737,11 @@ class BattleSummary(QWidget):
                 layout.activate()
         self._base_frame.layout().activate()
 
+    def _on_matchup_reorder_requested(self, from_idx: int, to_idx: int):
+        """Bubble a drag-drop reorder up so EventDetails can flush in-flight
+        edits before the route reload, then forward to the controller."""
+        self.matchup_reorder_requested.emit(from_idx, to_idx)
+
     def take_single_matchup_screenshot(self, mon_idx: int):
         """Capture a single matchup row as an image. The per-matchup Export
         button is hidden during capture (handled by the shared defaults-hide
@@ -740,6 +754,9 @@ class BattleSummary(QWidget):
         restore = self._hide_defaults_for_screenshot()
         try:
             pixmap = self._grab_transparent(mp)
+            pixmap = self._round_container_corners(
+                pixmap, [(0, 0, pixmap.width(), pixmap.height())]
+            )
             self._save_pixmap(pixmap, f"matchup_{mon_idx + 1}")
         finally:
             self._restore_after_screenshot(restore)
@@ -1077,6 +1094,7 @@ class BattleSummary(QWidget):
             self.setup_moves.set_move_list(self._controller.get_player_setup_moves())
             self.enemy_setup_moves.set_move_list(self._controller.get_enemy_setup_moves())
 
+            visible_count = 0
             for idx in range(6):
                 player_info = self._controller.get_pkmn_info(idx, True)
                 enemy_info = self._controller.get_pkmn_info(idx, False)
@@ -1090,6 +1108,16 @@ class BattleSummary(QWidget):
                         self._mon_pairs[idx].setVisible(True)
                         self._did_draw_mon_pairs[idx] = True
                     self._mon_pairs[idx].update_rendering()
+                    visible_count += 1
+
+            # Reorder grip: only meaningful for trainer battles (i.e. backed
+            # by an event group) with at least two matchups visible.
+            drag_enabled = (
+                visible_count >= 2
+                and self._controller.can_support_prefight_candies()
+            )
+            for idx in range(6):
+                self._mon_pairs[idx].set_drag_enabled(drag_enabled)
 
             self._loading = False
         finally:
@@ -1343,11 +1371,87 @@ class PrefightCandySummary(QWidget):
 
 
 # ===================================================================
+# Drag handle for matchup reordering
+# ===================================================================
+
+# Custom MIME format carrying the source mon_idx as utf-8 text.
+_MATCHUP_DRAG_MIME = "application/x-pkmn-router-matchup"
+_DRAG_THRESHOLD_PX = 6
+
+
+class DragGrip(QWidget):
+    """Compact grab-handle that initiates a QDrag on its owning MonPairSummary
+    once the user clicks and moves past a small threshold."""
+
+    def __init__(self, owner: "MonPairSummary", parent=None):
+        super().__init__(parent)
+        self._owner = owner
+        self._press_pos: QPoint = None
+        self.setFixedSize(12, 22)
+        self.setCursor(Qt.OpenHandCursor)
+        self.setToolTip("Drag to reorder this matchup")
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        try:
+            painter.setRenderHint(QPainter.Antialiasing, False)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor("#9a9a9a"))
+            cx = self.width() // 2
+            for row_idx in range(3):
+                cy = 4 + row_idx * 6
+                painter.drawRect(cx - 4, cy, 2, 2)
+                painter.drawRect(cx + 2, cy, 2, 2)
+        finally:
+            painter.end()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self._owner.is_drag_enabled():
+            self._press_pos = event.position().toPoint()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._press_pos is None or not (event.buttons() & Qt.LeftButton):
+            super().mouseMoveEvent(event)
+            return
+        delta = event.position().toPoint() - self._press_pos
+        if delta.manhattanLength() < _DRAG_THRESHOLD_PX:
+            return
+        self._press_pos = None
+
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData(_MATCHUP_DRAG_MIME, str(self._owner.mon_idx).encode("utf-8"))
+        drag.setMimeData(mime)
+
+        # Use the owning row as the drag preview; scale wide rows down so the
+        # cursor isn't dwarfed.
+        preview = self._owner.grab()
+        if preview.width() > 360:
+            preview = preview.scaledToWidth(360, Qt.SmoothTransformation)
+        drag.setPixmap(preview)
+        drag.setHotSpot(QPoint(20, preview.height() // 2))
+        try:
+            drag.exec(Qt.MoveAction)
+        finally:
+            self.setCursor(Qt.OpenHandCursor)
+
+    def mouseReleaseEvent(self, event):
+        self._press_pos = None
+        self.setCursor(Qt.OpenHandCursor)
+        super().mouseReleaseEvent(event)
+
+
+# ===================================================================
 # MonPairSummary -- one row per enemy pokemon matchup
 # ===================================================================
 
 class MonPairSummary(QWidget):
     export_requested = Signal(int)
+    reorder_requested = Signal(int, int)
 
     def __init__(self, controller: BattleSummaryController, mon_idx: int, parent=None):
         super().__init__(parent)
@@ -1439,22 +1543,34 @@ class MonPairSummary(QWidget):
         enemy_section_layout.addWidget(self._enemy_header)
         header_grid.addWidget(enemy_section, 0, 5, 1, 4, Qt.AlignCenter)
 
-        # Top-left corner: chevron + enemy mon icon (viewing mode only).
-        # During screenshot export the corner icon is hidden and the original
-        # in-header player/enemy icons are shown instead.
+        # Top-left corner: drag grip + chevron + enemy mon icon (viewing mode
+        # only). During screenshot export the corner icon is hidden and the
+        # original in-header player/enemy icons are shown instead.
         self._corner_widget = QWidget(self._header_widget)
         self._corner_widget.setStyleSheet("background: transparent; border: none;")
         corner_layout = QHBoxLayout(self._corner_widget)
         corner_layout.setContentsMargins(0, 0, 0, 0)
         corner_layout.setSpacing(4)
+        self._drag_grip = DragGrip(self, parent=self._corner_widget)
+        self._drag_enabled = False
+        self._drag_grip.setVisible(False)
         self._disclosure = DisclosureTriangle(size=14, color="#cccccc")
         self._enemy_icon_corner = QLabel()
         self._enemy_icon_corner.setFixedSize(24, 24)
         self._enemy_icon_corner.setStyleSheet("border: none;")
+        corner_layout.addWidget(self._drag_grip, 0, Qt.AlignVCenter)
         corner_layout.addWidget(self._disclosure, 0, Qt.AlignVCenter)
         corner_layout.addWidget(self._enemy_icon_corner, 0, Qt.AlignVCenter)
         header_grid.addWidget(self._corner_widget, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
         self._corner_widget.raise_()
+
+        # Drop indicator (thin horizontal bar) shown during a reorder drag.
+        self.setAcceptDrops(True)
+        self._drop_indicator = QFrame(self)
+        self._drop_indicator.setStyleSheet("background-color: #6cb1ff; border: none;")
+        self._drop_indicator.setFixedHeight(3)
+        self._drop_indicator.setVisible(False)
+        self._drop_indicator_pos = None  # 'top', 'bottom', or None
 
         outer_layout.addWidget(self._header_widget)
 
@@ -1603,8 +1719,9 @@ class MonPairSummary(QWidget):
         self._player_icon.setVisible(enabled and self._has_player_icon)
         self._enemy_icon.setVisible(enabled and self._has_enemy_icon)
         self._enemy_icon_corner.setVisible((not enabled) and self._has_corner_icon)
-        # Hide the expand/contract chevron in exported screenshots.
+        # Hide the expand/contract chevron and reorder grip in exported screenshots.
         self._disclosure.setVisible(not enabled)
+        self._drag_grip.setVisible((not enabled) and self._drag_enabled)
 
     def _update_header_text(self):
         player_info = self._controller.get_pkmn_info(self._mon_idx, True)
@@ -1729,14 +1846,98 @@ class MonPairSummary(QWidget):
         if not self._controller.pokemon_has_intimidate(self._mon_idx, is_player):
             widget.setVisible(False)
             return
+        blocked = self._controller.is_intimidate_blocked(self._mon_idx, is_player)
         widget._intimidate_is_loading = True
         try:
             widget._intimidate_checkbox.setChecked(
                 self._controller.is_intimidate_active(self._mon_idx, is_player)
             )
+            widget._intimidate_checkbox.setEnabled(not blocked)
+            widget._intimidate_checkbox.setToolTip(
+                "Opposing ability prevents stat reduction" if blocked else ""
+            )
         finally:
             widget._intimidate_is_loading = False
         widget.setVisible(True)
+
+    # ------------------------------------------------------------------
+    # Drag-drop reordering
+    # ------------------------------------------------------------------
+
+    @property
+    def mon_idx(self) -> int:
+        return self._mon_idx
+
+    def is_drag_enabled(self) -> bool:
+        return self._drag_enabled
+
+    def set_drag_enabled(self, enabled: bool):
+        if enabled == self._drag_enabled:
+            return
+        self._drag_enabled = enabled
+        self._drag_grip.setVisible(enabled)
+
+    def _set_drop_indicator(self, mode):
+        if mode == self._drop_indicator_pos:
+            return
+        self._drop_indicator_pos = mode
+        if mode is None:
+            self._drop_indicator.setVisible(False)
+            return
+        self._drop_indicator.setFixedWidth(self.width())
+        y = 0 if mode == "top" else self.height() - self._drop_indicator.height()
+        self._drop_indicator.move(0, y)
+        self._drop_indicator.raise_()
+        self._drop_indicator.setVisible(True)
+
+    def _read_drag_source_idx(self, event) -> int:
+        try:
+            raw = bytes(event.mimeData().data(_MATCHUP_DRAG_MIME))
+            return int(raw.decode("utf-8"))
+        except Exception:
+            return -1
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(_MATCHUP_DRAG_MIME):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if not event.mimeData().hasFormat(_MATCHUP_DRAG_MIME):
+            event.ignore()
+            return
+        src = self._read_drag_source_idx(event)
+        if src == self._mon_idx:
+            self._set_drop_indicator(None)
+            event.acceptProposedAction()
+            return
+        midpoint = self.height() // 2
+        self._set_drop_indicator("top" if event.position().y() < midpoint else "bottom")
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self._set_drop_indicator(None)
+        event.accept()
+
+    def dropEvent(self, event):
+        if not event.mimeData().hasFormat(_MATCHUP_DRAG_MIME):
+            event.ignore()
+            return
+        src = self._read_drag_source_idx(event)
+        midpoint = self.height() // 2
+        insert_above = event.position().y() < midpoint
+        self._set_drop_indicator(None)
+        event.acceptProposedAction()
+        if src < 0 or src == self._mon_idx:
+            return
+        # Insertion point in the original list: above this slot or below it.
+        # Translate to the post-pop final index that the controller expects.
+        insertion_point = self._mon_idx if insert_above else self._mon_idx + 1
+        to_idx = insertion_point if insertion_point <= src else insertion_point - 1
+        if to_idx == src:
+            return
+        self.reorder_requested.emit(src, to_idx)
 
 
 # ===================================================================

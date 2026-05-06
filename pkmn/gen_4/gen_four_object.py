@@ -257,10 +257,13 @@ class GenFour(CurrentGen):
     def get_elite_four_and_champion_names(self) -> List[str]:
         all_e4 = self._fight_categories.get(const.FIGHT_CATEGORY_ELITE_FOUR, [])
         all_champ = self._fight_categories.get(const.FIGHT_CATEGORY_CHAMPION, [])
+        post = self._fight_categories.get(const.FIGHT_CATEGORY_POST_GAME, [])
         if self._version_name in [const.HEART_GOLD_VERSION, const.SOUL_SILVER_VERSION]:
-            hgss_e4 = [name for name in all_e4 if any(k in name for k in ["Will", "Koga", "Bruno", "Karen"])]
-            hgss_champ = [name for name in all_champ if "Lance" in name]
-            return hgss_e4 + hgss_champ
+            hgss_e4 = [name for name in all_e4 if any(k in name for k in ["Will", "Koga", "Bruno", "Karen"]) and "Rematch" not in name]
+            lance_first = [name for name in all_champ if "Lance" in name and "Rematch" not in name]
+            lance_rematch = [name for name in all_champ if "Lance" in name and "Rematch 2" in name]
+            red = [name for name in post if "Red" in name]
+            return hgss_e4 + lance_first + lance_rematch + red
         else:
             dpp_e4 = [name for name in all_e4 if any(k in name for k in ["Aaron", "Bertha", "Flint", "Lucian"])]
             dpp_champ = [name for name in all_champ if "Cynthia" in name]

@@ -83,6 +83,7 @@ DEFAULT_SHORTCUTS = {
     "e4_4":                     "Ctrl+4",
     "e4_5":                     "Ctrl+5",
     "e4_6":                     "Ctrl+6",
+    "e4_7":                     "Ctrl+7",
     # Filter toggles (application-wide)
     "filter_trainer":           "Ctrl+F",
     "filter_rare_candy":        "Ctrl+R",
@@ -179,6 +180,7 @@ SHORTCUT_LABELS = {
     "e4_4":                     "Select Elite Four 4",
     "e4_5":                     "Select Elite Four 5",
     "e4_6":                     "Select Elite Four/Champion 6",
+    "e4_7":                     "Select Elite Four/Champion 7",
     # Filter toggles
     "filter_trainer":           "Toggle Trainer Filter",
     "filter_rare_candy":        "Toggle Rare Candy Filter",
@@ -215,7 +217,7 @@ SHORTCUT_CATEGORIES = {
     "Navigation":       ["delete_key", "scroll_home", "scroll_end", "toggle_tabs", "toggle_summary",
                          "gym_1", "gym_2", "gym_3", "gym_4", "gym_5", "gym_6", "gym_7", "gym_8",
                          "gym_blue",
-                         "e4_1", "e4_2", "e4_3", "e4_4", "e4_5", "e4_6"],
+                         "e4_1", "e4_2", "e4_3", "e4_4", "e4_5", "e4_6", "e4_7"],
     "Filters":          ["filter_trainer", "filter_rare_candy", "filter_tm_hm", "filter_vitamin",
                          "filter_wild_pkmn", "filter_acquire_item", "filter_purchase_item",
                          "filter_use_item", "filter_sell_item", "filter_hold_item",

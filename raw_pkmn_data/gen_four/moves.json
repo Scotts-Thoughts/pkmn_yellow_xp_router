@@ -276,7 +276,14 @@
         "affected_by_kings_rock": false,
         "description": "The user draws power from nature and fires it at the foe. It may also lower the target\u2019s Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Wood Hammer": {
@@ -1338,7 +1345,14 @@
         "affected_by_kings_rock": true,
         "description": "The user swings and hits with its strong and heavy fist. It lowers the user\u2019s Speed, however.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -1,
+                "stat": "spe",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Shadow Sneak": {
@@ -2320,7 +2334,14 @@
         "affected_by_kings_rock": false,
         "description": "The user vibrates its wings to generate a damaging sound wave. It may also lower the foe\u2019s Sp. Def stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Mirror Coat": {
@@ -3120,7 +3141,14 @@
         "affected_by_kings_rock": true,
         "description": "Comets are summoned down from the sky. The attack\u2019s recoil sharply reduces the user\u2019s Sp. Atk stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -2,
+                "stat": "spa",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Captivate": {
@@ -3349,7 +3377,14 @@
         "affected_by_kings_rock": false,
         "description": "The user heightens its mental focus and unleashes its power. It may also lower the target\u2019s Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Sludge": {
@@ -4265,7 +4300,20 @@
         "affected_by_kings_rock": true,
         "description": "The user fights the foe in close without guarding itself. It also cuts the user\u2019s Defense and Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -1,
+                "stat": "def",
+                "target": "self"
+            },
+            {
+                "chance": 100,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Pin Missile": {
@@ -6514,7 +6562,20 @@
         "affected_by_kings_rock": false,
         "description": "The user calls out its underlings to shield its body, raising its Defense and Sp. Def stats.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "def",
+                "target": "self"
+            },
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "spd",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Ice Beam": {
@@ -6717,7 +6778,14 @@
         "affected_by_kings_rock": true,
         "description": "The user gathers all its light energy and releases it at once. It may also lower the foe\u2019s Sp. Def stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Withdraw": {
@@ -8953,7 +9021,14 @@
         "affected_by_kings_rock": true,
         "description": "The user makes the ground under the foe erupt with power. It may also lower the target\u2019s Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Harden": {
@@ -9185,7 +9260,14 @@
         "affected_by_kings_rock": false,
         "description": "The user polishes its body to reduce drag. It can sharply raise the Speed stat. ",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 2,
+                "stat": "spe",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Ice Ball": {
@@ -9286,7 +9368,14 @@
         "affected_by_kings_rock": true,
         "description": "The user generates a shock wave from within its body. It may also lower the target\u2019s Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 40,
+                "modifier": -2,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Vital Throw": {
@@ -9382,7 +9471,14 @@
         "affected_by_kings_rock": true,
         "description": "A storm of sharp leaves is whipped up. The attack\u2019s recoil sharply reduces the user\u2019s Sp. Atk stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -2,
+                "stat": "spa",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Guard Swap": {
@@ -9809,7 +9905,14 @@
         "affected_by_kings_rock": true,
         "description": "The user launches a hard-packed mud ball to attack. It may also lower the target\u2019s accuracy.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "modifier": -1,
+                "stat": "acc",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Swords Dance": {
@@ -10212,7 +10315,14 @@
         "affected_by_kings_rock": false,
         "description": "The user stimulates its brain by thinking bad thoughts. It sharply raises the user\u2019s Sp. Atk.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 2,
+                "stat": "spa",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Sludge Bomb": {
@@ -10627,7 +10737,14 @@
         "affected_by_kings_rock": true,
         "description": "The user looses a flash of energy from its polished body. It may also lower the target\u2019s accuracy.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "modifier": -1,
+                "stat": "acc",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Destiny Bond": {

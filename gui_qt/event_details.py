@@ -94,6 +94,7 @@ class EventDetails(QWidget):
         self._tab_widget.addTab(self.battle_summary, "Battle Summary")
         self.battle_summary_tab_index = 1
         self.battle_summary.show_contents()
+        self.battle_summary.matchup_reorder_requested.connect(self._handle_matchup_reorder)
 
         # Auto-switch checkbox (inline with tabs)
         self.auto_switch_checkbox = CheckboxLabel(
@@ -448,6 +449,13 @@ class EventDetails(QWidget):
             return
 
         self._controller.update_existing_event(event_to_update, new_event)
+
+    def _handle_matchup_reorder(self, from_idx: int, to_idx: int):
+        """Drag-drop reorder from the battle summary. Flush any in-flight
+        editor edits first so notes/order being typed aren't clobbered when
+        the route reload reseeds the editors."""
+        self.force_and_clear_event_update()
+        self._battle_summary_controller.reorder_matchup(from_idx, to_idx)
 
     # ------------------------------------------------------------------
     # Notes visibility

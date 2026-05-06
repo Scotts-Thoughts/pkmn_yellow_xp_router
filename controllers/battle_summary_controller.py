@@ -1384,12 +1384,27 @@ class BattleSummaryController:
     def pokemon_has_intimidate(self, mon_idx:int, is_player:bool) -> bool:
         return self._player_has_intimidate(mon_idx) if is_player else self._enemy_has_intimidate(mon_idx)
 
+    def is_intimidate_blocked(self, mon_idx:int, is_player:bool) -> bool:
+        """Returns True when the opposing mon at *mon_idx* has an ability that
+        prevents stat reduction (Clear Body / Hyper Cutter), making Intimidate
+        from the *is_player* side a no-op for this matchup."""
+        opposing_list = self._original_enemy_mon_list if is_player else self._original_player_mon_list
+        if mon_idx < 0 or mon_idx >= len(opposing_list):
+            return False
+        return opposing_list[mon_idx].ability in const.INTIMIDATE_BLOCKING_ABILITIES
+
     def _resolve_intimidate(self, is_player:bool) -> set:
         """Returns the active set of intimidate matchups for this side. Falls
-        back to defaults if the user hasn't recorded an explicit choice yet."""
+        back to defaults if the user hasn't recorded an explicit choice yet.
+        Matchups where the opposing mon's ability blocks stat reduction are
+        filtered out so Intimidate becomes a no-op against Clear Body /
+        Hyper Cutter."""
         stored = self._player_intimidate if is_player else self._enemy_intimidate
         if stored is not None:
-            return stored
+            return {
+                idx for idx in stored
+                if not self.is_intimidate_blocked(idx, is_player)
+            }
 
         # Defaults:
         #   Player intimidates only the first enemy on switch-in (their mon
@@ -1397,11 +1412,18 @@ class BattleSummaryController:
         #   Enemy intimidates whenever an enemy with the ability switches in.
         result = set()
         if is_player:
-            if self._original_player_mon_list and self._player_has_intimidate(0):
+            if (
+                self._original_player_mon_list
+                and self._player_has_intimidate(0)
+                and not self.is_intimidate_blocked(0, True)
+            ):
                 result.add(0)
         else:
             for idx in range(len(self._original_enemy_mon_list)):
-                if self._enemy_has_intimidate(idx):
+                if (
+                    self._enemy_has_intimidate(idx)
+                    and not self.is_intimidate_blocked(idx, False)
+                ):
                     result.add(idx)
         return result
 
@@ -1472,6 +1494,76 @@ class BattleSummaryController:
         # have no event_group_id so this is a no-op write for them, but the
         # in-memory per-battle state still tracks correctly.
         self._on_nonload_change()
+
+    def reorder_matchup(self, from_disp_idx:int, to_disp_idx:int) -> bool:
+        """Move the matchup currently at *from_disp_idx* to *to_disp_idx* by
+        rewriting trainer_def.mon_order. Display-keyed controller state stays
+        valid because it's keyed off each mon's def_idx, not its slot.
+
+        Wild battles (no event_group_id) and out-of-range indices are no-ops.
+        Returns True iff the route was modified.
+        """
+        if from_disp_idx == to_disp_idx:
+            return False
+        if self._event_group_id is None:
+            return False
+        event_group = self._main_controller.get_event_by_id(self._event_group_id)
+        if (
+            event_group is None
+            or event_group.event_definition is None
+            or event_group.event_definition.trainer_def is None
+        ):
+            return False
+
+        pkmn_def_order = event_group.event_definition.get_pokemon_list(definition_order=True)
+        num_mons = len(pkmn_def_order)
+        if num_mons < 2:
+            return False
+        if not (0 <= from_disp_idx < num_mons) or not (0 <= to_disp_idx < num_mons):
+            return False
+
+        orig_td = event_group.event_definition.trainer_def
+        if orig_td.mon_order and len(orig_td.mon_order) == num_mons:
+            cur_mon_order = list(orig_td.mon_order)
+        else:
+            cur_mon_order = list(range(1, num_mons + 1))
+
+        # Invert mon_order (def_idx -> display_idx) to a display-ordered list of def indices.
+        display_to_def = [None] * num_mons
+        for def_idx, disp_pos in enumerate(cur_mon_order):
+            slot = disp_pos - 1
+            if 0 <= slot < num_mons and display_to_def[slot] is None:
+                display_to_def[slot] = def_idx
+        # Fill any holes (defensive: bad data on disk).
+        used = {x for x in display_to_def if x is not None}
+        missing_slots = [i for i, x in enumerate(display_to_def) if x is None]
+        missing_defs = [i for i in range(num_mons) if i not in used]
+        for slot, def_idx in zip(missing_slots, missing_defs):
+            display_to_def[slot] = def_idx
+
+        moved = display_to_def.pop(from_disp_idx)
+        display_to_def.insert(to_disp_idx, moved)
+
+        new_mon_order = [0] * num_mons
+        for new_disp_idx, def_idx in enumerate(display_to_def):
+            new_mon_order[def_idx] = new_disp_idx + 1
+
+        # Build a fresh trainer_def from controller state (preserves toggles,
+        # custom move data, intimidate, collapsed-mons, etc.) then patch in
+        # the editor-only fields we don't carry on the controller.
+        new_trainer_def = self.get_partial_trainer_definition()
+        if new_trainer_def is None:
+            return False
+        new_trainer_def.exp_split = list(orig_td.exp_split) if orig_td.exp_split else []
+        new_trainer_def.pay_day_amount = orig_td.pay_day_amount
+        new_trainer_def.mon_order = new_mon_order
+
+        new_event = EventDefinition(
+            trainer_def=new_trainer_def,
+            notes=event_group.event_definition.notes,
+        )
+        self._main_controller.update_existing_event(self._event_group_id, new_event)
+        return True
 
     def get_player_held_item(self) -> str:
         if self._original_player_mon_list:

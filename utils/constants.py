@@ -165,6 +165,9 @@ class Constants:
         self.PLAYER_INTIMIDATE_KEY = "player_intimidate"
         self.ENEMY_INTIMIDATE_KEY = "enemy_intimidate"
         self.INTIMIDATE_ABILITY = "Intimidate"
+        self.CLEAR_BODY_ABILITY = "Clear Body"
+        self.HYPER_CUTTER_ABILITY = "Hyper Cutter"
+        self.INTIMIDATE_BLOCKING_ABILITIES = frozenset([self.CLEAR_BODY_ABILITY, self.HYPER_CUTTER_ABILITY])
         self.PAY_DAY_AMOUNT = "pay_day_amount"
         self.MON_ORDER = "mon_order"
         self.TRANSFORMED = "transformed"
