@@ -37,7 +37,7 @@ if __name__ == "__main__":
         "--hidden-import=appdirs",
         "--hidden-import=signalrcore",
         "--name", "pkmn_xp_router",
-        "--add-data", "assets\*.tcl;assets",
+        "--add-data", "assets\\*.tcl;assets",
         "--add-data", "assets\\theme\\*.tcl;assets\\theme",
         "--add-data", "assets\\theme\\dark\\*;assets\\theme\\dark",
         "--add-data", "icons\\*.png;icons",
