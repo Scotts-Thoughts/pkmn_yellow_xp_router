@@ -11,6 +11,7 @@ from gui_qt.dialogs.highlight_color_config_dialog import HighlightColorConfigDia
 from gui_qt.dialogs.data_dir_config_dialog import DataDirConfigDialog
 from gui_qt.dialogs.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
 from gui_qt.dialogs.final_trainers_dialog import FinalTrainersDialog
+from gui_qt.dialogs.matchup_export_dialog import MatchupExportDialog
 
 __all__ = [
     "BaseDialog",
@@ -26,4 +27,5 @@ __all__ = [
     "DataDirConfigDialog",
     "KeyboardShortcutsDialog",
     "FinalTrainersDialog",
+    "MatchupExportDialog",
 ]

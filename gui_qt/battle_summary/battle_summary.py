@@ -743,21 +743,61 @@ class BattleSummary(QWidget):
         self.matchup_reorder_requested.emit(from_idx, to_idx)
 
     def take_single_matchup_screenshot(self, mon_idx: int):
-        """Capture a single matchup row as an image. The per-matchup Export
-        button is hidden during capture (handled by the shared defaults-hide
-        path) so the rendered image does not include it."""
+        """Prompt for which slice of the matchup to export, then capture it.
+
+        Shows a dialog with three choices: the full match-up, the player ranges
+        only, or the enemy ranges only. Cancelling the dialog leaves the UI
+        untouched.
+        """
         if mon_idx < 0 or mon_idx >= len(self._mon_pairs):
             return
         mp = self._mon_pairs[mon_idx]
         if not (self._did_draw_mon_pairs[mon_idx] and mp.isVisible()):
             return
+
+        from gui_qt.dialogs import MatchupExportDialog
+        dlg = MatchupExportDialog(self)
+        dlg.exec()
+        if dlg.selected_mode is None:
+            return
+        self._capture_single_matchup(mon_idx, dlg.selected_mode)
+
+    def _capture_single_matchup(self, mon_idx: int, mode: str):
+        """Render the chosen slice of matchup *mon_idx* and save it.
+
+        *mode* is one of ``MatchupExportDialog.MODE_FULL`` / ``MODE_PLAYER`` /
+        ``MODE_ENEMY``. The player/enemy modes crop the rendered matchup at the
+        center divider so each side keeps its own header, icon, and intimidate
+        toggle.
+        """
+        from gui_qt.dialogs import MatchupExportDialog
+
+        mp = self._mon_pairs[mon_idx]
         restore = self._hide_defaults_for_screenshot()
         try:
             pixmap = self._grab_transparent(mp)
+            full_h = pixmap.height()
+            full_w = pixmap.width()
+
+            if mode == MatchupExportDialog.MODE_PLAYER:
+                divider = mp.divider
+                div_left = divider.mapTo(mp, divider.rect().topLeft()).x()
+                split_x = max(0, min(full_w, div_left))
+                pixmap = pixmap.copy(0, 0, split_x, full_h)
+                suffix = f"matchup_{mon_idx + 1}_player_ranges"
+            elif mode == MatchupExportDialog.MODE_ENEMY:
+                divider = mp.divider
+                div_left = divider.mapTo(mp, divider.rect().topLeft()).x()
+                split_x = max(0, min(full_w, div_left + divider.width()))
+                pixmap = pixmap.copy(split_x, 0, full_w - split_x, full_h)
+                suffix = f"matchup_{mon_idx + 1}_enemy_ranges"
+            else:
+                suffix = f"matchup_{mon_idx + 1}"
+
             pixmap = self._round_container_corners(
                 pixmap, [(0, 0, pixmap.width(), pixmap.height())]
             )
-            self._save_pixmap(pixmap, f"matchup_{mon_idx + 1}")
+            self._save_pixmap(pixmap, suffix)
         finally:
             self._restore_after_screenshot(restore)
 
@@ -1741,20 +1781,19 @@ class MonPairSummary(QWidget):
             self._enemy_icon_corner.setVisible(False)
             return
 
-        # Pre-load both player and enemy icons (used for screenshot export).
-        player_icon_pm = pkmn_icon.get_icon(player_info.attacking_mon_name, size=28)
-        if player_icon_pm is not None:
-            self._player_icon.setPixmap(player_icon_pm)
-            self._has_player_icon = True
-        else:
-            self._player_icon.clear()
-            self._has_player_icon = False
-
+        # Pre-load enemy icon for screenshot export. Both header sides show the
+        # enemy mon icon: the player-side "Damage Ranges" header shows whom the
+        # player is attacking, which is visually clearer than the player's own
+        # icon next to their own name.
         enemy_icon_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=28)
         if enemy_icon_pm is not None:
+            self._player_icon.setPixmap(enemy_icon_pm)
+            self._has_player_icon = True
             self._enemy_icon.setPixmap(enemy_icon_pm)
             self._has_enemy_icon = True
         else:
+            self._player_icon.clear()
+            self._has_player_icon = False
             self._enemy_icon.clear()
             self._has_enemy_icon = False
 
