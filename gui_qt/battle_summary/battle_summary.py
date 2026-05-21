@@ -6,6 +6,7 @@ from typing import List
 from PySide6.QtWidgets import (
     QWidget, QLabel, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
     QFrame, QCompleter, QLineEdit, QSizePolicy, QPushButton, QCheckBox, QComboBox,
+    QDialog,
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QRectF, QStringListModel, QEvent, QCoreApplication, QMimeData, QPoint
 from PySide6.QtGui import QFont, QPixmap, QPainter, QPainterPath, QFocusEvent, QDrag, QColor
@@ -14,6 +15,7 @@ from controllers.battle_summary_controller import BattleSummaryController, MoveR
 from gui_qt.components.custom_components import (
     SimpleButton, SimpleOptionMenu, AmountEntry, CheckboxLabel, DisclosureTriangle,
 )
+from gui_qt.dialogs.base_dialog import BaseDialog
 from pkmn import universal_data_objects
 from pkmn.gen_factory import current_gen_info
 from routing import full_route_state
@@ -2069,6 +2071,49 @@ class AutocompleteEntry(QWidget):
 
 
 # ===================================================================
+# AssignMoveDialog -- Ctrl+Click move picker for a player move slot
+# ===================================================================
+
+class AssignMoveDialog(BaseDialog):
+    """Simple modal move picker shown when the user Ctrl+Clicks a player move
+    name. Lets them choose a move to teach into that slot; the caller turns the
+    selection into a tutor learn-move event placed before the battle."""
+
+    def __init__(self, move_names, slot_idx, parent=None):
+        super().__init__(parent=parent, title="Assign Move")
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            f"Teach a move into slot #{slot_idx + 1}.\n"
+            f"A tutor event will be added just before this battle."
+        ))
+
+        self._entry = AutocompleteEntry(move_names, width=24, parent=self)
+        layout.addWidget(self._entry)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        ok_btn = SimpleButton("OK", parent=self)
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = SimpleButton("Cancel", parent=self)
+        cancel_btn.clicked.connect(self.reject)
+        button_row.addWidget(ok_btn)
+        button_row.addWidget(cancel_btn)
+        layout.addLayout(button_row)
+
+    def selected_move(self):
+        val = self._entry.get().strip()
+        return val or None
+
+    def done(self, result):
+        # accept()/reject()/X all funnel through done(); clear the popup flag
+        # here so keyboard shortcuts are re-enabled however the dialog closes.
+        if self._main_window is not None and hasattr(self._main_window, '_popup_open'):
+            self._main_window._popup_open = False
+        super().done(result)
+
+
+# ===================================================================
 # DamageSummary -- a single move's damage info
 # ===================================================================
 
@@ -2328,10 +2373,17 @@ class DamageSummary(QWidget):
         self._controller.update_test_move(slot_idx, selected_move)
 
     def _on_move_name_mouse_press(self, event):
-        """Handle click on move name to cycle or reset highlight state."""
-        if not self._controller.get_show_move_highlights():
+        """Handle click on a player move name. Ctrl+Click opens a picker to
+        assign a new move to this slot (via a tutor event); a plain left/right
+        click cycles or resets the highlight state."""
+        if not self._is_player_mon or self._is_test_move:
             return
-        if not self._is_player_mon:
+        # Ctrl+Click assigns a new move to this slot, independent of whether
+        # move highlights are currently shown.
+        if event.button() == Qt.LeftButton and (event.modifiers() & Qt.ControlModifier):
+            self._prompt_assign_move()
+            return
+        if not self._controller.get_show_move_highlights():
             return
         if event.button() == Qt.LeftButton:
             self._controller.update_move_highlight(
@@ -2341,6 +2393,16 @@ class DamageSummary(QWidget):
             self._controller.update_move_highlight(
                 self._mon_idx, self._move_idx, self._is_player_mon, reset=True,
             )
+
+    def _prompt_assign_move(self):
+        """Ask the user which move to teach into this slot, then have the
+        controller create the corresponding tutor event before the battle."""
+        move_names = current_gen_info().move_db().get_filtered_names()
+        dialog = AssignMoveDialog(move_names, self._move_idx, parent=self.window())
+        if dialog.exec() == QDialog.Accepted:
+            selected = dialog.selected_move()
+            if selected:
+                self._controller.assign_player_move_via_tutor(self._move_idx, selected)
 
     # ------------------------------------------------------------------
     # Highlight colour helpers

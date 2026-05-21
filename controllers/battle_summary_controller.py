@@ -10,7 +10,7 @@ from routing.full_route_state import RouteState
 from utils.config_manager import config
 
 from utils.constants import const
-from routing.route_events import EventDefinition, EventFolder, EventGroup, HoldItemEventDefinition, InventoryEventDefinition, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition
+from routing.route_events import EventDefinition, EventFolder, EventGroup, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition
 from pkmn.gen_factory import current_gen_info
 
 logger = logging.getLogger(__name__)
@@ -308,6 +308,49 @@ class BattleSummaryController:
         self._is_player_transformed = saved_transformed
         self._double_battle_flag = saved_double
 
+        self._full_refresh()
+
+    def assign_player_move_via_tutor(self, slot_idx, move_name):
+        """Teach *move_name* into the player's move slot *slot_idx* (0-3) for the
+        current battle by inserting a Tutor learn-move event immediately before
+        the trainer. Triggered by Ctrl+Click on a player move name. No-ops if
+        there is no active battle, the slot is out of range, or no move is given.
+        """
+        if self._event_group_id is None:
+            return
+        if move_name is None or slot_idx is None or slot_idx < 0 or slot_idx > 3:
+            return
+
+        # Inserting an event triggers the route-change cascade (load_from_event),
+        # which reloads state from the event definition and would wipe transient
+        # battle state (setup moves, stat stages, weather, etc.). Save it, suppress
+        # the cascade's refresh, then restore and do a single refresh at the end.
+        # Mirrors update_prefight_candies.
+        trainer_id = self._event_group_id
+        saved = self._save_transient_state()
+        self._suppress_refresh = True
+        try:
+            self._main_controller.new_event(
+                EventDefinition(
+                    learn_move=LearnMoveEventDefinition(
+                        move_to_learn=move_name,
+                        destination=slot_idx,
+                        source=const.MOVE_SOURCE_TUTOR,
+                        # Force the move into exactly the clicked slot, replacing
+                        # whatever was there — even if other slots are empty.
+                        force_destination=True,
+                    )
+                ),
+                insert_before=trainer_id,
+                do_select=False,
+            )
+        finally:
+            self._suppress_refresh = False
+
+        self._restore_transient_state(saved)
+        # Re-focus the battle the user was looking at so the move change shows
+        # immediately (creating the event does not move the selection on its own).
+        self._main_controller.select_new_events([trainer_id])
         self._full_refresh()
 
     def _find_existing_prefight_hold_event(self):

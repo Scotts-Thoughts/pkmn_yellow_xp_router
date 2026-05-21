@@ -330,12 +330,18 @@ class SoloPokemon:
             nature=self.nature
         )
 
-    def get_move_destination(self, move_name, dest):
+    def get_move_destination(self, move_name, dest, force=False):
         # if one were to attempt to learn a move defined by the params
         # return what would the actual destination would be
 
         # if we are forgetting the move, always respect dest
         if move_name is None:
+            return dest, True
+
+        # explicit forced destination (e.g. Ctrl+Click reassign): drop the move
+        # into exactly the requested slot, overriding the empty-slot-first
+        # auto-placement and the "already known -> skip" behavior below.
+        if force and dest is not None:
             return dest, True
 
         # if we already know the move, ignore dest entirely and just don't learn it

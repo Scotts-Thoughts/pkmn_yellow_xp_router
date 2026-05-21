@@ -48,10 +48,17 @@ def get_move_accuracy(pkmn:universal_data_objects.EnemyPkmn, move:universal_data
         result = 100
     else:
         result = move.accuracy
-    
+
+    # Certain weather makes specific moves bypass accuracy checks entirely
+    # (they always hit, unaffected by accuracy/evasion)
+    if move.name == gen_three_const.BLIZZARD_MOVE_NAME and weather == const.WEATHER_HAIL:
+        return None
+    if move.name == gen_three_const.THUNDER_MOVE_NAME and weather == const.WEATHER_RAIN:
+        return None
+
     if result is None:
         return None
-    
+
     if pkmn.ability == gen_three_const.COMPOUND_EYES_ABILITY:
         result = min(
             math.floor(result * 1.3),

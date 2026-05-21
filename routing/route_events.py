@@ -142,12 +142,17 @@ class WildPkmnEventDefinition:
 
 
 class LearnMoveEventDefinition:
-    def __init__(self, move_to_learn, destination, source, level=const.LEVEL_ANY, mon=None):
+    def __init__(self, move_to_learn, destination, source, level=const.LEVEL_ANY, mon=None, force_destination=False):
         self.move_to_learn = move_to_learn
         self.destination = destination
         self.source = source
         self.level = level
         self.mon = mon
+        # When True, the move is placed into exactly `destination`, overriding
+        # the usual auto-placement (empty-slot-first / skip-if-already-known).
+        # Used by the Ctrl+Click "reassign this slot" feature so the new move
+        # replaces whatever the user clicked, even when other slots are empty.
+        self.force_destination = force_destination
 
     def serialize(self):
         return {
@@ -155,7 +160,8 @@ class LearnMoveEventDefinition:
             const.MOVE_DEST_KEY: self.destination,
             const.MOVE_SOURCE_KEY: self.source,
             const.MOVE_LEVEL_KEY: self.level,
-            const.MOVE_MON_KEY: self.mon
+            const.MOVE_MON_KEY: self.mon,
+            const.MOVE_FORCE_DEST_KEY: self.force_destination,
         }
 
     def get_level_up_key(self):
@@ -189,7 +195,8 @@ class LearnMoveEventDefinition:
                 raw_val[const.MOVE_DEST_KEY],
                 raw_val[const.MOVE_SOURCE_KEY],
                 level=raw_val[const.MOVE_LEVEL_KEY],
-                mon=mon_val
+                mon=mon_val,
+                force_destination=raw_val.get(const.MOVE_FORCE_DEST_KEY, False),
             )
 
     def __str__(self):
@@ -822,9 +829,11 @@ class EventItem:
                 )
         elif None is not self.event_definition.learn_move:
             # little bit of book-keeping. Manually update the definition to accurately reflect what happened to the move
+            force_dest = getattr(self.event_definition.learn_move, "force_destination", False)
             dest_info = cur_state.solo_pkmn.get_move_destination(
                 self.event_definition.learn_move.move_to_learn,
                 self.event_definition.learn_move.destination,
+                force=force_dest,
             )
             self.event_definition.learn_move.destination = dest_info[0]
 
@@ -833,6 +842,7 @@ class EventItem:
                 self.event_definition.learn_move.move_to_learn,
                 self.event_definition.learn_move.destination,
                 self.event_definition.learn_move.source,
+                force=force_dest,
             )
         elif None is not self.event_definition.hold_item:
             self.final_state, self.error_message = cur_state.hold_item(

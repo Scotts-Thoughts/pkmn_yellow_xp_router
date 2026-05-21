@@ -359,6 +359,7 @@ class Constants:
         self.MOVE_SOURCE_KEY = "source"
         self.MOVE_LEVEL_KEY = "level_learned"
         self.MOVE_MON_KEY = "species_when_learned"
+        self.MOVE_FORCE_DEST_KEY = "force_destination"
 
         self.LEARN_MOVE_KEY = "LearnMove"
         self.MOVE_SLOT_TEMPLATE = "Move #{} (Over {})"

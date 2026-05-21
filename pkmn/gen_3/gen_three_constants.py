@@ -121,6 +121,8 @@ class GenThreeConstants:
         self.RAGE_MOVE_NAME = "Rage"
         self.SPIT_UP_MOVE_NAME = "Spit Up"
         self.WEATHER_BALL_MOVE_NAME = "Weather Ball"
+        self.BLIZZARD_MOVE_NAME = "Blizzard"
+        self.THUNDER_MOVE_NAME = "Thunder"
         self.PURSUIT_MOVE_NAME = "Pursuit"
         self.STOMP_MOVE_NAME = "Stomp"
         self.GUST_MOVE_NAME = "Gust"

@@ -60,10 +60,17 @@ def get_move_accuracy(
         result = 100
     else:
         result = move.accuracy
-    
+
+    # Certain weather makes specific moves bypass accuracy checks entirely
+    # (they always hit, unaffected by accuracy/evasion)
+    if move.name == gen_four_const.BLIZZARD_MOVE_NAME and weather == const.WEATHER_HAIL:
+        return None
+    if move.name == gen_four_const.THUNDER_MOVE_NAME and weather == const.WEATHER_RAIN:
+        return None
+
     if result is None:
         return None
-    
+
     if pkmn.ability == gen_four_const.COMPOUND_EYES_ABILITY:
         result = min(
             math.floor(result * 1.3),

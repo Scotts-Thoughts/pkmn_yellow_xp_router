@@ -79,11 +79,11 @@ def _rare_candy(cur_pkmn:SoloPokemon, badges:pkmn.universal_data_objects.BadgeLi
     )
 
 
-def _learn_move(cur_pkmn:SoloPokemon, move_name, dest, badges):
+def _learn_move(cur_pkmn:SoloPokemon, move_name, dest, badges, force=False):
     # kinda ugly logic below, since move learning has several possible behaviors
     new_movelist = cur_pkmn.move_list
 
-    actual_dest = cur_pkmn.get_move_destination(move_name, dest)[0]
+    actual_dest = cur_pkmn.get_move_destination(move_name, dest, force=force)[0]
     if actual_dest is not None:
         new_movelist = [x for x in new_movelist]
         new_movelist[actual_dest] = move_name
@@ -228,7 +228,7 @@ class RouteState:
             const.INVENTORY_KEY: self.inventory.serialize(),
         }
 
-    def learn_move(self, move_name, dest, source):
+    def learn_move(self, move_name, dest, source, force=False):
         error_message = ""
         if source == const.MOVE_SOURCE_LEVELUP or source == const.MOVE_SOURCE_TUTOR:
             inv = self.inventory
@@ -249,7 +249,7 @@ class RouteState:
                 inv = self.inventory
 
         return RouteState(
-            _learn_move(self.solo_pkmn, move_name, dest, self.badges),
+            _learn_move(self.solo_pkmn, move_name, dest, self.badges, force=force),
             self.badges,
             inv
         ), error_message
