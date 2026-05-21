@@ -12,13 +12,15 @@ logger = logging.getLogger(__name__)
 
 
 class BlackRecorder(route_recording.recorder.RecorderGameHookClient):
-    def __init__(self, controller:route_recording.recorder.RecorderGameHookClient, expected_names:List[str], is_white=False):
+    def __init__(self, controller:route_recording.recorder.RecorderGameHookClient, expected_names:List[str], is_white=False, is_b2w2=False):
         super().__init__(controller, expected_names)
 
+        # is_b2w2 selects the Black 2/White 2 bag layout (larger items pocket, one
+        # more berry slot, one fewer TM/HM slot). See black_gamehook_constants.
         if is_white:
-            gh_gen_five_const.configure_for_white()
+            gh_gen_five_const.configure_for_white(is_b2w2=is_b2w2)
         else:
-            gh_gen_five_const.configure_for_black()
+            gh_gen_five_const.configure_for_black(is_b2w2=is_b2w2)
 
         self._machine = Machine(controller, self, GameHookConstantConverter(is_white=is_white), is_white=is_white)
 

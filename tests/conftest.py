@@ -17,6 +17,7 @@ from pkmn.gen_1 import gen_one_object
 from pkmn.gen_2 import gen_two_object
 from pkmn.gen_3 import gen_three_object
 from pkmn.gen_4 import gen_four_object
+from pkmn.gen_5 import gen_five_object
 from routing.router import Router
 
 
@@ -87,6 +88,22 @@ def _register_gens():
         pass
     try:
         gen_factory._gen_factory.register_gen(gen_four_object.gen_four_soulsilver, const.SOUL_SILVER_VERSION)
+    except ValueError:
+        pass
+    try:
+        gen_factory._gen_factory.register_gen(gen_five_object.gen_five_black, const.BLACK_VERSION)
+    except ValueError:
+        pass
+    try:
+        gen_factory._gen_factory.register_gen(gen_five_object.gen_five_white, const.WHITE_VERSION)
+    except ValueError:
+        pass
+    try:
+        gen_factory._gen_factory.register_gen(gen_five_object.gen_five_black_2, const.BLACK_2_VERSION)
+    except ValueError:
+        pass
+    try:
+        gen_factory._gen_factory.register_gen(gen_five_object.gen_five_white_2, const.WHITE_2_VERSION)
     except ValueError:
         pass
 

@@ -2,7 +2,56 @@ import math
 import logging
 from typing import Dict, Tuple
 
+from utils.constants import const
+
 logger = logging.getLogger(__name__)
+
+
+# Moves whose damage the normal formula can't produce: either a constant amount
+# (Dragon Rage 40, Sonic Boom 20) or an amount equal to the user's level (Seismic
+# Toss, Night Shade). The move data doesn't carry these reliably -- base_power is
+# often None or a placeholder like 1, and the gen 5 move data has no attack_flavor
+# at all -- so they're defined here by name and applied uniformly across all
+# generations. Matched on every spelling that appears (e.g. "SonicBoom" in gens
+# 1-4 vs "Sonic Boom" in gen 5).
+_FIXED_DAMAGE_BY_NAME = {
+    const.DRAGON_RAGE_MOVE_NAME: 40,
+    "SonicBoom": 20,
+    "Sonic Boom": 20,
+}
+_LEVEL_DAMAGE_MOVE_NAMES = {
+    "Seismic Toss",
+    "Night Shade",
+}
+
+
+def get_special_damage_override(move, attacking_pkmn, defending_species=None, type_chart=None):
+    """Return a DamageRange for moves that deal a special, formula-independent
+    amount -- a constant (Dragon Rage -> 40, Sonic Boom -> 20) or the user's level
+    (Seismic Toss, Night Shade) -- or None for any other move. Generation-agnostic;
+    callers should consult this before running the normal damage formula (and
+    before any base_power None early-out, since these moves don't store their
+    damage in base_power consistently across gens).
+
+    When ``defending_species`` and ``type_chart`` are supplied (gen 2+), type
+    immunity is respected: an immune matchup returns None so the caller falls
+    through to its normal no-damage handling. Gen 1 omits these args, so it is
+    unconditional -- matching gen 1's historical behavior of dealing the fixed/level
+    damage regardless of type immunity."""
+    amount = _FIXED_DAMAGE_BY_NAME.get(move.name)
+    if amount is None and move.name in _LEVEL_DAMAGE_MOVE_NAMES:
+        amount = attacking_pkmn.level
+    if amount is None:
+        return None
+
+    if defending_species is not None and type_chart is not None:
+        move_effectiveness = type_chart.get(move.move_type, {})
+        if (move_effectiveness.get(defending_species.first_type) == const.IMMUNE or
+                move_effectiveness.get(defending_species.second_type) == const.IMMUNE):
+            # Immune: defer to the caller's normal path, which produces no damage.
+            return None
+
+    return DamageRange({amount: 1})
 
 
 class DamageRange:

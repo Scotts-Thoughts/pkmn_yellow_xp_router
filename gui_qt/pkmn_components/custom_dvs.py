@@ -2,17 +2,189 @@ import logging
 from typing import Tuple
 
 from PySide6.QtWidgets import (
-    QWidget, QLabel, QGridLayout, QVBoxLayout,
+    QWidget, QLabel, QGridLayout, QVBoxLayout, QHBoxLayout,
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontMetrics
 
-from gui_qt.components.custom_components import AmountEntry, SimpleOptionMenu
+from gui_qt.components.custom_components import AmountEntry, SimpleButton, SimpleOptionMenu
 
 from pkmn.pkmn_info import CurrentGen
 from pkmn.universal_data_objects import Nature, PokemonSpecies, StatBlock
 from pkmn.gen_factory import current_gen_info
+from utils.constants import const
 
 logger = logging.getLogger(__name__)
+
+
+# Stat buttons, in display order. (stat_name constant, short button label)
+_STAT_ORDER = [
+    (const.ATTACK, "Attack"),
+    (const.DEFENSE, "Defense"),
+    (const.SPEED, "Speed"),
+    (const.SPECIAL_ATTACK, "Sp. Atk"),
+    (const.SPECIAL_DEFENSE, "Sp. Def"),
+]
+
+# Neutral natures don't raise or lower any stat, so they can't be found via
+# is_stat_raised/is_stat_lowered. Map each to the stat it sits on diagonally
+# (matching the chart ordering: Hardy/Docile/Serious/Bashful/Quirky).
+_NEUTRAL_NATURE_BY_STAT = {
+    const.ATTACK: Nature.HARDY,
+    const.DEFENSE: Nature.DOCILE,
+    const.SPEED: Nature.SERIOUS,
+    const.SPECIAL_ATTACK: Nature.BASHFUL,
+    const.SPECIAL_DEFENSE: Nature.QUIRKY,
+}
+_STAT_BY_NEUTRAL_NATURE = {nat: stat for stat, nat in _NEUTRAL_NATURE_BY_STAT.items()}
+
+_INCREASE_ACCENT = "#ef4444"
+_DECREASE_ACCENT = "#3b82f6"
+
+
+def _nature_for_stats(increase_stat, decrease_stat):
+    """Find the Nature that raises increase_stat and lowers decrease_stat."""
+    if increase_stat is None or decrease_stat is None:
+        return None
+    if increase_stat == decrease_stat:
+        return _NEUTRAL_NATURE_BY_STAT.get(increase_stat)
+    for nat in Nature:
+        if nat.is_stat_raised(increase_stat) and nat.is_stat_lowered(decrease_stat):
+            return nat
+    return None
+
+
+def _stats_for_nature(nat):
+    """Return (increased_stat, decreased_stat) for a Nature, or (None, None)."""
+    if nat in _STAT_BY_NEUTRAL_NATURE:
+        stat = _STAT_BY_NEUTRAL_NATURE[nat]
+        return stat, stat
+    increased = None
+    decreased = None
+    for stat, _ in _STAT_ORDER:
+        if nat.is_stat_raised(stat):
+            increased = stat
+        if nat.is_stat_lowered(stat):
+            decreased = stat
+    return increased, decreased
+
+
+class NatureSelector(QWidget):
+    """
+    Nature picker combining the dropdown with Increase/Decrease quick-pick stat
+    buttons. The two stay in sync: picking an Increase stat and a Decrease stat
+    selects the matching nature in the dropdown, and changing the dropdown
+    highlights the buttons for that nature's raised/lowered stats.
+    """
+
+    def __init__(self, init_nature: Nature = None, parent=None):
+        super().__init__(parent)
+        if init_nature is None:
+            init_nature = Nature.HARDY
+
+        self._nature_lookup = [str(x) for x in Nature]
+        self._increase_stat = None
+        self._decrease_stat = None
+        # Guards against the dropdown<->buttons sync handlers retriggering each other.
+        self._syncing = False
+
+        layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(5)
+        layout.setVerticalSpacing(5)
+
+        layout.addWidget(QLabel("Nature:"), 0, 0)
+        self.dropdown = SimpleOptionMenu(
+            option_list=self._nature_lookup,
+            default_val=str(init_nature),
+            callback=self._on_dropdown_changed,
+        )
+        layout.addWidget(self.dropdown, 0, 1)
+
+        self._increase_buttons = self._build_stat_row(
+            layout, 1, "Increase:", self._on_increase_clicked, _INCREASE_ACCENT
+        )
+        self._decrease_buttons = self._build_stat_row(
+            layout, 2, "Decrease:", self._on_decrease_clicked, _DECREASE_ACCENT
+        )
+
+        self._sync_buttons_from_dropdown()
+
+    def _build_stat_row(self, layout, row, label_text, handler, accent):
+        layout.addWidget(QLabel(label_text), row, 0)
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(3)
+        buttons = {}
+        for stat, short in _STAT_ORDER:
+            btn = SimpleButton(short)
+            btn.setCheckable(True)
+            btn.setStyleSheet(
+                "QPushButton { padding: 2px 10px; border: 1px solid transparent; } "
+                f"QPushButton:checked {{ background-color: {accent}; color: white; "
+                f"border: 1px solid {accent}; font-weight: bold; }}"
+            )
+            # The :checked style switches the label to bold, which is wider than
+            # the default-weight text the button sized itself for. Reserve room
+            # for the bold width (plus the 10px horizontal padding on each side)
+            # up front so the active stat's label never clips.
+            bold_metrics_font = btn.font()
+            bold_metrics_font.setBold(True)
+            bold_width = QFontMetrics(bold_metrics_font).horizontalAdvance(short)
+            btn.setMinimumWidth(bold_width + 24)
+            btn.clicked.connect(lambda checked, s=stat: handler(s))
+            buttons[stat] = btn
+            row_layout.addWidget(btn)
+        layout.addWidget(row_widget, row, 1)
+        return buttons
+
+    def _on_increase_clicked(self, stat):
+        # The button has already toggled its own checked state by the time this fires.
+        self._increase_stat = stat if self._increase_buttons[stat].isChecked() else None
+        self._refresh_button_checks()
+        self._sync_dropdown_from_buttons()
+
+    def _on_decrease_clicked(self, stat):
+        self._decrease_stat = stat if self._decrease_buttons[stat].isChecked() else None
+        self._refresh_button_checks()
+        self._sync_dropdown_from_buttons()
+
+    def _refresh_button_checks(self):
+        # Enforce single-selection within each row. setChecked emits toggled, not
+        # clicked, so this won't reenter the click handlers.
+        for stat, btn in self._increase_buttons.items():
+            btn.setChecked(stat == self._increase_stat)
+        for stat, btn in self._decrease_buttons.items():
+            btn.setChecked(stat == self._decrease_stat)
+
+    def _sync_dropdown_from_buttons(self):
+        if self._syncing:
+            return
+        nat = _nature_for_stats(self._increase_stat, self._decrease_stat)
+        if nat is None:
+            return
+        self._syncing = True
+        self.dropdown.set(str(nat))
+        self._syncing = False
+
+    def _on_dropdown_changed(self):
+        if self._syncing:
+            return
+        self._sync_buttons_from_dropdown()
+
+    def _sync_buttons_from_dropdown(self):
+        self._syncing = True
+        self._increase_stat, self._decrease_stat = _stats_for_nature(self.get_nature())
+        self._refresh_button_checks()
+        self._syncing = False
+
+    def get_nature(self) -> Nature:
+        return Nature(self._nature_lookup.index(self.dropdown.get()))
+
+    def get(self) -> str:
+        # Mirrors SimpleOptionMenu.get() so callers can treat this like the dropdown.
+        return self.dropdown.get()
 
 
 class CustomDVsFrame(QWidget):
@@ -38,6 +210,9 @@ class CustomDVsFrame(QWidget):
         self._grid.setContentsMargins(0, 0, 0, 0)
         self._grid.setHorizontalSpacing(5)
         self._grid.setVerticalSpacing(5)
+        # IVs live in the left columns (0-1); nature/ability in the right columns
+        # (3-4). Column 2 is a gap between the two so the block is short, not tall.
+        self._grid.setColumnMinimumWidth(2, 20)
         outer_layout.addWidget(self.controls_frame)
 
         self.padx = 5
@@ -116,13 +291,10 @@ class CustomDVsFrame(QWidget):
                 self.custom_dvs_spc_def_label = QLabel()
             if self.custom_dvs_spc_def is None:
                 self.custom_dvs_spc_def = AmountEntry(min_val=0, max_val=dv_max, callback=self.recalc_hidden_power)
-            if self.nature_label is None:
-                self.nature_label = QLabel("Nature:")
+            # The NatureSelector carries its own "Nature:" label, so nature_label
+            # stays None and the selector spans both grid columns below.
             if self.nature_vals is None:
-                self.nature_vals = SimpleOptionMenu(
-                    option_list=self._nature_lookup,
-                    default_val=str(init_nature),
-                )
+                self.nature_vals = NatureSelector(init_nature=init_nature)
             if self.ability_label is None:
                 self.ability_label = QLabel("Ability:")
             if self.ability_vals is None:
@@ -235,14 +407,14 @@ class CustomDVsFrame(QWidget):
         if self.hidden_power is not None:
             self._grid.addWidget(self.hidden_power, 6, 1)
 
-        if self.nature_label is not None:
-            self._grid.addWidget(self.nature_label, 10, 0)
+        # Right column: nature selector on top, ability beneath it. Top-aligned so
+        # it sits alongside the IV column rather than stretching to its full height.
         if self.nature_vals is not None:
-            self._grid.addWidget(self.nature_vals, 10, 1)
+            self._grid.addWidget(self.nature_vals, 0, 3, 3, 2, Qt.AlignTop)
         if self.ability_label is not None:
-            self._grid.addWidget(self.ability_label, 12, 0)
+            self._grid.addWidget(self.ability_label, 3, 3)
         if self.ability_vals is not None:
-            self._grid.addWidget(self.ability_vals, 12, 1)
+            self._grid.addWidget(self.ability_vals, 3, 4)
 
         # Populate the Hidden Power label with the initial DVs so it isn't blank
         # until the user edits a DV (e.g. when opening the new route dialog for Crystal).

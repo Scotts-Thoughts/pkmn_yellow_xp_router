@@ -1060,7 +1060,16 @@ class BattleSummaryController:
             for _ in range(len(event_group.event_definition.get_pokemon_list())):
                 self._custom_move_data.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
         else:
-            self._custom_move_data = [copy.deepcopy(x.custom_move_data) for x in event_group.event_definition.get_pokemon_list()]
+            # Per-pokemon custom_move_data can be None (e.g. when the trainer-level
+            # list is shorter than the team, get_pokemon_list leaves later mons at
+            # the EnemyPkmn default of None) or may be missing a PLAYER/ENEMY key.
+            # Normalize each entry so downstream lookups never hit a NoneType.
+            self._custom_move_data = []
+            for x in event_group.event_definition.get_pokemon_list():
+                cur = copy.deepcopy(x.custom_move_data) or {}
+                cur.setdefault(const.PLAYER_KEY, {})
+                cur.setdefault(const.ENEMY_KEY, {})
+                self._custom_move_data.append(cur)
         # Load per-move stat stage setup (backward compatible - handle missing data)
         if trainer_def.stat_stage_setup:
             self._stat_stage_setup = []

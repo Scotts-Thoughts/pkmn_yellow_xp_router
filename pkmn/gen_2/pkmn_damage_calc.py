@@ -41,6 +41,12 @@ def calculate_gen_two_damage(
     attacking_battle_stats:universal_data_objects.StatBlock=None,
     defending_battle_stats:universal_data_objects.StatBlock=None,
 ):
+    # Special-damage moves (Dragon Rage 40, Sonic Boom 20, Seismic Toss/Night Shade = level)
+    # don't store their damage in base_power. Type immunity IS respected here (gen 2+).
+    special_override = damage_calc.get_special_damage_override(move, attacking_pkmn, defending_species, type_chart)
+    if special_override is not None:
+        return special_override
+
     if move.name == const.HIDDEN_POWER_MOVE_NAME:
         move_type = get_hidden_power_type(attacking_pkmn.dvs)
         base_power = get_hidden_power_base_power(attacking_pkmn.dvs)

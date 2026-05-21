@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QMessageBox
 from pkmn.gen_1 import gen_one_object
 from pkmn.gen_2 import gen_two_object
 from pkmn.gen_3 import gen_three_object
+from pkmn.gen_5 import gen_five_object
 from pkmn import gen_factory
 
 from utils.config_manager import config
@@ -91,5 +92,10 @@ def init_base_generations():
     gen_factory._gen_factory.register_gen(gen_four_object.gen_four_pearl, const.PEARL_VERSION)
     gen_factory._gen_factory.register_gen(gen_four_object.gen_four_heartgold, const.HEART_GOLD_VERSION)
     gen_factory._gen_factory.register_gen(gen_four_object.gen_four_soulsilver, const.SOUL_SILVER_VERSION)
+
+    gen_factory._gen_factory.register_gen(gen_five_object.gen_five_black, const.BLACK_VERSION)
+    gen_factory._gen_factory.register_gen(gen_five_object.gen_five_white, const.WHITE_VERSION)
+    gen_factory._gen_factory.register_gen(gen_five_object.gen_five_black_2, const.BLACK_2_VERSION)
+    gen_factory._gen_factory.register_gen(gen_five_object.gen_five_white_2, const.WHITE_2_VERSION)
 
     gen_factory.change_version(const.YELLOW_VERSION)

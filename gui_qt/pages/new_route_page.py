@@ -41,6 +41,10 @@ class NewRoutePage(QWidget):
         const.PLATINUM_VERSION: ("Generation 4", "NDS", "In Beta"),
         const.HEART_GOLD_VERSION: ("Generation 4", "NDS", "In Alpha"),
         const.SOUL_SILVER_VERSION: ("Generation 4", "NDS", "In Alpha"),
+        const.BLACK_VERSION: ("Generation 5", "NDS", "In Alpha"),
+        const.WHITE_VERSION: ("Generation 5", "NDS", "In Alpha"),
+        const.BLACK_2_VERSION: ("Generation 5", "NDS", "In Alpha"),
+        const.WHITE_2_VERSION: ("Generation 5", "NDS", "In Alpha"),
     }
 
     def __init__(self, parent, controller, on_cancel=None, on_create=None):
@@ -252,6 +256,8 @@ class NewRoutePage(QWidget):
             const.FIRE_RED_VERSION, const.LEAF_GREEN_VERSION,
             const.DIAMOND_VERSION, const.PEARL_VERSION, const.PLATINUM_VERSION,
             const.HEART_GOLD_VERSION, const.SOUL_SILVER_VERSION,
+            const.BLACK_VERSION, const.WHITE_VERSION,
+            const.BLACK_2_VERSION, const.WHITE_2_VERSION,
         ]
 
         sorted_games = [g for g in official_games if g in all_games]

@@ -150,16 +150,16 @@ class Machine:
 
     def _get_mon_key(self, mon_idx) -> _MonKey:
         species_val = self.gh_converter.pkmn_name_convert(
-            self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_SPECIES[mon_idx]).value
+            self._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_SPECIES[mon_idx])
         )
         return _MonKey(
             species_val,
-            self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_ATTACK[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_DEFENSE[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_SPEED[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_ATTACK[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_DEFENSE[mon_idx]).value,
-            self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_LEVEL[mon_idx]).value,
+            self._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_ATTACK[mon_idx]),
+            self._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_DEFENSE[mon_idx]),
+            self._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_SPEED[mon_idx]),
+            self._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_ATTACK[mon_idx]),
+            self._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_IV_SPECIAL_DEFENSE[mon_idx]),
+            self._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_LEVEL[mon_idx]),
         )
 
     def _load_level_up_moves(self):
@@ -308,7 +308,7 @@ class Machine:
         self._item_cache_update(generate_events=False)
         self._money_cache_update()
         self._controller.entered_new_area(
-            f"{self._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value}"
+            f"{self._gamehook_client.get_value(gh_gen_five_const.KEY_OVERWORLD_MAP)}"
         )
     
     def _solo_mon_levelup(self, new_level, pre_evolution_moves=None):
@@ -370,7 +370,7 @@ class Machine:
         # Don't call _solo_mon_levelup here - moves will be checked when entering overworld
     
     def _money_cache_update(self):
-        new_cache = self._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MONEY).value
+        new_cache = self._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MONEY)
         if new_cache == self._cached_money:
             return None
         
@@ -380,10 +380,10 @@ class Machine:
     
     def _move_cache_update(self, generate_events=True, tm_name=None, hm_expected=False, tutor_expected=False, levelup_source=False):
         new_cache = []
-        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_MOVE_1).value))
-        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_MOVE_2).value))
-        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_MOVE_3).value))
-        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_MOVE_4).value))
+        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_MOVE_1)))
+        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_MOVE_2)))
+        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_MOVE_3)))
+        new_cache.append(self.gh_converter.move_name_convert(self._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_MOVE_4)))
 
         if generate_events:
             old_moves = set([x for x in self._cached_moves if x is not None])
@@ -418,7 +418,7 @@ class Machine:
             elif to_learn_move is not None:
                 if levelup_source:
                     source = const.MOVE_SOURCE_LEVELUP
-                    level = self._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_LEVEL).value
+                    level = self._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_LEVEL)
                     mon = self._solo_mon_key.species
                 elif tutor_expected:
                     source = const.MOVE_SOURCE_TUTOR
@@ -450,35 +450,31 @@ class Machine:
     def _get_item_cache(self):
         result = {}
 
-        # start with the normal pocket
-        for i in range(len(gh_gen_five_const.ALL_KEYS_ITEM_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_ITEM_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_ITEM_QUANTITY[i]).value
-        
-        # load the medicine pocket
-        for i in range(len(gh_gen_five_const.ALL_KEYS_MEDICINE_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_MEDICINE_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_MEDICINE_QUANTITY[i]).value
-        
-        # load the ball pocket
-        for i in range(len(gh_gen_five_const.ALL_KEYS_BALL_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_BALL_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_BALL_QUANTITY[i]).value
-        
-        # load the berries pocket
-        for i in range(len(gh_gen_five_const.ALL_KEYS_BERRY_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_BERRY_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_BERRY_QUANTITY[i]).value
+        def load_pocket(type_keys, quantity_keys):
+            # Read each (item, quantity) slot pair, skipping any slot the loaded
+            # mapper does not expose. The bag slot counts in the constants are
+            # per-mapper estimates; if a path is absent, get() returns None.
+            # Guarding here (like the registration loop in black_recorder.py)
+            # keeps a mapper/constant mismatch from crashing the recorder.
+            for type_key, quantity_key in zip(type_keys, quantity_keys):
+                type_prop = self._gamehook_client.get(type_key)
+                quantity_prop = self._gamehook_client.get(quantity_key)
+                if type_prop is None or quantity_prop is None:
+                    logger.debug(f"Skipping unmapped item slot: {type_key}")
+                    continue
+                result[type_prop.value] = quantity_prop.value
 
-        # load the key items pocket
-        # for i in range(len(gh_gen_five_const.ALL_KEYS_KEY_ITEMS)):
-        #     item_type = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_KEY_ITEMS[i]).value
-        #     result[item_type] = 1
-
-        # load the tms pocket
-        for i in range(len(gh_gen_five_const.ALL_KEYS_TMHM_TYPE)):
-            item_type = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_TMHM_TYPE[i]).value
-            result[item_type] = self._gamehook_client.get(gh_gen_five_const.ALL_KEYS_TMHM_QUANTITY[i]).value
+        # normal items pocket
+        load_pocket(gh_gen_five_const.ALL_KEYS_ITEM_TYPE, gh_gen_five_const.ALL_KEYS_ITEM_QUANTITY)
+        # medicine pocket
+        load_pocket(gh_gen_five_const.ALL_KEYS_MEDICINE_TYPE, gh_gen_five_const.ALL_KEYS_MEDICINE_QUANTITY)
+        # ball pocket (no `bag.balls` section in the gen 5 mappers yet; lists are empty)
+        load_pocket(gh_gen_five_const.ALL_KEYS_BALL_TYPE, gh_gen_five_const.ALL_KEYS_BALL_QUANTITY)
+        # berries pocket
+        load_pocket(gh_gen_five_const.ALL_KEYS_BERRY_TYPE, gh_gen_five_const.ALL_KEYS_BERRY_QUANTITY)
+        # key items pocket: not currently mapped
+        # tms/hms pocket
+        load_pocket(gh_gen_five_const.ALL_KEYS_TMHM_TYPE, gh_gen_five_const.ALL_KEYS_TMHM_QUANTITY)
 
         return result
 
@@ -555,7 +551,7 @@ class Machine:
                 # Check if this is a lottery desk purchase in Goldenrod City
                 custom_price = None
                 if purchase_expected:
-                    current_map = self._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value
+                    current_map = self._gamehook_client.get_value(gh_gen_five_const.KEY_OVERWORLD_MAP)
                     if current_map == GOLDENROD_LOTTERY_MAP:
                         # For TMs, check by move name (e.g. "Dragon Claw") since they come through as "TM02" etc.
                         item_match_name = app_item_name

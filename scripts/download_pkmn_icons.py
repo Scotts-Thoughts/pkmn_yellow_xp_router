@@ -16,7 +16,7 @@ import json
 import re
 
 DEST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "pkmn_icons")
-MAX_DEX = 493
+MAX_DEX = 649
 
 # Bulbagarden archives direct URL pattern for HOME menu icons
 # The actual file URL can be scraped from the wiki File page

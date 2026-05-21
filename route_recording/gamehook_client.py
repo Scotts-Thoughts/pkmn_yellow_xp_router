@@ -235,6 +235,24 @@ class GameHookClient:
 
         return result
 
+    def get_value(self, path, default=None):
+        """Safely read a property's value.
+
+        Returns ``default`` when ``path`` is None (an intentionally-unmapped
+        constant, e.g. a KEY_* the current mapper does not provide) or when the
+        mapper does not expose ``path``. This lets recorder logic read optional
+        paths via ``client.get_value(KEY)`` without crashing with
+        ``'NoneType' object has no attribute 'value'`` on mappers that omit them.
+        Unlike ``get``, this does not log a warning, since callers use it
+        precisely for paths that may legitimately be absent.
+        """
+        if path is None:
+            return default
+        result = self.properties.get(path)
+        if result is None:
+            return default
+        return result.value
+
     def _edit_property(self, path, freeze, new_bytes=None):
         path = path.replace('.', '/')
 

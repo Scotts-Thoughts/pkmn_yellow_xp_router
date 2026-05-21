@@ -1,0 +1,693 @@
+# NOTE: This module was copied from gen_4/gen_four_object.py to bootstrap gen 5
+# (Black/White/Black 2/White 2). It deliberately reuses the gen-4 damage engine,
+# stat blocks, and data loaders because the gen 5 battle formula is essentially
+# identical to gen 4. The data file format is also identical, so the gen-4 loaders
+# work unchanged on the gen 5 JSON. Things that have been made gen-5-specific:
+# data paths, the badge list (Unova badges), gym-leader / elite-four ordering, the
+# recorder client, and the registered game instances at the bottom of the file.
+# When a true gen-5 engine is desired, edit pkmn/gen_5/* directly.
+from ast import Dict
+import json
+import os
+import shutil
+from typing import List, Tuple
+import logging
+
+from pkmn import universal_data_objects
+from pkmn.gen_5 import pkmn_damage_calc
+from pkmn.damage_calc import DamageRange
+from pkmn.gen_5.data_objects import GenFiveBadgeList, GenFiveStatBlock, instantiate_trainer_pokemon, instantiate_wild_pokemon, get_hidden_power_base_power, get_hidden_power_type, VIT_AMT, VIT_CAP, BLACKOUT_BASE_VALS
+from pkmn.gen_5.gen_five_constants import gen_five_const
+from pkmn.pkmn_db import ItemDB, MinBattlesDB, PkmnDB, TrainerDB, MoveDB
+from pkmn.pkmn_info import CurrentGen
+from route_recording.game_recorders.gen_five.black_recorder import BlackRecorder
+from route_recording.recorder import RecorderController, RecorderGameHookClient
+from routing import full_route_state
+from utils.constants import const
+from utils import io_utils
+
+logger = logging.getLogger(__name__)
+
+
+class GenFive(CurrentGen):
+    def __init__(self, pkmn_db_path, trainer_db_path, item_path, move_path, type_info_path, fight_info_path, min_battles_path, version_name, base_version_name=None):
+        self._version_name = version_name
+        self._base_version_name = base_version_name
+
+        self._all_flat_files = [
+            pkmn_db_path, trainer_db_path, item_path, move_path, type_info_path, fight_info_path
+        ]
+
+        try:
+            self._pkmn_db = PkmnDB(_load_pkmn_db(pkmn_db_path))
+        except Exception as e:
+            msg = f"Error loading pokemon DB: {pkmn_db_path}"
+            logger.exception(msg)
+            raise ValueError(msg)
+
+        try:
+            self._trainer_db = TrainerDB(_load_trainer_db(trainer_db_path, self._pkmn_db))
+        except Exception as e:
+            msg = f"Error loading trainer DB: {trainer_db_path}"
+            logger.exception(msg)
+            raise ValueError(msg)
+
+        try:
+            self._item_db = ItemDB(_load_item_db(item_path))
+        except Exception as e:
+            msg = f"Error loading item DB: {item_path}"
+            logger.exception(msg)
+            raise ValueError(msg)
+        
+        try:
+            self._move_db = MoveDB(_load_move_db(move_path))
+        except Exception as e:
+            msg = f"Error loading move DB: {move_path}"
+            logger.exception(msg)
+            raise ValueError(msg)
+
+        try:
+            self._min_battles_db = MinBattlesDB(min_battles_path)
+        except Exception as e:
+            msg = f"Error loading min battles DB: {min_battles_path}"
+            logger.exception(msg)
+            raise ValueError(msg)
+
+        try:
+            with open(type_info_path, 'r', encoding='utf-8') as f:
+                type_info = json.load(f)
+            
+            self._type_chart:Dict[str, Dict[str, str]] = type_info[const.TYPE_CHART_KEY]
+            self._held_item_boosts:Dict[str, str] = type_info[const.HELD_ITEM_BOOSTS_KEY]
+        except Exception as e:
+            msg = f"Error loading type info: {pkmn_db_path}"
+            logger.exception(msg)
+            raise ValueError(msg)
+
+        try:
+            with open(fight_info_path, 'r', encoding='utf-8') as f:
+                fight_info = json.load(f)
+            
+            self._badge_rewards:Dict[str, str] = fight_info[const.BADGE_REWARDS_KEY]
+            raw_major_fights = fight_info[const.MAJOR_FIGHTS_KEY]
+            if isinstance(raw_major_fights, list):
+                self._fight_categories = {}
+                self._major_fights = set(raw_major_fights)
+                self._trainer_to_category = {}
+            else:
+                self._fight_categories = raw_major_fights
+                self._major_fights = set()
+                self._trainer_to_category = {}
+                for cat, names in raw_major_fights.items():
+                    self._major_fights.update(names)
+                    for name in names:
+                        self._trainer_to_category[name] = cat
+            self._fight_rewards:Dict[str, str] = fight_info[const.FIGHT_REWARDS_KEY]
+            self._branched_mandatory_fights:List[str] = fight_info.get(const.BRANCHED_MANDATORY_FIGHTS_KEY, [])
+
+            timing_info = fight_info.get(const.TRAINER_TIMING_INFO_KEY, {})
+            self._trainer_timing_info = universal_data_objects.TrainerTimingStats(
+                timing_info.get(const.INTRO_TIME_KEY, const.DEFAULT_INTRO_TIME),
+                timing_info.get(const.OUTRO_TIME_KEY, const.DEFAULT_OUTRO_TIME),
+                timing_info.get(const.KO_TIME_KEY, const.DEFAULT_KO_TIME),
+                timing_info.get(const.SEND_OUT_TIME_KEY, const.DEFAULT_SEND_OUT_TIME)
+            )
+        except Exception as e:
+            logger.error(f"Error loading fight info: {pkmn_db_path}")
+            logger.exception(e)
+            raise ValueError(f"Failed to load fight info: {e}")
+
+        supported_types = self._type_chart.keys()
+        self._move_db.validate_move_types(supported_types)
+        self._item_db.validate_tms_hms(self._move_db)
+        self._validate_fight_rewards()
+        self._validate_held_item_boosts(supported_types)
+        self._pkmn_db.validate_types(supported_types)
+        self._pkmn_db.validate_moves(self._move_db)
+        self._trainer_db.validate_trainers(self._pkmn_db, self._move_db)
+
+    def version_name(self) -> str:
+        return self._version_name
+
+    def base_version_name(self) -> str:
+        return self._base_version_name
+    
+    def get_generation(self) -> int:
+        return 5
+
+    def pkmn_db(self) -> PkmnDB:
+        return self._pkmn_db
+    
+    def item_db(self) -> ItemDB:
+        return self._item_db
+    
+    def trainer_db(self) -> TrainerDB:
+        return self._trainer_db
+    
+    def move_db(self) -> MoveDB:
+        return self._move_db
+    
+    def min_battles_db(self) -> MinBattlesDB:
+        return self._min_battles_db
+
+    def get_recorder_client(self, recorder_controller:RecorderController) -> RecorderGameHookClient:
+        version_name = self._base_version_name
+        if version_name is None:
+            version_name = self._version_name
+
+        # All four gen 5 games reuse the same (experimental) BlackRecorder logic; see
+        # route_recording/game_recorders/gen_five/ and MAPPER_GAPS.md. The recorder
+        # reads game state through a GameHook mapper, so it only actually works if
+        # GameHook has loaded a mapper whose gameName matches expected_names and whose
+        # property-path schema matches what the recorder registers. Black/White are
+        # the most tested. Black 2/White 2 are wired experimentally: the recorder code
+        # is gen-5-wide (B2W2 share gen 5's species/move/item IDs), but B2W2 has its
+        # own RAM layout, so this depends on a compatible B2W2 GameHook mapper. If no
+        # matching mapper is loaded, on_mapper_loaded fails validation gracefully
+        # rather than recording bad data. B2W2's bag layout may differ from Black's
+        # hard-coded slot counts; revisit black_gamehook_constants if so.
+        if version_name == const.BLACK_VERSION:
+            return BlackRecorder(recorder_controller, ["Pokemon Black"], is_white=False)
+        elif version_name == const.WHITE_VERSION:
+            return BlackRecorder(recorder_controller, ["Pokemon White"], is_white=True)
+        elif version_name == const.BLACK_2_VERSION:
+            return BlackRecorder(recorder_controller, ["Pokemon Black 2"], is_white=False, is_b2w2=True)
+        elif version_name == const.WHITE_2_VERSION:
+            return BlackRecorder(recorder_controller, ["Pokemon White 2"], is_white=True, is_b2w2=True)
+
+        raise NotImplementedError()
+
+    def create_trainer_pkmn(self, pkmn_name, pkmn_level):
+        return instantiate_trainer_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level)
+    
+    def create_wild_pkmn(self, pkmn_name, pkmn_level, dv=15):
+        return instantiate_wild_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level, dv=dv)
+    
+    def get_crit_rate(self, pkmn, move, custom_move_data):
+        return pkmn_damage_calc.get_crit_rate(pkmn, move, custom_move_data)
+    
+    def get_move_accuracy(self, pkmn, move, custom_move_data, defending_pkmn, weather):
+        return pkmn_damage_calc.get_move_accuracy(pkmn, move, custom_move_data, defending_pkmn, weather)
+
+    def calculate_damage(self,
+        attacking_pkmn:universal_data_objects.EnemyPkmn,
+        move:universal_data_objects.Move,
+        defending_pkmn:universal_data_objects.EnemyPkmn,
+        attacking_stage_modifiers:universal_data_objects.StageModifiers=None,
+        defending_stage_modifiers:universal_data_objects.StageModifiers=None,
+        attacking_field:universal_data_objects.FieldStatus=None,
+        defending_field:universal_data_objects.FieldStatus=None,
+        is_crit:bool=False,
+        custom_move_data:str="",
+        weather:str=const.WEATHER_NONE,
+        is_double_battle:bool=False,
+        attacking_battle_stats:universal_data_objects.StatBlock=None,
+        defending_battle_stats:universal_data_objects.StatBlock=None,
+    ) -> DamageRange:
+        return pkmn_damage_calc.calculate_gen_five_damage(
+            attacking_pkmn,
+            self.pkmn_db().get_pkmn(attacking_pkmn.name),
+            move,
+            defending_pkmn,
+            self.pkmn_db().get_pkmn(defending_pkmn.name),
+            self._type_chart,
+            self._held_item_boosts,
+            attacking_stage_modifiers=attacking_stage_modifiers,
+            defending_stage_modifiers=defending_stage_modifiers,
+            attacking_field=attacking_field,
+            defending_field=defending_field,
+            is_crit=is_crit,
+            custom_move_data=custom_move_data,
+            weather=weather,
+            is_double_battle=is_double_battle,
+            attacking_battle_stats=attacking_battle_stats,
+            defending_battle_stats=defending_battle_stats,
+        )
+    
+    def make_stat_block(self, hp, attack, defense, special_attack, special_defense, speed, is_stat_xp=False) -> universal_data_objects.StatBlock:
+        return GenFiveStatBlock(hp, attack, defense, special_attack, special_defense, speed, is_stat_xp=is_stat_xp)
+    
+    def make_badge_list(self) -> universal_data_objects.BadgeList:
+        return GenFiveBadgeList(self._badge_rewards)
+    
+    def make_inventory(self) -> full_route_state.Inventory:
+        return full_route_state.Inventory()
+    
+    def get_stat_modifer_moves(self) -> List[str]:
+        result = [self._move_db.get_move(x).name for x in self._move_db.stat_mod_moves.keys()]
+        result.extend([self._move_db.get_move(x).name for x in self._move_db.old_hacky_field_moves.keys()])
+        return sorted(result)
+
+    def get_field_moves(self):
+        result = [self._move_db.get_move(x).name for x in self._move_db.field_moves.keys()]
+        # NOTE: kind of doing a weird cheat, since this is an ability, not a move. but whatever
+        result.append(gen_five_const.SLOW_START_ABILITY)
+        return sorted(result)
+    
+    def get_fight_reward(self, trainer_name) -> str:
+        return self._fight_rewards.get(trainer_name)
+    
+    def is_major_fight(self, trainer_name) -> bool:
+        return trainer_name in self._major_fights
+
+    def get_fight_category(self, trainer_name):
+        return self._trainer_to_category.get(trainer_name)
+
+    def is_branched_mandatory_fight(self, trainer_name) -> bool:
+        return trainer_name in self._branched_mandatory_fights
+
+    def has_branched_mandatory_fights(self) -> bool:
+        return len(self._branched_mandatory_fights) > 0
+
+    def _is_bw2(self) -> bool:
+        # Black 2 / White 2 share the b2w2 dataset; Black / White share the bw dataset.
+        name = self._base_version_name or self._version_name
+        return name in (const.BLACK_2_VERSION, const.WHITE_2_VERSION)
+
+    def get_gym_leader_names(self) -> List[str]:
+        # gen 5 uses a single shared fights_info.json covering both BW and B2W2 gyms,
+        # so we filter/order the combined leader list down to the active game's gyms.
+        all_leaders = self._fight_categories.get(const.FIGHT_CATEGORY_GYM_LEADER, [])
+        if self._is_bw2():
+            unova = ["Cheren", "Roxie", "Burgh", "Elesa", "Clay", "Skyla", "Drayden", "Marlon"]
+        else:
+            # Black/White: Striaton is a starter-dependent trio, then the rest in order.
+            # Drayden (Black) / Iris (White) are both listed; the trainer data only
+            # contains the one that applies, so listing both here is harmless.
+            unova = ["Chili", "Cilan", "Cress", "Lenora", "Burgh", "Elesa", "Clay", "Skyla", "Brycen", "Drayden", "Iris"]
+        order = {k: i for i, k in enumerate(unova)}
+        leaders = [name for name in all_leaders if any(k in name for k in unova)]
+        leaders.sort(key=lambda n: next((order[k] for k in unova if k in n), 99))
+        return leaders
+
+    def get_elite_four_and_champion_names(self) -> List[str]:
+        all_e4 = self._fight_categories.get(const.FIGHT_CATEGORY_ELITE_FOUR, [])
+        all_champ = self._fight_categories.get(const.FIGHT_CATEGORY_CHAMPION, [])
+        # Unova Elite Four (order is player-selectable in-game; list in a stable order).
+        e4_order = ["Shauntal", "Marshal", "Grimsley", "Caitlin"]
+        order = {k: i for i, k in enumerate(e4_order)}
+        e4 = [name for name in all_e4 if any(k in name for k in e4_order)]
+        e4.sort(key=lambda n: next((order[k] for k in e4_order if k in n), 99))
+        # Champion: Alder (BW) / Iris (B2W2). Iris is also a BW gym leader, but in
+        # B2W2 she is the Champion, so match on the champion category list directly.
+        champ = list(all_champ)
+        return e4 + champ
+
+    def get_move_custom_data(self, move_name) -> List[str]:
+        return gen_five_const.CUSTOM_MOVE_DATA.get(move_name)
+    
+    def get_hidden_power(self, dvs: universal_data_objects.StatBlock) -> Tuple[str, int]:
+        return get_hidden_power_type(dvs), get_hidden_power_base_power(dvs)
+
+    def get_natural_gift(self, held_item: str) -> Tuple[str, int]:
+        berry_data = gen_five_const.NATURAL_GIFT_BERRY_DATA.get(held_item)
+        if berry_data is None:
+            return None
+        base_power, move_type = berry_data
+        return move_type, base_power
+
+    def get_valid_weather(self) -> List[str]:
+        return [const.WEATHER_NONE, const.WEATHER_SUN, const.WEATHER_RAIN, const.WEATHER_SANDSTORM, const.WEATHER_HAIL, const.WEATHER_FOG]
+    
+    def get_stats_boosted_by_vitamin(self, vit_name: str) -> List[str]:
+        if vit_name == const.HP_UP:
+            return [const.HP]
+        elif vit_name == const.PROTEIN:
+            return [const.ATK]
+        elif vit_name == const.IRON:
+            return [const.DEF]
+        elif vit_name == const.CALCIUM:
+            return [const.SPA]
+        elif vit_name == const.ZINC:
+            return [const.SPD]
+        elif vit_name == const.CARBOS:
+            return [const.SPE]
+
+        raise ValueError(f"Unknown vitamin: {vit_name}")
+
+    def get_valid_vitamins(self) -> List[str]:
+        return [const.HP_UP, const.CARBOS, const.IRON, const.CALCIUM, const.ZINC, const.PROTEIN]
+    
+    def get_vitamin_amount(self) -> int:
+        return VIT_AMT
+    
+    def get_vitamin_use_cap(self) -> int:
+        return VIT_CAP
+    
+    def get_vitamin_value_cap(self) -> int:
+        return VIT_CAP
+
+    def create_new_custom_gen(self, new_version_name):
+        folder_name = io_utils.get_safe_path_no_collision(const.CUSTOM_GENS_DIR, new_version_name)
+        os.makedirs(folder_name)
+
+        for cur_file in self._all_flat_files:
+            shutil.copy2(cur_file, os.path.join(folder_name, os.path.basename(cur_file)))
+
+        # create metadata json file for custom version
+        with open(os.path.join(folder_name, const.CUSTOM_GEN_META_FILE_NAME), 'w') as f:
+            json.dump(
+                {
+                    const.CUSTOM_GEN_NAME_KEY: new_version_name,
+                    const.BASE_GEN_NAME_KEY: self._version_name
+                },
+                f, indent=4
+            )
+    
+    def load_custom_gen(self, custom_version_name, root_path) -> CurrentGen:
+        return GenFive(
+            os.path.join(root_path, const.POKEMON_DB_FILE_NAME),
+            os.path.join(root_path, const.TRAINERS_DB_FILE_NAME),
+            os.path.join(root_path, const.ITEM_DB_FILE_NAME),
+            os.path.join(root_path, const.MOVE_DB_FILE_NAME),
+            os.path.join(root_path, const.TYPE_INFO_FILE_NAME),
+            os.path.join(root_path, const.FIGHTS_INFO_FILE_NAME),
+            "",
+            custom_version_name,
+            base_version_name=self._version_name
+        )
+    
+    def get_trainer_timing_info(self) -> universal_data_objects.TrainerTimingStats:
+        return self._trainer_timing_info
+    
+    def get_stat_xp_yield(self, pkmn_name:str, exp_split:int, held_item:str) -> universal_data_objects.StatBlock:
+        if held_item == const.MACHO_BRACE_ITEM_NAME:
+            return self.pkmn_db().get_pkmn(pkmn_name).stat_xp_yield.add(self.pkmn_db().get_pkmn(pkmn_name).stat_xp_yield)
+
+        result = self.pkmn_db().get_pkmn(pkmn_name).stat_xp_yield
+        if held_item == const.POWER_WEIGHT_ITEM_NAME:
+            return result.add(GenFiveStatBlock(4, 0, 0, 0, 0, 0, is_stat_xp=True))
+        elif held_item == const.POWER_BRACER_ITEM_NAME:
+            return result.add(GenFiveStatBlock(0, 4, 0, 0, 0, 0, is_stat_xp=True))
+        elif held_item == const.POWER_BELT_ITEM_NAME:
+            return result.add(GenFiveStatBlock(0, 0, 4, 0, 0, 0, is_stat_xp=True))
+        elif held_item == const.POWER_LENS_ITEM_NAME:
+            return result.add(GenFiveStatBlock(0, 0, 0, 4, 0, 0, is_stat_xp=True))
+        elif held_item == const.POWER_BAND_ITEM_NAME:
+            return result.add(GenFiveStatBlock(0, 0, 0, 0, 4, 0, is_stat_xp=True))
+        elif held_item == const.POWER_ANKLET_ITEM_NAME:
+            return result.add(GenFiveStatBlock(0, 0, 0, 0, 0, 4, is_stat_xp=True))
+        
+        return result
+
+    def get_money_after_blackout(self, cur_money:str, mon_level:int, badges:universal_data_objects.BadgeList) -> int:
+        base_val = BLACKOUT_BASE_VALS.get(badges.num_badges(), 120)
+        return max(0, cur_money - (base_val * mon_level))
+
+    def _validate_held_item_boosts(self, supported_types):
+        invalid_types = []
+        for cur_item, cur_type in self._held_item_boosts.items():
+            if cur_type not in supported_types:
+                invalid_types.append((cur_item, cur_type))
+            elif self._item_db.get_item(cur_item) == None:
+                invalid_types.append((cur_item, cur_type))
+        
+        if invalid_types:
+            raise ValueError(f"Detected invalid item boosts: {invalid_types}")
+    
+    def _validate_fight_rewards(self):
+        invalid_rewards = []
+        for cur_fight, cur_reward in self._fight_rewards.items():
+            if self._item_db.get_item(cur_reward) is None:
+                invalid_rewards.append((cur_fight, cur_reward))
+        
+        if len(invalid_rewards) > 0:
+            raise ValueError(f"Invalid Fight Rewards: {invalid_rewards}")
+
+
+def _load_pkmn_db(path):
+    result = {}
+    with open(path, 'r', encoding='utf-8') as f:
+        raw_pkmn_db = json.load(f)
+
+    all_pkmn = raw_pkmn_db.get("pokemon", raw_pkmn_db.values())
+    for cur_pkmn in all_pkmn:
+        result[cur_pkmn[const.SPECIES_KEY]] = universal_data_objects.PokemonSpecies(
+            cur_pkmn[const.SPECIES_KEY],
+            cur_pkmn[const.GROWTH_RATE_KEY],
+            cur_pkmn[const.BASE_EXPERIENCE_KEY],
+            cur_pkmn[const.FIRST_TYPE_KEY],
+            cur_pkmn[const.SECOND_TYPE_KEY],
+            GenFiveStatBlock(
+                cur_pkmn[const.BASE_STATS_KEY][const.HP],
+                cur_pkmn[const.BASE_STATS_KEY][const.ATTACK],
+                cur_pkmn[const.BASE_STATS_KEY][const.DEFENSE],
+                cur_pkmn[const.BASE_STATS_KEY][const.SPECIAL_ATTACK],
+                cur_pkmn[const.BASE_STATS_KEY][const.SPECIAL_DEFENSE],
+                cur_pkmn[const.BASE_STATS_KEY][const.SPEED],
+            ),
+            [],
+            cur_pkmn[const.LEVEL_UP_MOVESET_KEY],
+            cur_pkmn[const.TM_HM_LEARNSET_KEY],
+            GenFiveStatBlock(
+                cur_pkmn[const.EV_YIELD_KEY][const.HP],
+                cur_pkmn[const.EV_YIELD_KEY][const.ATTACK],
+                cur_pkmn[const.EV_YIELD_KEY][const.DEFENSE],
+                cur_pkmn[const.EV_YIELD_KEY][const.SPECIAL_ATTACK],
+                cur_pkmn[const.EV_YIELD_KEY][const.SPECIAL_DEFENSE],
+                cur_pkmn[const.EV_YIELD_KEY][const.SPEED],
+            ),
+            cur_pkmn[const.ABILITY_LIST_KEY],
+            weight=cur_pkmn[const.WEIGHT_KEY],
+        )
+
+    return result
+
+
+# The gen 5 trainers.json stores move names using the older, compact display style
+# (e.g. "AncientPower", "Faint Attack", "Hi Jump Kick") while moves.json uses the
+# modern spellings ("Ancient Power", "Feint Attack", "High Jump Kick"). Map the
+# trainer names onto the move-DB names so move lookups/validation succeed. This is a
+# data inconsistency between the two extraction sources; if the trainer data is ever
+# re-extracted with canonical names, this map can be removed.
+_TRAINER_MOVE_ALIASES = {
+    "AncientPower": "Ancient Power",
+    "BubbleBeam": "Bubble Beam",
+    "DoubleSlap": "Double Slap",
+    "DragonBreath": "Dragon Breath",
+    "DynamicPunch": "Dynamic Punch",
+    "ExtremeSpeed": "Extreme Speed",
+    "Faint Attack": "Feint Attack",
+    "FeatherDance": "Feather Dance",
+    "GrassWhistle": "Grass Whistle",
+    "Hi Jump Kick": "High Jump Kick",
+    "PoisonPowder": "Poison Powder",
+    "Sand-Attack": "Sand Attack",
+    "Softboiled": "Soft-Boiled",
+    "SolarBeam": "Solar Beam",
+    "ThunderPunch": "Thunder Punch",
+    "ThunderShock": "Thunder Shock",
+    "Selfdestruct": "Self-Destruct",
+    "SmokeScreen": "Smokescreen",
+    "SonicBoom": "Sonic Boom",
+}
+
+
+def _normalize_trainer_moves(moves):
+    return [_TRAINER_MOVE_ALIASES.get(m, m) for m in moves]
+
+
+# A few species names in the gen 5 trainer data are corrupted/mismatched relative to
+# pokemon.json: the gender symbols on Nidoran came through as circled-number mojibake
+# (U+246E / U+246D), and Farfetch'd uses a straight apostrophe instead of the curly
+# one. The Nidoran gender assignments below were confirmed by matching each trainer
+# mon's moveset against the species level-up learnset. Like the move alias map, this
+# can be removed if the trainer data is re-extracted cleanly.
+_TRAINER_SPECIES_ALIASES = {
+    "Nidoran⑮": "Nidoran♀",  # circled-15 -> Nidoran (female)
+    "Nidoran⑭": "Nidoran♂",  # circled-14 -> Nidoran (male)
+    "Farfetch'd": "Farfetch’d",   # straight apostrophe -> curly apostrophe
+}
+
+
+def _create_trainer(trainer_dict, pkmn_db:PkmnDB, extract_trainer_id=False) -> universal_data_objects.Trainer:
+    enemy_pkmn = []
+    for cur_mon in trainer_dict[const.TRAINER_POKEMON]:
+        species = _TRAINER_SPECIES_ALIASES.get(cur_mon[const.SPECIES_KEY], cur_mon[const.SPECIES_KEY])
+        cur_mon[const.SPECIES_KEY] = species
+        if pkmn_db.get_pkmn(species) == None:
+            raise ValueError(f"Failed to get mon: {species}")
+        enemy_pkmn.append(
+            universal_data_objects.EnemyPkmn(
+                cur_mon[const.SPECIES_KEY],
+                cur_mon[const.LEVEL],
+                cur_mon[const.EXPERIENCE_YIELD_KEY],
+                _normalize_trainer_moves(cur_mon[const.MOVES]),
+                GenFiveStatBlock(
+                    cur_mon[const.STATS_KEY][const.HP],
+                    cur_mon[const.STATS_KEY][const.ATTACK],
+                    cur_mon[const.STATS_KEY][const.DEFENSE],
+                    cur_mon[const.STATS_KEY][const.SPECIAL_ATTACK],
+                    cur_mon[const.STATS_KEY][const.SPECIAL_DEFENSE],
+                    cur_mon[const.STATS_KEY][const.SPEED],
+                ),
+                pkmn_db.get_pkmn(cur_mon[const.SPECIES_KEY]).stats,
+                GenFiveStatBlock(
+                    cur_mon[const.IVS_PLURAL_KEY][const.HP],
+                    cur_mon[const.IVS_PLURAL_KEY][const.ATTACK],
+                    cur_mon[const.IVS_PLURAL_KEY][const.DEFENSE],
+                    cur_mon[const.IVS_PLURAL_KEY][const.SPECIAL_ATTACK],
+                    cur_mon[const.IVS_PLURAL_KEY][const.SPECIAL_DEFENSE],
+                    cur_mon[const.IVS_PLURAL_KEY][const.SPEED],
+                ),
+                GenFiveStatBlock(0, 0, 0, 0, 0, 0),
+                None,
+                is_trainer_mon=True,
+                held_item=cur_mon[const.HELD_ITEM_KEY],
+                ability=cur_mon[const.ABILITY_KEY],
+                nature=universal_data_objects.Nature(cur_mon[const.NATURE_KEY])
+            )
+        )
+    
+    try:
+        trainer_id = trainer_dict[const.ROM_ID]
+    except Exception as e:
+        raise KeyError(f"Issue with {trainer_dict[const.NAME_KEY]}") from e
+
+    # Gen 5 prize money = base_money * level_of_last_pokemon. The stored MONEY
+    # byte is base_money / 4, so multiplying by 4 recovers the real base rate;
+    # it must then be scaled by the last party member's level.
+    last_level = enemy_pkmn[-1].level if enemy_pkmn else 0
+    reward_money = trainer_dict[const.MONEY] * 4 * last_level
+
+    return universal_data_objects.Trainer(
+        trainer_dict[const.TRAINER_CLASS],
+        trainer_dict[const.TRAINER_NAME],
+        "",
+        reward_money,
+        enemy_pkmn,
+        rematch=("Rematch" in trainer_dict[const.TRAINER_NAME]),
+        trainer_id=trainer_id,
+        refightable=trainer_dict.get(const.TRAINER_REFIGHTABLE, False),
+        double_battle=trainer_dict[const.TRAINER_DOUBLE_BATTLE]
+    )
+
+
+def _load_trainer_db(path, pkmn_db:PkmnDB):
+    result = {}
+    with open(path, 'r', encoding='utf-8') as f:
+        raw_db = json.load(f)
+
+    all_trainers = raw_db.get("trainers", raw_db.values())
+    unused_count = 0
+    for raw_trainer in all_trainers:
+        # ignoring all unused trainers
+        if raw_trainer[const.TRAINER_LOC] == const.UNUSED_TRAINER_LOC:
+            unused_count += 1
+            continue
+        if raw_trainer[const.TRAINER_NAME] in result:
+            raise ValueError(f"Multiple trainers with the same name ({raw_trainer[const.TRAINER_NAME]}) from trainer file: {path}")
+        result[raw_trainer[const.TRAINER_NAME]] = _create_trainer(raw_trainer, pkmn_db)
+    
+    if not len(all_trainers) == len(result) + unused_count:
+        raise ValueError("Incorrect number of trainers. Some name collisions must exist")
+    return result
+
+
+def _load_item_db(path):
+    result = {}
+
+    with open(path, 'r', encoding='utf-8') as f:
+        raw_db = json.load(f)
+
+    all_items = raw_db.get("items", raw_db.values())
+    for raw_item in all_items:
+        item_name:str = raw_item[const.NAME_KEY]
+        move_name = None
+        if item_name.startswith("TM") or item_name.startswith("HM"):
+            move_name = item_name.split(" ", 1)[1]
+
+        result[item_name] = universal_data_objects.BaseItem(
+            item_name,
+            raw_item[const.IS_KEY_ITEM],
+            raw_item[const.PURCHASE_PRICE],
+            [],
+            move_name,
+        )
+    
+    return result
+
+
+def _load_move_db(path):
+    # NOTE: The gen 5 moves.json is currently leaner than the gen 4 file. It is
+    # missing the structured `effects` list, the `attack_flavor` list, and the
+    # `has_field_effect` flag that the other gens provide; it only carries a scalar
+    # `effect` code (e.g. "lower_enemy_attack_1"). Damage calculation only relies on
+    # name/accuracy/pp/power/type/category, all of which are present, so battles and
+    # routing work correctly. The consequence of the missing `effects` data is that
+    # automatic detection of stat-modifying / field moves (used to populate some
+    # dropdowns in pkmn_db) is unavailable for gen 5 until the data is enriched —
+    # the scalar `effect` code could be parsed into structured effects later.
+    result = {}
+    with open(path, 'r', encoding='utf-8') as f:
+        raw_db = json.load(f)
+
+    all_moves = raw_db.get("moves", raw_db.values())
+    for raw_move in all_moves:
+        # The gen 5 moves.json includes 18 "Shadow"-type moves carried over from the
+        # Colosseum/XD data. "Shadow" is not a real type and is absent from the gen 5
+        # type chart, so these would fail validate_move_types. No BW/B2W2 Pokemon or
+        # trainer uses them, so they are safely skipped here.
+        if raw_move.get(const.MOVE_TYPE) == "Shadow":
+            continue
+        result[raw_move[const.MOVE_KEY]] = universal_data_objects.Move(
+            raw_move[const.MOVE_KEY],
+            raw_move[const.MOVE_ACCURACY],
+            raw_move[const.MOVE_PP],
+            raw_move[const.POWER],
+            raw_move[const.MOVE_TYPE],
+            raw_move.get(const.MOVE_EFFECTS, []) or [],
+            raw_move.get(const.MOVE_FLAVOR, raw_move.get("attack_flavor", [])) or [],
+            targeting=raw_move[const.MOVE_TARGET],
+            category=raw_move[const.MOVE_CATEGORY],
+            has_field_effect=raw_move.get(const.MOVE_HAS_FIELD_EFFECT, False),
+        )
+
+    return result
+
+
+# Black and White share the black_white dataset; Black 2 and White 2 share the
+# black2_white2 dataset. All four share the gen-5 items/moves/type/fights data.
+gen_five_black = GenFive(
+    gen_five_const.BW_POKEMON_PATH,
+    gen_five_const.BW_TRAINER_DB_PATH,
+    gen_five_const.ITEM_DB_PATH,
+    gen_five_const.MOVE_DB_PATH,
+    gen_five_const.TYPE_INFO_PATH,
+    gen_five_const.FIGHTS_INFO_PATH,
+    "",
+    const.BLACK_VERSION
+)
+
+gen_five_white = GenFive(
+    gen_five_const.BW_POKEMON_PATH,
+    gen_five_const.BW_TRAINER_DB_PATH,
+    gen_five_const.ITEM_DB_PATH,
+    gen_five_const.MOVE_DB_PATH,
+    gen_five_const.TYPE_INFO_PATH,
+    gen_five_const.FIGHTS_INFO_PATH,
+    "",
+    const.WHITE_VERSION
+)
+
+gen_five_black_2 = GenFive(
+    gen_five_const.B2W2_POKEMON_PATH,
+    gen_five_const.B2W2_TRAINER_DB_PATH,
+    gen_five_const.ITEM_DB_PATH,
+    gen_five_const.MOVE_DB_PATH,
+    gen_five_const.TYPE_INFO_PATH,
+    gen_five_const.FIGHTS_INFO_PATH,
+    "",
+    const.BLACK_2_VERSION
+)
+
+gen_five_white_2 = GenFive(
+    gen_five_const.B2W2_POKEMON_PATH,
+    gen_five_const.B2W2_TRAINER_DB_PATH,
+    gen_five_const.ITEM_DB_PATH,
+    gen_five_const.MOVE_DB_PATH,
+    gen_five_const.TYPE_INFO_PATH,
+    gen_five_const.FIGHTS_INFO_PATH,
+    "",
+    const.WHITE_2_VERSION
+)

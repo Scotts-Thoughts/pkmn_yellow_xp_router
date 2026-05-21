@@ -37,9 +37,15 @@ def calculate_gen_one_damage(
     attacking_battle_stats:universal_data_objects.StatBlock=None,
     defending_battle_stats:universal_data_objects.StatBlock=None,
 ):
+    # Special-damage moves (Dragon Rage 40, Sonic Boom 20, Seismic Toss/Night Shade = level)
+    # don't store their damage in base_power. Type immunity is intentionally ignored in gen 1.
+    special_override = damage_calc.get_special_damage_override(move, attacking_pkmn)
+    if special_override is not None:
+        return special_override
+
     if move.base_power is None or move.base_power == 0:
         return None
-    
+
     # special move interactions
     if const.FLAVOR_FIXED_DAMAGE in move.attack_flavor:
         return damage_calc.DamageRange({move.base_power: 1})

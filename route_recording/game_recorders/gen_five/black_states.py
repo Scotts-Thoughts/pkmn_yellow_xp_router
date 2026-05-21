@@ -50,7 +50,7 @@ class WatchForResetState(State):
         if self.machine._player_id is not None:
             if new_prop.path == gh_gen_five_const.KEY_PLAYER_PLAYERID and new_prop.value == 0:
                 return StateType.RESETTING
-            elif new_prop.value == 0 and self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value == 0:
+            elif new_prop.value == 0 and self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_PLAYERID) == 0:
                 return StateType.RESETTING
         return None
 
@@ -81,7 +81,7 @@ class WatchState(State):
 
     def transition(self, new_prop:GameHookProperty, prev_prop:GameHookProperty) -> StateType:
         if new_prop.path != gh_gen_five_const.KEY_GAMETIME_SECONDS:
-            frame_val = self.machine._gamehook_client.get(gh_gen_five_const.KEY_GAMETIME_FRAMES).value
+            frame_val = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_GAMETIME_FRAMES)
             logger.info(f"On Frame {frame_val:02} Changing {new_prop.path} from {prev_prop.value} to {new_prop.value}({type(new_prop.value)})")
 
         return self.state_type
@@ -98,7 +98,7 @@ class UninitializedState(WatchForResetState):
         self._seconds_delay = 2
     
     def _on_exit(self, next_state: State):
-        self.machine._player_id = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value
+        self.machine._player_id = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_PLAYERID)
         # Shouldn't really happen ever, but if the player connects to an active game, but then resets the emulator
         # it's possible that we exit (due to transitioning to a reset state) while the player id is 0
         # If this happens, just ignore the update, let the ResettingState handle setting the player id
@@ -112,12 +112,12 @@ class UninitializedState(WatchForResetState):
         if new_prop.path == gh_gen_five_const.KEY_GAMETIME_SECONDS:
             if self._seconds_delay <= 0:
                 if (
-                    self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value == 'Battle'
+                    self.machine._gamehook_client.get_value(gh_gen_five_const.META_STATE) == 'Battle'
                 ):
                     return StateType.BATTLE
                 else:
                     return StateType.OVERWORLD
-            elif not self._is_waiting and self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value != 0:
+            elif not self._is_waiting and self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_PLAYERID) != 0:
                 self._is_waiting = True
 
             if self._is_waiting:
@@ -138,7 +138,7 @@ class ResettingState(State):
         self.machine._queue_new_event(EventDefinition(notes=gh_gen_five_const.RESET_FLAG))
     
     def _on_exit(self, next_state: State):
-        new_player_id = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value
+        new_player_id = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_PLAYERID)
         if self.machine._player_id is None:
             self.machine._player_id = new_player_id
         elif self.machine._player_id != new_player_id:
@@ -166,7 +166,7 @@ class BattleState(WatchForResetState):
 
     class DelayedBattleMovesUpdate(DelayedUpdate):
         def _update_helper(self):
-            if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
+            if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS) == 0:
                 self.machine.update_team_cache()
                 self.machine._move_cache_update(levelup_source=True)
 
@@ -179,16 +179,16 @@ class BattleState(WatchForResetState):
             self._init_held_item = held_item
 
         def _update_helper(self):
-            if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
-                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value is None:
+            if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS) == 0:
+                if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM) is None:
                     self.machine._queue_new_event(EventDefinition(hold_item=HoldItemEventDefinition(None, True)))
-                elif self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value != self._init_held_item:
+                elif self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM) != self._init_held_item:
                     do_consume = self._init_held_item is not None
-                    self._init_held_item = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value
+                    self._init_held_item = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM)
                     self.machine._queue_new_event(
                         EventDefinition(
                             hold_item=HoldItemEventDefinition(
-                                self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value,
+                                self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM),
                                 do_consume
                             )
                         )
@@ -199,8 +199,8 @@ class BattleState(WatchForResetState):
             self.original_level = original_level
 
         def _update_helper(self):
-            if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value == 0:
-                new_level = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_LEVEL).value
+            if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS) == 0:
+                new_level = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_LEVEL)
                 if new_level > self.original_level:
                     self.machine._solo_mon_levelup(new_level)
                     self.original_level = new_level
@@ -270,17 +270,17 @@ class BattleState(WatchForResetState):
         self._is_double_battle = False
         self._multi_battle = False
         # self._is_tutorial_battle = False
-        self._ally_id = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_NUMBER).value
+        self._ally_id = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_ALLY_NUMBER)
         logger.info(f"ally id: {self._ally_id}")
-        self._initial_money = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MONEY).value
+        self._initial_money = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MONEY)
         self._init_held_item = None
         self._solo_hp_zero = False
         self._team_hp_zero = False
         self._watching_for_map_change = False
-        self._initial_map = self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value
+        self._initial_map = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_OVERWORLD_MAP)
         
         # PID-based exp split tracking for double battles
-        self._solo_mon_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_PID).value
+        self._solo_mon_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_PID)
         self._current_ally_pid = None
         self._ally_hp_zero = False
         
@@ -296,11 +296,11 @@ class BattleState(WatchForResetState):
         # so, for now, just iterate over enemy pokemon team species, and figure out how many non-empty team members are loaded
         result = 0
         for cur_key in gh_gen_five_const.ALL_KEYS_ENEMY_TEAM_SPECIES:
-            if self.machine._gamehook_client.get(cur_key).value:
+            if self.machine._gamehook_client.get_value(cur_key):
                 result += 1
-        if self.trainer_2 > 0:
+        if self.trainer_2 and self.trainer_2 > 0:
             for cur_key in gh_gen_five_const.ALL_KEYS_ENEMY_2_TEAM_SPECIES:
-                if self.machine._gamehook_client.get(cur_key).value:
+                if self.machine._gamehook_client.get_value(cur_key):
                     result += 1
         return result
 
@@ -316,40 +316,58 @@ class BattleState(WatchForResetState):
         result = {}
         next_pos_idx = 0
         for cur_key_idx in real_order:
-            if self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_ENEMY_TEAM_SPECIES[cur_key_idx]).value:
+            if self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_ENEMY_TEAM_SPECIES[cur_key_idx]):
                 result[cur_key_idx] = next_pos_idx
                 next_pos_idx += 1
 
         return result
 
     def _battle_ready(self):
-        # to be called after battle is actually initialized
-        battle_mode = self.machine._gamehook_client.get(gh_gen_five_const.KEY_TRAINER_BATTLE_FLAG).value
-        if battle_mode is None or battle_mode == 'null':
-            self._delayed_initialization.reset()
+        # to be called after battle is actually initialized.
+        #
+        # The gen 4 recorder gated this on `battle.mode` ('Trainer'/'null'), but the
+        # gen 5 mappers do not expose `battle.mode`, so KEY_TRAINER_BATTLE_FLAG is
+        # None here. Instead we wait until the enemy lead is populated (battle data
+        # loaded), then use `battle.opponent.id` (a trainer id; 0/None for wild
+        # encounters) to tell trainer battles from wild ones.
+        #
+        # This is invoked both from the periodic game-second tick and, for low
+        # latency, directly on every property change while the battle is still
+        # uninitialized (see the fast-path at the top of transition). It must be
+        # idempotent and must not deactivate itself while merely waiting for data.
+        if self._battle_started:
+            # already initialized this battle; never re-run (avoids duplicate events)
+            return
+        first_enemy_species = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_SPECIES)
+        if not first_enemy_species:
+            # battle data not loaded yet; stay armed and retry on the next property
+            # change / tick instead of giving up
             return
 
-        self.trainer_1 = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_TRAINER_A_NUMBER).value
-        self.trainer_2 = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_TRAINER_B_NUMBER).value
+        self.trainer_1 = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_TRAINER_A_NUMBER)
+        self.trainer_2 = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_TRAINER_B_NUMBER)
 
         self._battle_started = True
-        self._init_held_item = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM).value
+        self._init_held_item = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM)
         if not self.trainer_2:
             self._is_double_battle = False
         else:
             self._is_double_battle = True
             if self._ally_id != 0:
                 self._multi_battle = True
-        # self._is_tutorial_battle = self.machine._gamehook_client.get(gh_gen_five_const.KEY_TUTORIAL_BATTLE_FLAG).value
-        self.is_trainer_battle = battle_mode
-        self._delayed_levelup.configure_level(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_LEVEL).value)
 
-        # if self._is_tutorial_battle:
-        #     logger.info(f"tutorial fight found")
+        # Trainer battle iff the opponent has a (nonzero) trainer id; otherwise wild.
+        self.is_trainer_battle = 'Trainer' if self.trainer_1 else 'Wild'
+        self._delayed_levelup.configure_level(self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_LEVEL))
+
         if self.is_trainer_battle == 'Trainer':
             logger.info(f"trainer battle found")
-            self._trainer_name = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_TRAINER_A_NUMBER).value
-            self._second_trainer_name = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_TRAINER_B_NUMBER).value
+            # Store the raw trainer id here. The event processor (_process_events in
+            # black_fsm) converts id->name via trainer_db().get_trainer_by_id(), so
+            # this must be the numeric `battle.opponent.id`, NOT the glossary-resolved
+            # `battle.opponent.trainer` (which is the trainer class, e.g. "Rival").
+            self._trainer_name = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_TRAINER_A_NUMBER)
+            self._second_trainer_name = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_TRAINER_B_NUMBER)
             if self._second_trainer_name is None:
                 self._second_trainer_name = ""
 
@@ -359,12 +377,12 @@ class BattleState(WatchForResetState):
             # NEW: Initialize enemy PID tracking - read all enemy team PIDs at battle start
             self._enemy_pids_in_battle = []
             for cur_key in gh_gen_five_const.ALL_KEYS_BATTLE_ENEMY_1_PID:
-                enemy_pid = self.machine._gamehook_client.get(cur_key).value
+                enemy_pid = self.machine._gamehook_client.get_value(cur_key)
                 if enemy_pid and enemy_pid != 0:
                     self._enemy_pids_in_battle.append(enemy_pid)
-            if self.trainer_2 > 0:
+            if self.trainer_2 and self.trainer_2 > 0:
                 for cur_key in gh_gen_five_const.ALL_KEYS_BATTLE_ENEMY_2_PID:
-                    enemy_pid = self.machine._gamehook_client.get(cur_key).value
+                    enemy_pid = self.machine._gamehook_client.get_value(cur_key)
                     if enemy_pid and enemy_pid != 0:
                         self._enemy_pids_in_battle.append(enemy_pid)
             
@@ -379,7 +397,7 @@ class BattleState(WatchForResetState):
             for enemy_pid in self._enemy_pids_in_battle:
                 if self._is_double_battle and not self._multi_battle:
                     # Double battle: start with solo + ally
-                    self._current_ally_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PID).value
+                    self._current_ally_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PID)
                     self._enemy_pid_to_participating_player_pids[enemy_pid] = set([self._solo_mon_pid, self._current_ally_pid])
                     logger.info(f"[EXP_SPLIT] Enemy PID {enemy_pid} starts with participants: {self._enemy_pid_to_participating_player_pids[enemy_pid]}")
                 else:
@@ -397,7 +415,7 @@ class BattleState(WatchForResetState):
             
             # For backward compatibility, also track legacy exp_split
             if self._is_double_battle and not self._multi_battle:
-                ally_mon_pos = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
+                ally_mon_pos = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS)
                 self._exp_split = [set([0, ally_mon_pos]) for _ in range(num_enemy_pokemon)]
             else:
                 self._exp_split = [set([0]) for _ in range(num_enemy_pokemon)]
@@ -405,7 +423,7 @@ class BattleState(WatchForResetState):
             return_custom_move_data = None
             if gen_five_const.RETURN_MOVE_NAME in self.machine._cached_moves:
                 return_custom_move_data = []
-                cur_friendship = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP).value
+                cur_friendship = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP)
                 for _ in range(6):
                     return_custom_move_data.append({
                         const.PLAYER_KEY: {gen_five_const.RETURN_MOVE_NAME: str(int(cur_friendship / 2.5))},
@@ -502,7 +520,7 @@ class BattleState(WatchForResetState):
                             exp_split=final_exp_split,
                             mon_order=final_mon_order,
                             custom_move_data=return_custom_move_data,
-                            pay_day_amount=self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MONEY).value - self._initial_money,
+                            pay_day_amount=self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MONEY) - self._initial_money,
                         ),
                         notes=gh_gen_five_const.ROAR_FLAG
                     )
@@ -516,18 +534,18 @@ class BattleState(WatchForResetState):
     
     def _get_first_enemy_mon_pos(self, value=None):
         if value is None:
-            value = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PARTY_POS).value
+            value = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PARTY_POS)
         return self._enemy_pos_lookup[value]
 
     def _get_second_enemy_mon_pos(self, value=None):
         if value is None:
-            value = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS).value
+            value = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PARTY_POS)
         return self._enemy_pos_lookup[value]
 
     def _check_all_team_hp_zero(self):
         """Check if all team HP values are 0 or below"""
         for hp_key in gh_gen_five_const.ALL_KEYS_BATTLE_TEAM_HP:
-            hp_value = self.machine._gamehook_client.get(hp_key).value
+            hp_value = self.machine._gamehook_client.get_value(hp_key)
             if hp_value is not None and hp_value > 0:
                 return False
         return True
@@ -566,6 +584,16 @@ class BattleState(WatchForResetState):
         # don't actually track anything during the tutorial battle
         # if self._is_tutorial_battle:
         #     return self.state_type
+
+        # Initialize the battle the instant its data is available rather than waiting
+        # for the periodic game-second tick (BASE_DELAY). The mapper exposes the
+        # trainer/enemy data almost immediately on battle entry, and the battle
+        # summary needs to appear with minimal lag while the user is playing.
+        # _battle_ready is idempotent (guards on _battle_started), so calling it here
+        # on every property change is safe and just makes init fire as soon as the
+        # enemy lead is populated.
+        if not self._battle_started:
+            self._battle_ready()
 
         # Track solo HP hitting 0 - start blackout detection
         if new_prop.path == gh_gen_five_const.ALL_KEYS_BATTLE_SOLO_HP:
@@ -606,7 +634,7 @@ class BattleState(WatchForResetState):
             
             # Check first enemy slot
             if self._cached_first_mon_species or self._cached_first_mon_level:
-                first_enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID).value
+                first_enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID)
                 logger.info(f"[EXP_SPLIT] First enemy cached, checking PID: {first_enemy_pid}")
                 if first_enemy_pid and first_enemy_pid in self._enemy_pid_to_participating_player_pids:
                     defeated_enemy_pid = first_enemy_pid
@@ -616,7 +644,7 @@ class BattleState(WatchForResetState):
             
             # Check second enemy slot
             if not defeated_enemy_pid and (self._cached_second_mon_species or self._cached_second_mon_level):
-                second_enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID).value
+                second_enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID)
                 logger.info(f"[EXP_SPLIT] Second enemy cached, checking PID: {second_enemy_pid}")
                 if second_enemy_pid and second_enemy_pid in self._enemy_pid_to_participating_player_pids:
                     defeated_enemy_pid = second_enemy_pid
@@ -679,7 +707,7 @@ class BattleState(WatchForResetState):
             # Check if battle ended AFTER processing EXP changes
             # If META_STATE is not 'Battle', we've left battle
             # BUT: Don't transition if we're tracking a blackout
-            meta_state = self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value
+            meta_state = self.machine._gamehook_client.get_value(gh_gen_five_const.META_STATE)
             if meta_state != 'Battle':
                 # If we're tracking a blackout, stay in battle state
                 if self._solo_hp_zero:
@@ -695,7 +723,7 @@ class BattleState(WatchForResetState):
                 logger.info(f"[EXP_SPLIT] First enemy HP: {prev_prop.value} -> {new_prop.value}")
                 
                 # Get the enemy PID
-                enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID).value
+                enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID)
                 logger.info(f"[EXP_SPLIT] First enemy PID: {enemy_pid}")
                 
                 # Always cache when HP hits 0 (like Emerald) - allows caching multiple Pokemon
@@ -708,12 +736,12 @@ class BattleState(WatchForResetState):
                     )))
                     logger.info(f"[EXP_SPLIT] Adding previously cached Pokemon to defeated list before overwriting: {self._cached_first_mon_species} level {self._cached_first_mon_level}")
                 
-                species_raw = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_SPECIES).value
-                level_raw = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_LEVEL).value
+                species_raw = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_SPECIES)
+                level_raw = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_LEVEL)
                 self._cached_first_mon_species = self.machine.gh_converter.pkmn_name_convert(species_raw)
                 self._cached_first_mon_level = level_raw
                 logger.info(f"[EXP_SPLIT] Cached first enemy: {self._cached_first_mon_species} level {self._cached_first_mon_level} (raw: {species_raw}, {level_raw})")
-                self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP).value)
+                self._friendship_data.append(self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP))
                 
                 # Log participation info for this enemy PID
                 if enemy_pid in self._enemy_pid_to_participating_player_pids:
@@ -728,7 +756,7 @@ class BattleState(WatchForResetState):
                 logger.info(f"[EXP_SPLIT] Second enemy HP: {prev_prop.value} -> {new_prop.value}")
                 
                 # Get the enemy PID
-                enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID).value
+                enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID)
                 logger.info(f"[EXP_SPLIT] Second enemy PID: {enemy_pid}")
                 
                 # Always cache when HP hits 0 (like Emerald) - allows caching multiple Pokemon
@@ -741,10 +769,10 @@ class BattleState(WatchForResetState):
                     )))
                     logger.info(f"[EXP_SPLIT] Adding previously cached Pokemon to defeated list before overwriting: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
                 
-                self._cached_second_mon_species = self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_SPECIES).value)
-                self._cached_second_mon_level = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_LEVEL).value
+                self._cached_second_mon_species = self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_SPECIES))
+                self._cached_second_mon_level = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_LEVEL)
                 logger.info(f"[EXP_SPLIT] Cached second enemy: {self._cached_second_mon_species} level {self._cached_second_mon_level}")
-                self._friendship_data.append(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP).value)
+                self._friendship_data.append(self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_FRIENDSHIP))
                 
                 # Log participation info for this enemy PID
                 if enemy_pid in self._enemy_pid_to_participating_player_pids:
@@ -765,10 +793,10 @@ class BattleState(WatchForResetState):
                     self._ally_hp_zero = False  # Reset ally faint flag
                     
                     # Get currently active enemy PIDs
-                    first_enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID).value
-                    second_enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID).value
-                    first_enemy_hp = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP).value
-                    second_enemy_hp = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP).value
+                    first_enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID)
+                    second_enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID)
+                    first_enemy_hp = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP)
+                    second_enemy_hp = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP)
                     
                     logger.info(f"[EXP_SPLIT] First enemy PID: {first_enemy_pid}, HP: {first_enemy_hp}")
                     logger.info(f"[EXP_SPLIT] Second enemy PID: {second_enemy_pid}, HP: {second_enemy_hp}")
@@ -794,7 +822,7 @@ class BattleState(WatchForResetState):
             elif new_prop.value is None or new_prop.value == 0:
                 logger.info(f"[EXP_SPLIT] Ally PID set to None/0 (value: {new_prop.value})")
         elif new_prop.path == gh_gen_five_const.KEY_BATTLE_PLAYER_MON_HP:
-            player_mon_pos = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value
+            player_mon_pos = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS)
             if player_mon_pos == 0 and new_prop.value <= 0:
                 if self._battle_started:
                     logger.info(f"Player mon HP dropped to 0 or below")
@@ -825,10 +853,10 @@ class BattleState(WatchForResetState):
                             logger.info(f"[EXP_SPLIT] Removed ally PID {self._current_ally_pid} from enemy PID {enemy_pid}. Player PIDs now: {self._enemy_pid_to_participating_player_pids[enemy_pid]}")
                 
                 # Log enemy status for context
-                first_enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID).value
-                second_enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID).value
-                first_hp = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP).value
-                second_hp = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP).value
+                first_enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID)
+                second_enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID)
+                first_hp = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP)
+                second_hp = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP)
                 logger.info(f"[EXP_SPLIT] First enemy PID: {first_enemy_pid}, HP: {first_hp}")
                 logger.info(f"[EXP_SPLIT] Second enemy PID: {second_enemy_pid}, HP: {second_hp}")
                 logger.info(f"[EXP_SPLIT] ===== END ALLY FAINTED =====")
@@ -838,11 +866,11 @@ class BattleState(WatchForResetState):
                 # additionally, we also want to remove from the exp split if the enemy is cached, as this means they died on the same turn (e.g. earthquake)
                 # if the enemy has no HP *AND* is not cached for exp distribution, then they have died and enemy trainer has no further mons
                 #   In that case, leave the ally in the exp split, as they did participate already
-                ally_mon_pos = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value
+                ally_mon_pos = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS)
                 enemy_mon_pos = self._get_first_enemy_mon_pos()
                 if (
                     ally_mon_pos in self._exp_split[enemy_mon_pos] and (
-                        self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0 or
+                        self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP) > 0 or
                         self._cached_first_mon_species
                     )
                 ):
@@ -852,7 +880,7 @@ class BattleState(WatchForResetState):
                 second_enemy_mon_pos = self._get_second_enemy_mon_pos()
                 if (
                     ally_mon_pos in self._exp_split[second_enemy_mon_pos] and (
-                        self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0 or
+                        self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP) > 0 or
                         self._cached_second_mon_species
                     )
                 ):
@@ -874,16 +902,16 @@ class BattleState(WatchForResetState):
             self._delayed_initialization.tick()
         elif new_prop.path == gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS:
             if new_prop.value >= 0 and new_prop.value < 6:
-                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0:
+                if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP) > 0:
                     self._exp_split[self._get_first_enemy_mon_pos()].add(new_prop.value)
                 if self._is_double_battle:
-                    if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0:
+                    if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP) > 0:
                         self._exp_split[self._get_second_enemy_mon_pos()].add(new_prop.value)
         elif new_prop.path == gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS:
             if self._is_double_battle and not self._multi_battle and new_prop.value >= 0 and new_prop.value < 6:
-                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP).value > 0:
+                if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_HP) > 0:
                     self._exp_split[self._get_first_enemy_mon_pos()].add(new_prop.value)
-                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP).value > 0:
+                if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_HP) > 0:
                     self._exp_split[self._get_second_enemy_mon_pos()].add(new_prop.value)
         elif new_prop.path == gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PARTY_POS:
             real_new_value = self._get_first_enemy_mon_pos(value=new_prop.value)
@@ -895,16 +923,16 @@ class BattleState(WatchForResetState):
                 # NEW: With enemy PID tracking, we don't need to reset anything!
                 # The enemy PID remains associated with the Pokemon regardless of position.
                 # Just log the new enemy PID for debugging
-                new_enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID).value
+                new_enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_FIRST_ENEMY_PID)
                 logger.info(f"[EXP_SPLIT] New enemy PID in first slot: {new_enemy_pid}")
                 if new_enemy_pid in self._enemy_pid_to_participating_player_pids:
                     logger.info(f"[EXP_SPLIT] Participating player PIDs for this enemy: {self._enemy_pid_to_participating_player_pids[new_enemy_pid]}")
                 
                 # Legacy exp_split tracking (for backwards compatibility)
-                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_HP).value > 0:
-                    self._exp_split[real_new_value] = set([self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
-                if self._is_double_battle and not self._multi_battle and self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
-                    self._exp_split[real_new_value].add(self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value)
+                if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_HP) > 0:
+                    self._exp_split[real_new_value] = set([self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS)])
+                if self._is_double_battle and not self._multi_battle and self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_ALLY_MON_HP) > 0:
+                    self._exp_split[real_new_value].add(self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS))
 
                 # NOTE: this logic won't perfectly reflect things if the player uses roar/whirlwind
                 # or if the enemy trainer switches pokemon (and doesn't only send out new mons on previous death)
@@ -927,16 +955,16 @@ class BattleState(WatchForResetState):
                 # NEW: With enemy PID tracking, we don't need to reset anything!
                 # The enemy PID remains associated with the Pokemon regardless of position.
                 # Just log the new enemy PID for debugging
-                new_enemy_pid = self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID).value
+                new_enemy_pid = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_SECOND_ENEMY_PID)
                 logger.info(f"[EXP_SPLIT] New enemy PID in second slot: {new_enemy_pid}")
                 if new_enemy_pid in self._enemy_pid_to_participating_player_pids:
                     logger.info(f"[EXP_SPLIT] Participating player PIDs for this enemy: {self._enemy_pid_to_participating_player_pids[new_enemy_pid]}")
                 
                 # Legacy exp_split tracking (for backwards compatibility)
-                if self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_HP).value > 0:
-                    self._exp_split[real_new_value] = set([self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
-                if not self._multi_battle and self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_HP).value > 0:
-                    self._exp_split[real_new_value].add(self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS).value)
+                if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_HP) > 0:
+                    self._exp_split[real_new_value] = set([self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_PLAYER_MON_PARTY_POS)])
+                if not self._multi_battle and self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_ALLY_MON_HP) > 0:
+                    self._exp_split[real_new_value].add(self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_ALLY_MON_PARTY_POS))
 
                 # NOTE: this logic won't perfectly reflect things if the player uses roar/whirlwind
                 # or if the enemy trainer switches pokemon (and doesn't only send out new mons on previous death)
@@ -950,7 +978,7 @@ class BattleState(WatchForResetState):
             # Only transition if META_STATE indicates we've left battle
             # Don't transition immediately on species change - wait for META_STATE to change
             # If we're watching for blackout, transition to OVERWORLD so it can handle map change detection
-            meta_state = self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value
+            meta_state = self.machine._gamehook_client.get_value(gh_gen_five_const.META_STATE)
             if meta_state != 'Battle':
                 # If we're watching for blackout, transition to OVERWORLD (it will handle map change)
                 if self._watching_for_map_change:
@@ -975,7 +1003,7 @@ class BattleState(WatchForResetState):
         # BUT: Don't transition if we have a cached Pokemon waiting for EXP change
         # If we're watching for blackout, transition to OVERWORLD so it can handle map change detection
         if new_prop.path != gh_gen_five_const.KEY_PLAYER_MON_EXPPOINTS:
-            meta_state = self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value
+            meta_state = self.machine._gamehook_client.get_value(gh_gen_five_const.META_STATE)
             # If META_STATE is not 'Battle', we've left battle (could be 'From Battle', 'Overworld', or anything else)
             if meta_state != 'Battle':
                 # If we're watching for blackout, transition to OVERWORLD (it will handle map change)
@@ -1033,12 +1061,12 @@ class InventoryChangeState(WatchForResetState):
             # Check if EVs changed by comparing machine's cached EVs (from overworld) with current EVs
             # Machine's cached_evs were captured in OverworldState BEFORE the EV change happened
             current_evs = {
-                'hp': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]).value,
-                'attack': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]).value,
-                'defense': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]).value,
-                'speed': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]).value,
-                'special_attack': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]).value,
-                'special_defense': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]).value,
+                'hp': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]),
+                'attack': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]),
+                'defense': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]),
+                'speed': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]),
+                'special_attack': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]),
+                'special_defense': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]),
             }
             
             evs_changed = any(
@@ -1113,7 +1141,7 @@ class UseRareCandyState(WatchForResetState):
     def _on_exit(self, next_state: State):
         if next_state.state_type != StateType.RESETTING:
             if self.machine._item_cache_update(candy_flag=True):
-                self.machine._solo_mon_levelup(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_LEVEL).value)
+                self.machine._solo_mon_levelup(self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_LEVEL))
             if self._move_learned:
                 self.machine.update_team_cache()
                 self.machine._move_cache_update(levelup_source=True)
@@ -1212,12 +1240,12 @@ class UseVitaminState(WatchForResetState):
             # Check if EVs changed by comparing machine's cached EVs (from overworld) with current EVs
             # Machine's cached_evs were captured in OverworldState BEFORE the EV change happened
             current_evs = {
-                'hp': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]).value,
-                'attack': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]).value,
-                'defense': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]).value,
-                'speed': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]).value,
-                'special_attack': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]).value,
-                'special_defense': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]).value,
+                'hp': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]),
+                'attack': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]),
+                'defense': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]),
+                'speed': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]),
+                'special_attack': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]),
+                'special_defense': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]),
             }
             logger.info(f"Vitamin state exiting. Cached EVs (from overworld): {self.machine._cached_evs}, Current EVs: {current_evs}")
             
@@ -1290,10 +1318,10 @@ class OverworldState(WatchForResetState):
         self._new_file_delay = self.BASE_DELAY
 
         self._wrong_mon_delay = self.BASE_DELAY
-        if self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_SPECIES).value == None:
+        if self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_SPECIES) == None:
             self._waiting_for_solo_mon_in_slot_1 = True
             self._wrong_mon_in_slot_1 = False
-        elif self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_SPECIES).value != self.machine._solo_mon_key.species:
+        elif self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_SPECIES) != self.machine._solo_mon_key.species:
             self._waiting_for_solo_mon_in_slot_1 = False
             self._wrong_mon_in_slot_1 = True
         else:
@@ -1314,17 +1342,17 @@ class OverworldState(WatchForResetState):
         
         # Log blackout flag status when entering OVERWORLD
         if self.machine._potential_blackout_flag:
-            current_map = self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value
+            current_map = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_OVERWORLD_MAP)
             logger.info(f"[BLACKOUT DEBUG] Entered OVERWORLD with blackout flag set. Current map: {current_map}, Initial map: {self.machine._blackout_initial_map}")
         
         # Check for potential blackout if flag is set (in case map changed before we transitioned)
         if self.machine._potential_blackout_flag and self.machine._blackout_initial_map is not None:
-            current_map = self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value
+            current_map = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_OVERWORLD_MAP)
             if current_map != self.machine._blackout_initial_map:
                 # Map has already changed, check team HP
                 all_team_hp_zero = True
                 for hp_key in gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_HP:
-                    hp_value = self.machine._gamehook_client.get(hp_key).value
+                    hp_value = self.machine._gamehook_client.get_value(hp_key)
                     if hp_value is not None and hp_value > 0:
                         all_team_hp_zero = False
                         break
@@ -1343,12 +1371,12 @@ class OverworldState(WatchForResetState):
     def _update_ev_cache(self):
         """Update the machine's EV cache for vitamin detection"""
         self.machine._cached_evs = {
-            'hp': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]).value,
-            'attack': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]).value,
-            'defense': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]).value,
-            'speed': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]).value,
-            'special_attack': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]).value,
-            'special_defense': self.machine._gamehook_client.get(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]).value,
+            'hp': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_HP[0]),
+            'attack': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_ATTACK[0]),
+            'defense': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_DEFENSE[0]),
+            'speed': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPEED[0]),
+            'special_attack': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_ATTACK[0]),
+            'special_defense': self.machine._gamehook_client.get_value(gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_EV_SPECIAL_DEFENSE[0]),
         }
 
     def _confirm_blackout(self):
@@ -1401,32 +1429,32 @@ class OverworldState(WatchForResetState):
         logger.info("Attempting validation!")
         valid = True
         cur_state = self.machine._controller._controller.get_final_state()
-        live_xp = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_EXPPOINTS).value
+        live_xp = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_EXPPOINTS)
         if live_xp != cur_state.solo_pkmn.cur_xp:
             logger.error(f"VALIDATION FAILED for xp: {cur_state.solo_pkmn.cur_xp} vs {live_xp}")
             valid = False
         cur_total_evs = cur_state.solo_pkmn.unrealized_stat_xp.add(cur_state.solo_pkmn.realized_stat_xp)
-        hp_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_HP).value
+        hp_ev = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_HP)
         if hp_ev != cur_total_evs.hp:
             logger.error(f"VALIDATION FAILED for HP EV: {cur_total_evs.hp} vs {hp_ev}")
             valid = False
-        attack_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_ATTACK).value
+        attack_ev = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_ATTACK)
         if attack_ev != cur_total_evs.attack:
             logger.error(f"VALIDATION FAILED for attack EV: {cur_total_evs.attack} vs {attack_ev}")
             valid = False
-        defense_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_DEFENSE).value
+        defense_ev = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_DEFENSE)
         if defense_ev != cur_total_evs.defense:
             logger.error(f"VALIDATION FAILED for defense EV: {cur_total_evs.defense} vs {defense_ev}")
             valid = False
-        special_attack_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPECIAL_ATTACK).value
+        special_attack_ev = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPECIAL_ATTACK)
         if special_attack_ev != cur_total_evs.special_attack:
             logger.error(f"VALIDATION FAILED for special attack EV: {cur_total_evs.special_attack} vs {special_attack_ev}")
             valid = False
-        special_defense_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPECIAL_DEFENSE).value
+        special_defense_ev = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPECIAL_DEFENSE)
         if special_defense_ev != cur_total_evs.special_defense:
             logger.error(f"VALIDATION FAILED for special defense EV: {cur_total_evs.special_attack} vs {special_defense_ev}")
             valid = False
-        speed_ev = self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPEED).value
+        speed_ev = self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_STAT_EXP_SPEED)
         if speed_ev != cur_total_evs.speed:
             logger.error(f"VALIDATION FAILED for speed EV: {cur_total_evs.speed} vs {speed_ev}")
             valid = False
@@ -1455,8 +1483,8 @@ class OverworldState(WatchForResetState):
             
             if (
                 check_for_battle and
-                self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value == 'Battle' and
-                self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_OUTCOME).value is None
+                self.machine._gamehook_client.get_value(gh_gen_five_const.META_STATE) == 'Battle' and
+                self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_OUTCOME) is None
             ):
                 logger.info(f"tranitioning into battle pre-emptively")
                 return StateType.BATTLE
@@ -1464,7 +1492,7 @@ class OverworldState(WatchForResetState):
 
         elif new_prop.path == gh_gen_five_const.KEY_OVERWORLD_MAP:
             self.machine._controller.entered_new_area(
-                f"{self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value}"
+                f"{self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_OVERWORLD_MAP)}"
             )
             
             # Check for potential blackout if flag is set
@@ -1477,7 +1505,7 @@ class OverworldState(WatchForResetState):
                 all_team_hp_zero = True
                 team_hp_values = []
                 for hp_key in gh_gen_five_const.ALL_KEYS_PLAYER_TEAM_HP:
-                    hp_value = self.machine._gamehook_client.get(hp_key).value
+                    hp_value = self.machine._gamehook_client.get_value(hp_key)
                     team_hp_values.append(hp_value)
                     if hp_value is not None and hp_value > 0:
                         all_team_hp_zero = False
@@ -1491,7 +1519,7 @@ class OverworldState(WatchForResetState):
                     logger.info(f"Map changed but team HP is not 0 - not a blackout, clearing flag")
                     self._clear_blackout_flags()
         elif new_prop.path == gh_gen_five_const.KEY_PLAYER_PLAYERID:
-            if prev_prop.value and self.machine._player_id != self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_PLAYERID).value:
+            if prev_prop.value and self.machine._player_id != self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_PLAYERID):
                 self._waiting_for_new_file = True
         elif new_prop.path == gh_gen_five_const.KEY_PLAYER_MON_HELD_ITEM:
             self._propagate_held_item_flag = True
@@ -1522,7 +1550,7 @@ class OverworldState(WatchForResetState):
                     if move_path == prev_prop.path:
                         all_cur_moves.append(prev_prop.value)
                     else:
-                        all_cur_moves.append(self.machine._gamehook_client.get(move_path).value)
+                        all_cur_moves.append(self.machine._gamehook_client.get_value(move_path))
                 if new_prop.value is None or new_prop.value in all_cur_moves:
                     return StateType.MOVE_DELETE
                 else:
@@ -1570,14 +1598,14 @@ class OverworldState(WatchForResetState):
                     self.machine.update_team_cache(regenerate_move_cache=True)
                     self._wrong_mon_in_slot_1 = (
                         self.machine._solo_mon_key.species != 
-                        self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get(gh_gen_five_const.KEY_PLAYER_MON_SPECIES).value)
+                        self.machine.gh_converter.pkmn_name_convert(self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_PLAYER_MON_SPECIES))
                     )
                 self._wrong_mon_delay -= 1
             
             # Handle save delay using gametime ticks (independent check, can run with other conditions)
             if self._save_detected:
                 if self._save_delay <= 0:
-                    self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value)))
+                    self.machine._queue_new_event(EventDefinition(save=SaveEventDefinition(location=self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_OVERWORLD_MAP))))
                     self._save_detected = False
                     self._save_delay = self.SAVE_DELAY
                 else:
@@ -1586,7 +1614,7 @@ class OverworldState(WatchForResetState):
             # Handle heal delay using gametime ticks (independent check, can run with other conditions)
             if self._heal_detected:
                 if self._heal_delay <= 0:
-                    self.machine._queue_new_event(EventDefinition(heal=HealEventDefinition(location=self.machine._gamehook_client.get(gh_gen_five_const.KEY_OVERWORLD_MAP).value)))
+                    self.machine._queue_new_event(EventDefinition(heal=HealEventDefinition(location=self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_OVERWORLD_MAP))))
                     self._heal_detected = False
                     self._heal_delay = self.HEAL_DELAY
                 else:
@@ -1603,8 +1631,8 @@ class OverworldState(WatchForResetState):
             self._update_ev_cache()
 
             if (
-                self.machine._gamehook_client.get(gh_gen_five_const.META_STATE).value == 'Battle' and
-                self.machine._gamehook_client.get(gh_gen_five_const.KEY_BATTLE_OUTCOME).value is None
+                self.machine._gamehook_client.get_value(gh_gen_five_const.META_STATE) == 'Battle' and
+                self.machine._gamehook_client.get_value(gh_gen_five_const.KEY_BATTLE_OUTCOME) is None
             ):
                 return StateType.BATTLE
 

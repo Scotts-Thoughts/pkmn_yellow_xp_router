@@ -12,7 +12,7 @@ class Gen5GameHookConstants:
     def __init__(self):
         self.configure_for_black()
 
-    def configure_for_black(self):
+    def configure_for_black(self, is_b2w2=False):
         self.RESET_FLAG        = const.RECORDING_ERROR_FRAGMENT + "FLAG TO SIGNAL GAME RESET. USER SHOULD NEVER SEE THIS"
         self.TRAINER_LOSS_FLAG = const.RECORDING_ERROR_FRAGMENT + "FLAG TO SIGNAL LOSING TO TRAINER. USER SHOULD NEVER SEE THIS"
         self.ROAR_FLAG         = const.RECORDING_ERROR_FRAGMENT + "FLAG TO SIGNAL ROARS NEED TO BE HANDLED. USER SHOULD NEVER SEE THIS"
@@ -82,6 +82,12 @@ class Gen5GameHookConstants:
         self.KEY_BATTLE_ALLY_MON_HP          = None
         self.KEY_BATTLE_ALLY_MON_PID         = None
 
+        # `battle.opponent.id` is the raw trainer-id int (0 for wild encounters). It
+        # is used both to detect trainer-vs-wild and as the trainer identifier stored
+        # on the event; the event processor (_process_events) converts it to a name
+        # via trainer_db().get_trainer_by_id(). (The mapper also exposes
+        # `battle.opponent.trainer`, the glossary-resolved trainer *class* like
+        # "Rival" -- not used here, since it isn't the route's trainer name.)
         self.KEY_BATTLE_TRAINER_A_NUMBER       = "battle.opponent.id"
         self.KEY_BATTLE_TRAINER_B_NUMBER       = "battle.opponent_2.id"
         # See MAPPER_GAPS.md: Black has battle.ally.team[*] but no battle.ally.id.
@@ -115,30 +121,39 @@ class Gen5GameHookConstants:
         self.SAVE_SOUND_EFFECT_VALUE  = 36342100
         self.HEAL_SOUND_EFFECT_VALUE  = 36335692
 
-        # Slot counts match the Black mapper (pokemon_black.xml):
-        #   items=40, medicine=48, berries=30, tmhm=102
-        # These differ from the Gen 4 Platinum mapper (medicine=20, berries=63,
-        # tmhm=99); using mismatched ranges would cause registration of
-        # nonexistent paths (over) or silent under-tracking (under).
-        self.ALL_KEYS_ITEM_TYPE         = [f"bag.items.{i}.item" for i in range(0, 40)]
-        self.ALL_KEYS_ITEM_QUANTITY     = [f"bag.items.{i}.quantity" for i in range(0, 40)]
-        self.ALL_KEYS_MEDICINE_TYPE     = [f"bag.medicine.{i}.item" for i in range(0, 48)]
-        self.ALL_KEYS_MEDICINE_QUANTITY = [f"bag.medicine.{i}.quantity" for i in range(0, 48)]
-        # See MAPPER_GAPS.md group 1: Black has no `bag.balls` section.
-        # Ball pickups/usage will not be recorded until the mapper is fixed.
+        # Bag pocket slot counts. These MUST match the loaded GameHook mapper, or
+        # the recorder either reads nonexistent paths (crash/None) or silently
+        # under-tracks. Verified against the STANDARD/gen5 mappers:
+        #   Black/White (pokemon_black.xml/pokemon_white.xml):
+        #       items=40, medicine=48, berries=30, tmhm=102
+        #   Black 2/White 2 (pokemon_black_2.xml/pokemon_white_2.xml):
+        #       items=146, medicine=48, berries=34, tmhm=101
+        # B2W2 added a much larger general-items pocket, one more berry slot, and
+        # has one fewer TM/HM slot (95 TMs + 6 HMs = 101 vs Black's 102).
+        item_count   = 146 if is_b2w2 else 40
+        berry_count  = 34  if is_b2w2 else 30
+        tmhm_count   = 101 if is_b2w2 else 102
+        medicine_count = 48
+
+        self.ALL_KEYS_ITEM_TYPE         = [f"bag.items.{i}.item" for i in range(0, item_count)]
+        self.ALL_KEYS_ITEM_QUANTITY     = [f"bag.items.{i}.quantity" for i in range(0, item_count)]
+        self.ALL_KEYS_MEDICINE_TYPE     = [f"bag.medicine.{i}.item" for i in range(0, medicine_count)]
+        self.ALL_KEYS_MEDICINE_QUANTITY = [f"bag.medicine.{i}.quantity" for i in range(0, medicine_count)]
+        # See MAPPER_GAPS.md group 1: the gen 5 mappers have no `bag.balls` section.
+        # Ball pickups/usage will not be recorded until the mappers are fixed.
         self.ALL_KEYS_BALL_TYPE         = []
         self.ALL_KEYS_BALL_QUANTITY     = []
-        self.ALL_KEYS_BERRY_TYPE        = [f"bag.berries.{i}.item" for i in range(0, 30)]
-        self.ALL_KEYS_BERRY_QUANTITY    = [f"bag.berries.{i}.quantity" for i in range(0, 30)]
+        self.ALL_KEYS_BERRY_TYPE        = [f"bag.berries.{i}.item" for i in range(0, berry_count)]
+        self.ALL_KEYS_BERRY_QUANTITY    = [f"bag.berries.{i}.quantity" for i in range(0, berry_count)]
 
-        self.ALL_KEYS_TMHM_TYPE     = [f"bag.tmhm.{i}.item" for i in range(0, 102)]
-        self.ALL_KEYS_TMHM_QUANTITY = [f"bag.tmhm.{i}.quantity" for i in range(0, 102)]
+        self.ALL_KEYS_TMHM_TYPE     = [f"bag.tmhm.{i}.item" for i in range(0, tmhm_count)]
+        self.ALL_KEYS_TMHM_QUANTITY = [f"bag.tmhm.{i}.quantity" for i in range(0, tmhm_count)]
         self._define_derived_constant()
 
-    def configure_for_white(self):
+    def configure_for_white(self, is_b2w2=False):
         # For now, White uses the same constants as Black
         # If differences are discovered, they can be added here
-        self.configure_for_black()
+        self.configure_for_black(is_b2w2=is_b2w2)
 
     def _define_derived_constant(self, is_white=False):
         self.ALL_KEYS_ALL_ITEM_FIELDS = set([])
@@ -345,6 +360,10 @@ class GameHookConstantConverter:
             converted_name = "Up Grade"
         elif converted_name == "Paralyze Heal":
             converted_name = "Parlyz Heal"
+        elif converted_name == "X Defense":
+            # The gen 5 item DB uses the older name "X Defend"; the mapper glossary
+            # reports the modern "X Defense". (X Special / X Sp. Def already match.)
+            converted_name = "X Defend"
 
         return converted_name
     

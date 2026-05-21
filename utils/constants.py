@@ -439,6 +439,11 @@ class Constants:
         self.HEART_GOLD_VERSION = "HeartGold"
         self.SOUL_SILVER_VERSION = "SoulSilver"
 
+        self.BLACK_VERSION = "Black"
+        self.WHITE_VERSION = "White"
+        self.BLACK_2_VERSION = "Black 2"
+        self.WHITE_2_VERSION = "White 2"
+
         self.VERSION_LIST = [
             self.YELLOW_VERSION,
             self.RED_VERSION,
@@ -456,6 +461,10 @@ class Constants:
             self.PLATINUM_VERSION,
             self.HEART_GOLD_VERSION,
             self.SOUL_SILVER_VERSION,
+            self.BLACK_VERSION,
+            self.WHITE_VERSION,
+            self.BLACK_2_VERSION,
+            self.WHITE_2_VERSION,
         ]
 
         self.FRLG_VERSIONS = [
@@ -485,6 +494,11 @@ class Constants:
 
             self.HEART_GOLD_VERSION: "#a89030",
             self.SOUL_SILVER_VERSION: "#8898a0",
+
+            self.BLACK_VERSION: "#444444",
+            self.WHITE_VERSION: "#a0a0a0",
+            self.BLACK_2_VERSION: "#3a4a5a",
+            self.WHITE_2_VERSION: "#90a0b0",
         }
 
         self.NO_SAVED_ROUTES = "No Saved Routes"
@@ -533,6 +547,7 @@ class Constants:
         self.MIMIC_MOVE_NAME = "Mimic"
         self.EXPLOSION_MOVE_NAME = "Explosion"
         self.SELFDESTRUCT_MOVE_NAME = "Selfdestruct"
+        self.DRAGON_RAGE_MOVE_NAME = "Dragon Rage"
         self.FLAIL_MOVE_NAME = "Flail"
         self.REVERSAL_MOVE_NAME = "Reversal"
         self.FUTURE_SIGHT_MOVE_NAME = "Future Sight"
