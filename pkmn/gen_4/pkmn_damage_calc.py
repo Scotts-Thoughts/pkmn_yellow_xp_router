@@ -82,7 +82,16 @@ def get_move_accuracy(
             is_physical = custom_move_data in [gen_four_const.SAND_TERRAIN, gen_four_const.CAVE_TERRAIN, gen_four_const.TALL_GRASS_TERRAIN]
         if is_physical:
             result = math.floor(result * 3277 / 4096)
-    
+
+    if (
+        pkmn.held_item == gen_four_const.WIDE_LENS_NAME and
+        pkmn.ability != gen_four_const.KLUTZ_ABILITY
+    ):
+        result = min(
+            math.floor(result * 1.1),
+            100
+        )
+
     if defending_pkmn.ability == gen_four_const.SAND_VEIL_ABILITY and weather == const.WEATHER_SANDSTORM:
         result = math.floor(result * 3277 / 4096)
 

@@ -89,6 +89,15 @@ def get_move_accuracy(
     if defending_pkmn.ability == gen_five_const.SNOW_CLOAK_ABILITY and weather == const.WEATHER_SANDSTORM:
         result = math.floor(result * 3277 / 4096)
 
+    if (
+        pkmn.held_item == gen_five_const.WIDE_LENS_NAME and
+        pkmn.ability != gen_five_const.KLUTZ_ABILITY
+    ):
+        result = min(
+            math.floor(result * 4506 / 4096),
+            100
+        )
+
     return result
 
 

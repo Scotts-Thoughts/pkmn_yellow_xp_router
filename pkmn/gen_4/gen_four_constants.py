@@ -59,6 +59,7 @@ class GenFourConstants:
         self.CHOICE_BAND_NAME = "Choice Band"
         self.CHOICE_SPECS_NAME = "Choice Specs"
         self.CHOICE_SCARF_NAME = "Choice Scarf"
+        self.WIDE_LENS_NAME = "Wide Lens"
 
         self.LATIOS_NAME = "Latios"
         self.LATIAS_NAME = "Latias"

@@ -1783,19 +1783,22 @@ class MonPairSummary(QWidget):
             self._enemy_icon_corner.setVisible(False)
             return
 
-        # Pre-load enemy icon for screenshot export. Both header sides show the
-        # enemy mon icon: the player-side "Damage Ranges" header shows whom the
-        # player is attacking, which is visually clearer than the player's own
-        # icon next to their own name.
-        enemy_icon_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=28)
-        if enemy_icon_pm is not None:
-            self._player_icon.setPixmap(enemy_icon_pm)
+        # Pre-load header icons for screenshot export. Each side shows its own
+        # mon: the player-side "Damage Ranges" header shows the player's mon,
+        # the enemy-side header shows the enemy mon.
+        player_icon_pm = pkmn_icon.get_icon(player_info.attacking_mon_name, size=28)
+        if player_icon_pm is not None:
+            self._player_icon.setPixmap(player_icon_pm)
             self._has_player_icon = True
-            self._enemy_icon.setPixmap(enemy_icon_pm)
-            self._has_enemy_icon = True
         else:
             self._player_icon.clear()
             self._has_player_icon = False
+
+        enemy_icon_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=28)
+        if enemy_icon_pm is not None:
+            self._enemy_icon.setPixmap(enemy_icon_pm)
+            self._has_enemy_icon = True
+        else:
             self._enemy_icon.clear()
             self._has_enemy_icon = False
 
