@@ -649,9 +649,13 @@ class BattleSummary(QWidget):
             self._base_frame.setStyleSheet(saved_base)
         return pixmap
 
-    def _hide_defaults_for_screenshot(self):
+    def _hide_defaults_for_screenshot(self, icon_mode: str = "full"):
         """Hide default-value dropdowns and unchecked toggles in all visible
         damage summaries. Returns a list of widgets to re-show afterwards.
+
+        *icon_mode* selects which header icons appear in the export: ``"full"``
+        keeps both player and enemy icons; ``"player"``/``"enemy"`` show only
+        the enemy mon icon (the matchup identifier) for cropped half-exports.
 
         "Default" means the first option (index 0) — e.g., "No Bonus" for
         custom-data dropdowns or "0" for stat-stage dropdowns. Forces a
@@ -693,9 +697,9 @@ class BattleSummary(QWidget):
             if mp._export_button.isVisible():
                 mp._export_button.setVisible(False)
                 restore.append(mp._export_button)
-        # Swap matchup-header icons into screenshot layout: player icon next
-        # to player title, enemy icon next to enemy title, corner icon hidden.
-        self._set_screenshot_icon_mode(True)
+        # Swap matchup-header icons into screenshot layout. For the full
+        # battle both icons show; cropped half-exports show only the enemy icon.
+        self._set_screenshot_icon_mode(True, icon_mode)
         if restore:
             self._reactivate_layouts_for(restore)
         # The icon swap also changes header geometry — re-activate the header
@@ -712,11 +716,11 @@ class BattleSummary(QWidget):
             self._reactivate_layouts_for(restore)
         self._reactivate_matchup_header_layouts()
 
-    def _set_screenshot_icon_mode(self, enabled: bool):
+    def _set_screenshot_icon_mode(self, enabled: bool, mode: str = "full"):
         for idx, mp in enumerate(self._mon_pairs):
             if not (self._did_draw_mon_pairs[idx] and mp.isVisible()):
                 continue
-            mp.set_screenshot_icon_mode(enabled)
+            mp.set_screenshot_icon_mode(enabled, mode)
 
     def _reactivate_matchup_header_layouts(self):
         for idx, mp in enumerate(self._mon_pairs):
@@ -775,7 +779,13 @@ class BattleSummary(QWidget):
         from gui_qt.dialogs import MatchupExportDialog
 
         mp = self._mon_pairs[mon_idx]
-        restore = self._hide_defaults_for_screenshot()
+        if mode == MatchupExportDialog.MODE_PLAYER:
+            icon_mode = "player"
+        elif mode == MatchupExportDialog.MODE_ENEMY:
+            icon_mode = "enemy"
+        else:
+            icon_mode = "full"
+        restore = self._hide_defaults_for_screenshot(icon_mode)
         try:
             pixmap = self._grab_transparent(mp)
             full_h = pixmap.height()
@@ -888,7 +898,7 @@ class BattleSummary(QWidget):
 
     def take_player_ranges_screenshot(self):
         """Capture only the left (player) half of the mon-pair grids."""
-        restore = self._hide_defaults_for_screenshot()
+        restore = self._hide_defaults_for_screenshot("player")
         try:
             pixmap = self._grab_transparent(self._base_frame)
             divider_pos = self._get_divider_x_in_base_frame()
@@ -914,7 +924,7 @@ class BattleSummary(QWidget):
 
     def take_enemy_ranges_screenshot(self):
         """Capture only the right (enemy) half of the mon-pair grids."""
-        restore = self._hide_defaults_for_screenshot()
+        restore = self._hide_defaults_for_screenshot("enemy")
         try:
             pixmap = self._grab_transparent(self._base_frame)
             w = pixmap.width()
@@ -1556,6 +1566,10 @@ class MonPairSummary(QWidget):
         # Hidden during normal viewing; shown only for exported screenshots.
         self._player_icon.setVisible(False)
         self._has_player_icon = False
+        # Cached pixmaps so partial exports can repurpose the player slot to
+        # show the enemy mon icon (the matchup identifier) on the left.
+        self._player_icon_pm = None
+        self._enemy_icon_pm = None
 
         self._enemy_icon = QLabel()
         self._enemy_icon.setFixedSize(28, 28)
@@ -1750,16 +1764,45 @@ class MonPairSummary(QWidget):
         self._content.setVisible(self._expanded)
         self._disclosure.set_expanded(self._expanded)
 
-    def set_screenshot_icon_mode(self, enabled: bool):
+    def set_screenshot_icon_mode(self, enabled: bool, mode: str = "full"):
         """Swap header icon layout between viewing and screenshot modes.
 
         Viewing (enabled=False): player icon hidden, enemy icon shown next to
         the chevron in the top-left corner.
-        Screenshot (enabled=True): both player and enemy icons shown next to
-        their respective headers; corner icon hidden.
+        Screenshot (enabled=True): icon layout depends on *mode* --
+
+          - ``"full"``: both player and enemy icons shown next to their
+            respective headers (the whole-battle export keeps both sides).
+          - ``"player"``: only the left (player) half is exported, so the
+            matchup is identified by the enemy mon icon shown on the left in
+            place of the player icon. No player icon, no right-side icon.
+          - ``"enemy"``: only the right (enemy) half is exported, where the
+            enemy icon already sits to the left of the enemy header. No player
+            icon.
+
+        Corner icon is hidden during any export.
         """
-        self._player_icon.setVisible(enabled and self._has_player_icon)
-        self._enemy_icon.setVisible(enabled and self._has_enemy_icon)
+        # Restore the player slot to the actual player icon by default; the
+        # "player" partial export repurposes it to the enemy icon below.
+        if self._has_player_icon and self._player_icon_pm is not None:
+            self._player_icon.setPixmap(self._player_icon_pm)
+
+        if enabled and mode == "player":
+            # Show the enemy mon icon on the left to identify the matchup.
+            if self._has_enemy_icon and self._enemy_icon_pm is not None:
+                self._player_icon.setPixmap(self._enemy_icon_pm)
+            self._player_icon.setVisible(self._has_enemy_icon)
+            self._enemy_icon.setVisible(False)
+        elif enabled and mode == "enemy":
+            # Enemy icon already sits on the left of the enemy header; suppress
+            # the player icon (it would be cropped out anyway).
+            self._player_icon.setVisible(False)
+            self._enemy_icon.setVisible(self._has_enemy_icon)
+        else:
+            # Full-battle export or normal viewing.
+            self._player_icon.setVisible(enabled and self._has_player_icon)
+            self._enemy_icon.setVisible(enabled and self._has_enemy_icon)
+
         self._enemy_icon_corner.setVisible((not enabled) and self._has_corner_icon)
         # Hide the expand/contract chevron and reorder grip in exported screenshots.
         self._disclosure.setVisible(not enabled)
@@ -1778,6 +1821,8 @@ class MonPairSummary(QWidget):
             self._has_player_icon = False
             self._has_enemy_icon = False
             self._has_corner_icon = False
+            self._player_icon_pm = None
+            self._enemy_icon_pm = None
             self._player_icon.setVisible(False)
             self._enemy_icon.setVisible(False)
             self._enemy_icon_corner.setVisible(False)
@@ -1789,17 +1834,21 @@ class MonPairSummary(QWidget):
         player_icon_pm = pkmn_icon.get_icon(player_info.attacking_mon_name, size=28)
         if player_icon_pm is not None:
             self._player_icon.setPixmap(player_icon_pm)
+            self._player_icon_pm = player_icon_pm
             self._has_player_icon = True
         else:
             self._player_icon.clear()
+            self._player_icon_pm = None
             self._has_player_icon = False
 
         enemy_icon_pm = pkmn_icon.get_icon(enemy_info.attacking_mon_name, size=28)
         if enemy_icon_pm is not None:
             self._enemy_icon.setPixmap(enemy_icon_pm)
+            self._enemy_icon_pm = enemy_icon_pm
             self._has_enemy_icon = True
         else:
             self._enemy_icon.clear()
+            self._enemy_icon_pm = None
             self._has_enemy_icon = False
 
         # Corner icon (viewing mode): the enemy mon, smaller to sit next to chevron.
