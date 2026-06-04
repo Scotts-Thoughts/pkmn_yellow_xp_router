@@ -175,6 +175,10 @@ class GenTwo(CurrentGen):
         return pkmn_damage_calc.get_crit_rate(pkmn, move)
     
     def get_move_accuracy(self, pkmn, move, custom_move_data, defending_pkmn, weather):
+        # In rain, Thunder bypasses the accuracy check entirely (always hits).
+        # None signals "no accuracy check" to the caller, matching gen 3+.
+        if move.name == gen_two_const.THUNDER_MOVE_NAME and weather == const.WEATHER_RAIN:
+            return None
         return move.accuracy
 
     def calculate_damage(self,

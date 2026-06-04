@@ -43,6 +43,8 @@ class GenTwoConstants:
         self.PIKACHU_NAME = "Pikachu"
         self.LIGHT_BALL_NAME = "Light Ball"
 
+        self.THUNDER_MOVE_NAME = "Thunder"
+
         self.DITTO_NAME = "Ditto"
         self.METAL_POWDER_NAME = "Metal Powder"
 
