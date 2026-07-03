@@ -104,7 +104,54 @@ def _learn_move(cur_pkmn:SoloPokemon, move_name, dest, badges, force=False):
     )
 
 
+def _eat_ev_berry(cur_pkmn:SoloPokemon, berry_name, badges, force=False):
+    # like vitamins, eating an EV berry causes the game to recalculate stats,
+    # so all pending stat XP gets realized (with the berry's reduction applied on top)
+    gen_info = pkmn.gen_factory.current_gen_info()
+    cur_stat_xp = cur_pkmn.unrealized_stat_xp
+    new_vals = {
+        const.HP: cur_stat_xp.hp,
+        const.ATK: cur_stat_xp.attack,
+        const.DEF: cur_stat_xp.defense,
+        const.SPA: cur_stat_xp.special_attack,
+        const.SPD: cur_stat_xp.special_defense,
+        const.SPE: cur_stat_xp.speed,
+    }
+
+    for lowered_stat in gen_info.get_stats_lowered_by_ev_berry(berry_name):
+        if new_vals[lowered_stat] <= 0 and not force:
+            raise ValueError(f"Ineffective Berry: {berry_name} (Stat EV already at 0)")
+        new_vals[lowered_stat] = gen_info.get_ev_berry_reduced_value(new_vals[lowered_stat])
+
+    final_realized_stat_xp = gen_info.make_stat_block(
+        new_vals[const.HP],
+        new_vals[const.ATK],
+        new_vals[const.DEF],
+        new_vals[const.SPA],
+        new_vals[const.SPD],
+        new_vals[const.SPE],
+        is_stat_xp=True
+    )
+
+    return SoloPokemon(
+        cur_pkmn.name,
+        cur_pkmn.species_def,
+        cur_pkmn.dvs,
+        badges,
+        cur_pkmn._empty_stat_block,
+        cur_pkmn.ability_idx,
+        cur_pkmn.nature,
+        move_list=cur_pkmn.move_list,
+        cur_xp=cur_pkmn.cur_xp,
+        realized_stat_xp=final_realized_stat_xp,
+        held_item=cur_pkmn.held_item
+    )
+
+
 def _take_vitamin(cur_pkmn:SoloPokemon, vit_name, badges, force=False):
+    if vit_name in pkmn.gen_factory.current_gen_info().get_valid_ev_berries():
+        return _eat_ev_berry(cur_pkmn, vit_name, badges, force=force)
+
     # NOTE: some potentially buggy reporting of how much stat xp is actually possible when nearing the stat XP cap
     # this is due to the fact that we are keeping unrealized stat XP separate,
     # so any stat XP over the hard cap won't be properly ignored until it's realized

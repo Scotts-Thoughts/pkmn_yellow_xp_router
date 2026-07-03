@@ -16,7 +16,7 @@ import logging
 from pkmn import universal_data_objects
 from pkmn.gen_5 import pkmn_damage_calc
 from pkmn.damage_calc import DamageRange
-from pkmn.gen_5.data_objects import GenFiveBadgeList, GenFiveStatBlock, instantiate_trainer_pokemon, instantiate_wild_pokemon, get_hidden_power_base_power, get_hidden_power_type, VIT_AMT, VIT_CAP, BLACKOUT_BASE_VALS
+from pkmn.gen_5.data_objects import GenFiveBadgeList, GenFiveStatBlock, instantiate_trainer_pokemon, instantiate_wild_pokemon, get_hidden_power_base_power, get_hidden_power_type, VIT_AMT, VIT_CAP, EV_BERRY_AMT, BLACKOUT_BASE_VALS
 from pkmn.gen_5.gen_five_constants import gen_five_const
 from pkmn.pkmn_db import ItemDB, MinBattlesDB, PkmnDB, TrainerDB, MoveDB
 from pkmn.pkmn_info import CurrentGen
@@ -333,9 +333,31 @@ class GenFive(CurrentGen):
     
     def get_vitamin_use_cap(self) -> int:
         return VIT_CAP
-    
+
     def get_vitamin_value_cap(self) -> int:
         return VIT_CAP
+
+    def get_valid_ev_berries(self) -> List[str]:
+        return [const.POMEG_BERRY, const.KELPSY_BERRY, const.QUALOT_BERRY, const.HONDEW_BERRY, const.GREPA_BERRY, const.TAMATO_BERRY]
+
+    def get_stats_lowered_by_ev_berry(self, berry_name: str) -> List[str]:
+        if berry_name == const.POMEG_BERRY:
+            return [const.HP]
+        elif berry_name == const.KELPSY_BERRY:
+            return [const.ATK]
+        elif berry_name == const.QUALOT_BERRY:
+            return [const.DEF]
+        elif berry_name == const.HONDEW_BERRY:
+            return [const.SPA]
+        elif berry_name == const.GREPA_BERRY:
+            return [const.SPD]
+        elif berry_name == const.TAMATO_BERRY:
+            return [const.SPE]
+
+        raise ValueError(f"Unknown EV berry: {berry_name}")
+
+    def get_ev_berry_reduced_value(self, cur_stat_xp: int) -> int:
+        return max(cur_stat_xp - EV_BERRY_AMT, 0)
 
     def create_new_custom_gen(self, new_version_name):
         folder_name = io_utils.get_safe_path_no_collision(const.CUSTOM_GENS_DIR, new_version_name)

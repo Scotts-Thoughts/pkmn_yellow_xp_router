@@ -850,7 +850,7 @@ class InlineEventCreator(QFrame):
                     item_event_def=InventoryEventDefinition(n, q, False, True)
                 )
             # use_item
-            if n in current_gen_info().get_valid_vitamins():
+            if n in current_gen_info().get_valid_vitamins() or n in current_gen_info().get_valid_ev_berries():
                 return EventDefinition(
                     vitamin=VitaminEventDefinition(n, q)
                 )
@@ -916,7 +916,7 @@ class InlineEventCreator(QFrame):
 
     def _cfg_vitamin(self):
         self._lbl("Vitamin:")
-        vits = current_gen_info().get_valid_vitamins()
+        vits = current_gen_info().get_valid_vitamins() + current_gen_info().get_valid_ev_berries()
         vit_c = self._combo(vits, 100)
 
         self._lbl("Qty:")

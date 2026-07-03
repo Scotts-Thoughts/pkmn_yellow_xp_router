@@ -188,7 +188,11 @@ class QuickItemAdd(QGroupBox):
             else:
                 self._tm_hm_button.enable()
 
-            if cur_item.name in current_gen_info().get_valid_vitamins() or cur_item.name == const.RARE_CANDY:
+            if (
+                cur_item.name in current_gen_info().get_valid_vitamins() or
+                cur_item.name in current_gen_info().get_valid_ev_berries() or
+                cur_item.name == const.RARE_CANDY
+            ):
                 self._use_button.enable()
             else:
                 self._use_button.disable()
@@ -296,7 +300,7 @@ class QuickItemAdd(QGroupBox):
 
     def _use_item(self):
         cur_item = self._item_selector.get()
-        if cur_item in current_gen_info().get_valid_vitamins():
+        if cur_item in current_gen_info().get_valid_vitamins() or cur_item in current_gen_info().get_valid_ev_berries():
             self._create_event(
                 EventDefinition(
                     vitamin=VitaminEventDefinition(cur_item, int(self._item_amount.get()))

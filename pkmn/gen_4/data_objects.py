@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 VIT_AMT = 10
 VIT_CAP = 100
+EV_BERRY_AMT = 10
+# gen 4 quirk: an EV berry used on a stat with more than 100 EVs drops it to exactly 100
+EV_BERRY_DROP_TARGET = 100
 SINGLE_STAT_EV_CAP = 255
 TOTAL_EV_CAP = 510
 

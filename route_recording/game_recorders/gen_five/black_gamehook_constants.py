@@ -244,9 +244,19 @@ class GameHookConstantConverter:
             sanitize_string("Zinc"),
         ]
         self._game_rare_candy = sanitize_string("Rare Candy")
-    
+        # EV-lowering berries ride the same detection/event pipeline as vitamins
+        self._game_ev_berries = [
+            sanitize_string("Pomeg Berry"),
+            sanitize_string("Kelpsy Berry"),
+            sanitize_string("Qualot Berry"),
+            sanitize_string("Hondew Berry"),
+            sanitize_string("Grepa Berry"),
+            sanitize_string("Tamato Berry"),
+        ]
+
     def is_game_vitamin(self, item_name):
-        return sanitize_string(item_name) in self._game_vitamins
+        sanitized = sanitize_string(item_name)
+        return sanitized in self._game_vitamins or sanitized in self._game_ev_berries
     
     def is_game_rare_candy(self, item_name):
         return sanitize_string(item_name) == self._game_rare_candy

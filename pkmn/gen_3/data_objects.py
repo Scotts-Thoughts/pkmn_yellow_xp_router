@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 VIT_AMT = 10
 VIT_CAP = 100
+EV_BERRY_AMT = 10
 SINGLE_STAT_EV_CAP = 255
 TOTAL_EV_CAP = 510
 

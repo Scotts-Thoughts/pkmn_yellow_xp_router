@@ -351,7 +351,7 @@ class VitaminEditor(EventEditorBase):
     
     @ignore_updates
     def configure(self, editor_params, save_callback=None, delayed_save_callback=None):
-        self._vitamin_types.new_values(current_gen_info().get_valid_vitamins())
+        self._vitamin_types.new_values(current_gen_info().get_valid_vitamins() + current_gen_info().get_valid_ev_berries())
         return super().configure(editor_params, save_callback, delayed_save_callback)
     
     @ignore_updates

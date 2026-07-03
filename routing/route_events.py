@@ -83,6 +83,12 @@ class VitaminEventDefinition:
     def serialize(self):
         return [self.vitamin, self.amount]
 
+    def is_ev_berry(self):
+        try:
+            return self.vitamin in current_gen_info().get_valid_ev_berries()
+        except Exception:
+            return False
+
     @staticmethod
     def deserialize(raw_val):
         if not raw_val:
@@ -94,6 +100,8 @@ class VitaminEventDefinition:
             return VitaminEventDefinition(raw_val[0], raw_val[1])
 
     def __str__(self):
+        if self.is_ev_berry():
+            return f"Berry {self.vitamin}, x{self.amount}"
         return f"Vitamin {self.vitamin}, x{self.amount}"
 
 
@@ -580,6 +588,8 @@ class EventDefinition:
         if self.rare_candy is not None:
             return "Rare Candy x1"
         elif self.vitamin is not None:
+            if self.vitamin.is_ev_berry():
+                return f"Berry: {self.vitamin.vitamin} x1"
             return f"Vitamin: {self.vitamin.vitamin} x1"
         elif self.wild_pkmn_info is not None:
             return str(self.wild_pkmn_info)

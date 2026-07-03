@@ -151,7 +151,17 @@ class CurrentGen:
     
     def get_vitamin_value_cap(self) -> int:
         raise NotImplementedError()
-    
+
+    def get_valid_ev_berries(self) -> List[str]:
+        # EV-lowering berries only exist in gen 3+
+        return []
+
+    def get_stats_lowered_by_ev_berry(self, berry_name:str) -> List[str]:
+        raise ValueError(f"Unknown EV berry: {berry_name}")
+
+    def get_ev_berry_reduced_value(self, cur_stat_xp:int) -> int:
+        raise NotImplementedError()
+
     def create_new_custom_gen(self, new_version_name):
         raise NotImplementedError()
     

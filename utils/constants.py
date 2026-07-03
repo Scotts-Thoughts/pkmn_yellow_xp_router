@@ -206,6 +206,14 @@ class Constants:
         self.PROTEIN = "Protein"
         self.RARE_CANDY = "Rare Candy"
 
+        # EV-lowering berries (gen 3+)
+        self.POMEG_BERRY = "Pomeg Berry"
+        self.KELPSY_BERRY = "Kelpsy Berry"
+        self.QUALOT_BERRY = "Qualot Berry"
+        self.HONDEW_BERRY = "Hondew Berry"
+        self.GREPA_BERRY = "Grepa Berry"
+        self.TAMATO_BERRY = "Tamato Berry"
+
         self.HIGHLIGHT_NONE = "Don't Highlight"
         self.HIGHLIGHT_GUARANTEED_KILL = "Guaranteed Kill"
         self.HIGHLIGHT_CONSISTENT_KILL = "Consistent Kill"
