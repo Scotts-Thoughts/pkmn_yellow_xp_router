@@ -100,6 +100,15 @@ def calculate_gen_three_damage(
     attacking_battle_stats:universal_data_objects.StatBlock=None,
     defending_battle_stats:universal_data_objects.StatBlock=None,
 ):
+    # NOTE: resolved up front because everything that keys off the weather (Forecast,
+    # Weather Ball's type) has to be settled before any type-based immunity check
+    is_weather_active = damage_calc.is_weather_active(attacking_pkmn.ability, defending_pkmn.ability, weather)
+
+    # Forecast retypes Castform to match the weather, which changes STAB when it's
+    # attacking and type effectiveness when it's defending
+    attacking_species = damage_calc.apply_forecast(attacking_species, attacking_pkmn.ability, weather, is_weather_active)
+    defending_species = damage_calc.apply_forecast(defending_species, defending_pkmn.ability, weather, is_weather_active)
+
     # Special-damage moves (Dragon Rage 40, Sonic Boom 20, Seismic Toss/Night Shade = level)
     # don't store their damage in base_power. Type immunity IS respected here (gen 2+).
     special_override = damage_calc.get_special_damage_override(move, attacking_pkmn, defending_species, type_chart)
@@ -115,7 +124,14 @@ def calculate_gen_three_damage(
 
     if base_power is None or base_power == 0:
         return None
-    
+
+    # Weather Ball takes on the weather's type (and doubles in power). Has to happen
+    # before the immunity checks below, otherwise e.g. a sun-boosted (Fire) Weather Ball
+    # would still be treated as Normal, and read as immune against a Ghost type
+    if move.name == const.WEATHER_BALL_MOVE_NAME and is_weather_active:
+        base_power *= 2
+        move_type = damage_calc.get_weather_ball_type(weather, is_weather_active, default_type=move_type)
+
     if (
         type_chart.get(move_type).get(defending_species.first_type) == const.IMMUNE or
         type_chart.get(move_type).get(defending_species.second_type) == const.IMMUNE
@@ -177,15 +193,6 @@ def calculate_gen_three_damage(
     elif const.FLAVOR_PSYWAVE in move.attack_flavor:
         psywave_upper_limit = math.floor(attacking_pkmn.level * 1.5)
         return damage_calc.DamageRange({x:1 for x in range(1, psywave_upper_limit)})
-
-    # TODO: technically inaccurate data if in a doubles battle, and either of the other mons outside the equation have these abilities. Wtv
-    # It doesn't actually ever happen in vanilla games, so we're just fully ignoring it
-    is_weather_active = False
-    if (
-        defending_pkmn.ability not in [gen_three_const.AIR_LOCK_ABILITY, gen_three_const.CLOUD_NINE_ABILITY] and
-        attacking_pkmn.ability not in [gen_three_const.AIR_LOCK_ABILITY, gen_three_const.CLOUD_NINE_ABILITY]
-    ):
-        is_weather_active = (weather != const.WEATHER_NONE)
 
     # TODO: low kick. ughhhhh
     # TODO: present. ughhhhh
@@ -263,16 +270,6 @@ def calculate_gen_three_damage(
         elif custom_move_data == gen_three_const.UNDERWATER_TERRAIN:
             base_power = 120
             move_type = const.TYPE_WATER
-    elif move.name == gen_three_const.WEATHER_BALL_MOVE_NAME and is_weather_active:
-        base_power *= 2
-        if weather == const.WEATHER_SUN:
-            move_type = const.TYPE_FIRE
-        elif weather == const.WEATHER_RAIN:
-            move_type = const.TYPE_WATER
-        elif weather == const.WEATHER_HAIL:
-            move_type = const.TYPE_ICE
-        elif weather == const.WEATHER_SANDSTORM:
-            move_type = const.TYPE_ROCK
     
     if attacking_stage_modifiers is None:
         attacking_stage_modifiers = universal_data_objects.StageModifiers()

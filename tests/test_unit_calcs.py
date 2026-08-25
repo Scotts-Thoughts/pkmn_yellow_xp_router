@@ -248,3 +248,131 @@ class TestStatCalculation:
                 assert sxp.special_attack >= 0
                 assert sxp.special_defense >= 0
                 assert sxp.speed >= 0
+
+
+# =============================================================================
+# Weather Ball / Forecast (gens 3-5)
+# =============================================================================
+@pytest.mark.parametrize("version", [const.EMERALD_VERSION, const.PLATINUM_VERSION, const.BLACK_VERSION])
+class TestWeatherBallAndForecast:
+    """Weather Ball takes on the active weather's type, and Castform's Forecast
+    retypes it to match. Both have to be resolved before type effectiveness is
+    applied, on offense (STAB, immunity) and defense (effectiveness)."""
+
+    def _setup(self, version):
+        gen_factory.change_version(version)
+        gen = gen_factory.current_gen_info()
+        castform = gen.create_trainer_pkmn("Castform", 50)
+        castform.ability = const.FORECAST_ABILITY
+        return gen, castform
+
+    def test_weather_ball_is_normal_with_no_weather(self, version):
+        """No weather: Weather Ball stays Normal, so a Ghost type is immune."""
+        gen, castform = self._setup(version)
+        gengar = gen.create_trainer_pkmn("Gengar", 50)
+        weather_ball = gen.move_db().get_move(const.WEATHER_BALL_MOVE_NAME)
+
+        assert gen.calculate_damage(castform, weather_ball, gengar, weather=const.WEATHER_NONE) is None
+
+    @pytest.mark.parametrize("weather", [const.WEATHER_SUN, const.WEATHER_RAIN, const.WEATHER_HAIL])
+    def test_weather_ball_loses_normal_immunity(self, version, weather):
+        """In weather, Weather Ball isn't Normal anymore, so Ghost types can be hit.
+        This has to be resolved before the immunity check, not after it."""
+        gen, castform = self._setup(version)
+        gengar = gen.create_trainer_pkmn("Gengar", 50)
+        weather_ball = gen.move_db().get_move(const.WEATHER_BALL_MOVE_NAME)
+
+        assert gen.calculate_damage(castform, weather_ball, gengar, weather=weather) is not None
+
+    def test_weather_ball_type_matches_weather(self, version):
+        """Skarmory (Steel/Flying) reads each Weather Ball type differently:
+        Fire is 2x, Water/Ice/Rock are all neutral against it."""
+        gen, castform = self._setup(version)
+        skarmory = gen.create_trainer_pkmn("Skarmory", 50)
+        weather_ball = gen.move_db().get_move(const.WEATHER_BALL_MOVE_NAME)
+
+        def dmg(weather):
+            return gen.calculate_damage(castform, weather_ball, skarmory, weather=weather).max_damage
+
+        # Sun (Fire) is super effective, and gets the sun's own 1.5x damage boost on top
+        assert dmg(const.WEATHER_SUN) == dmg(const.WEATHER_RAIN) * 2
+        # Rain (Water) is neutral but weather-boosted, hail (Ice) is neutral and not
+        assert dmg(const.WEATHER_RAIN) > dmg(const.WEATHER_HAIL)
+        # Sandstorm (Rock) is neutral, and gets no STAB since Castform stays Normal
+        assert dmg(const.WEATHER_HAIL) > dmg(const.WEATHER_SANDSTORM)
+
+    def test_forecast_grants_stab_to_weather_ball(self, version):
+        """Both Castform and Weather Ball become the weather's type, so the move
+        picks up STAB that it wouldn't get if only one of the two changed."""
+        gen, castform = self._setup(version)
+        no_forecast = gen.create_trainer_pkmn("Castform", 50)
+        no_forecast.ability = ""
+        gengar = gen.create_trainer_pkmn("Gengar", 50)
+        weather_ball = gen.move_db().get_move(const.WEATHER_BALL_MOVE_NAME)
+
+        with_stab = gen.calculate_damage(castform, weather_ball, gengar, weather=const.WEATHER_SUN)
+        without_stab = gen.calculate_damage(no_forecast, weather_ball, gengar, weather=const.WEATHER_SUN)
+        assert with_stab.max_damage > without_stab.max_damage
+
+    def test_forecast_changes_defensive_typing(self, version):
+        """A Forecast Castform stops being Normal, so Ghost moves can hit it."""
+        gen, castform = self._setup(version)
+        pikachu = gen.create_trainer_pkmn("Pikachu", 50)
+        shadow_ball = gen.move_db().get_move("Shadow Ball")
+
+        assert gen.calculate_damage(pikachu, shadow_ball, castform, weather=const.WEATHER_NONE) is None
+        assert gen.calculate_damage(pikachu, shadow_ball, castform, weather=const.WEATHER_RAIN) is not None
+
+    def test_forecast_rain_castform_takes_double_from_electric(self, version):
+        """Rain makes Castform a Water type, which Electric is super effective against."""
+        gen, castform = self._setup(version)
+        pikachu = gen.create_trainer_pkmn("Pikachu", 50)
+        thunderbolt = gen.move_db().get_move("Thunderbolt")
+
+        neutral = gen.calculate_damage(pikachu, thunderbolt, castform, weather=const.WEATHER_NONE)
+        super_effective = gen.calculate_damage(pikachu, thunderbolt, castform, weather=const.WEATHER_RAIN)
+        assert super_effective.max_damage == neutral.max_damage * 2
+
+    def test_forecast_ignores_sandstorm(self, version):
+        """There's no sandstorm Castform form -- it stays Normal, so it keeps its
+        Ghost immunity even though the weather is active."""
+        gen, castform = self._setup(version)
+        pikachu = gen.create_trainer_pkmn("Pikachu", 50)
+        shadow_ball = gen.move_db().get_move("Shadow Ball")
+
+        assert gen.calculate_damage(pikachu, shadow_ball, castform, weather=const.WEATHER_SANDSTORM) is None
+
+    def test_air_lock_suppresses_weather_ball_and_forecast(self, version):
+        """Air Lock shuts the weather off, so neither Weather Ball nor Forecast
+        do anything -- Weather Ball is Normal again, and immune against a Ghost type."""
+        gen, castform = self._setup(version)
+        gengar = gen.create_trainer_pkmn("Gengar", 50)
+        gengar.ability = "Air Lock"
+        weather_ball = gen.move_db().get_move(const.WEATHER_BALL_MOVE_NAME)
+
+        for weather in [const.WEATHER_SUN, const.WEATHER_RAIN, const.WEATHER_HAIL]:
+            assert gen.calculate_damage(castform, weather_ball, gengar, weather=weather) is None
+
+    def test_forecast_only_applies_to_forecast_users(self, version):
+        """A mon without Forecast keeps its own typing no matter the weather."""
+        gen, _ = self._setup(version)
+        machop = gen.create_trainer_pkmn("Machop", 50)
+        plain_castform = gen.create_trainer_pkmn("Castform", 50)
+        tackle = gen.move_db().get_move("Tackle")
+
+        baseline = gen.calculate_damage(machop, tackle, plain_castform, weather=const.WEATHER_NONE)
+        for weather in [const.WEATHER_SUN, const.WEATHER_RAIN, const.WEATHER_HAIL, const.WEATHER_SANDSTORM]:
+            cur = gen.calculate_damage(machop, tackle, plain_castform, weather=weather)
+            assert cur.max_damage == baseline.max_damage
+
+    def test_species_db_is_not_mutated_by_forecast(self, version):
+        """Forecast must not write through to the shared species objects in the db."""
+        gen, castform = self._setup(version)
+        gengar = gen.create_trainer_pkmn("Gengar", 50)
+        weather_ball = gen.move_db().get_move(const.WEATHER_BALL_MOVE_NAME)
+
+        gen.calculate_damage(castform, weather_ball, gengar, weather=const.WEATHER_SUN)
+
+        species = gen.pkmn_db().get_pkmn("Castform")
+        assert species.first_type == const.TYPE_NORMAL
+        assert species.second_type == const.TYPE_NORMAL

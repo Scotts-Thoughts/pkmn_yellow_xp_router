@@ -120,6 +120,33 @@ def calculate_gen_four_damage(
     attacking_battle_stats:universal_data_objects.StatBlock=None,
     defending_battle_stats:universal_data_objects.StatBlock=None,
 ):
+    if attacking_field is None:
+        attacking_field = universal_data_objects.FieldStatus()
+    if defending_field is None:
+        defending_field = universal_data_objects.FieldStatus()
+
+    attacking_ability = attacking_pkmn.ability
+    defending_ability = defending_pkmn.ability
+
+    if attacking_field.worry_seed:
+        attacking_ability = gen_four_const.INSOMNIA_ABILITY
+    elif attacking_field.gastro_acid:
+        attacking_ability = ""
+
+    if defending_field.worry_seed:
+        defending_ability = gen_four_const.INSOMNIA_ABILITY
+    elif defending_field.gastro_acid:
+        defending_ability = ""
+
+    # NOTE: resolved up front because everything that keys off the weather (Forecast,
+    # Weather Ball's type) has to be settled before any type-based immunity check
+    is_weather_active = damage_calc.is_weather_active(attacking_ability, defending_ability, weather)
+
+    # Forecast retypes Castform to match the weather, which changes STAB when it's
+    # attacking and type effectiveness when it's defending
+    attacking_species = damage_calc.apply_forecast(attacking_species, attacking_ability, weather, is_weather_active)
+    defending_species = damage_calc.apply_forecast(defending_species, defending_ability, weather, is_weather_active)
+
     # Special-damage moves (Dragon Rage 40, Sonic Boom 20, Seismic Toss/Night Shade = level)
     # don't store their damage in base_power. Type immunity IS respected here (gen 2+).
     special_override = damage_calc.get_special_damage_override(move, attacking_pkmn, defending_species, type_chart)
@@ -138,33 +165,12 @@ def calculate_gen_four_damage(
     
     attacking_mon_first_type = attacking_species.first_type
     attacking_mon_second_type = attacking_species.second_type
-    attacking_ability = attacking_pkmn.ability
-    defending_ability = defending_pkmn.ability
-
-    if attacking_field.worry_seed:
-        attacking_ability = gen_four_const.INSOMNIA_ABILITY
-    elif attacking_field.gastro_acid:
-        attacking_ability = ""
-
-    if defending_field.worry_seed:
-        defending_ability = gen_four_const.INSOMNIA_ABILITY
-    elif defending_field.gastro_acid:
-        defending_ability = ""
 
     if attacking_ability == gen_four_const.MULTITYPE_ABILITY:
         new_type = gen_four_const.PLATE_TYPE_LOOKUP.get(attacking_pkmn.held_item)
         if new_type:
             attacking_mon_first_type = new_type
             attacking_mon_second_type = new_type
-
-    # TODO: technically inaccurate data if in a doubles battle, and either of the other mons outside the equation have these abilities. Wtv
-    # It doesn't actually ever happen in vanilla games, so we're just fully ignoring it
-    is_weather_active = False
-    if (
-        defending_ability not in [gen_four_const.AIR_LOCK_ABILITY, gen_four_const.CLOUD_NINE_ABILITY] and
-        attacking_ability not in [gen_four_const.AIR_LOCK_ABILITY, gen_four_const.CLOUD_NINE_ABILITY]
-    ):
-        is_weather_active = (weather != const.WEATHER_NONE)
 
     # Need to resolve any moves/abilities that change move type as early as possible
     if move.name == gen_four_const.NATURE_POWER_MOVE_NAME:
@@ -197,16 +203,9 @@ def calculate_gen_four_damage(
         elif custom_move_data == gen_four_const.UNDERWATER_TERRAIN:
             base_power = 120
             move_type = const.TYPE_WATER
-    elif move.name == gen_four_const.WEATHER_BALL_MOVE_NAME and is_weather_active:
+    elif move.name == const.WEATHER_BALL_MOVE_NAME and is_weather_active:
         base_power *= 2
-        if weather == const.WEATHER_SUN:
-            move_type = const.TYPE_FIRE
-        elif weather == const.WEATHER_RAIN:
-            move_type = const.TYPE_WATER
-        elif weather == const.WEATHER_HAIL:
-            move_type = const.TYPE_ICE
-        elif weather == const.WEATHER_SANDSTORM:
-            move_type = const.TYPE_ROCK
+        move_type = damage_calc.get_weather_ball_type(weather, is_weather_active, default_type=move_type)
     elif move.name == gen_four_const.NATURAL_GIFT_MOVE_NAME:
         # Klutz suppresses the held item, so Natural Gift fails
         if attacking_ability == gen_four_const.KLUTZ_ABILITY:

@@ -4,7 +4,7 @@ import copy
 import logging
 from typing import Dict, List, Tuple
 from controllers.main_controller import MainController
-from pkmn.damage_calc import DamageRange, find_kill
+from pkmn.damage_calc import DamageRange, find_kill, get_weather_ball_type, is_weather_active
 from pkmn.universal_data_objects import EnemyPkmn, FieldStatus, StageModifiers
 from routing.full_route_state import RouteState
 from utils.config_manager import config
@@ -819,6 +819,13 @@ class BattleSummaryController:
             if natural_gift_data is not None:
                 natural_gift_type, natural_gift_base_power = natural_gift_data
                 move_display_name = f"{move.name} ({natural_gift_type}: {natural_gift_base_power})"
+        elif move.name == const.WEATHER_BALL_MOVE_NAME and move.base_power:
+            # Weather changes both the type and the power, so show what the move
+            # actually resolved to, the same way Hidden Power/Natural Gift do
+            weather_ball_active = is_weather_active(attacking_mon.ability, defending_mon.ability, current_weather)
+            if weather_ball_active:
+                weather_ball_type = get_weather_ball_type(current_weather, weather_ball_active, default_type=move.move_type)
+                move_display_name = f"{move.name} ({weather_ball_type}: {move.base_power * 2})"
 
         if move_display_name is None:
             move_display_name = move.name

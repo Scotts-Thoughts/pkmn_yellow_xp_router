@@ -1,3 +1,4 @@
+import copy
 import math
 import logging
 from typing import Dict, Tuple
@@ -52,6 +53,56 @@ def get_special_damage_override(move, attacking_pkmn, defending_species=None, ty
             return None
 
     return DamageRange({amount: 1})
+
+
+def is_weather_active(attacking_ability:str, defending_ability:str, weather:str) -> bool:
+    """Whether ``weather`` is actually in effect. Air Lock / Cloud Nine on either
+    side shuts it off completely.
+
+    TODO: technically inaccurate data if in a doubles battle, and either of the other
+    mons outside the equation have these abilities. Wtv. It doesn't actually ever
+    happen in vanilla games, so we're just fully ignoring it"""
+    if weather == const.WEATHER_NONE:
+        return False
+    return (
+        attacking_ability not in const.WEATHER_SUPPRESSING_ABILITIES and
+        defending_ability not in const.WEATHER_SUPPRESSING_ABILITIES
+    )
+
+
+def get_weather_ball_type(weather:str, weather_is_active:bool, default_type:str=None) -> str:
+    """The type Weather Ball takes on in the given weather. Returns ``default_type``
+    (the move's own type, i.e. Normal) when there's no weather to key off of, and for
+    weather with no type of its own -- gen 4/5 fog still doubles the move's power, but
+    leaves it Normal."""
+    if not weather_is_active:
+        return default_type
+    return const.WEATHER_BALL_TYPE_MAP.get(weather, default_type)
+
+
+def apply_forecast(species, ability:str, weather:str, weather_is_active:bool):
+    """Castform's Forecast ability retypes it to match the active weather
+    (Sun -> Fire, Rain -> Water, Hail -> Ice). Returns a copy of ``species`` with
+    both types replaced, or ``species`` untouched when Forecast isn't relevant.
+
+    Returning a copy matters: the species objects come straight out of the pkmn
+    db and are shared by every caller, so they must never be mutated in place.
+
+    ``weather_is_active`` is the caller's already-resolved weather state, so
+    abilities that suppress weather (Air Lock / Cloud Nine) also suppress
+    Forecast, and ``ability`` should likewise already account for suppression
+    (Gastro Acid) in the gens that support it."""
+    if species is None or not weather_is_active or ability != const.FORECAST_ABILITY:
+        return species
+
+    new_type = const.FORECAST_TYPE_MAP.get(weather)
+    if new_type is None:
+        return species
+
+    result = copy.copy(species)
+    result.first_type = new_type
+    result.second_type = new_type
+    return result
 
 
 class DamageRange:

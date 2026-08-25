@@ -168,6 +168,7 @@ class Constants:
         self.CLEAR_BODY_ABILITY = "Clear Body"
         self.HYPER_CUTTER_ABILITY = "Hyper Cutter"
         self.INTIMIDATE_BLOCKING_ABILITIES = frozenset([self.CLEAR_BODY_ABILITY, self.HYPER_CUTTER_ABILITY])
+        self.FORECAST_ABILITY = "Forecast"
         self.PAY_DAY_AMOUNT = "pay_day_amount"
         self.MON_ORDER = "mon_order"
         self.TRANSFORMED = "transformed"
@@ -563,6 +564,7 @@ class Constants:
         self.SPIT_UP_MOVE_NAME = "Spit Up"
         self.HIDDEN_POWER_MOVE_NAME = "Hidden Power"
         self.NATURAL_GIFT_MOVE_NAME = "Natural Gift"
+        self.WEATHER_BALL_MOVE_NAME = "Weather Ball"
         self.SOLAR_BEAM_MOVE_NAME = "SolarBeam"
         self.LIGHTSCREEN_SANITIZED_MOVE_NAME = "lightscreen"
         self.REFLECT_SANITIZED_MOVE_NAME = "reflect"
@@ -635,6 +637,30 @@ class Constants:
             "Sandstorm": self.WEATHER_SANDSTORM,
             "Hail": self.WEATHER_HAIL,
         }
+
+        # Map of weather to the type Forecast (Castform) converts the mon to.
+        # Weather that isn't in this map (Sandstorm, Fog) leaves Castform Normal,
+        # which matches the games (there is no sandstorm/fog Castform form).
+        self.FORECAST_TYPE_MAP = {
+            self.WEATHER_SUN: self.TYPE_FIRE,
+            self.WEATHER_RAIN: self.TYPE_WATER,
+            self.WEATHER_HAIL: self.TYPE_ICE,
+        }
+
+        # Map of weather to the type Weather Ball becomes. Any active weather also
+        # doubles its power, including weather that isn't in this map (Fog, gen 4+),
+        # which doubles the power but leaves the move Normal.
+        self.WEATHER_BALL_TYPE_MAP = {
+            self.WEATHER_SUN: self.TYPE_FIRE,
+            self.WEATHER_RAIN: self.TYPE_WATER,
+            self.WEATHER_HAIL: self.TYPE_ICE,
+            self.WEATHER_SANDSTORM: self.TYPE_ROCK,
+        }
+
+        # Abilities that shut the weather off entirely while the mon is on the field,
+        # which also disables everything downstream of it (Forecast, Weather Ball's
+        # type change, the Fire/Water damage modifiers, ...)
+        self.WEATHER_SUPPRESSING_ABILITIES = frozenset(["Air Lock", "Cloud Nine"])
 
         # Self-applied field-status moves -> logical id (matches FieldStatus attributes).
         # Originally just screens; now also covers Magnet Rise (Ground immunity).
