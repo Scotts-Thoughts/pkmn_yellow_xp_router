@@ -8,6 +8,7 @@ from enum import Enum, auto
 from pkmn.universal_data_objects import PokemonSpecies
 import route_recording.recorder
 from route_recording.gamehook_client import GameHookProperty
+from route_recording.supershuckie_client import supershuckie_client
 from routing.route_events import EventDefinition, EvolutionEventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, RareCandyEventDefinition, SaveEventDefinition, VitaminEventDefinition
 from route_recording.game_recorders.gen_three.emerald_gamehook_constants import GameHookConstantConverter, gh_gen_three_const
 from utils.constants import const
@@ -510,6 +511,7 @@ class Machine:
         self._cur_state = self._registered_states[StateType.UNINITIALIZED]
         self._cur_state._on_enter(None)
         self._controller.set_game_state(self._cur_state.state_type)
+        supershuckie_client.start()
         self._processing_thread.start()
     
     def handle_event(self, new_prop:GameHookProperty, prev_prop:GameHookProperty):
@@ -532,12 +534,16 @@ class Machine:
             self._controller.set_game_state(self._cur_state.state_type)
     
     def shutdown(self):
-        logger.info("Shutting down Crystal recording FSM")
+        logger.info("Shutting down Emerald recording FSM")
         self._active = False
+        supershuckie_client.stop()
         if self._processing_thread.is_alive():
             self._processing_thread.join()
     
     def _queue_new_event(self, event_def:EventDefinition):
+        # record the time here rather than when the event is processed, as processing
+        # happens on a background thread that can lag behind by a poll interval
+        event_def.recorded_time = supershuckie_client.get_current_time()
         self._events_to_generate.append(event_def)
 
     def _process_events(self):

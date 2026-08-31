@@ -448,8 +448,16 @@ class EvolutionEventDefinition:
 
 
 class EventDefinition:
-    def __init__(self, enabled=True, rare_candy=None, vitamin=None, trainer_def=None, wild_pkmn_info=None, item_event_def=None, learn_move=None, hold_item=None, save=None, heal=None, blackout=None, evolution=None, notes="", tags=None):
+    def __init__(self, enabled=True, rare_candy=None, vitamin=None, trainer_def=None, wild_pkmn_info=None, item_event_def=None, learn_move=None, hold_item=None, save=None, heal=None, blackout=None, evolution=None, notes="", tags=None, recorded_time=None, split_time=None):
         self.enabled = enabled
+        # Super Shuckie's timer when this event was recorded, as H:MM:SS.CC.
+        # None for any event that wasn't created by the recorder, or that was recorded
+        # while Super Shuckie wasn't running a timed run
+        self.recorded_time = recorded_time
+        # Super Shuckie's timer when the overlay split on this event, same format.
+        # Nothing in the router sets this yet; it round-trips so that the overlay
+        # integration can fill it in later
+        self.split_time = split_time
         self.rare_candy:RareCandyEventDefinition = rare_candy
         self.vitamin:VitaminEventDefinition = vitamin
         self.trainer_def:TrainerEventDefinition = trainer_def
@@ -708,7 +716,12 @@ class EventDefinition:
         return self.get_label()
 
     def serialize(self):
-        result = {const.ENABLED_KEY: self.enabled, const.TAGS_KEY: self.tags}
+        result = {
+            const.ENABLED_KEY: self.enabled,
+            const.RECORDED_TIME_KEY: self.recorded_time,
+            const.SPLIT_TIME_KEY: self.split_time,
+            const.TAGS_KEY: self.tags,
+        }
         if self.notes:
             result[const.TASK_NOTES_ONLY] = self.notes
 
@@ -743,6 +756,8 @@ class EventDefinition:
             enabled=raw_val.get(const.ENABLED_KEY, True),
             notes=raw_val.get(const.TASK_NOTES_ONLY, ""),
             tags=raw_val.get(const.TAGS_KEY),
+            recorded_time=raw_val.get(const.RECORDED_TIME_KEY),
+            split_time=raw_val.get(const.SPLIT_TIME_KEY),
 
             rare_candy=RareCandyEventDefinition.deserialize(raw_val.get(const.TASK_RARE_CANDY)),
             vitamin=VitaminEventDefinition.deserialize(raw_val.get(const.TASK_VITAMIN)),

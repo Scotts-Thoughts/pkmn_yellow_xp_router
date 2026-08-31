@@ -535,6 +535,13 @@ class Router:
         if old_tags and not new_event_def.tags:
             new_event_def.tags = list(old_tags)
 
+        # The recorded/split times describe when the event happened, not what it contains,
+        # so editing an event must not clear them
+        if new_event_def.recorded_time is None:
+            new_event_def.recorded_time = event_group_obj.event_definition.recorded_time
+        if new_event_def.split_time is None:
+            new_event_def.split_time = event_group_obj.event_definition.split_time
+
         if isinstance(event_group_obj, route_events.EventFolder):
             if new_event_def.get_event_type() != const.TASK_NOTES_ONLY:
                 raise ValueError(f"Can only assign notes to EventFolders")

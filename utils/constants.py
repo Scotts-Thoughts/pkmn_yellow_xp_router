@@ -303,6 +303,11 @@ class Constants:
         self.ENABLED_KEY = "Enabled"
         self.EXPANDED_KEY = "Expanded"
         self.TAGS_KEY = "Tags"
+        # both times are H:MM:SS.CC strings, taken from Super Shuckie's run timer
+        self.RECORDED_TIME_KEY = "Recorded Time"
+        self.SPLIT_TIME_KEY = "Split Time"
+
+        self.SUPER_SHUCKIE_URL = "http://127.0.0.1:30158"
 
         self.HIGHLIGHT_LABEL = "highlight"
         self.HIGHLIGHT_LABEL_1 = "highlight1"

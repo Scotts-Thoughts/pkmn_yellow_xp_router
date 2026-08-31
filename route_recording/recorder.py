@@ -5,6 +5,7 @@ from typing import List, Tuple
 import controllers.main_controller
 import pkmn.gen_factory
 from route_recording.gamehook_client import GameHookClient
+from route_recording.supershuckie_client import supershuckie_client
 import routing.route_events
 from utils.config_manager import config
 from utils.constants import const
@@ -255,6 +256,13 @@ class RecorderController:
 
     @skip_if_inactive
     def add_event(self, event_def:routing.route_events.EventDefinition):
+        # Events queued straight from a game event are stamped by the FSM, which is as
+        # close as we can get to when they actually happened. Events the FSM synthesizes
+        # while processing (like the berry a starter is already holding) never go through
+        # there, so stamp them here instead of leaving them without a time
+        if event_def.recorded_time is None:
+            event_def.recorded_time = supershuckie_client.get_current_time()
+
         if self._potential_new_area_name is not None:
             if self._active_area_name == self._potential_new_area_name:
                 self._potential_new_area_name = None
@@ -306,6 +314,8 @@ class RecorderController:
                 last_event.parent.name == self._active_folder_name
             ):
                 event_def.item_event_def.item_amount += last_event.event_definition.item_event_def.item_amount
+                # the combined event still starts where the original one did
+                event_def.recorded_time = last_event.event_definition.recorded_time
                 self._controller.update_existing_event(last_event.group_id, event_def)
                 return
         elif None is not event_def.vitamin:
@@ -317,6 +327,8 @@ class RecorderController:
                 last_event.parent.name == self._active_folder_name
             ):
                 event_def.vitamin.amount += last_event.event_definition.vitamin.amount
+                # the combined event still starts where the original one did
+                event_def.recorded_time = last_event.event_definition.recorded_time
                 self._controller.update_existing_event(last_event.group_id, event_def)
                 return
         elif None is not event_def.rare_candy:
@@ -327,6 +339,8 @@ class RecorderController:
                 last_event.parent.name == self._active_folder_name
             ):
                 event_def.rare_candy.amount += last_event.event_definition.rare_candy.amount
+                # the combined event still starts where the original one did
+                event_def.recorded_time = last_event.event_definition.recorded_time
                 self._controller.update_existing_event(last_event.group_id, event_def)
                 return
 
