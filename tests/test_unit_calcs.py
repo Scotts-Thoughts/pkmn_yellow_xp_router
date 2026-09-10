@@ -376,3 +376,86 @@ class TestWeatherBallAndForecast:
         species = gen.pkmn_db().get_pkmn("Castform")
         assert species.first_type == const.TYPE_NORMAL
         assert species.second_type == const.TYPE_NORMAL
+
+
+# =============================================================================
+# Magnitude (gens 2-5)
+# =============================================================================
+@pytest.mark.parametrize("version", [
+    const.CRYSTAL_VERSION, const.EMERALD_VERSION, const.PLATINUM_VERSION, const.BLACK_VERSION,
+])
+class TestMagnitude:
+    """Magnitude's base power is chosen by the magnitude level (10/30/50/70/90/110/150,
+    identical in every gen that has the move), and it deals double damage only against a
+    target that is underground from Dig.
+
+    Both halves of that are easy to get wrong. The level and the Dig bonus share a single
+    custom-data string ("Mag 7" vs "Mag 7 Dig Bonus"), so unlike Earthquake there is no
+    "No Bonus" option to test against - checking for one made the bonus apply always.
+    And the level-based power means the move db carries a placeholder power, so a null
+    there makes the move register as doing no damage at all."""
+
+    MAGNITUDE_LEVELS = [4, 5, 6, 7, 8, 9, 10]
+
+    def _setup(self, version):
+        gen_factory.change_version(version)
+        gen = gen_factory.current_gen_info()
+        # Machop on both sides is deliberate: Fighting gets no Ground STAB and takes
+        # neutral damage from it, so nothing rounds after the Dig bonus is applied
+        # and the doubling stays exact.
+        attacker = gen.create_trainer_pkmn("Machop", 50)
+        defender = gen.create_trainer_pkmn("Machop", 50)
+        return gen, attacker, defender
+
+    def test_move_db_has_usable_power(self, version):
+        """The db power is only a placeholder, but a null/zero one short-circuits the
+        damage calc before the real power is ever looked up."""
+        gen, _, _ = self._setup(version)
+        magnitude = gen.move_db().get_move("Magnitude")
+
+        assert magnitude is not None
+        assert magnitude.base_power
+
+    def test_every_magnitude_level_deals_damage(self, version):
+        gen, attacker, defender = self._setup(version)
+        magnitude = gen.move_db().get_move("Magnitude")
+
+        for level in self.MAGNITUDE_LEVELS:
+            dmg = gen.calculate_damage(attacker, magnitude, defender, custom_move_data=f"Mag {level}")
+            assert dmg is not None, f"Magnitude {level} did no damage"
+            assert dmg.max_damage > 0
+
+    def test_damage_increases_with_magnitude_level(self, version):
+        """Higher magnitude means higher base power, all the way up."""
+        gen, attacker, defender = self._setup(version)
+        magnitude = gen.move_db().get_move("Magnitude")
+
+        results = [
+            gen.calculate_damage(attacker, magnitude, defender, custom_move_data=f"Mag {level}").max_damage
+            for level in self.MAGNITUDE_LEVELS
+        ]
+        assert results == sorted(results)
+        assert results[0] < results[-1]
+
+    def test_dig_bonus_doubles_damage(self, version):
+        gen, attacker, defender = self._setup(version)
+        magnitude = gen.move_db().get_move("Magnitude")
+
+        for level in self.MAGNITUDE_LEVELS:
+            plain = gen.calculate_damage(attacker, magnitude, defender, custom_move_data=f"Mag {level}")
+            dug_in = gen.calculate_damage(attacker, magnitude, defender, custom_move_data=f"Mag {level} Dig Bonus")
+            assert dug_in.max_damage == plain.max_damage * 2, f"Magnitude {level} Dig bonus was not 2x"
+
+    def test_no_dig_bonus_without_dig(self, version):
+        """The regression this guards: a plain magnitude selection must not pick up the
+        underground bonus just because it has no explicit "No Bonus" option."""
+        gen, attacker, defender = self._setup(version)
+        magnitude = gen.move_db().get_move("Magnitude")
+        earthquake = gen.move_db().get_move("Earthquake")
+
+        # Magnitude 10 is 150 base power against Earthquake's 100, so undoubled it lands
+        # above Earthquake; doubled by mistake it would be miles above doubled Earthquake.
+        mag_ten = gen.calculate_damage(attacker, magnitude, defender, custom_move_data="Mag 10")
+        quake = gen.calculate_damage(attacker, earthquake, defender, custom_move_data="No Bonus")
+
+        assert quake.max_damage < mag_ten.max_damage < quake.max_damage * 2

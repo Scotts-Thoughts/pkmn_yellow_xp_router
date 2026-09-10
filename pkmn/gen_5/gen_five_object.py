@@ -634,9 +634,16 @@ def _load_move_db(path):
     # NOTE: The gen 5 moves.json is currently leaner than the gen 4 file. It is
     # missing the structured `effects` list, the `attack_flavor` list, and the
     # `has_field_effect` flag that the other gens provide; it only carries a scalar
-    # `effect` code (e.g. "lower_enemy_attack_1"). Damage calculation only relies on
-    # name/accuracy/pp/power/type/category, all of which are present, so battles and
-    # routing work correctly. The consequence of the missing `effects` data is that
+    # `effect` code (e.g. "lower_enemy_attack_1"). Damage calculation relies on
+    # name/accuracy/pp/power/type/category. Watch out for `power`: variable-power moves
+    # carry a placeholder that the calc overrides later, but gen 4 uses 1 where this file
+    # uses null, and a null power short-circuits the calc into reporting no damage at all.
+    # Magnitude is fixed; the rest of the null-power moves (Flail, Reversal, Return,
+    # Frustration, Low Kick, Present, Gyro Ball, Grass Knot, Spit Up, Crush Grip,
+    # Wring Out, Punishment, Trump Card, Natural Gift, Fling, Beat Up, Electro Ball,
+    # Heavy Slam, Heat Crash) are still affected.
+    #
+    # The consequence of the missing `effects` data is that
     # automatic detection of stat-modifying / field moves (used to populate some
     # dropdowns in pkmn_db) is unavailable for gen 5 until the data is enriched —
     # the scalar `effect` code could be parsed into structured effects later.

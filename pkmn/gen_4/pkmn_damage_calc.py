@@ -682,7 +682,6 @@ def calculate_gen_four_damage(
         gen_four_const.SURF_MOVE_NAME,
         gen_four_const.WHIRLPOOL_MOVE_NAME,
         gen_four_const.EARTHQUAKE_MOVE_NAME,
-        gen_four_const.MAGNITUDE_MOVE_NAME,
         gen_four_const.PURSUIT_MOVE_NAME,
         gen_four_const.STOMP_MOVE_NAME,
         gen_four_const.EXTRASENSORY_MOVE_NAME,
@@ -698,6 +697,10 @@ def calculate_gen_four_damage(
         gen_four_const.WAKE_UP_SLAP_MOVE_NAME,
     ]:
         double_damage = custom_move_data and (gen_four_const.NO_BONUS not in custom_move_data)
+    elif move.name == gen_four_const.MAGNITUDE_MOVE_NAME:
+        # Magnitude folds the bonus into the same string as the magnitude level
+        # ("Mag 7" vs "Mag 7 Dig Bonus"), so there is no "No Bonus" option to test for
+        double_damage = (gen_four_const.DIG_BONUS in custom_move_data)
     else:
         double_damage = False
 

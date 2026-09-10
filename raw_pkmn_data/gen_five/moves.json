@@ -4425,7 +4425,7 @@
         "type": "Ground",
         "category": "Physical",
         "pp": 30,
-        "power": null,
+        "power": 1,
         "accuracy": 100,
         "priority": 0,
         "effect": "magnitude",
