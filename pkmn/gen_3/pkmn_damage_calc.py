@@ -457,6 +457,12 @@ def calculate_gen_three_damage(
     if flash_fire_activated:
         temp = math.floor(temp * 1.5)
 
+    # The game clamps damage to a minimum of 1 before the flat +2 is added,
+    # but only inside the physical branch of CalculateBaseDamage. Special-type
+    # moves have no such clamp, and can legitimately reach the +2 with a 0 here
+    if move_type not in special_types and temp <= 0:
+        temp = 1
+
     temp += 2
 
     if (
