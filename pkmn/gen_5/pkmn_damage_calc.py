@@ -18,6 +18,11 @@ NUM_ROLLS = MAX_RANGE - MIN_RANGE + 1
 
 
 def get_crit_rate(cur_mon:universal_data_objects.EnemyPkmn, move:universal_data_objects.Move, custom_move_data:str):
+    # Frost Breath / Storm Throw always crit in gen 5; their moves.json `effect` is
+    # mislabelled "high_crit_rate" (a +1 crit-stage effect), not a guaranteed crit.
+    if move.name in gen_five_const.ALWAYS_CRIT_MOVES:
+        return 1.0
+
     stage = 0
     if const.FLAVOR_HIGH_CRIT in move.attack_flavor:
         stage += 1
@@ -49,15 +54,14 @@ def get_move_accuracy(
         return None
 
     if move.name == gen_five_const.NATURE_POWER_MOVE_NAME:
-        if custom_move_data == gen_five_const.TALL_GRASS_TERRAIN:
-            result = 75
-        elif custom_move_data == gen_five_const.LONG_GRASS_TERRAIN:
-            result = 95
-        elif custom_move_data == gen_five_const.UNDERWATER_TERRAIN:
-            result = 80
-        elif custom_move_data == gen_five_const.PLAIN_TERRAIN:
-            result = None
-        result = 100
+        # Gen 5 Nature Power calls the mapped move (Earthquake/Seed Bomb/Rock
+        # Slide/.../Air Slash per terrain), so its accuracy should be the CALLED
+        # move's accuracy, not a terrain-keyed value. A prior bug here (bug X7 in
+        # docs/damage_calc_review/README.md) unconditionally overwrote every branch
+        # with 100 regardless of terrain; this was never fully modelled and is left
+        # at the called moves' accuracy is not tracked by this dropdown, so fall back
+        # to the move's own table accuracy (None, i.e. no data) rather than guessing.
+        result = move.accuracy
     else:
         result = move.accuracy
 
@@ -67,6 +71,13 @@ def get_move_accuracy(
         return None
     if move.name == gen_five_const.THUNDER_MOVE_NAME and weather == const.WEATHER_RAIN:
         return None
+    if move.name == gen_five_const.THUNDER_MOVE_NAME and weather == const.WEATHER_SUN:
+        result = 50
+    if move.name == gen_five_const.HURRICANE_MOVE_NAME:
+        if weather == const.WEATHER_RAIN:
+            return None
+        elif weather == const.WEATHER_SUN:
+            result = 50
 
     if result is None:
         return None
@@ -86,7 +97,7 @@ def get_move_accuracy(
     if defending_pkmn.ability == gen_five_const.SAND_VEIL_ABILITY and weather == const.WEATHER_SANDSTORM:
         result = math.floor(result * 3277 / 4096)
 
-    if defending_pkmn.ability == gen_five_const.SNOW_CLOAK_ABILITY and weather == const.WEATHER_SANDSTORM:
+    if defending_pkmn.ability == gen_five_const.SNOW_CLOAK_ABILITY and weather == const.WEATHER_HAIL:
         result = math.floor(result * 3277 / 4096)
 
     if (
@@ -124,6 +135,12 @@ def calculate_gen_five_damage(
         attacking_field = universal_data_objects.FieldStatus()
     if defending_field is None:
         defending_field = universal_data_objects.FieldStatus()
+    # Defaulted up front (not just before the crit-stage handling further down) because
+    # Punishment's power depends on defending_stage_modifiers and is resolved earlier.
+    if attacking_stage_modifiers is None:
+        attacking_stage_modifiers = universal_data_objects.StageModifiers()
+    if defending_stage_modifiers is None:
+        defending_stage_modifiers = universal_data_objects.StageModifiers()
 
     attacking_ability = attacking_pkmn.ability
     defending_ability = defending_pkmn.ability
@@ -153,6 +170,11 @@ def calculate_gen_five_damage(
     if special_override is not None:
         return special_override
 
+    # Struggle is typeless in gen 5 (no STAB, no type chart, no immunities -- it hits
+    # Ghosts) rather than a Normal-type move; resolved up front since it gates both the
+    # immunity checks below and STAB later.
+    is_struggle = move.name == const.STRUGGLE_MOVE_NAME
+
     if move.name == const.HIDDEN_POWER_MOVE_NAME:
         move_type = get_hidden_power_type(attacking_pkmn.dvs)
         base_power = get_hidden_power_base_power(attacking_pkmn.dvs)
@@ -160,9 +182,15 @@ def calculate_gen_five_damage(
         move_type = move.move_type
         base_power = move.base_power
     
-    if base_power is None or base_power == 0:
-        return None
-    
+    # NOTE: unlike gen 1-4 (which use a placeholder power of 1 for variable-power
+    # moves), gen 5's moves.json uses `power: null` for them. There used to be a
+    # `base_power is None or base_power == 0: return None` guard right here, before any
+    # of the per-move power overrides below had a chance to run -- which meant every
+    # variable-power move (Low Kick, Flail, Return, Present, Gyro Ball, Natural Gift,
+    # Trump Card, Crush Grip, Wring Out, Punishment, Psywave, Super Fang, Endeavor, the
+    # OHKO moves, Frustration, Spit Up, Heavy Slam, Heat Crash, Electro Ball, Stored
+    # Power...) always reported "no damage" (gen_5_findings.md section 1, item 4). The
+    # equivalent guard now runs much further down, after every override has resolved.
     attacking_mon_first_type = attacking_species.first_type
     attacking_mon_second_type = attacking_species.second_type
 
@@ -230,19 +258,19 @@ def calculate_gen_five_damage(
             move_type = new_type
     
     if move.name == gen_five_const.PUNISHMENT_MOVE_NAME:
-        num_buffs = 0
-        for cur_stage in [
+        # power = 60 + 20*(sum of the target's positive stat stages, incl. acc/eva),
+        # cap 200. json power is null, and the old code added the stage bonus onto that
+        # null power instead of the real base of 60 (gen_4_findings.md bug #4d, ported).
+        positive_stage_total = sum(max(stage, 0) for stage in [
             defending_stage_modifiers.attack_stage,
             defending_stage_modifiers.defense_stage,
             defending_stage_modifiers.special_attack_stage,
             defending_stage_modifiers.special_defense_stage,
             defending_stage_modifiers.speed_stage,
-        ]:
-            if cur_stage > 0:
-                num_buffs += cur_stage
-        
-        num_buffs = min(num_buffs, 7)
-        base_power += (num_buffs * 20)
+            defending_stage_modifiers.accuracy_stage,
+            defending_stage_modifiers.evasion_stage,
+        ])
+        base_power = min(60 + 20 * positive_stage_total, 200)
 
     is_scrappy_active = (
         (defending_species.first_type == const.TYPE_GHOST or defending_species.second_type == const.TYPE_GHOST) and
@@ -263,7 +291,9 @@ def calculate_gen_five_damage(
     )
 
     
-    if (
+    if is_struggle:
+        pass
+    elif (
         (
             type_chart.get(move_type).get(defending_species.first_type) == const.IMMUNE or
             type_chart.get(move_type).get(defending_species.second_type) == const.IMMUNE
@@ -283,6 +313,7 @@ def calculate_gen_five_damage(
         defending_ability == gen_five_const.DAMP_ABILITY and
         (
             move.name == const.SELFDESTRUCT_MOVE_NAME or
+            move.name == gen_five_const.SELFDESTRUCT_MOVE_NAME or
             move.name == const.EXPLOSION_MOVE_NAME
         )
     ):
@@ -339,26 +370,31 @@ def calculate_gen_five_damage(
     elif const.FLAVOR_LEVEL_DAMAGE in move.attack_flavor:
         return damage_calc.DamageRange({attacking_pkmn.level: 1})
     elif const.FLAVOR_PSYWAVE in move.attack_flavor:
-        psywave_upper_limit = math.floor(attacking_pkmn.level * 1.5)
-        return damage_calc.DamageRange({x:1 for x in range(1, psywave_upper_limit)})
-    
-    if attacking_stage_modifiers is None:
-        attacking_stage_modifiers = universal_data_objects.StageModifiers()
-    if defending_stage_modifiers is None:
-        defending_stage_modifiers = universal_data_objects.StageModifiers()
+        # Gen 5 Psywave (documented, unverified -- no gen 5 decomp exists):
+        # floor(level * (r + 50) / 100), r uniform 0..100 (101 equally likely values),
+        # min 1. This differs from every earlier gen's Psywave formula.
+        damage_vals = {}
+        for r in range(0, 101):
+            dmg = max(math.floor(attacking_pkmn.level * (r + 50) / 100), 1)
+            damage_vals[dmg] = damage_vals.get(dmg, 0) + 1
+        return damage_calc.DamageRange(damage_vals)
 
     # when a crit occurs, always ignore negative modifiers for the attacking pokemon, and always ignore positive modifiers for the defensive pokemon
+    # gen_4_findings.md bug #1 (ported verbatim into this gen 5 copy): a crit should
+    # ignore only the USED attacking stat's negative stage and the USED defending
+    # stat's positive stage -- not check the opposite category's stats, and not wipe
+    # every other stage (accuracy, evasion, Speed, ...) along with it.
     if is_crit:
         if move.category == const.CATEGORY_PHYSICAL:
-            if attacking_stage_modifiers.special_attack_stage < 0:
-                attacking_stage_modifiers = universal_data_objects.StageModifiers()
-            if defending_stage_modifiers.special_defense_stage > 0:
-                defending_stage_modifiers = universal_data_objects.StageModifiers()
-        else:
             if attacking_stage_modifiers.attack_stage < 0:
-                attacking_stage_modifiers = universal_data_objects.StageModifiers()
+                attacking_stage_modifiers = attacking_stage_modifiers.apply_stat_mod([(const.ATK, -attacking_stage_modifiers.attack_stage)])
             if defending_stage_modifiers.defense_stage > 0:
-                defending_stage_modifiers = universal_data_objects.StageModifiers()
+                defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.DEF, -defending_stage_modifiers.defense_stage)])
+        else:
+            if attacking_stage_modifiers.special_attack_stage < 0:
+                attacking_stage_modifiers = attacking_stage_modifiers.apply_stat_mod([(const.SPA, -attacking_stage_modifiers.special_attack_stage)])
+            if defending_stage_modifiers.special_defense_stage > 0:
+                defending_stage_modifiers = defending_stage_modifiers.apply_stat_mod([(const.SPD, -defending_stage_modifiers.special_defense_stage)])
 
     if attacking_battle_stats is None:
         attacking_battle_stats = attacking_pkmn.get_battle_stats(attacking_stage_modifiers, mon_field=attacking_field)
@@ -416,14 +452,21 @@ def calculate_gen_five_damage(
         move.name == gen_five_const.WRING_OUT_MOVE_NAME
     ):
         try:
-            base_power = math.floor(1 + (120 * int(custom_move_data)))
+            # power = floor(1 + 120*curHP/maxHP); custom_move_data is that HP % (1..100),
+            # so it must be divided back down to a fraction. The prior version omitted the
+            # /100 entirely, so "100" HP produced a base power of 12001 instead of 121.
+            base_power = math.floor(1 + (120 * int(custom_move_data) / 100))
         except Exception as e:
             logger.warning(f"Failed to convert return move power to an int: {custom_move_data}")
     elif move.name == gen_five_const.GYRO_BALL_MOVE_NAME:
-        base_power = math.floor(1 + ((25 * attacking_battle_stats.speed) / defending_battle_stats.speed))
+        # power = floor(1 + 25*targetSpeed/userSpeed), cap 150 -- the ratio was inverted
+        # (a fast user got a low-power Gyro Ball instead of a high-power one).
+        base_power = math.floor(1 + ((25 * defending_battle_stats.speed) / attacking_battle_stats.speed))
         base_power = min(base_power, 150)
     elif move.name == gen_five_const.TRUMP_CARD_MOVE_NAME:
-        if custom_move_data == "3":
+        if custom_move_data == "4+":
+            base_power = 40
+        elif custom_move_data == "3":
             base_power = 50
         elif custom_move_data == "2":
             base_power = 60
@@ -431,22 +474,124 @@ def calculate_gen_five_damage(
             base_power = 80
         elif custom_move_data == "0":
             base_power = 200
-    elif move.name in [gen_five_const.LOW_KICK_MOVE_NAME, gen_five_const.GRASS_KNOW_MOVE_NAME]:
-        if defending_species.weight is None:
-            base_power = 1
+    elif move.name in [gen_five_const.LOW_KICK_MOVE_NAME, gen_five_const.GRASS_KNOW_MOVE_NAME, gen_five_const.HEAVY_SLAM_MOVE_NAME, gen_five_const.HEAT_CRASH_MOVE_NAME]:
+        is_weight_ratio_move = move.name in [gen_five_const.HEAVY_SLAM_MOVE_NAME, gen_five_const.HEAT_CRASH_MOVE_NAME]
+        if defending_species.weight is None or (is_weight_ratio_move and attacking_species.weight is None):
+            base_power = 40 if is_weight_ratio_move else 20
             logger.warning(f"Undefined weight for species: {defending_species.name}")
-        elif defending_species.weight < 10:
+        elif is_weight_ratio_move:
+            # Heavy Slam / Heat Crash: power keyed on the USER's weight relative to the
+            # target's, not the target's absolute weight.
+            ratio = attacking_species.weight / defending_species.weight
+            if ratio >= 5:
+                base_power = 120
+            elif ratio >= 4:
+                base_power = 100
+            elif ratio >= 3:
+                base_power = 80
+            elif ratio >= 2:
+                base_power = 60
+            else:
+                base_power = 40
+        elif defending_species.weight <= 10:
             base_power = 20
-        elif defending_species.weight < 25:
+        elif defending_species.weight <= 25:
             base_power = 40
-        elif defending_species.weight < 50:
+        elif defending_species.weight <= 50:
             base_power = 60
-        elif defending_species.weight < 100:
+        elif defending_species.weight <= 100:
             base_power = 80
-        elif defending_species.weight < 200:
+        elif defending_species.weight <= 200:
             base_power = 100
         else:
             base_power = 120
+    elif move.name == gen_five_const.ELECTRO_BALL_MOVE_NAME:
+        # power by speed ratio user/target (battle speeds, incl. stages/items): >=4x:150,
+        # >=3x:120, >=2x:80, >=1x:60, else 40.
+        if defending_battle_stats.speed <= 0:
+            ratio = float("inf")
+        else:
+            ratio = attacking_battle_stats.speed / defending_battle_stats.speed
+        if ratio >= 4:
+            base_power = 150
+        elif ratio >= 3:
+            base_power = 120
+        elif ratio >= 2:
+            base_power = 80
+        elif ratio >= 1:
+            base_power = 60
+        else:
+            base_power = 40
+    elif move.name == gen_five_const.STORED_POWER_MOVE_NAME:
+        # power = 20 + 20 * (sum of the user's positive stat stages, incl. acc/eva), cap 860.
+        positive_stage_total = sum(max(stage, 0) for stage in [
+            attacking_stage_modifiers.attack_stage,
+            attacking_stage_modifiers.defense_stage,
+            attacking_stage_modifiers.special_attack_stage,
+            attacking_stage_modifiers.special_defense_stage,
+            attacking_stage_modifiers.speed_stage,
+            attacking_stage_modifiers.accuracy_stage,
+            attacking_stage_modifiers.evasion_stage,
+        ])
+        base_power = min(20 + 20 * positive_stage_total, 860)
+    elif move.name == gen_five_const.HEX_MOVE_NAME:
+        if custom_move_data == gen_five_const.STATUS_BONUS:
+            base_power = 100
+    elif move.name == gen_five_const.VENOSHOCK_MOVE_NAME:
+        if custom_move_data == gen_five_const.POISONED_BONUS:
+            base_power = 130
+    elif move.name == gen_five_const.RETALIATE_MOVE_NAME:
+        if custom_move_data == gen_five_const.ALLY_FAINTED_BONUS:
+            base_power = 140
+    elif move.name == gen_five_const.ECHOED_VOICE_MOVE_NAME:
+        try:
+            consecutive_turns = int(custom_move_data)
+        except Exception:
+            consecutive_turns = 1
+        base_power = min(40 * consecutive_turns, 200)
+    elif move.name == gen_five_const.ACROBATICS_MOVE_NAME:
+        if not attacking_pkmn.held_item:
+            base_power = 110
+    elif move.name == gen_five_const.PRESENT_MOVE_NAME:
+        if custom_move_data == "80":
+            base_power = 80
+        elif custom_move_data == "120":
+            base_power = 120
+        elif custom_move_data == gen_five_const.HEAL_OPTION:
+            # Present heals instead of dealing damage; no damage row to report.
+            base_power = None
+        else:
+            base_power = 40
+    elif move.name == gen_five_const.FRUSTRATION_MOVE_NAME:
+        try:
+            base_power = int(custom_move_data)
+        except Exception as e:
+            logger.warning(f"Failed to convert frustration move power to an int: {custom_move_data}")
+
+    # These moves don't go through the base_power/Attack/Defense formula at all -- their
+    # damage is derived directly from HP or speed -- so they return straight away. This
+    # app doesn't track in-battle HP loss, so "current HP" here means "full HP" (the same
+    # simplification used elsewhere, e.g. Flail/Reversal default to a HP% dropdown rather
+    # than a live value); Endeavor gets a dropdown for the attacker's assumed HP % since
+    # its whole point is being used after the attacker has already taken damage.
+    if move.name in gen_five_const.ONE_HIT_KO_MOVE_NAMES:
+        if attacking_battle_stats.speed < defending_battle_stats.speed:
+            return None
+        return damage_calc.DamageRange({defending_pkmn.cur_stats.hp: 1})
+    elif move.name == gen_five_const.SUPER_FANG_MOVE_NAME:
+        return damage_calc.DamageRange({max(defending_pkmn.cur_stats.hp // 2, 1): 1})
+    elif move.name == gen_five_const.ENDEAVOR_MOVE_NAME:
+        try:
+            attacker_hp_pct = int(custom_move_data)
+        except Exception:
+            attacker_hp_pct = 100
+        attacker_hp = math.floor(attacking_pkmn.cur_stats.hp * attacker_hp_pct / 100)
+        remaining = defending_pkmn.cur_stats.hp - attacker_hp
+        if remaining <= 0:
+            return None
+        return damage_calc.DamageRange({remaining: 1})
+    elif move.name == gen_five_const.FINAL_GAMBIT_MOVE_NAME:
+        return damage_calc.DamageRange({attacking_pkmn.cur_stats.hp: 1})
 
     # NOTE: for now, just ignoring the "edge case" of: what if the mon for mon-specific unique items has klutz?
     # it never occurs in normal gameplay, and would require a hack. so, wtv
@@ -554,8 +699,15 @@ def calculate_gen_five_damage(
     
     if move.category == const.CATEGORY_SPECIAL:
         attacking_stat = attacking_battle_stats.special_attack
-        defending_stat = defending_battle_stats.special_defense
-        if defending_field.light_screen and not is_crit and move.name != gen_five_const.BRICK_BREAK_MOVE_NAME:
+        # Psyshock / Psystrike / Secret Sword are Special moves that hit the target's
+        # DEFENSE (and Defense stage/screen), not Sp. Defense.
+        if move.name in gen_five_const.USES_TARGET_DEFENSE_MOVES:
+            defending_stat = defending_battle_stats.defense
+            screen_field = defending_field.reflect
+        else:
+            defending_stat = defending_battle_stats.special_defense
+            screen_field = defending_field.light_screen
+        if screen_field and not is_crit and move.name != gen_five_const.BRICK_BREAK_MOVE_NAME:
             screen_active = True
         else:
             screen_active = False
@@ -566,13 +718,23 @@ def calculate_gen_five_damage(
             screen_active = True
         else:
             screen_active = False
-    
-    if  move.name == const.EXPLOSION_MOVE_NAME or move.name == const.SELFDESTRUCT_MOVE_NAME:
-        defending_stat = max(math.floor(defending_stat / 2), 1)
 
-    is_stab = (attacking_mon_first_type == move_type) or (attacking_mon_second_type == move_type)
-    if move.name == const.FUTURE_SIGHT_MOVE_NAME:
-        is_stab = False
+    if move.name == gen_five_const.FOUL_PLAY_MOVE_NAME:
+        # Foul Play uses the TARGET's Attack stat (with the target's own stages/items/
+        # ability already folded into defending_battle_stats), not the user's Attack.
+        attacking_stat = defending_battle_stats.attack
+
+    if move.name in gen_five_const.IGNORES_DEFENSE_STAGES_MOVES:
+        # Chip Away / Sacred Sword ignore the target's Defense/evasion stat stages.
+        unboosted_defending_stats = defending_pkmn.get_battle_stats(
+            universal_data_objects.StageModifiers(), mon_field=defending_field
+        )
+        defending_stat = unboosted_defending_stats.defense
+
+    # Gen 5 removed the "halve the target's Defense" rule that Explosion/Selfdestruct had
+    # in gens 2-4 (gen_5_findings.md move table), so defending_stat is left untouched here.
+
+    is_stab = (not is_struggle) and ((attacking_mon_first_type == move_type) or (attacking_mon_second_type == move_type))
 
     if (
         held_item_boost_table.get(attacking_pkmn.held_item) == move_type and
@@ -598,6 +760,13 @@ def calculate_gen_five_damage(
     ):
         attacking_stat = math.floor(attacking_stat * 1.2)
 
+    # Every per-move power override above has now run; a still-missing power means the
+    # move genuinely has no damage formula implemented here (Counter, Mirror Coat, Metal
+    # Burst, Bide, Fling, Beat Up, Techno Blast's drive-typing aside, Present's "Heal"
+    # option, ...) rather than being blocked by the old too-early null check.
+    if base_power is None or base_power == 0:
+        return None
+
     # begin actual formula
     temp = 2 * attacking_pkmn.level
     temp = math.floor(temp / 5) + 2
@@ -612,9 +781,13 @@ def calculate_gen_five_damage(
     if screen_active:
         temp = math.floor(temp / 2)
     
-    if is_double_battle and move.targeting == const.TARGETING_BOTH_ENEMIES:
-        temp = math.floor(temp / 2)
+    # Gen 5 spread factor is x0.75 (gen 4 is x0.5); the app's gen 4/5 move data uses
+    # "All Foes"/"Others" for spread targeting, not the gen-3-only "target_both_enemies"
+    # vocabulary, so that check alone never fired (gen_5_findings.md section 1, item 6).
+    if is_double_battle and move.targeting in (const.TARGETING_BOTH_ENEMIES, "All Foes", "Others"):
+        temp = math.floor(temp * 3 / 4)
 
+    is_solar_beam = move.name == const.SOLAR_BEAM_MOVE_NAME or move.name == gen_five_const.SOLAR_BEAM_MOVE_NAME
     weather_boost = False
     weather_penalty = False
     if is_weather_active:
@@ -622,15 +795,13 @@ def calculate_gen_five_damage(
             weather_boost = (move_type == const.TYPE_WATER)
             weather_penalty = (
                 move_type == const.TYPE_FIRE or
-                move.name == const.SOLAR_BEAM_MOVE_NAME
+                is_solar_beam
             )
         elif weather == const.WEATHER_SUN:
             weather_boost = (move_type == const.TYPE_FIRE)
             weather_penalty = (move_type == const.TYPE_WATER)
         elif weather != const.WEATHER_NONE:
-            weather_penalty = (
-                move.name == const.SOLAR_BEAM_MOVE_NAME
-        )
+            weather_penalty = is_solar_beam
 
     if weather_boost:
         temp = math.floor(temp * 1.5)
@@ -644,9 +815,11 @@ def calculate_gen_five_damage(
 
     temp += 2
 
+    # Spit Up, Future Sight and Doom Desire all CAN crit in gen 5 (this used to exclude
+    # them, a gen-4-era bug ported into the copy -- see gen_4_findings.md bug #5, and
+    # gen_5_findings.md's Future Sight/Doom Desire row for the crit change).
     if (
-        is_crit and 
-        move.name not in [const.SPIT_UP_MOVE_NAME, const.DOOM_DESIRE_MOVE_NAME, const.FUTURE_SIGHT_MOVE_NAME] and
+        is_crit and
         defending_ability not in [gen_five_const.BATTLE_ARMOR_ABILITY, gen_five_const.SHELL_ARMOR_ABILITY]
     ):
         if attacking_ability == gen_five_const.SNIPER_ABILITY:
@@ -657,18 +830,27 @@ def calculate_gen_five_damage(
     # handle all the special moves that may affect the damage formula in other ways
     move_modifier = 1
 
-    if move.name == gen_five_const.ROLLOUT_MOVE_NAME:
-        # ugh, dumb hack. String is either just an int, or the special case of last turn + defense curl
-        try:
-            num_rollout_turns = int(custom_move_data)
-        except ValueError:
-            num_rollout_turns = 6
-        
-        move_modifier = math.pow(2, num_rollout_turns)
+    if move.name in [gen_five_const.ROLLOUT_MOVE_NAME, gen_five_const.ICE_BALL_MOVE_NAME]:
+        # Turn n's power is base*2^(n-1) (turn 1 is NOT doubled), with Defense Curl
+        # doubling it again on top -- the old `2**n` doubled turn 1 too, and "5 +
+        # DefenseCurl" produced 2**6 (x64) instead of 2**4*2 (x32).
+        if "DefenseCurl" in custom_move_data:
+            num_rollout_turns = 5
+            has_defense_curl = True
+        else:
+            try:
+                num_rollout_turns = int(custom_move_data)
+            except ValueError:
+                num_rollout_turns = 5
+            has_defense_curl = False
+
+        move_modifier = 2 ** (num_rollout_turns - 1)
+        if has_defense_curl:
+            move_modifier *= 2
     elif move.name == gen_five_const.FURY_CUTTER_MOVE_NAME:
-        move_modifier = math.pow(2, int(custom_move_data) - 1)
-    elif move.name == gen_five_const.RAGE_MOVE_NAME:
-        move_modifier = int(custom_move_data)
+        # Gen 5 caps the doubling at the 4th hit (20 -> 40 -> 80 -> 160, then holds);
+        # the dropdown's "6" option is kept only as a "5 or more" label.
+        move_modifier = 2 ** (min(int(custom_move_data), 5) - 1)
     elif move.name == gen_five_const.TRIPLE_KICK_MOVE_NAME:
         move_modifier = int(custom_move_data)
     elif move.name == gen_five_const.SPIT_UP_MOVE_NAME:
@@ -684,9 +866,7 @@ def calculate_gen_five_damage(
         gen_five_const.EARTHQUAKE_MOVE_NAME,
         gen_five_const.PURSUIT_MOVE_NAME,
         gen_five_const.STOMP_MOVE_NAME,
-        gen_five_const.EXTRASENSORY_MOVE_NAME,
-        gen_five_const.ASTONISH_MOVE_NAME,
-        gen_five_const.NEEDLE_ARM_MOVE_NAME,
+        gen_five_const.STEAMROLLER_MOVE_NAME,
         gen_five_const.FACADE_MOVE_NAME,
         gen_five_const.SMELLING_SALT_MOVE_NAME,
         gen_five_const.REVENGE_MOVE_NAME,
@@ -724,22 +904,23 @@ def calculate_gen_five_damage(
             temp = math.floor(temp * 1.5)
 
     is_tinted_lens_active = False
-    for test_type in type_chart.get(move_type):
-        if test_type == defending_species.first_type or test_type == defending_species.second_type:
-            effectiveness = type_chart.get(move_type).get(test_type)
-            if effectiveness == const.SUPER_EFFECTIVE:
-                if (
-                    defending_ability == gen_five_const.FILTER_ABILITY or
-                    defending_ability == gen_five_const.SOLID_ROCK_ABILITY
-                ):
-                    temp = math.floor(temp * 1.5)
-                else:
-                    temp *= 2
-            elif effectiveness == const.NOT_VERY_EFFECTIVE:
-                if attacking_ability == gen_five_const.TINTED_LENS_ABILITY:
-                    is_tinted_lens_active = True
-                temp = math.floor(temp / 2)
-    
+    if not is_struggle:
+        for test_type in type_chart.get(move_type):
+            if test_type == defending_species.first_type or test_type == defending_species.second_type:
+                effectiveness = type_chart.get(move_type).get(test_type)
+                if effectiveness == const.SUPER_EFFECTIVE:
+                    if (
+                        defending_ability == gen_five_const.FILTER_ABILITY or
+                        defending_ability == gen_five_const.SOLID_ROCK_ABILITY
+                    ):
+                        temp = math.floor(temp * 1.5)
+                    else:
+                        temp *= 2
+                elif effectiveness == const.NOT_VERY_EFFECTIVE:
+                    if attacking_ability == gen_five_const.TINTED_LENS_ABILITY:
+                        is_tinted_lens_active = True
+                    temp = math.floor(temp / 2)
+
     # doing all this so that we guarantee that you only get one tinted lens boost if the move is doubly resisted
     if is_tinted_lens_active:
         temp *= 2

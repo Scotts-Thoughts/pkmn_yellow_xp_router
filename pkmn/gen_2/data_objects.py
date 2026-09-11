@@ -401,7 +401,9 @@ def modify_stat_by_stage(raw_stat, stage):
 
 def calc_unboosted_stat(base_val, level, dv, stat_xp, is_hp=False):
     temp = (base_val + dv) * 2
-    temp += math.floor(math.ceil(math.sqrt(stat_xp)) / 4)
+    # GetSquareRoot caps its result at 255 (NUM_SQUARE_ROOTS); math.ceil(sqrt(x)) can reach
+    # 256 for stat_xp in 65026..65535.
+    temp += math.floor(min(math.ceil(math.sqrt(stat_xp)), 255) / 4)
     temp = math.floor(temp * level / 100)
 
     if is_hp:
@@ -522,13 +524,15 @@ def get_hidden_power_type(dvs:universal_data_objects.StatBlock) -> str:
 
 def get_hidden_power_base_power(dvs:universal_data_objects.StatBlock) -> int:
     # remember that single dv for special is stored in specal_attack
-    result = 5 * (1 if dvs.special_attack > 8 else 0)
+    # NOTE: the game tests bit 3 of the DV (dv & 8), i.e. dv >= 8, not dv > 8 -- a DV of
+    # exactly 8 (very common, including this app's own trainer-style DVs) has that bit set.
+    result = 5 * (1 if dvs.special_attack >= 8 else 0)
     result += (dvs.special_attack % 4)
     result = math.floor(result / 2)
 
-    result += 5 * (1 if dvs.speed > 8 else 0)
-    result += 10 * (1 if dvs.defense > 8 else 0)
-    result += 20 * (1 if dvs.attack > 8 else 0)
+    result += 5 * (1 if dvs.speed >= 8 else 0)
+    result += 10 * (1 if dvs.defense >= 8 else 0)
+    result += 20 * (1 if dvs.attack >= 8 else 0)
     result += 31
 
     return result

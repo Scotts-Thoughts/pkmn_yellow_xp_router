@@ -37,7 +37,9 @@ class GenThreeConstants:
         self.EARTH_BADGE = "earth"
 
         self.MAROWAK_NAME = "Marowak"
+        self.CUBONE_NAME = "Cubone"
         self.THICK_CLUB_NAME = "Thick Club"
+        self.SEA_INCENSE_NAME = "Sea Incense"
 
         self.PIKACHU_NAME = "Pikachu"
         self.LIGHT_BALL_NAME = "Light Ball"
@@ -60,7 +62,7 @@ class GenThreeConstants:
         self.VOLT_ABOSRB_ABILITY = "Volt Absorb"
         self.LIGHTNING_ROD_ABILITY = "Lightning Rod"
         self.WATER_ABSORB_ABILITY = "Water Absorb"
-        self.FLASH_FIRE_ABILITY = "Water Absorb"
+        self.FLASH_FIRE_ABILITY = "Flash Fire"
         self.WONDER_GUARD_ABILITY = "Wonder Guard"
         self.BATTLE_ARMOR_ABILITY = "Battle Armor"
         self.SHELL_ARMOR_ABILITY = "Shell Armor"
@@ -75,6 +77,11 @@ class GenThreeConstants:
         self.BLAZE_ABILITY = "Blaze"
         self.TORRENT_ABILITY = "Torrent"
         self.SWARM_ABILITY = "Swarm"
+        self.SOUNDPROOF_ABILITY = "Soundproof"
+        self.STURDY_ABILITY = "Sturdy"
+
+        # Sound-based moves Soundproof blocks (battle_util.c:688-692)
+        self.SOUND_MOVE_NAMES = {"Snore", "Uproar", "Hyper Voice", "Growl", "Roar", "Sing", "Supersonic", "Screech", "Metal Sound", "GrassWhistle"}
 
         self.NO_BONUS = "No Bonus"
         self.DIG_BONUS = "Dig Bonus"
@@ -138,6 +145,24 @@ class GenThreeConstants:
         self.BRICK_BREAK_MOVE_NAME = "Brick Break"
         self.ERUPTION_MOVE_NAME = "Eruption"
         self.WATER_SPOUT_MOVE_NAME = "Water Spout"
+        self.FRUSTRATION_MOVE_NAME = "Frustration"
+        self.SUPER_FANG_MOVE_NAME = "Super Fang"
+        self.ENDEAVOR_MOVE_NAME = "Endeavor"
+        self.COUNTER_MOVE_NAME = "Counter"
+        self.MIRROR_COAT_MOVE_NAME = "Mirror Coat"
+        self.BIDE_MOVE_NAME = "Bide"
+        self.PRESENT_MOVE_NAME = "Present"
+        self.PRESENT_40 = "40 BP"
+        self.PRESENT_80 = "80 BP"
+        self.PRESENT_120 = "120 BP"
+        self.TRIPLE_KICK_SENTINEL_PREFIX = "__triple_kick_power_"
+        self.BEAT_UP_MOVE_NAME = "Beat Up"
+
+        self.GUILLOTINE_MOVE_NAME = "Guillotine"
+        self.HORN_DRILL_MOVE_NAME = "Horn Drill"
+        self.FISSURE_MOVE_NAME = "Fissure"
+        self.SHEER_COLD_MOVE_NAME = "Sheer Cold"
+        self.OHKO_MOVE_NAMES = {self.GUILLOTINE_MOVE_NAME, self.HORN_DRILL_MOVE_NAME, self.FISSURE_MOVE_NAME, self.SHEER_COLD_MOVE_NAME}
 
         self.CUSTOM_MOVE_DATA = {
             self.MAGNITUDE_MOVE_NAME: [
@@ -196,9 +221,16 @@ class GenThreeConstants:
             self.SMELLING_SALT_MOVE_NAME: [self.NO_BONUS, self.PARALYSIS_BONUS],
             self.REVENGE_MOVE_NAME: [self.NO_BONUS, self.DAMAGED_BONUS],
             self.RETURN_MOVE_NAME: [str(x) for x in range(102, 0, -1)],
+            self.FRUSTRATION_MOVE_NAME: [str(x) for x in range(102, 0, -1)],
             self.ERUPTION_MOVE_NAME: [str(x) for x in range(100, 0, -1)],
             self.WATER_SPOUT_MOVE_NAME: [str(x) for x in range(100, 0, -1)],
+            self.ENDEAVOR_MOVE_NAME: [str(x) for x in range(100, 0, -1)],
             self.SPIT_UP_MOVE_NAME: [str(x) for x in range(1, 4)],
+            self.PRESENT_MOVE_NAME: [self.PRESENT_40, self.PRESENT_80, self.PRESENT_120],
+            # No real party data reaches the damage calc, so this is an approximation:
+            # every "hit" uses the Beat Up user's own base Attack/level (matching the
+            # game's "wild mon / 1-mon party" case) rather than each real party member's.
+            self.BEAT_UP_MOVE_NAME: [str(x) for x in range(1, 7)],
         }
 
 

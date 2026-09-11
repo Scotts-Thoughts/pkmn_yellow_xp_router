@@ -1,0 +1,64 @@
+{
+  "id": "0001-this-agent-is-hanging",
+  "number": 1,
+  "title": "this agent is hanging",
+  "description": "i thought we fixed this issue, but it still persists.",
+  "status": "fix-applied",
+  "screenshot": "screenshot.png",
+  "attachments": [],
+  "context": {
+    "agents": [
+      {
+        "effort": "high",
+        "live": true,
+        "model": "opus",
+        "name": "Agent 2",
+        "phase": "turn_complete",
+        "turn": "done"
+      },
+      {
+        "effort": "xhigh",
+        "live": true,
+        "model": "fable",
+        "name": "extensive damage calculation review",
+        "phase": "launching",
+        "turn": null
+      }
+    ],
+    "project_dir": "A:\\pkmn_yellow_xp_router",
+    "reported_at": "2026-09-10T20:36:04.449Z",
+    "theme": "system",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36 Edg/152.0.0.0",
+    "window": {
+      "dpr": 1.5,
+      "height": 1349,
+      "width": 2434
+    },
+    "workspace": "Router"
+  },
+  "tags": [],
+  "fix": {
+    "technical": "## What was wrong\n\nOn Windows, `ResizePseudoConsole` called while conhost is still on its\ninherit-cursor handshake wedges the console. `portable_pty` creates every\npseudoconsole with `PSEUDOCONSOLE_INHERIT_CURSOR`, so conhost sends\n`ESC [ 6 n` and holds the child until it reads a cursor report on its input.\nThe harness answers that query correctly (`instances.rs`, `answer_cursor_query`\n— I verified the bytes, the ESC is there). But the desktop pane sends a\n`Resize` over the WebSocket the moment its xterm mounts, a few milliseconds\nafter the spawn, and `Proc::resize` passed it straight to\n`ResizePseudoConsole`. When that lands inside the handshake, conhost never\ntakes the answer, never releases the child, and the pane stays black. The\nagent's whole terminal log is the four bytes of the query.\n\n`claude.exe` is a Node process and attaches slowly, so its handshake window is\nwide enough for the pane's resize to land inside it; `cmd.exe` attaches in\nunder 5 ms and never hits it. On a loaded machine the window is wider still —\nhence the burst of twelve hangs in one minute at 14:22 today.\n\nThe previous fix (the cursor-report watchdog, 40 × 250 ms) could not help:\nit repeats an answer to a console that is wedged, not one that is waiting.\n\nEvidence: 24 instance logs in `%APPDATA%\\ClaudeHarness\\logs` from today are\nexactly `1b 5b 36 6e`, including the fable/xhigh agent in the screenshot\n(73c85e96…, 14:35:14).\n\n## What changed\n\n`crates/harness-runtime/src/instances.rs`:\n\n- `Proc` gains `handshake_done` (the reader thread's existing `moved_on`\n  flag, now shared) and `pending_resize: Mutex<Option<(u16, u16)>>`.\n- `Proc::resize` on Windows parks the size while `!handshake_done` instead of\n  applying it; the actual `ResizePseudoConsole` call moved to `apply_resize`.\n  After parking it re-checks the flag and flushes itself if the reader\n  finished in between — without that re-check a parked resize could be\n  orphaned (found by the new test under parallel load).\n- `flush_pending_resize` applies whatever is parked; idempotent.\n- The reader thread holds a `Weak<Proc>` (no cycle) and flushes on the\n  `moved_on` false→true transition. The watchdog flushes on every exit path\n  as a backstop.\n- Non-Windows is unchanged: resize applies immediately.\n- `handshake_done()` and `size()` accessors, for the test.\n\n## How it was checked\n\nReproduced first, with a throwaway test spawning the real `claude.exe\n--version` 30× at 42×38 (not committed — it depends on a user path):\n\n- no resize: **0/30** hung\n- `resize()` 0 ms after spawn, before the fix: **4/30** and **5/30** hung,\n  each with the exact `1b5b366e` 4-byte log\n- same, after the fix: **0/30, 0/30, 0/30**, and the 6 s timeouts vanished\n\nCommitted regression test\n`instances::tests::a_resize_during_the_handshake_is_parked_and_then_applied`:\nspawns `cmd.exe`, resizes immediately, asserts the size is *not* applied\nduring the handshake, then that it *is* applied and the child ran. Confirmed\nthe parked branch is hit every run. Stable over 6 full-suite runs.\n\n- `cargo test -p harness-runtime -p harness-core`: 95 core + 94 runtime pass,\n  `end_to_end` 17/17.\n- One failure, pre-existing and unrelated: `costs::tests::round_trips_through_the_log_file`\n  reads the real `costs.jsonl` (27 rows vs 2). It fails identically on the\n  baseline with my change stashed. Worth its own fix.\n\nRust changes need the desktop app rebuilt and restarted; the running one\nstill has the old code.\n\n## Still open\n\n- The five instances currently in `phase=launching` with large logs are a\n  *different* issue: Claude Code ran fine but no hook moved them out of\n  Launching. Not the reported bug; not touched here.\n- `costs` test isolation, as above.\n- `claude.exe` was modified at 14:36 today (auto-update) — the exact minute\n  the issue was filed. Coincidental as far as I can tell, since the hangs\n  predate it, but worth knowing.",
+    "plain": "When you started an agent, its panel sometimes stayed completely black with\n\"Starting\" at the top and never went any further, however long you waited.\nClosing it and starting again usually worked, which is why it felt random.\n\nIt was not the agent. In the first instant after an agent starts, the panel\ntells it how big it is — and on Windows, if that message arrives during a\nvery short moment while the agent is still being set up, everything freezes\nbefore it can draw anything. That moment is wider for Claude than for simpler\nprograms, and wider still when the computer is busy, which is why it came in\nbursts.\n\nThe size message now waits until the agent is ready for it, then goes\nthrough. Agents start every time; nothing else changes.\n\nYou will need to rebuild and restart the harness for this to take effect.",
+    "by": "Agent 2",
+    "files_changed": [],
+    "at": 1789091789071
+  },
+  "activity": [
+    {
+      "at": 1789072564457,
+      "actor": "user",
+      "action": "created",
+      "note": ""
+    },
+    {
+      "at": 1789091789071,
+      "actor": "Agent 2",
+      "action": "fix-applied",
+      "note": ""
+    }
+  ],
+  "reopened_count": 0,
+  "created_at": 1789072564457,
+  "updated_at": 1789091789071
+}

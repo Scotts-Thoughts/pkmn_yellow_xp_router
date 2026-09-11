@@ -499,7 +499,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user stabs the foe with a sharpened stone. It has a high critical-hit ratio. ",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -2125,7 +2127,8 @@
         "affected_by_kings_rock": true,
         "description": "A two-turn attack. Blades of wind hit the foe on the second turn. It has a high critical-hit ratio.",
         "attack_flavor": [
-            "two_turn"
+            "two_turn",
+            "high_crit"
         ],
         "effects": [],
         "has_field_effect": false
@@ -2441,7 +2444,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user slashes the foe the instant an opportunity arises. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -5834,7 +5839,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user tears the foe along with the space around it. This move has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -7427,7 +7434,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user calls out its underlings to pummel the foe. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -8682,7 +8691,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user tears at the foe with blades formed by psychic power. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -9422,7 +9433,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user slams the foe with a tail, etc. The target is hit twice in a row. ",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "two_hit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -9881,7 +9894,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "A slashing attack that may also leave the target poisoned. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -12118,7 +12133,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user slashes with a sharp claw made from shadows. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },

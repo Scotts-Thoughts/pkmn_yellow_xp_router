@@ -2397,7 +2397,9 @@
             "pp": 5,
             "base_power": 100,
             "type": "Flying",
-            "attack_flavor": [],
+            "attack_flavor": [
+                "high_crit"
+            ],
             "effects": [],
             "rom_id": 177
         },

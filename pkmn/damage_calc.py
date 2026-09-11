@@ -156,7 +156,7 @@ class DamageRange:
                 if cur_total_damage not in result_damage_vals:
                     result_damage_vals[cur_total_damage] = 0
 
-                result_damage_vals[cur_total_damage] += my_count + your_count
+                result_damage_vals[cur_total_damage] += my_count * your_count
 
         return DamageRange(result_damage_vals, num_attacks=(self.num_attacks + other.num_attacks))
 

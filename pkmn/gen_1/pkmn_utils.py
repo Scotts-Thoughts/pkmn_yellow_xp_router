@@ -66,7 +66,9 @@ def modify_stat_by_stage(raw_stat, stage):
 
 def calc_unboosted_stat(base_val, level, dv, stat_xp, is_hp=False):
     temp = (base_val + dv) * 2
-    temp += math.floor(math.ceil(math.sqrt(stat_xp)) / 4)
+    # Bug 6: the game's `GetSquareRoot` caps its result at 255 (NUM_SQUARE_ROOTS), so
+    # ceil(sqrt(stat_xp)) above 65025 stays at 255 rather than growing to 256+.
+    temp += math.floor(min(math.ceil(math.sqrt(stat_xp)), 255) / 4)
     temp = math.floor(temp * level / 100)
 
     if is_hp:

@@ -45,6 +45,7 @@ class GenFourConstants:
         self.EARTH_BADGE = "earth"
 
         self.MAROWAK_NAME = "Marowak"
+        self.CUBONE_NAME = "Cubone"
         self.THICK_CLUB_NAME = "Thick Club"
 
         self.PIKACHU_NAME = "Pikachu"
@@ -75,7 +76,7 @@ class GenFourConstants:
         self.PLATE_TYPE_LOOKUP = {
             "Draco Plate": const.TYPE_DRAGON,
             "Dread Plate": const.TYPE_DARK,
-            "Earth Plate": const.TYPE_DARK,
+            "Earth Plate": const.TYPE_GROUND,
             "Fist Plate": const.TYPE_FIGHTING,
             "Flame Plate": const.TYPE_FIRE,
             "Icicle Plate": const.TYPE_ICE,
@@ -97,7 +98,7 @@ class GenFourConstants:
         self.VOLT_ABOSRB_ABILITY = "Volt Absorb"
         self.LIGHTNING_ROD_ABILITY = "Lightning Rod"
         self.WATER_ABSORB_ABILITY = "Water Absorb"
-        self.FLASH_FIRE_ABILITY = "Water Absorb"
+        self.FLASH_FIRE_ABILITY = "Flash Fire"
         self.WONDER_GUARD_ABILITY = "Wonder Guard"
         self.BATTLE_ARMOR_ABILITY = "Battle Armor"
         self.SHELL_ARMOR_ABILITY = "Shell Armor"
@@ -132,6 +133,93 @@ class GenFourConstants:
         self.MULTITYPE_ABILITY = "Multitype"
         self.INSOMNIA_ABILITY = "Insomnia"
         self.SLOW_START_ABILITY = "Slow Start"
+        self.SOUNDPROOF_ABILITY = "Soundproof"
+        self.IRON_FIST_ABILITY = "Iron Fist"
+        self.RECKLESS_ABILITY = "Reckless"
+        self.STURDY_ABILITY = "Sturdy"
+
+        self.SCOPE_LENS_NAME = "Scope Lens"
+        self.RAZOR_CLAW_NAME = "Razor Claw"
+        self.LUCKY_PUNCH_NAME = "Lucky Punch"
+        self.STICK_NAME = "Stick"
+        self.CHANSEY_NAME = "Chansey"
+        self.FARFETCHD_NAME = "Farfetch'd"
+        self.LIFE_ORB_NAME = "Life Orb"
+        self.EXPERT_BELT_NAME = "Expert Belt"
+        self.MUSCLE_BAND_NAME = "Muscle Band"
+        self.WISE_GLASSES_NAME = "Wise Glasses"
+        self.BRIGHT_POWDER_NAME = "BrightPowder"
+        self.LAX_INCENSE_NAME = "Lax Incense"
+        self.IRON_BALL_NAME = "Iron Ball"
+
+        # Sound-based moves: Soundproof mons are immune (subscript_blocked_by_soundproof)
+        self.SOUND_MOVES = {"Uproar", "Snore", "Hyper Voice", "Bug Buzz", "Chatter"}
+        # Punching moves boosted 1.2x by Iron Fist
+        self.PUNCH_MOVES = {
+            "Ice Punch", "Fire Punch", "ThunderPunch", "Mach Punch", "Focus Punch",
+            "Dizzy Punch", "DynamicPunch", "Hammer Arm", "Mega Punch", "Comet Punch",
+            "Meteor Mash", "Shadow Punch", "Drain Punch", "Bullet Punch", "Sky Uppercut",
+        }
+        # Recoil moves boosted 1.2x power by Reckless
+        self.RECKLESS_MOVES = {
+            "Jump Kick", "Hi Jump Kick", "Take Down", "Submission", "Double-Edge",
+            "Volt Tackle", "Brave Bird", "Wood Hammer", "Flare Blitz", "Head Smash",
+        }
+
+        self.SUPER_FANG_MOVE_NAME = "Super Fang"
+        self.ENDEAVOR_MOVE_NAME = "Endeavor"
+        self.PRESENT_MOVE_NAME = "Present"
+        self.FLING_MOVE_NAME = "Fling"
+        self.STRUGGLE_MOVE_NAME = "Struggle"
+        self.FRUSTRATION_MOVE_NAME = "Frustration"
+
+        # OHKO moves: damage = target's current HP; fails outright if the user isn't
+        # at least as fast as the target, or the target has Sturdy.
+        self.OHKO_MOVE_NAMES = {"Guillotine", "Horn Drill", "Fissure", "Sheer Cold"}
+
+        self.TARGETING_ALL_FOES = "All Foes"
+        self.TARGETING_OTHERS = "Others"
+
+        # BattleSystem_FlingItem (battle_lib.c 5854+) fling-power table, by held item name.
+        self.FLING_POWER_TABLE = {
+            "Iron Ball": 130,
+            "Hard Stone": 100, "Rare Bone": 100,
+            "Helix Fossil": 100, "Dome Fossil": 100, "Old Amber": 100, "Root Fossil": 100,
+            "Claw Fossil": 100, "Armor Fossil": 100, "Skull Fossil": 100, "Cover Fossil": 100,
+            "Plume Fossil": 100,
+            "Draco Plate": 90, "Dread Plate": 90, "Earth Plate": 90, "Fist Plate": 90,
+            "Flame Plate": 90, "Icicle Plate": 90, "Insect Plate": 90, "Iron Plate": 90,
+            "Meadow Plate": 90, "Mind Plate": 90, "Sky Plate": 90, "Splash Plate": 90,
+            "Spooky Plate": 90, "Stone Plate": 90, "Toxic Plate": 90, "Zap Plate": 90,
+            "DeepSeaTooth": 90, "Thick Club": 90, "Grip Claw": 90,
+            "Razor Claw": 80, "Quick Claw": 80, "Sticky Barb": 80, "Dawn Stone": 80,
+            "Dusk Stone": 80, "Shiny Stone": 80, "Electirizer": 80, "Magmarizer": 80,
+            "Protector": 80, "Oval Stone": 80, "Odd Keystone": 80,
+            "Dragon Fang": 70, "Poison Barb": 70, "Power Anklet": 70, "Power Band": 70,
+            "Power Belt": 70, "Power Bracer": 70, "Power Lens": 70, "Power Weight": 70,
+            "Adamant Orb": 60, "Lustrous Orb": 60, "Griseous Orb": 60, "Damp Rock": 60,
+            "Heat Rock": 60, "Macho Brace": 60, "Stick": 60,
+            "Sharp Beak": 50, "Dubious Disc": 50,
+            "Lucky Punch": 40, "Icy Rock": 40,
+            "Life Orb": 30, "Light Ball": 30, "Scope Lens": 30, "Metronome": 30,
+            "Soul Dew": 30, "DeepSeaScale": 30, "King's Rock": 30, "Razor Fang": 30,
+            "Shell Bell": 30, "Amulet Coin": 30, "Lucky Egg": 30, "Everstone": 30,
+            "Exp. Share": 30, "Black Sludge": 30, "Flame Orb": 30, "Toxic Orb": 30,
+            "Light Clay": 30, "Cleanse Tag": 30, "Smoke Ball": 30, "Up-Grade": 30,
+            "Dragon Scale": 30, "Black Belt": 30, "BlackGlasses": 30, "Charcoal": 30,
+            "Magnet": 30, "Metal Coat": 30, "Miracle Seed": 30, "Mystic Water": 30,
+            "NeverMeltIce": 30, "Spell Tag": 30, "TwistedSpoon": 30,
+            "Silk Scarf": 10, "SilverPowder": 10, "Soft Sand": 10,
+            "Choice Band": 10, "Choice Specs": 10, "Choice Scarf": 10,
+            "Expert Belt": 10, "Focus Band": 10, "Focus Sash": 10, "Muscle Band": 10,
+            "Wise Glasses": 10, "Wide Lens": 10, "Zoom Lens": 10, "BrightPowder": 10,
+            "Lax Incense": 10, "Full Incense": 10, "Odd Incense": 10, "Rock Incense": 10,
+            "Rose Incense": 10, "Sea Incense": 10, "Wave Incense": 10, "Luck Incense": 10,
+            "Pure Incense": 10, "Leftovers": 10, "Metal Powder": 10, "Quick Powder": 10,
+            "Big Root": 10, "Destiny Knot": 10, "Mental Herb": 10, "Power Herb": 10,
+            "Shed Shell": 10, "Smooth Rock": 10, "Soothe Bell": 10, "White Herb": 10,
+            "Lagging Tail": 10, "Reaper Cloth": 10,
+        }
 
         self.NO_BONUS = "No Bonus"
         self.DIG_BONUS = "Dig Bonus"
@@ -146,15 +234,38 @@ class GenFourConstants:
         self.SECOND_BONUS = "Move Second Bonus"
         self.SLEEPING_BONUS = "Sleeping Bonus"
 
-        self.PLAIN_TERRAIN = "Plain"
-        self.SAND_TERRAIN = "Sand"
-        self.CAVE_TERRAIN = "Cave"
-        self.ROCK_TERRAIN = "Rock"
-        self.TALL_GRASS_TERRAIN = "Tall Grass"
-        self.LONG_GRASS_TERRAIN = "Long Grass"
-        self.POND_WATER_TERRAIN = "Pond Water"
-        self.SEA_WATER_TERRAIN = "Sea Water"
-        self.UNDERWATER_TERRAIN = "Underwater"
+        # Gen 4's Nature Power terrain->move table (HGSS asm 109-111 / to_move.h). This
+        # replaces the gen-3 terrain list the app previously (and incorrectly) used for
+        # every gen. Terrain pairs that call the same move (e.g. Plain and Sand both
+        # call Earthquake) are collapsed into one dropdown entry.
+        self.NATURE_POWER_PLAIN_SAND = "Plain/Sand"
+        self.NATURE_POWER_GRASS_PUDDLE = "Grass/Puddle"
+        self.NATURE_POWER_MOUNTAIN_CAVE = "Mountain/Cave"
+        self.NATURE_POWER_SNOW = "Snow"
+        self.NATURE_POWER_WATER = "Water"
+        self.NATURE_POWER_ICE = "Ice"
+        self.NATURE_POWER_BUILDING = "Building"
+        self.NATURE_POWER_GREAT_MARSH = "Great Marsh"
+        self.NATURE_POWER_BRIDGE = "Bridge"
+
+        # terrain -> (base_power, move_type, accuracy) of the move Nature Power calls
+        self.NATURE_POWER_MOVE_TABLE = {
+            self.NATURE_POWER_PLAIN_SAND: (100, const.TYPE_GROUND, 100),      # Earthquake
+            self.NATURE_POWER_GRASS_PUDDLE: (80, const.TYPE_GRASS, 100),      # Seed Bomb
+            self.NATURE_POWER_MOUNTAIN_CAVE: (75, const.TYPE_ROCK, 90),       # Rock Slide
+            self.NATURE_POWER_SNOW: (120, const.TYPE_ICE, 70),                # Blizzard
+            self.NATURE_POWER_WATER: (120, const.TYPE_WATER, 80),             # Hydro Pump
+            self.NATURE_POWER_ICE: (95, const.TYPE_ICE, 100),                 # Ice Beam
+            self.NATURE_POWER_BUILDING: (80, const.TYPE_NORMAL, 100),         # Tri Attack
+            self.NATURE_POWER_GREAT_MARSH: (65, const.TYPE_GROUND, 85),       # Mud Bomb
+            self.NATURE_POWER_BRIDGE: (75, const.TYPE_FLYING, 95),            # Air Slash
+        }
+        # terrains whose called move is Physical (used for Hustle's accuracy penalty)
+        self.NATURE_POWER_PHYSICAL_TERRAINS = {
+            self.NATURE_POWER_PLAIN_SAND,
+            self.NATURE_POWER_GRASS_PUDDLE,
+            self.NATURE_POWER_MOUNTAIN_CAVE,
+        }
 
         self.MAGNITUDE_MOVE_NAME = "Magnitude"
         self.MAGNITUDE_4 = "Mag 4"
@@ -253,23 +364,23 @@ class GenFourConstants:
             "Watmel Berry": (80, const.TYPE_FIRE),
             "Durin Berry":  (80, const.TYPE_WATER),
             "Belue Berry":  (80, const.TYPE_ELECTRIC),
-            "Occa Berry":   (80, const.TYPE_FIRE),
-            "Passho Berry": (80, const.TYPE_WATER),
-            "Wacan Berry":  (80, const.TYPE_ELECTRIC),
-            "Rindo Berry":  (80, const.TYPE_GRASS),
-            "Yache Berry":  (80, const.TYPE_ICE),
-            "Chople Berry": (80, const.TYPE_FIGHTING),
-            "Kebia Berry":  (80, const.TYPE_POISON),
-            "Shuca Berry":  (80, const.TYPE_GROUND),
-            "Coba Berry":   (80, const.TYPE_FLYING),
-            "Payapa Berry": (80, const.TYPE_PSYCHIC),
-            "Tanga Berry":  (80, const.TYPE_BUG),
-            "Charti Berry": (80, const.TYPE_ROCK),
-            "Kasib Berry":  (80, const.TYPE_GHOST),
-            "Haban Berry":  (80, const.TYPE_DRAGON),
-            "Colbur Berry": (80, const.TYPE_DARK),
-            "Babiri Berry": (80, const.TYPE_STEEL),
-            "Chilan Berry": (80, const.TYPE_NORMAL),
+            "Occa Berry":   (60, const.TYPE_FIRE),
+            "Passho Berry": (60, const.TYPE_WATER),
+            "Wacan Berry":  (60, const.TYPE_ELECTRIC),
+            "Rindo Berry":  (60, const.TYPE_GRASS),
+            "Yache Berry":  (60, const.TYPE_ICE),
+            "Chople Berry": (60, const.TYPE_FIGHTING),
+            "Kebia Berry":  (60, const.TYPE_POISON),
+            "Shuca Berry":  (60, const.TYPE_GROUND),
+            "Coba Berry":   (60, const.TYPE_FLYING),
+            "Payapa Berry": (60, const.TYPE_PSYCHIC),
+            "Tanga Berry":  (60, const.TYPE_BUG),
+            "Charti Berry": (60, const.TYPE_ROCK),
+            "Kasib Berry":  (60, const.TYPE_GHOST),
+            "Haban Berry":  (60, const.TYPE_DRAGON),
+            "Colbur Berry": (60, const.TYPE_DARK),
+            "Babiri Berry": (60, const.TYPE_STEEL),
+            "Chilan Berry": (60, const.TYPE_NORMAL),
             "Liechi Berry": (80, const.TYPE_GRASS),
             "Ganlon Berry": (80, const.TYPE_ICE),
             "Salac Berry":  (80, const.TYPE_FIGHTING),
@@ -310,28 +421,14 @@ class GenFourConstants:
                 self.FLAIL_FIVE_PERCENT_HP,
                 self.FLAIL_MIN_HP,
             ],
-            self.NATURE_POWER_MOVE_NAME: [
-                self.PLAIN_TERRAIN,
-                self.SAND_TERRAIN,
-                self.CAVE_TERRAIN,
-                self.ROCK_TERRAIN,
-                self.TALL_GRASS_TERRAIN,
-                self.LONG_GRASS_TERRAIN,
-                self.POND_WATER_TERRAIN,
-                self.SEA_WATER_TERRAIN,
-                self.UNDERWATER_TERRAIN,
-            ],
-            self.FURY_CUTTER_MOVE_NAME: ["1", "2", "3", "4", "5", "6"],
+            self.NATURE_POWER_MOVE_NAME: list(self.NATURE_POWER_MOVE_TABLE.keys()),
+            self.FURY_CUTTER_MOVE_NAME: ["1", "2", "3", "4", "5"],
             self.ROLLOUT_MOVE_NAME: ["1", "2", "3", "4", "5", "5 + DefenseCurl"],
             self.ICE_BALL_MOVE_NAME: ["1", "2", "3", "4", "5", "5 + DefenseCurl"],
             self.TRIPLE_KICK_MOVE_NAME: ["1", "2", "3"],
-            self.RAGE_MOVE_NAME: ["1", "2", "3", "4", "5", "6"],
 
             self.PURSUIT_MOVE_NAME: [self.NO_BONUS, self.SWITCH_BONUS],
             self.STOMP_MOVE_NAME: [self.NO_BONUS, self.MINIMIZE_BONUS],
-            self.ASTONISH_MOVE_NAME: [self.NO_BONUS, self.MINIMIZE_BONUS],
-            self.NEEDLE_ARM_MOVE_NAME: [self.NO_BONUS, self.MINIMIZE_BONUS],
-            self.EXTRASENSORY_MOVE_NAME: [self.NO_BONUS, self.MINIMIZE_BONUS],
             self.GUST_MOVE_NAME: [self.NO_BONUS, self.FLY_BONUS],
             self.TWISTER_MOVE_NAME: [self.NO_BONUS, self.FLY_BONUS],
             self.EARTHQUAKE_MOVE_NAME: [self.NO_BONUS, self.DIG_BONUS],
@@ -341,15 +438,17 @@ class GenFourConstants:
             self.SMELLING_SALT_MOVE_NAME: [self.NO_BONUS, self.PARALYSIS_BONUS],
             self.REVENGE_MOVE_NAME: [self.NO_BONUS, self.DAMAGED_BONUS],
             self.RETURN_MOVE_NAME: [str(x) for x in range(102, 0, -1)],
+            self.FRUSTRATION_MOVE_NAME: [str(x) for x in range(102, 0, -1)],
             self.ERUPTION_MOVE_NAME: [str(x) for x in range(100, 0, -1)],
             self.WATER_SPOUT_MOVE_NAME: [str(x) for x in range(100, 0, -1)],
             self.SPIT_UP_MOVE_NAME: [str(x) for x in range(1, 4)],
+            self.PRESENT_MOVE_NAME: ["40", "80", "120", "Heal"],
 
             self.ASSURANCE_MOVE_NAME: [self.NO_BONUS, self.DAMAGED_BONUS],
             self.AVALANCHE_MOVE_NAME: [self.NO_BONUS, self.DAMAGED_BONUS],
             self.BRINE_MOVE_NAME: [self.NO_BONUS, self.LOW_HEALTH_BONUS],
             self.PAYBACK_MOVE_NAME: [self.NO_BONUS, self.SECOND_BONUS],
-            self.TRUMP_CARD_MOVE_NAME: [str(x) if x < 4 else f"{x}+" for x in range(4, 0, -1)],
+            self.TRUMP_CARD_MOVE_NAME: ["4+", "3", "2", "1", "0"],
             self.WAKE_UP_SLAP_MOVE_NAME: [self.NO_BONUS, self.SLEEPING_BONUS],
             self.CRUSH_GRIP_MOVE_NAME: [str(x) for x in range(100, 0, -1)],
             self.WRING_OUT_MOVE_NAME: [str(x) for x in range(100, 0, -1)],

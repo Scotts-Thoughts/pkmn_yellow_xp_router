@@ -179,6 +179,14 @@ class GenTwo(CurrentGen):
         # None signals "no accuracy check" to the caller, matching gen 3+.
         if move.name == gen_two_const.THUNDER_MOVE_NAME and weather == const.WEATHER_RAIN:
             return None
+        if move.name == gen_two_const.THUNDER_MOVE_NAME and weather == const.WEATHER_SUN:
+            return 50
+
+        if gen_two_const.FLAVOR_ONE_HIT_KO in move.attack_flavor:
+            if pkmn.level < defending_pkmn.level:
+                return 0
+            return min(76 + 2 * (pkmn.level - defending_pkmn.level), 255) / 256 * 100
+
         return move.accuracy
 
     def calculate_damage(self,
@@ -214,6 +222,7 @@ class GenTwo(CurrentGen):
             weather=weather,
             attacking_battle_stats=attacking_battle_stats,
             defending_battle_stats=defending_battle_stats,
+            version_name=self._base_version_name or self._version_name,
         )
     
     def make_stat_block(self, hp, attack, defense, special_attack, special_defense, speed, is_stat_xp=False) -> universal_data_objects.StatBlock:

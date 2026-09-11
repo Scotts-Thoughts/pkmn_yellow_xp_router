@@ -7,6 +7,7 @@ independent of any route files.
 import pytest
 from utils.constants import const
 from pkmn import universal_utils, gen_factory
+from pkmn.damage_calc import DamageRange
 
 
 # =============================================================================
@@ -444,7 +445,14 @@ class TestMagnitude:
         for level in self.MAGNITUDE_LEVELS:
             plain = gen.calculate_damage(attacker, magnitude, defender, custom_move_data=f"Mag {level}")
             dug_in = gen.calculate_damage(attacker, magnitude, defender, custom_move_data=f"Mag {level} Dig Bonus")
-            assert dug_in.max_damage == plain.max_damage * 2, f"Magnitude {level} Dig bonus was not 2x"
+            # Gens where the Dig bonus doubles the move's POWER (before the two floor
+            # divisions in the damage formula, matching the real games) can land a
+            # couple points under an exact 2x on final damage -- each floor() can
+            # swallow a fractional point that a doubled-at-the-end model wouldn't
+            # lose, but it can never land OVER 2x. Gens that still double the final
+            # damage value land on exactly 2x.
+            assert plain.max_damage * 2 - 2 <= dug_in.max_damage <= plain.max_damage * 2, \
+                f"Magnitude {level} Dig bonus was not ~2x"
 
     def test_no_dig_bonus_without_dig(self, version):
         """The regression this guards: a plain magnitude selection must not pick up the
@@ -459,3 +467,25 @@ class TestMagnitude:
         quake = gen.calculate_damage(attacker, earthquake, defender, custom_move_data="No Bonus")
 
         assert quake.max_damage < mag_ten.max_damage < quake.max_damage * 2
+
+
+# =============================================================================
+# DamageRange combination (multi-hit joint distribution)
+# =============================================================================
+class TestDamageRangeAdd:
+    def test_add_multiplies_counts_not_adds_them(self):
+        # a = {10: 1, 11: 2}; a + a should be the joint distribution of two
+        # independent draws from a: {20: 1*1, 21: 1*2 + 2*1, 22: 2*2} = {20:1, 21:4, 22:4}, size 9.
+        a = DamageRange({10: 1, 11: 2})
+        result = a.add(a)
+        assert result.damage_vals == {20: 1, 21: 4, 22: 4}
+        assert result.size == 9
+
+    def test_add_simple_uniform_ranges(self):
+        a = DamageRange({1: 1, 2: 1})
+        b = DamageRange({10: 1, 20: 1})
+        result = a.add(b)
+        assert result.damage_vals == {11: 1, 21: 1, 12: 1, 22: 1}
+        assert result.size == 4
+        assert result.min_damage == 11
+        assert result.max_damage == 22

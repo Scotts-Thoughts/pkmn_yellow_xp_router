@@ -230,7 +230,7 @@
         },
         {
             "name": "Bind",
-            "accuracy": 85,
+            "accuracy": 75,
             "pp": 20,
             "base_power": 15,
             "type": "Normal",
@@ -1870,7 +1870,7 @@
         },
         {
             "name": "Poison Gas",
-            "accuracy": 90,
+            "accuracy": 55,
             "pp": 40,
             "base_power": null,
             "type": "Poison",
@@ -2007,7 +2007,7 @@
         },
         {
             "name": "Psywave",
-            "accuracy": 100,
+            "accuracy": 80,
             "pp": 15,
             "base_power": -1,
             "type": "Psychic",

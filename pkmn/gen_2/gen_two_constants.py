@@ -38,6 +38,7 @@ class GenTwoConstants:
         self.BAG_LIMIT = 20
 
         self.MAROWAK_NAME = "Marowak"
+        self.CUBONE_NAME = "Cubone"
         self.THICK_CLUB_NAME = "Thick Club"
 
         self.PIKACHU_NAME = "Pikachu"
@@ -81,6 +82,19 @@ class GenTwoConstants:
         self.TWISTER_MOVE_NAME = "Twister"
         self.EARTHQUAKE_MOVE_NAME = "Earthquake"
         self.RETURN_MOVE_NAME = "Return"
+        self.FRUSTRATION_MOVE_NAME = "Frustration"
+        self.PRESENT_MOVE_NAME = "Present"
+        self.PRESENT_HEAL = "Heal"
+        self.COUNTER_MOVE_NAME = "Counter"
+        self.MIRROR_COAT_MOVE_NAME = "Mirror Coat"
+        self.BIDE_MOVE_NAME = "Bide"
+
+        # attack_flavor tags (raw_pkmn_data/gen_two/moves.json) for moves whose damage
+        # doesn't come from the vanilla base_power*attack/defense formula.
+        self.FLAVOR_ONE_HIT_KO = "one_hit_ko"
+        self.FLAVOR_SUPER_FANG = "super_fang"
+        self.FLAVOR_BEAT_UP = "beat_up"
+        self.FLAVOR_FALSE_SWIPE = "false_swipe"
 
         self.CUSTOM_MOVE_DATA = {
             self.MAGNITUDE_MOVE_NAME: [
@@ -110,7 +124,7 @@ class GenTwoConstants:
             ],
             self.FURY_CUTTER_MOVE_NAME: ["1", "2", "3", "4", "5", "6"],
             self.ROLLOUT_MOVE_NAME: ["1", "2", "3", "4", "5", "5 + DefenseCurl"],
-            self.TRIPLE_KICK_MOVE_NAME: ["1", "2", "3"],
+            self.TRIPLE_KICK_MOVE_NAME: ["1 Kick", "2 Kicks", "3 Kicks"],
             self.RAGE_MOVE_NAME: ["1", "2", "3", "4", "5", "6"],
 
             self.PURSUIT_MOVE_NAME: [self.NO_BONUS, self.SWITCH_BONUS],
@@ -119,6 +133,8 @@ class GenTwoConstants:
             self.TWISTER_MOVE_NAME: [self.NO_BONUS, self.FLY_BONUS],
             self.EARTHQUAKE_MOVE_NAME: [self.NO_BONUS, self.DIG_BONUS],
             self.RETURN_MOVE_NAME: [str(x) for x in range(102, 0, -1)],
+            self.FRUSTRATION_MOVE_NAME: [str(x) for x in range(102, 0, -1)],
+            self.PRESENT_MOVE_NAME: ["40", "80", "120", self.PRESENT_HEAL],
         }
 
 

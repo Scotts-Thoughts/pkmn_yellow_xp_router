@@ -307,7 +307,9 @@ class GenFive(CurrentGen):
         return move_type, base_power
 
     def get_valid_weather(self) -> List[str]:
-        return [const.WEATHER_NONE, const.WEATHER_SUN, const.WEATHER_RAIN, const.WEATHER_SANDSTORM, const.WEATHER_HAIL, const.WEATHER_FOG]
+        # NOTE: Fog does not exist as a weather condition in gen 5 (it was gen 4's
+        # Great Marsh/Sinnoh-only condition); gen_5_findings.md section 1 flags this.
+        return [const.WEATHER_NONE, const.WEATHER_SUN, const.WEATHER_RAIN, const.WEATHER_SANDSTORM, const.WEATHER_HAIL]
     
     def get_stats_boosted_by_vitamin(self, vit_name: str) -> List[str]:
         if vit_name == const.HP_UP:
@@ -630,18 +632,37 @@ def _load_item_db(path):
     return result
 
 
+# Maps the gen 5 moves.json scalar `effect` code to the `attack_flavor` strings the
+# shared damage-calc code (pkmn/damage_calc.py, pkmn/gen_5/pkmn_damage_calc.py,
+# controllers/battle_summary_controller.py) looks for, since the gen 5 data has no
+# `attack_flavor` list of its own (docs/damage_calc_review/gen_5_findings.md section 1,
+# item 1-3: this is why high-crit moves rolled the base crit rate, 2-5 hit moves showed
+# a single hit with no dropdown, and 2-hit moves showed a single hit).
+_EFFECT_TO_FLAVOR = {
+    "high_crit_rate": [const.FLAVOR_HIGH_CRIT],
+    "may_burn_and_high_crit_rate": [const.FLAVOR_HIGH_CRIT],
+    "may_poison_and_high_crit_rate": [const.FLAVOR_HIGH_CRIT],
+    "two_to_five_hits": [const.FLAVOR_MULTI_HIT],
+    "two_hits": [const.DOUBLE_HIT_FLAVOR],
+    "two_hits_and_may_poison": [const.DOUBLE_HIT_FLAVOR],
+    "psywave": [const.FLAVOR_PSYWAVE],
+    "fixed_damage": [const.FLAVOR_FIXED_DAMAGE],
+    "level_based_damage": [const.FLAVOR_LEVEL_DAMAGE],
+}
+
+
 def _load_move_db(path):
     # NOTE: The gen 5 moves.json is currently leaner than the gen 4 file. It is
-    # missing the structured `effects` list, the `attack_flavor` list, and the
-    # `has_field_effect` flag that the other gens provide; it only carries a scalar
-    # `effect` code (e.g. "lower_enemy_attack_1"). Damage calculation relies on
-    # name/accuracy/pp/power/type/category. Watch out for `power`: variable-power moves
-    # carry a placeholder that the calc overrides later, but gen 4 uses 1 where this file
-    # uses null, and a null power short-circuits the calc into reporting no damage at all.
-    # Magnitude is fixed; the rest of the null-power moves (Flail, Reversal, Return,
-    # Frustration, Low Kick, Present, Gyro Ball, Grass Knot, Spit Up, Crush Grip,
-    # Wring Out, Punishment, Trump Card, Natural Gift, Fling, Beat Up, Electro Ball,
-    # Heavy Slam, Heat Crash) are still affected.
+    # missing the structured `effects` list and the `has_field_effect` flag that the
+    # other gens provide; it only carries a scalar `effect` code (e.g.
+    # "lower_enemy_attack_1"), which is translated into `attack_flavor` via
+    # _EFFECT_TO_FLAVOR above. Damage calculation relies on name/accuracy/pp/power/
+    # type/category/attack_flavor. Watch out for `power`: variable-power moves carry a
+    # placeholder that the calc overrides later, but gen 4 uses 1 where this file uses
+    # null; calculate_gen_five_damage resolves every per-move power override before
+    # checking for a still-null/zero power, so this is handled, but any *newly* added
+    # variable-power move needs its override added there too or it will silently deal
+    # no damage.
     #
     # The consequence of the missing `effects` data is that
     # automatic detection of stat-modifying / field moves (used to populate some
@@ -659,6 +680,9 @@ def _load_move_db(path):
         # trainer uses them, so they are safely skipped here.
         if raw_move.get(const.MOVE_TYPE) == "Shadow":
             continue
+        attack_flavor = raw_move.get(const.MOVE_FLAVOR, raw_move.get("attack_flavor", [])) or []
+        if not attack_flavor:
+            attack_flavor = _EFFECT_TO_FLAVOR.get(raw_move.get("effect"), [])
         result[raw_move[const.MOVE_KEY]] = universal_data_objects.Move(
             raw_move[const.MOVE_KEY],
             raw_move[const.MOVE_ACCURACY],
@@ -666,7 +690,7 @@ def _load_move_db(path):
             raw_move[const.POWER],
             raw_move[const.MOVE_TYPE],
             raw_move.get(const.MOVE_EFFECTS, []) or [],
-            raw_move.get(const.MOVE_FLAVOR, raw_move.get("attack_flavor", [])) or [],
+            attack_flavor,
             targeting=raw_move[const.MOVE_TARGET],
             category=raw_move[const.MOVE_CATEGORY],
             has_field_effect=raw_move.get(const.MOVE_HAS_FIELD_EFFECT, False),

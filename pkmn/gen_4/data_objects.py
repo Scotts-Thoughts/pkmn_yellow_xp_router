@@ -386,7 +386,7 @@ class GenFourStatBlock(universal_data_objects.StatBlock):
             level,
             stat_dv.defense,
             stat_xp.defense,
-            stage_modifiers.defense_stage,
+            0,
             nature_raised=nature.is_stat_raised(const.DEFENSE),
             nature_lowered=nature.is_stat_lowered(const.DEFENSE),
         )
@@ -399,7 +399,7 @@ class GenFourStatBlock(universal_data_objects.StatBlock):
             stage_modifiers.speed_stage,
             nature_raised=nature.is_stat_raised(const.SPEED),
             nature_lowered=nature.is_stat_lowered(const.SPEED),
-            slowed_speed=(held_item in const.SPEED_SLOWING_ITEMS),
+            slowed_speed=(held_item in const.SPEED_SLOWING_ITEMS or held_item == gen_four_const.IRON_BALL_NAME),
             choice_scarf=held_item == const.CHOICE_SCARF_ITEM_NAME,
         )
 
@@ -424,14 +424,18 @@ class GenFourStatBlock(universal_data_objects.StatBlock):
         )
 
         if field_status.power_trick:
-            result.attack, result.special_attack = result.special_attack, result.attack
+            # Power Trick swaps Attack and Defense (not Special Attack); both are
+            # still raw/unstaged here, so the swap happens before either stat's
+            # stage is applied below.
+            result.attack, result.defense = result.defense, result.attack
 
         if field_status.slow_start:
+            # Slow Start halves Attack and Speed only -- Special Attack is untouched.
             result.attack = int(result.attack / 2)
-            result.special_attack = int(result.special_attack / 2)
             result.speed = int(result.speed / 2)
 
         result.attack = modify_stat_by_stage(result.attack, stage_modifiers.attack_stage)
+        result.defense = modify_stat_by_stage(result.defense, stage_modifiers.defense_stage)
         result.special_attack = modify_stat_by_stage(result.special_attack, stage_modifiers.special_attack_stage)
 
         if field_status.tailwind:

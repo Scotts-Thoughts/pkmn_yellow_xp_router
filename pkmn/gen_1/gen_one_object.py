@@ -159,7 +159,7 @@ class GenOne(CurrentGen):
         return pkmn_utils.instantiate_wild_pokemon(self._pkmn_db.get_pkmn(pkmn_name), pkmn_level, dv=dv)
     
     def get_crit_rate(self, pkmn, move, custom_move_data):
-        return pkmn_damage_calc.get_crit_rate(pkmn, move)
+        return pkmn_damage_calc.get_crit_rate(pkmn, move, custom_move_data=custom_move_data)
     
     def get_move_accuracy(self, pkmn, move, custom_move_data, defending_pkmn, weather):
         return move.accuracy
@@ -178,6 +178,7 @@ class GenOne(CurrentGen):
         is_double_battle:bool=False,
         attacking_battle_stats:universal_data_objects.StatBlock=None,
         defending_battle_stats:universal_data_objects.StatBlock=None,
+        attacker_is_enemy:bool=False,
     ) -> DamageRange:
         return pkmn_damage_calc.calculate_gen_one_damage(
             attacking_pkmn,
@@ -195,6 +196,7 @@ class GenOne(CurrentGen):
             custom_move_data=custom_move_data,
             attacking_battle_stats=attacking_battle_stats,
             defending_battle_stats=defending_battle_stats,
+            attacker_is_enemy=attacker_is_enemy,
         )
     
     def make_stat_block(self, hp, attack, defense, special_attack, special_defense, speed, is_stat_xp=False) -> universal_data_objects.StatBlock:
@@ -238,10 +240,10 @@ class GenOne(CurrentGen):
         return e4 + [champ]
 
     def get_move_custom_data(self, move_name) -> List[str]:
-        # Gen one moves that require custom data are already handled by the rendering engine
-        # Mimc, and all multi-hit moves
-        # so, no other moves will need custom data
-        return None
+        # Mimic and all multi-hit moves are already handled by the rendering engine's generic
+        # multi-hit fallback. Super Fang, the partial-trapping moves, and Counter/Bide need
+        # their own move-specific dropdowns (see gen_one_const.CUSTOM_MOVE_DATA).
+        return gen_one_const.CUSTOM_MOVE_DATA.get(move_name)
     
     def get_hidden_power(self, dvs: universal_data_objects.StatBlock) -> Tuple[str, int]:
         return "", 0
