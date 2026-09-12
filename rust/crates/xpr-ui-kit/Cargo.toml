@@ -1,0 +1,9 @@
+[package]
+name = "xpr-ui-kit"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+xpr-core = { path = "../xpr-core" }
+egui = "0.33.3"
+log = { workspace = true }

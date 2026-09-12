@@ -1,0 +1,659 @@
+//! The landing page (`pages/landing_page.py`) and the new-route page
+//! (`pages/new_route_page.py`).
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use egui::{Align2, Color32, CornerRadius, Pos2, Rect, Sense, Stroke, Ui, Vec2};
+
+use xpr_core::consts;
+use xpr_core::io_utils;
+use xpr_core::{Config, Paths};
+use xpr_data::model::Nature;
+use xpr_data::{GenData, Registry};
+use xpr_ui_kit::theme::Theme;
+use xpr_ui_kit::widgets::{self, Entry, StyledButton};
+
+use crate::assets::Assets;
+use crate::custom_dvs::CustomDvsFrame;
+use crate::editors::OptionMenu;
+use crate::route_index::RouteIndex;
+
+pub const SORT_MOST_RECENT: &str = "most_recent";
+pub const SORT_GAME: &str = "game";
+pub const SORT_ALPHABETICAL: &str = "alphabetical";
+const NO_ROUTES: &str = "No saved routes found";
+
+/// What the landing page asks for.
+#[derive(Clone, Debug, Default)]
+pub struct LandingActions {
+    pub create_route: bool,
+    pub load_route: Option<PathBuf>,
+    pub auto_load_toggled: bool,
+}
+
+pub struct LandingPage {
+    current_sort: String,
+    selected_game_filter: String,
+    search_text: String,
+    search_deadline: Option<Instant>,
+    selected_route: Option<String>,
+    game_filter: OptionMenu,
+    pub auto_load: bool,
+}
+
+impl LandingPage {
+    pub fn new(cfg: &Config) -> LandingPage {
+        let mut sort = cfg.get_landing_page_sort();
+        if sort.is_empty() {
+            sort = SORT_MOST_RECENT.to_string();
+        }
+        let mut filter = cfg.get_landing_page_game_filter();
+        if filter.is_empty() {
+            filter = "All Games".to_string();
+        }
+        LandingPage {
+            current_sort: sort,
+            selected_game_filter: filter.clone(),
+            search_text: cfg.get_landing_page_search_filter(),
+            search_deadline: None,
+            selected_route: None,
+            game_filter: OptionMenu::new(vec!["All Games".to_string()], Some(&filter)),
+            auto_load: cfg.get_auto_load_most_recent_route(),
+        }
+    }
+
+    fn populate_game_filter(&mut self, registry: &Registry) {
+        let mut all = vec!["All Games".to_string()];
+        all.extend(registry.get_gen_names(true, true));
+        let sel = self.selected_game_filter.clone();
+        self.game_filter.new_values(all, Some(&sel));
+        if self.game_filter.get() != sel {
+            self.selected_game_filter = "All Games".to_string();
+            self.game_filter.set("All Games");
+        }
+    }
+
+    pub fn tick(&mut self, ctx: &egui::Context, cfg: &mut Config) {
+        if let Some(d) = self.search_deadline {
+            let now = Instant::now();
+            if now >= d {
+                self.search_deadline = None;
+                cfg.set_landing_page_search_filter(&self.search_text);
+            } else {
+                ctx.request_repaint_after(d - now);
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, paths: &Paths, registry: &Registry, index: &RouteIndex, actions: &mut LandingActions) {
+        let key_load = ui.input(|i| i.key_pressed(egui::Key::Enter));
+        ui.vertical_centered(|ui| {
+            ui.add_space(50.0);
+            ui.label(egui::RichText::new("Pokemon XP Router").font(theme.font_bold(24.0)).color(theme.text));
+            ui.add_space(20.0);
+            let create = StyledButton::new(theme, egui::RichText::new("Create New Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
+            if create.clicked() {
+                actions.create_route = true;
+            }
+            ui.add_space(10.0);
+            let can_load = self.selected_route.as_ref().map(|r| r != NO_ROUTES).unwrap_or(false);
+            let load = StyledButton::new(theme, egui::RichText::new("Load Selected Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).enabled(can_load).show(ui);
+            if (load.clicked() || key_load) && can_load {
+                if let Some(r) = &self.selected_route {
+                    actions.load_route = Some(io_utils::get_existing_route_path(paths, r));
+                }
+            }
+            ui.add_space(10.0);
+            let mut auto = self.auto_load;
+            if widgets::checkbox(ui, theme, &mut auto, "Automatically Load Most Recent Route on Startup", true).changed() {
+                self.auto_load = auto;
+                cfg.set_auto_load_most_recent_route(auto);
+                actions.auto_load_toggled = true;
+            }
+            ui.add_space(10.0);
+            // ---- routes section (600 px wide) ----
+            let width = 600.0;
+            ui.allocate_ui_with_layout(Vec2::new(width, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
+                ui.set_width(width);
+                ui.spacing_mut().item_spacing.y = 4.0;
+                ui.vertical_centered(|ui| {
+                    ui.label(egui::RichText::new("Routes").font(theme.font_bold(18.0)).color(theme.text));
+                });
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    let mut new_sort: Option<&str> = None;
+                    if widgets::seg_toggle(ui, theme, "Most Recent", self.current_sort == SORT_MOST_RECENT).clicked() {
+                        new_sort = Some(SORT_MOST_RECENT);
+                    }
+                    if widgets::seg_toggle(ui, theme, "Alphabetical", self.current_sort == SORT_ALPHABETICAL).clicked() {
+                        new_sort = Some(SORT_ALPHABETICAL);
+                    }
+                    if widgets::seg_toggle(ui, theme, "Game", self.current_sort == SORT_GAME).clicked() {
+                        new_sort = Some(SORT_GAME);
+                    }
+                    if let Some(s) = new_sort {
+                        self.current_sort = s.to_string();
+                        cfg.set_landing_page_sort(s);
+                        if s == SORT_GAME {
+                            self.populate_game_filter(registry);
+                        }
+                    }
+                    if self.current_sort == SORT_GAME {
+                        ui.add_space(8.0);
+                        if self.game_filter.options.len() <= 1 {
+                            self.populate_game_filter(registry);
+                        }
+                        if self.game_filter.ui(ui, theme, ui.id().with("game_filter"), Some(160.0), true) {
+                            self.selected_game_filter = self.game_filter.get().to_string();
+                            cfg.set_landing_page_game_filter(&self.selected_game_filter);
+                        }
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    widgets::label(ui, theme, "Search:");
+                    let r = Entry::new(theme, &mut self.search_text).width(ui.available_width()).hint("Filter routes...").id(ui.id().with("landing_search")).show(ui);
+                    if r.changed {
+                        self.search_deadline = Some(Instant::now() + Duration::from_millis(300));
+                    }
+                });
+                self.route_table(ui, theme, paths, index, actions);
+            });
+        });
+    }
+
+    fn route_table(&mut self, ui: &mut Ui, theme: &Theme, paths: &Paths, index: &RouteIndex, actions: &mut LandingActions) {
+        // gather + filter + sort
+        let mut entries: Vec<(&String, &String, &String, f64)> = index.entries.values().map(|e| (&e.name, &e.version, &e.species, e.mtime)).collect();
+        if self.current_sort == SORT_GAME && self.selected_game_filter != "All Games" {
+            entries.retain(|(_, v, _, _)| **v == self.selected_game_filter);
+        }
+        let st = self.search_text.trim().to_lowercase();
+        if !st.is_empty() {
+            entries.retain(|(n, v, s, _)| n.to_lowercase().contains(&st) || v.to_lowercase().contains(&st) || s.to_lowercase().contains(&st));
+        }
+        match self.current_sort.as_str() {
+            SORT_GAME => entries.sort_by(|a, b| (a.1, a.0).cmp(&(b.1, b.0))),
+            SORT_ALPHABETICAL => entries.sort_by_key(|e| e.0.to_lowercase()),
+            _ => entries.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap_or(std::cmp::Ordering::Equal)),
+        }
+        let bold = theme.body_bold();
+        let font = theme.body();
+        let total_w = ui.available_width();
+        let widths = [80.0, 90.0, (total_w - 80.0 - 90.0 - 130.0).max(120.0), 130.0];
+        let headers = ["Game", "Species", "Route Name", "Date Played"];
+        let frame = egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border));
+        frame.show(ui, |ui| {
+            ui.set_min_height(300.0);
+            ui.spacing_mut().item_spacing = Vec2::ZERO;
+            let (hrect, _) = ui.allocate_exact_size(Vec2::new(total_w, 22.0), Sense::hover());
+            let mut x = hrect.min.x;
+            for (i, h) in headers.iter().enumerate() {
+                let r = Rect::from_min_size(Pos2::new(x, hrect.min.y), Vec2::new(widths[i], 22.0));
+                ui.painter().rect(r, CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
+                ui.painter().text(Pos2::new(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *h, bold.clone(), theme.text);
+                x += widths[i];
+            }
+            egui::ScrollArea::vertical().id_salt("landing_routes").auto_shrink([false, false]).max_height(ui.available_height().max(300.0)).show(ui, |ui| {
+                if !index.loaded {
+                    ui.add_space(4.0);
+                    widgets::label_colored(ui, theme, "Loading routes...", theme.secondary);
+                    return;
+                }
+                if entries.is_empty() {
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(total_w, 22.0), Sense::hover());
+                    ui.painter().text(Pos2::new(r.min.x + widths[0] + widths[1] + 4.0, r.center().y), Align2::LEFT_CENTER, NO_ROUTES, font.clone(), theme.secondary);
+                    self.selected_route = None;
+                    return;
+                }
+                let mut clicked: Option<(String, bool)> = None;
+                for (row_idx, (name, version, species, mtime)) in entries.iter().enumerate() {
+                    let (r, resp) = ui.allocate_exact_size(Vec2::new(total_w, 22.0), Sense::click());
+                    let selected = self.selected_route.as_deref() == Some(name.as_str());
+                    let fill = if selected {
+                        theme.accent
+                    } else if resp.hovered() {
+                        theme.hover_bg
+                    } else if row_idx % 2 == 1 {
+                        theme.bg_lighter
+                    } else {
+                        theme.bg_input
+                    };
+                    ui.painter().rect_filled(r, CornerRadius::ZERO, fill);
+                    let color = if selected { Color32::WHITE } else { theme.text };
+                    let date = chrono::DateTime::<chrono::Local>::from(std::time::UNIX_EPOCH + Duration::from_secs_f64((*mtime).max(0.0))).format("%Y-%m-%d %H:%M").to_string();
+                    let cells = [version.as_str(), species.as_str(), name.as_str(), date.as_str()];
+                    let mut x = r.min.x;
+                    for (i, c) in cells.iter().enumerate() {
+                        let shown = widgets::elide(ui, c, &font, widths[i] - 8.0);
+                        ui.painter().text(Pos2::new(x + 4.0, r.center().y), Align2::LEFT_CENTER, shown, font.clone(), color);
+                        x += widths[i];
+                    }
+                    if resp.clicked() {
+                        clicked = Some((name.to_string(), false));
+                    }
+                    if resp.double_clicked() {
+                        clicked = Some((name.to_string(), true));
+                    }
+                }
+                if let Some((name, dbl)) = clicked {
+                    self.selected_route = Some(name.clone());
+                    if dbl {
+                        actions.load_route = Some(io_utils::get_existing_route_path(paths, &name));
+                    }
+                }
+            });
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// New route page
+// ---------------------------------------------------------------------------
+
+/// Game information: version -> (generation, platform, recorder status)
+fn game_info(version: &str) -> Option<(&'static str, &'static str, &'static str)> {
+    Some(match version {
+        consts::RED_VERSION | consts::BLUE_VERSION | consts::YELLOW_VERSION => ("Generation 1", "GB/GBC", "Available"),
+        consts::GOLD_VERSION | consts::SILVER_VERSION | consts::CRYSTAL_VERSION => ("Generation 2", "GBC", "Available"),
+        consts::RUBY_VERSION | consts::SAPPHIRE_VERSION | consts::EMERALD_VERSION | consts::FIRE_RED_VERSION | consts::LEAF_GREEN_VERSION => ("Generation 3", "GBA", "Available"),
+        consts::DIAMOND_VERSION | consts::PEARL_VERSION => ("Generation 4", "NDS", "Unavailable"),
+        consts::PLATINUM_VERSION => ("Generation 4", "NDS", "In Beta"),
+        consts::HEART_GOLD_VERSION | consts::SOUL_SILVER_VERSION => ("Generation 4", "NDS", "In Alpha"),
+        consts::BLACK_VERSION | consts::WHITE_VERSION | consts::BLACK_2_VERSION | consts::WHITE_2_VERSION => ("Generation 5", "NDS", "In Alpha"),
+        _ => return None,
+    })
+}
+
+#[derive(Clone, Debug)]
+struct GameRow {
+    name: String,
+    gen: String,
+    platform: String,
+    recorder: String,
+}
+
+/// What the new-route page asks for.
+#[derive(Clone, Debug, Default)]
+pub struct NewRouteActions {
+    pub cancel: bool,
+    pub create: Option<CreateRequest>,
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CreateRequest {
+    pub solo_mon: String,
+    pub base_route_path: Option<PathBuf>,
+    pub version: String,
+    pub dvs: xpr_data::model::StatBlock,
+    pub ability_idx: i64,
+    pub nature: Nature,
+}
+
+pub struct NewRoutePage {
+    games: Vec<GameRow>,
+    selected_game: Option<String>,
+    selected_gen: Option<Arc<GenData>>,
+    current_gen_num: Option<u8>,
+    pkmn_filter: String,
+    solo_selector: OptionMenu,
+    min_battles_filter: String,
+    min_battles_cache: Vec<String>,
+    min_battles_selector: OptionMenu,
+    pub dvs: CustomDvsFrame,
+    route_cache_per_game: HashMap<String, Vec<String>>,
+    pkmn_list_cache: HashMap<(String, String), Vec<String>>,
+    pending_game_load: bool,
+}
+
+impl NewRoutePage {
+    pub fn new() -> NewRoutePage {
+        NewRoutePage {
+            games: Vec::new(),
+            selected_game: None,
+            selected_gen: None,
+            current_gen_num: None,
+            pkmn_filter: String::new(),
+            solo_selector: OptionMenu::new(vec![consts::NO_POKEMON.to_string()], None),
+            min_battles_filter: String::new(),
+            min_battles_cache: vec![consts::EMPTY_ROUTE_NAME.to_string()],
+            min_battles_selector: OptionMenu::new(vec![consts::EMPTY_ROUTE_NAME.to_string()], None),
+            dvs: CustomDvsFrame::new(),
+            route_cache_per_game: HashMap::new(),
+            pkmn_list_cache: HashMap::new(),
+            pending_game_load: false,
+        }
+    }
+
+    /// `_populate_game_table`
+    pub fn populate_game_table(&mut self, registry: &Registry) {
+        let all = registry.get_gen_names(true, true);
+        // the page's own order (Red before Yellow), unlike const.VERSION_LIST
+        let official: Vec<&str> = vec![
+            consts::RED_VERSION,
+            consts::BLUE_VERSION,
+            consts::YELLOW_VERSION,
+            consts::GOLD_VERSION,
+            consts::SILVER_VERSION,
+            consts::CRYSTAL_VERSION,
+            consts::RUBY_VERSION,
+            consts::SAPPHIRE_VERSION,
+            consts::EMERALD_VERSION,
+            consts::FIRE_RED_VERSION,
+            consts::LEAF_GREEN_VERSION,
+            consts::DIAMOND_VERSION,
+            consts::PEARL_VERSION,
+            consts::PLATINUM_VERSION,
+            consts::HEART_GOLD_VERSION,
+            consts::SOUL_SILVER_VERSION,
+            consts::BLACK_VERSION,
+            consts::WHITE_VERSION,
+            consts::BLACK_2_VERSION,
+            consts::WHITE_2_VERSION,
+        ];
+        let mut sorted: Vec<String> = official.iter().filter(|g| all.contains(&g.to_string())).map(|s| s.to_string()).collect();
+        let mut custom: Vec<String> = all.iter().filter(|g| !official.contains(&g.as_str())).cloned().collect();
+        custom.sort();
+        sorted.extend(custom);
+        self.games = sorted
+            .into_iter()
+            .map(|name| match game_info(&name) {
+                Some((g, p, r)) => GameRow { name, gen: g.into(), platform: p.into(), recorder: r.into() },
+                None => {
+                    let (gen, platform, recorder) = match registry.get_version(&name) {
+                        Ok(obj) => {
+                            let g = format!("Generation {}", obj.get_generation());
+                            let rec = obj.base_version_name().and_then(game_info).map(|(_, _, r)| r).unwrap_or("Unknown");
+                            (g, "Custom".to_string(), rec.to_string())
+                        }
+                        Err(_) => ("Unknown".to_string(), "Unknown".to_string(), "Unknown".to_string()),
+                    };
+                    GameRow { name, gen, platform, recorder }
+                }
+            })
+            .collect();
+    }
+
+    /// `refresh_game_list`
+    pub fn refresh_game_list(&mut self, registry: &Registry, paths: &Paths) {
+        if let Err(e) = registry.reload_all_custom_gens() {
+            log::warn!("Could not reload some custom gens: {}", e);
+        }
+        let current = self.selected_game.clone();
+        self.populate_game_table(registry);
+        match current {
+            Some(c) if self.games.iter().any(|g| g.name == c) => {}
+            _ => {
+                if let Some(first) = self.games.first().map(|g| g.name.clone()) {
+                    self.select_game(&first, registry, paths);
+                }
+            }
+        }
+    }
+
+    /// `reset_form`
+    pub fn reset_form(&mut self, registry: &Registry, paths: &Paths) {
+        self.pkmn_filter.clear();
+        self.min_battles_filter.clear();
+        self.populate_game_table(registry);
+        self.selected_game = None;
+        self.selected_gen = None;
+        self.current_gen_num = None;
+        self.pkmn_list_cache.clear();
+        if let Some(first) = self.games.first().map(|g| g.name.clone()) {
+            self.select_game(&first, registry, paths);
+        } else {
+            self.solo_selector.new_values(vec![consts::NO_POKEMON.to_string()], None);
+            self.min_battles_selector.new_values(vec![consts::EMPTY_ROUTE_NAME.to_string()], None);
+        }
+    }
+
+    /// `_on_game_selection_changed` + `_pkmn_version_callback`
+    fn select_game(&mut self, new_game: &str, registry: &Registry, paths: &Paths) -> Option<String> {
+        if self.selected_game.as_deref() == Some(new_game) {
+            return None;
+        }
+        self.selected_game = Some(new_game.to_string());
+        let gen = match registry.get_version(new_game) {
+            Ok(g) => Some(g),
+            Err(_) => {
+                let _ = registry.reload_all_custom_gens();
+                registry.get_version(new_game).ok()
+            }
+        };
+        let Some(gen) = gen else {
+            self.selected_gen = None;
+            return Some(format!("Could not load game version '{}'. The base generation may not be available yet.", new_game));
+        };
+        let new_gen_num = gen.get_generation();
+        let gen_changed = self.current_gen_num != Some(new_gen_num);
+        self.current_gen_num = Some(new_gen_num);
+        self.selected_gen = Some(gen.clone());
+        self.update_pokemon_list();
+        // routes for this game
+        let game = new_game.to_string();
+        if !self.route_cache_per_game.contains_key(&game) {
+            let mut all_routes = vec![consts::EMPTY_ROUTE_NAME.to_string()];
+            for preset in &gen.min_battles_db().data {
+                all_routes.push(format!("{}{}", consts::PRESET_ROUTE_PREFIX, preset));
+            }
+            for name in io_utils::get_existing_route_names(paths, "", false) {
+                let p = io_utils::get_existing_route_path(paths, &name);
+                if let Ok(bytes) = std::fs::read(&p) {
+                    if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                        if v.get(consts::PKMN_VERSION_KEY).and_then(|x| x.as_str()) == Some(game.as_str()) {
+                            all_routes.push(name);
+                        }
+                    }
+                }
+            }
+            self.route_cache_per_game.insert(game.clone(), all_routes);
+        }
+        self.min_battles_cache = self.route_cache_per_game[&game].clone();
+        self.base_route_filter_callback();
+        if gen_changed {
+            let selected = self.solo_selector.get().to_string();
+            let mon = if !selected.is_empty() && selected != consts::NO_POKEMON { gen.pkmn_db().get_pkmn(&selected).cloned() } else { None };
+            self.dvs.config_for_target_game_and_mon(&gen, mon.as_deref(), None, None, None);
+        }
+        None
+    }
+
+    fn update_pokemon_list(&mut self) {
+        let (Some(game), Some(gen)) = (self.selected_game.clone(), self.selected_gen.clone()) else { return };
+        let filter = self.pkmn_filter.trim().to_string();
+        let key = (game, filter.clone());
+        let list = match self.pkmn_list_cache.get(&key) {
+            Some(l) => l.clone(),
+            None => {
+                let l = if filter.is_empty() { gen.pkmn_db().get_all_names(None) } else { gen.pkmn_db().get_filtered_names(Some(&filter), None) };
+                self.pkmn_list_cache.insert(key, l.clone());
+                l
+            }
+        };
+        self.solo_selector.new_values(list, None);
+    }
+
+    /// `_pkmn_selector_callback`
+    fn pkmn_selector_callback(&mut self) {
+        let Some(gen) = self.selected_gen.clone() else { return };
+        let selected = self.solo_selector.get().to_string();
+        let mon = if !selected.is_empty() && selected != consts::NO_POKEMON { gen.pkmn_db().get_pkmn(&selected).cloned() } else { None };
+        self.dvs.config_for_target_game_and_mon(&gen, mon.as_deref(), None, None, None);
+    }
+
+    fn base_route_filter_callback(&mut self) {
+        let f = self.min_battles_filter.trim().to_lowercase();
+        let mut vals: Vec<String> = self.min_battles_cache.iter().filter(|x| x.to_lowercase().contains(&f)).cloned().collect();
+        if vals.is_empty() {
+            vals = vec![consts::EMPTY_ROUTE_NAME.to_string()];
+        }
+        self.min_battles_selector.new_values(vals, None);
+    }
+
+    /// `create()`
+    fn create_request(&self, paths: &Paths) -> Option<CreateRequest> {
+        let game = self.selected_game.clone()?;
+        let gen = self.selected_gen.clone()?;
+        let selected = self.min_battles_selector.get().to_string();
+        let base = if selected == consts::EMPTY_ROUTE_NAME {
+            None
+        } else if let Some(rest) = selected.strip_prefix(consts::PRESET_ROUTE_PREFIX) {
+            Some(gen.min_battles_db().get_dir().join(format!("{}.json", rest)))
+        } else {
+            Some(io_utils::get_existing_route_path(paths, &selected))
+        };
+        let (dvs, ability_idx, nature) = self.dvs.get_dvs()?;
+        Some(CreateRequest { solo_mon: self.solo_selector.get().to_string(), base_route_path: base, version: game, dvs, ability_idx, nature })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, registry: &Registry, paths: &Paths, assets: &mut Assets, actions: &mut NewRouteActions) {
+        if self.games.is_empty() {
+            self.populate_game_table(registry);
+            if let Some(first) = self.games.first().map(|g| g.name.clone()) {
+                if let Some(e) = self.select_game(&first, registry, paths) {
+                    actions.error = Some(e);
+                }
+            }
+        }
+        let _ = self.pending_game_load;
+        let (enter, escape) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape)));
+        if escape {
+            actions.cancel = true;
+        }
+        let lbl_font = theme.font(12.0);
+        let entry_font = theme.font(11.0);
+        ui.vertical_centered(|ui| {
+            ui.add_space(30.0);
+            ui.label(egui::RichText::new("Create New Route").font(theme.font_bold(24.0)).color(theme.text));
+            ui.add_space(10.0);
+        });
+        egui::Frame::new().inner_margin(egui::Margin { left: 100, right: 100, top: 0, bottom: 0 }).show(ui, |ui| {
+            ui.spacing_mut().item_spacing = Vec2::new(10.0, 5.0);
+            let label_w = 180.0;
+            // ---- game table ----
+            let page_w = ui.available_width();
+            ui.horizontal_top(|ui| {
+                ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                    ui.label(egui::RichText::new("Pokemon Version:").font(lbl_font.clone()).color(theme.text));
+                });
+                let table_h = (ui.available_height() * 0.45).max(100.0);
+                let total_w = (page_w - label_w - 10.0).max(400.0);
+                let widths = [84.0, 120.0, 120.0, 100.0, (total_w - 84.0 - 120.0 - 120.0 - 100.0).max(80.0)];
+                let headers = ["Box Art", "Game", "Generation", "Platform", "Recorder"];
+                egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border)).show(ui, |ui| {
+                    ui.set_width(total_w);
+                    ui.spacing_mut().item_spacing = Vec2::ZERO;
+                    ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing = Vec2::ZERO;
+                    let (hrect, _) = ui.allocate_exact_size(Vec2::new(total_w, 22.0), Sense::hover());
+                    let mut x = hrect.min.x;
+                    for (i, h) in headers.iter().enumerate() {
+                        let r = Rect::from_min_size(Pos2::new(x, hrect.min.y), Vec2::new(widths[i], 22.0));
+                        ui.painter().rect(r, CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
+                        ui.painter().text(Pos2::new(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *h, theme.body_bold(), theme.text);
+                        x += widths[i];
+                    }
+                    let mut clicked: Option<String> = None;
+                    egui::ScrollArea::vertical().id_salt("game_table").max_height(table_h).auto_shrink([false, false]).show(ui, |ui| {
+                        for (row_idx, g) in self.games.clone().iter().enumerate() {
+                            let (r, resp) = ui.allocate_exact_size(Vec2::new(total_w, 76.0), Sense::click());
+                            let selected = self.selected_game.as_deref() == Some(g.name.as_str());
+                            let fill = if selected {
+                                theme.accent
+                            } else if resp.hovered() {
+                                theme.hover_bg
+                            } else if row_idx % 2 == 1 {
+                                theme.bg_lighter
+                            } else {
+                                theme.bg_input
+                            };
+                            ui.painter().rect_filled(r, CornerRadius::ZERO, fill);
+                            if let Some(tex) = assets.box_art(ui.ctx(), &g.name) {
+                                let [w, h] = tex.size();
+                                let scale = (72.0 / w as f32).min(72.0 / h as f32);
+                                let sz = Vec2::new(w as f32 * scale, h as f32 * scale);
+                                let img = Rect::from_center_size(Pos2::new(r.min.x + 42.0, r.center().y), sz);
+                                ui.painter().image(tex.id(), img, Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)), Color32::WHITE);
+                            }
+                            let color = if selected { Color32::WHITE } else { theme.text };
+                            let cells = [g.name.as_str(), g.gen.as_str(), g.platform.as_str(), g.recorder.as_str()];
+                            let mut x = r.min.x + widths[0];
+                            for (i, c) in cells.iter().enumerate() {
+                                ui.painter().text(Pos2::new(x + 4.0, r.center().y), Align2::LEFT_CENTER, *c, theme.body(), color);
+                                x += widths[i + 1];
+                            }
+                            if resp.clicked() {
+                                clicked = Some(g.name.clone());
+                            }
+                        }
+                    });
+                    if let Some(name) = clicked {
+                        if let Some(e) = self.select_game(&name, registry, paths) {
+                            actions.error = Some(e);
+                        }
+                    }
+                    });
+                });
+            });
+            // ---- solo filter / selector ----
+            ui.horizontal(|ui| {
+                ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.label(egui::RichText::new("Solo Pokemon Filter:").font(lbl_font.clone()).color(theme.text));
+                });
+                let r = Entry::new(theme, &mut self.pkmn_filter).width((page_w - label_w - 10.0).max(300.0)).font(entry_font.clone()).id(ui.id().with("pkmn_filter")).show(ui);
+                if r.changed {
+                    self.update_pokemon_list();
+                    self.pkmn_selector_callback();
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.label(egui::RichText::new("Solo Pokemon:").font(lbl_font.clone()).color(theme.text));
+                });
+                if self.solo_selector.ui(ui, theme, ui.id().with("solo"), Some((page_w - label_w - 10.0).max(250.0)), true) {
+                    self.pkmn_selector_callback();
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.label(egui::RichText::new("Base Route Filter:").font(lbl_font.clone()).color(theme.text));
+                });
+                let r = Entry::new(theme, &mut self.min_battles_filter).width((page_w - label_w - 10.0).max(300.0)).font(entry_font.clone()).id(ui.id().with("base_filter")).show(ui);
+                if r.changed {
+                    self.base_route_filter_callback();
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.label(egui::RichText::new("Base Route:").font(lbl_font.clone()).color(theme.text));
+                });
+                self.min_battles_selector.ui(ui, theme, ui.id().with("base_route"), Some((page_w - label_w - 10.0).max(250.0)), true);
+            });
+            ui.horizontal_top(|ui| {
+                let est = if self.selected_gen.as_ref().map(|g| g.get_generation() > 2).unwrap_or(false) { 760.0 } else { 300.0 };
+                ui.add_space(((page_w - est) / 2.0).max(0.0));
+                self.dvs.ui(ui, theme);
+            });
+            ui.vertical_centered(|ui| {
+                ui.label(egui::RichText::new("WARNING: Any unsaved changes in your current route\nwill be lost when creating a new route!").font(theme.font(10.0)).color(Color32::RED));
+            });
+            ui.horizontal(|ui| {
+                if StyledButton::new(theme, "Create Route").fixed_width(180.0).show(ui).clicked() || enter {
+                    if let Some(req) = self.create_request(paths) {
+                        actions.create = Some(req);
+                    }
+                }
+                if StyledButton::new(theme, "Cancel").fixed_width(180.0).show(ui).clicked() {
+                    actions.cancel = true;
+                }
+            });
+        });
+    }
+}

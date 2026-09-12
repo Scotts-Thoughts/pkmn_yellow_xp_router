@@ -1,0 +1,19 @@
+[package]
+name = "xpr-golden"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "xpr-golden"
+path = "src/main.rs"
+
+[dependencies]
+xpr-core = { path = "../xpr-core" }
+xpr-data = { path = "../xpr-data" }
+xpr-engine = { path = "../xpr-engine" }
+xpr-calc = { path = "../xpr-calc" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+log = { workspace = true }
+rayon = { workspace = true }

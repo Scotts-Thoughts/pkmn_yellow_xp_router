@@ -1,0 +1,14 @@
+[package]
+name = "xpr-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+once_cell = { workspace = true }
+chrono = { workspace = true }
+encoding_rs = { workspace = true }
