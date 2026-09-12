@@ -946,6 +946,13 @@ impl Gen2Machine {
         if self.battle.is_trainer_battle {
             let total = store_i64(store, &self.keys.battle_trainer_total_pokemon).max(0) as usize;
             self.battle.exp_split = (0..total).map(|_| HashSet::from([0i64])).collect();
+            // the lead always comes from party slot 0 (seeded like the gen 3 recorder
+            // does): the game writes -1 (255) to wCurOTMon while setting the battle up
+            // and 0 when the lead is sent out, and whether either write is seen as a
+            // change depends on which GameHook poll it lands in
+            if !self.battle.enemy_mon_order.contains(&0) {
+                self.battle.enemy_mon_order.insert(0, 0);
+            }
             self.battle.trainer_name = self.conv.trainer_name_convert(store.str_of(&self.keys.battle_trainer_class).as_deref(), &store.value(&self.keys.battle_trainer_number));
             let mut td = TrainerEventDefinition::new(&self.battle.trainer_name);
             if self.has_return() {
@@ -1048,9 +1055,11 @@ impl Gen2Machine {
                         if !final_exp_split.iter().any(|x| *x > 1) {
                             final_exp_split = Vec::new();
                         }
+                        // 1-based, like gens 3/4: mon_order[definition idx] = the position
+                        // the mon came out at (see `EventDefinition::get_pokemon_list`)
                         let mut sorted = self.battle.enemy_mon_order.clone();
                         sorted.sort();
-                        let final_mon_order: Vec<i64> = sorted.iter().map(|x| self.battle.enemy_mon_order.iter().position(|y| y == x).unwrap_or(0) as i64).collect();
+                        let final_mon_order: Vec<i64> = sorted.iter().map(|x| self.battle.enemy_mon_order.iter().position(|y| y == x).unwrap_or(0) as i64 + 1).collect();
                         let mut td = TrainerEventDefinition::new(&self.battle.trainer_name);
                         td.exp_split = final_exp_split;
                         td.mon_order = final_mon_order;
@@ -1360,7 +1369,8 @@ impl Gen2Machine {
             if v >= 0 && (v as usize) < self.battle.exp_split.len() {
                 self.battle.exp_split[v as usize] = HashSet::from([store_i64(store, &self.keys.battle_player_mon_party_pos)]);
             }
-            if !self.battle.enemy_mon_order.contains(&v) {
+            // only party slots count: the game parks -1 (255) here between mons
+            if (0..6).contains(&v) && !self.battle.enemy_mon_order.contains(&v) {
                 self.battle.enemy_mon_order.push(v);
             }
         } else if new.path == self.keys.battle_mode {

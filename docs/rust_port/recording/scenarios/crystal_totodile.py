@@ -123,16 +123,23 @@ class Game:
         s.set("battle.battleStart", 0)
         s.tick(2)
 
-    def start_trainer(self, trainer_class, trainer_id, team, my_hp=30):
+    def start_trainer(self, trainer_class, trainer_id, team, my_hp=30, sentinel=True):
         s = self.s
         s.note(f"trainer {trainer_class}:{trainer_id} {team}")
         s.set("battle.trainer.class", trainer_class, "battle.trainer.id", trainer_id, "battle.trainer.totalPokemon", len(team))
         s.set("battle.battleStart", 1)
-        s.set("battle.mode", "Trainer")
+        # InitEnemyTrainer writes -1 to wCurOTMon (the enemy party position) just before
+        # it sets the battle mode; the lead's 0 arrives when it is sent out. Whether the
+        # -1 is seen as a change depends on which GameHook poll it lands in (sentinel=False:
+        # it isn't, and the position was already 0 from the previous fight).
+        if sentinel:
+            s.set("battle.mode", "Trainer", "battle.enemyPokemon.partyPos", 255)
+        else:
+            s.set("battle.mode", "Trainer")
         s.tick(1)
+        s.set("battle.textBuffer", f"{trainer_class} wants to battle!")
         s.set("battle.enemyPokemon.species", team[0][0], "battle.enemyPokemon.level", team[0][1], "battle.enemyPokemon.hp", team[0][2], "battle.enemyPokemon.partyPos", 0)
         s.set("battle.yourPokemon.partyPos", 0, "battle.yourPokemon.species", "Totodile", "battle.yourPokemon.hp", my_hp)
-        s.set("battle.textBuffer", f"{trainer_class} wants to battle!")
         s.set("battle.battleStart", 0)
         s.tick(2)
 
@@ -160,8 +167,8 @@ class Game:
         if prize:
             self.set_money(self.money + prize)
         s.set("battle.mode", None)
-        # back in the overworld the battle slots are cleared (position 7 = empty)
-        s.set("battle.enemyPokemon.species", None, "battle.enemyPokemon.level", 0, "battle.enemyPokemon.partyPos", 7, "battle.textBuffer", "")
+        # the enemy party position keeps its last value after the battle
+        s.set("battle.enemyPokemon.species", None, "battle.enemyPokemon.level", 0, "battle.textBuffer", "")
         s.tick(2)
 
 
@@ -209,17 +216,17 @@ def build() -> Scenario:
     s.set("audio.currentSound", 0)
     s.tick(2)
 
-    # NOTE: the gen 2 recorder writes a 0-based mon_order (gens 3/4 add +1), so a
-    # fight whose only enemy position change is to slot 0 records mon_order=[0],
-    # which the route engine cannot resolve (Python's engine raises and stops
-    # recalculating the route from there). Multi-mon trainers only, see
-    # docs/rust_port/KNOWN_ISSUES.md.
-    s.note("Bug Catcher Don (two Caterpie), won, with the level 7 Rage learned")
-    g.start_trainer("BUG CATCHER", 1, [("Caterpie", 3, 14), ("Caterpie", 3, 14)])
+    s.note("rival fight (Chikorita), won, with the level 7 Rage learned")
+    g.start_trainer("RIVAL1", 1, [("Chikorita", 5, 20)])
+    g.ko(40)
+    g.level_up(7, learn_move="RAGE", into_slot=3)
+    g.end_battle(prize=300)
+
+    s.note("Bug Catcher Don: the game's -1 write lands in the same poll as the lead's 0 (no change seen)")
+    g.start_trainer("BUG CATCHER", 1, [("Caterpie", 3, 14), ("Caterpie", 3, 14)], sentinel=False)
     g.ko(20)
     g.next_enemy(1, "Caterpie", 3, 14)
     g.ko(20)
-    g.level_up(7, learn_move="RAGE", into_slot=3)
     g.end_battle(prize=48)
 
     g.go_to(26, 3)  # route 30

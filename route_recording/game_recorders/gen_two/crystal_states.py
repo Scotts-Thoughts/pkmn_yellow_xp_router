@@ -170,6 +170,13 @@ class BattleState(WatchForResetState):
 
         if self.is_trainer_battle:
             self._exp_split = [set([0]) for _ in range(self.machine._gamehook_client.get(gh_gen_two_const.KEY_BATTLE_TRAINER_TOTAL_POKEMON).value)]
+            # The lead always comes from party slot 0 (like the gen 3 recorder seeds
+            # its order). It cannot be inferred from a partyPos change: the game
+            # writes -1 (255) to wCurOTMon while setting the battle up and 0 when the
+            # lead is sent out, and whether either write is seen as a change depends
+            # on which GameHook poll it lands in.
+            if 0 not in self._enemy_mon_order:
+                self._enemy_mon_order.insert(0, 0)
             self._trainer_name = self.machine.gh_converter.trainer_name_convert(
                 self.machine._gamehook_client.get(gh_gen_two_const.KEY_BATTLE_TRAINER_CLASS).value,
                 self.machine._gamehook_client.get(gh_gen_two_const.KEY_BATTLE_TRAINER_NUMBER).value,
@@ -196,7 +203,9 @@ class BattleState(WatchForResetState):
                 if not any([True for x in final_exp_split if x > 1]):
                     final_exp_split = None
                 
-                final_mon_order = [self._enemy_mon_order.index(x) for x in sorted(self._enemy_mon_order)]
+                # 1-based, like gens 3/4: mon_order[definition idx] = the position the mon
+                # came out at (see EventDefinition.get_pokemon_list)
+                final_mon_order = [self._enemy_mon_order.index(x) + 1 for x in sorted(self._enemy_mon_order)]
 
                 return_custom_move_data = None
                 if gen_two_const.RETURN_MOVE_NAME in self.machine._cached_moves:
@@ -328,7 +337,8 @@ class BattleState(WatchForResetState):
                 self._exp_split[new_prop.value] = set([self.machine._gamehook_client.get(gh_gen_two_const.KEY_BATTLE_PLAYER_MON_PARTY_POS).value])
             # NOTE: this logic won't perfectly reflect things if the player uses roar/whirlwind
             # or if the enemy trainer switches pokemon (and doesn't only send out new mons on previous death)
-            if new_prop.value not in self._enemy_mon_order:
+            # Only party slots count: the game parks -1 (255) here between mons.
+            if new_prop.value >= 0 and new_prop.value < 6 and new_prop.value not in self._enemy_mon_order:
                 self._enemy_mon_order.append(new_prop.value)
         elif new_prop.path == gh_gen_two_const.KEY_BATTLE_MODE:
             if new_prop.value is None:
