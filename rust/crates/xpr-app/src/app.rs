@@ -1833,11 +1833,7 @@ fn smoke_http_get(url: &str) -> Option<String> {
     };
     let mut stream = std::net::TcpStream::connect(host_port).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
-    write!(stream, "GET {} HTTP/1.1
-Host: {}
-Connection: close
-
-", path, host_port).ok()?;
+    write!(stream, "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n", path, host_port).ok()?;
     let mut body = String::new();
     stream.read_to_string(&mut body).ok()?;
     Some(body)

@@ -1218,19 +1218,16 @@ impl Gen1Machine {
             }
         } else if new.path == self.keys.audio_channel_5 {
             if new.eq_i64(158) && !self.overworld.waiting_for_heal_completion {
-                let loc = store.str_of(&self.keys.overworld_map).unwrap_or_else(|| "None".into());
-                self.queue_new_event(EventDefinition::with_heal(&loc));
+                self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
                 self.overworld.waiting_for_heal_completion = true;
                 self.overworld.heal_delay = 2;
             } else if new.eq_i64(182) {
-                let loc = store.str_of(&self.keys.overworld_map).unwrap_or_else(|| "None".into());
-                self.queue_new_event(EventDefinition::with_save(&loc));
+                self.queue_new_event(EventDefinition::with_save_value(&store.value(&self.keys.overworld_map)));
             }
         } else if new.path == self.keys.audio_channel_4 {
             // channel 4 for R/B pokecenters, channel 5 for Y
             if new.eq_i64(158) && !self.overworld.waiting_for_heal_completion {
-                let loc = store.str_of(&self.keys.overworld_map).unwrap_or_else(|| "None".into());
-                self.queue_new_event(EventDefinition::with_heal(&loc));
+                self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
                 self.overworld.waiting_for_heal_completion = true;
                 self.overworld.heal_delay = 2;
             }
@@ -1406,9 +1403,12 @@ impl GameRecorder for Gen1Machine {
         }
     }
 
+    fn active_flag(&self) -> ActiveFlag {
+        self.active.clone()
+    }
+
     fn shutdown(&mut self) {
         log::info!("Shutting down Yellow recording FSM");
-        self.active.store(false, Ordering::SeqCst);
-        crate::shuckie::supershuckie().stop();
+        crate::controller::deactivate(&self.active);
     }
 }

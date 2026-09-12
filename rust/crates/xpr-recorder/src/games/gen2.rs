@@ -1448,12 +1448,11 @@ impl Gen2Machine {
                 return GameState::Vitamin;
             }
         } else if new.path == self.keys.audio_current_sound {
+            // the location is the map *group* value as the mapper reports it (an int)
             if new.eq_i64(PKMN_CENTER_HEAL_SOUND_ID) {
-                let loc = py_str(&store.value(&self.keys.overworld_map));
-                self.queue_new_event(EventDefinition::with_heal(&loc));
+                self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
             } else if new.eq_i64(SAVE_HEAL_SOUND_ID) {
-                let loc = py_str(&store.value(&self.keys.overworld_map));
-                self.queue_new_event(EventDefinition::with_save(&loc));
+                self.queue_new_event(EventDefinition::with_save_value(&store.value(&self.keys.overworld_map)));
             }
         } else if new.path == self.keys.gametime_seconds {
             if self.overworld.waiting_for_registration {
@@ -1754,9 +1753,12 @@ impl GameRecorder for Gen2Machine {
         }
     }
 
+    fn active_flag(&self) -> ActiveFlag {
+        self.active.clone()
+    }
+
     fn shutdown(&mut self) {
         log::info!("Shutting down Crystal recording FSM");
-        self.active.store(false, Ordering::SeqCst);
-        crate::shuckie::supershuckie().stop();
+        crate::controller::deactivate(&self.active);
     }
 }

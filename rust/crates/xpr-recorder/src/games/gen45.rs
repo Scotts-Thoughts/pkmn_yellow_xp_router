@@ -2329,8 +2329,7 @@ impl Gen45Machine {
             }
             if self.overworld.save_detected {
                 if self.overworld.save_delay <= 0 {
-                    let loc = py_str(&store.get_value(Some(&k.overworld_map)));
-                    self.queue_new_event(EventDefinition::with_save(&loc));
+                    self.queue_new_event(EventDefinition::with_save_value(&store.get_value(Some(&k.overworld_map))));
                     self.overworld.save_detected = false;
                     self.overworld.save_delay = SAVE_DELAY;
                 } else {
@@ -2339,8 +2338,7 @@ impl Gen45Machine {
             }
             if self.overworld.heal_detected {
                 if self.overworld.heal_delay <= 0 {
-                    let loc = py_str(&store.get_value(Some(&k.overworld_map)));
-                    self.queue_new_event(EventDefinition::with_heal(&loc));
+                    self.queue_new_event(EventDefinition::with_heal_value(&store.get_value(Some(&k.overworld_map))));
                     self.overworld.heal_detected = false;
                     self.overworld.heal_delay = HEAL_DELAY;
                 } else {
@@ -2436,6 +2434,7 @@ fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv: &Gen45Con
             return;
         } else if cur_event.notes == roar_flag() {
             log::info!("[BLACKOUT DEBUG] Processing ROAR_FLAG event for trainer: {}", trainer_name);
+            log::info!("Updating full trainer event: {}", event_str(gen, &cur_event));
             log::info!("Updating split exp for trainer {} to {:?}", trainer_name, td.exp_split);
             let name = trainer_name.clone();
             let mut test_obj = ctx.controller.host().call(|h| h.get_previous_event(None));
@@ -2454,6 +2453,7 @@ fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv: &Gen45Con
                 None => log::error!("[BLACKOUT DEBUG] ROAR_FLAG: Failed to find trainer fight to update for exp split behavior"),
                 Some(obj) => {
                     cur_event.notes = String::new();
+                    log::info!("held item: {}", obj.final_held_item.as_deref().unwrap_or("None"));
                     let amulet = obj.final_held_item.as_deref() == Some(consts::AMULET_COIN_ITEM_NAME);
                     let mut expected_money = trainer.money;
                     if amulet {
@@ -2644,9 +2644,12 @@ impl GameRecorder for Gen45Machine {
         }
     }
 
+    fn active_flag(&self) -> ActiveFlag {
+        self.active.clone()
+    }
+
     fn shutdown(&mut self) {
         log::info!("Shutting down {} recording FSM", if self.flavor.is_gen5() { "Black/White" } else { "Platinum" });
-        self.active.store(false, Ordering::SeqCst);
-        crate::shuckie::supershuckie().stop();
+        crate::controller::deactivate(&self.active);
     }
 }

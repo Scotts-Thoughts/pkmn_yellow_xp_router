@@ -94,6 +94,11 @@ impl EventQueue {
         guard.pop_front()
     }
 
+    /// `_events_to_generate.pop(0)` when the list is not empty.
+    pub fn try_pop(&self) -> Option<EventDefinition> {
+        self.items.lock().unwrap().pop_front()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.items.lock().unwrap().is_empty()
     }
@@ -114,6 +119,8 @@ pub struct RecorderController {
     status: Mutex<RecorderStatus>,
     folders: Mutex<FolderMeta>,
     client: Mutex<Option<Arc<GameHookClient>>>,
+    /// the running machine's `_active` flag (see `deactivate`)
+    machine_active: Mutex<Option<ActiveFlag>>,
     wake: Arc<dyn Fn() + Send + Sync>,
 }
 
@@ -127,6 +134,7 @@ impl RecorderController {
                 ..Default::default()
             }),
             client: Mutex::new(None),
+            machine_active: Mutex::new(None),
             wake,
         })
     }
@@ -182,15 +190,16 @@ impl RecorderController {
             match start {
                 Some(info) => match crate::games::create_recorder(&info, self.clone()) {
                     Some((expected_names, game)) => {
+                        *self.machine_active.lock().unwrap() = Some(game.active_flag());
                         let session = Session { controller: self.clone(), expected_names, game };
                         let client = GameHookClient::connect(&info.url, Box::new(session));
                         *self.client.lock().unwrap() = Some(client);
                     }
                     None => {
-                        self.host.post(|h| {
-                            h.trigger_exception("No recorder has been created yet for the current version");
-                            h.set_record_mode(false);
-                        });
+                        // The Qt `RecorderStatus` only shows the message in the status bar
+                        // and leaves record mode on (the tkinter-era controller raised and
+                        // turned recording off; that handler is not registered in the Qt app).
+                        log::warn!("No recorder has been created yet for the current version");
                     }
                 },
                 None => {
@@ -204,6 +213,11 @@ impl RecorderController {
             let client = self.client.lock().unwrap().take();
             if let Some(c) = client {
                 c.disconnect();
+            }
+            // `disconnect()` → `machine.shutdown()` in Python: the machine stops now,
+            // not when the connection thread gets around to it
+            if let Some(flag) = self.machine_active.lock().unwrap().take() {
+                deactivate(&flag);
             }
         }
     }
@@ -502,9 +516,25 @@ pub trait GameRecorder: Send {
     /// invalid (unmapped) constants.
     fn on_mapper_loaded(&mut self, store: &PropertyStore) -> (Vec<String>, Vec<String>);
     fn is_active(&self) -> bool;
+    /// The machine's `_active` flag, shared with its processing thread (and
+    /// with the controller, which clears it when recording stops).
+    fn active_flag(&self) -> ActiveFlag;
     fn startup(&mut self, store: &PropertyStore);
     fn handle_event(&mut self, store: &PropertyStore, new: &GameHookProperty, prev: &GameHookProperty);
     fn shutdown(&mut self);
+}
+
+/// `Machine.shutdown()`: deactivate the machine and stop the Super Shuckie
+/// poller — once. Python does this synchronously from `disconnect()`; here
+/// it can run from the UI thread (recording turned off) and again from the
+/// connection thread when it winds down, and only the first call may stop the
+/// poller, or it would stop the poller of a session started in between.
+pub fn deactivate(flag: &ActiveFlag) -> bool {
+    let was_active = flag.swap(false, Ordering::SeqCst);
+    if was_active {
+        crate::shuckie::supershuckie().stop();
+    }
+    was_active
 }
 
 /// `RecorderGameHookClient`: statuses and mapper validation around a game recorder.

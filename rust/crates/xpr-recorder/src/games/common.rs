@@ -254,13 +254,25 @@ pub struct ProcessCtx {
 
 impl ProcessCtx {
     /// `_process_events`: drain the queue while active (and then until empty).
+    ///
+    /// The loop polls like Python's (`pop(0)` when there is something queued,
+    /// else `time.sleep(0.1)`) instead of waking the instant an event is
+    /// pushed. The latency is part of the recorder's behaviour: the machines
+    /// queue events and *then* update their bookkeeping in the same call
+    /// (e.g. `update_all_cached_info` queues an evolution before it calls
+    /// `entered_new_area`), and the folder an event lands in depends on the
+    /// processing thread not getting to it before that bookkeeping ran.
     pub fn run(&self, mut process_one: impl FnMut(&ProcessCtx, EventDefinition)) {
         loop {
             let active = self.active.load(std::sync::atomic::Ordering::SeqCst);
             if !active && self.queue.is_empty() {
                 break;
             }
-            match self.queue.pop(Duration::from_millis(100)) {
+            let next = self.queue.try_pop();
+            if next.is_none() {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            match next {
                 Some(event) => {
                     let label = event_str(&self.gen, &event);
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| process_one(self, event)));

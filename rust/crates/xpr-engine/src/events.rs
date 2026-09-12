@@ -745,17 +745,37 @@ impl TrainerEventDefinition {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LocationEventDefinition {
     pub location: Option<String>,
+    /// The location exactly as loaded / recorded when it is not a string
+    /// (the gen 2 recorder stores the map group *number*); Python keeps the
+    /// raw value, so it is written back verbatim. `None` for string locations.
+    pub raw: Option<Value>,
 }
 
 impl LocationEventDefinition {
     pub fn new(location: &str) -> Self {
         LocationEventDefinition {
             location: Some(location.to_string()),
+            raw: None,
+        }
+    }
+
+    /// `SaveEventDefinition(location=<any JSON value>)`
+    pub fn from_value(location: &Value) -> Self {
+        match location {
+            Value::String(s) => LocationEventDefinition::new(s),
+            Value::Null => LocationEventDefinition { location: None, raw: None },
+            other => LocationEventDefinition {
+                location: Some(pyjson::python_str_number(other)),
+                raw: Some(other.clone()),
+            },
         }
     }
 
     pub fn serialize(&self) -> Value {
-        Value::Array(vec![opt_str_value(&self.location)])
+        match &self.raw {
+            Some(v) => Value::Array(vec![v.clone()]),
+            None => Value::Array(vec![opt_str_value(&self.location)]),
+        }
     }
 
     pub fn deserialize(raw: Option<&Value>) -> Option<Self> {
@@ -764,8 +784,9 @@ impl LocationEventDefinition {
             return None;
         }
         let Value::Array(items) = raw else { return None };
-        Some(LocationEventDefinition {
-            location: items.first().and_then(s_or_none),
+        Some(match items.first() {
+            Some(v) => LocationEventDefinition::from_value(v),
+            None => LocationEventDefinition { location: None, raw: None },
         })
     }
 
@@ -947,6 +968,22 @@ impl EventDefinition {
     pub fn with_heal(location: &str) -> EventDefinition {
         EventDefinition {
             heal: Some(LocationEventDefinition::new(location)),
+            ..Default::default()
+        }
+    }
+
+    /// `EventDefinition(save=SaveEventDefinition(location=value))` with the raw mapper value.
+    pub fn with_save_value(location: &Value) -> EventDefinition {
+        EventDefinition {
+            save: Some(LocationEventDefinition::from_value(location)),
+            ..Default::default()
+        }
+    }
+
+    /// `EventDefinition(heal=HealEventDefinition(location=value))` with the raw mapper value.
+    pub fn with_heal_value(location: &Value) -> EventDefinition {
+        EventDefinition {
+            heal: Some(LocationEventDefinition::from_value(location)),
             ..Default::default()
         }
     }

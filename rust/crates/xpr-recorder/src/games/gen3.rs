@@ -1597,11 +1597,11 @@ impl Gen3Machine {
                 return GameState::Vitamin;
             }
         } else if new.path == self.keys.sstp_tracking {
-            let loc = py_str(&store.value(&self.keys.overworld_map));
+            let loc = store.value(&self.keys.overworld_map);
             if new.eq_str("SAVE") {
-                self.queue_new_event(EventDefinition::with_save(&loc));
+                self.queue_new_event(EventDefinition::with_save_value(&loc));
             } else if new.eq_str("HEAL") {
-                self.queue_new_event(EventDefinition::with_heal(&loc));
+                self.queue_new_event(EventDefinition::with_heal_value(&loc));
             }
         } else if new.path == self.keys.gametime_seconds {
             if self.overworld.waiting_for_registration {
@@ -1701,7 +1701,7 @@ fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv: &Gen3Conv
                 Some(obj) => {
                     cur_event.notes = String::new();
                     let mut expected_money = trainer.money;
-                    log::info!("held item: {:?}", obj.final_held_item);
+                    log::info!("held item: {}", obj.final_held_item.as_deref().unwrap_or("None"));
                     if obj.final_held_item.as_deref() == Some(consts::AMULET_COIN_ITEM_NAME) {
                         expected_money *= 2;
                     }
@@ -1894,9 +1894,12 @@ impl GameRecorder for Gen3Machine {
         }
     }
 
+    fn active_flag(&self) -> ActiveFlag {
+        self.active.clone()
+    }
+
     fn shutdown(&mut self) {
         log::info!("Shutting down Emerald recording FSM");
-        self.active.store(false, Ordering::SeqCst);
-        crate::shuckie::supershuckie().stop();
+        crate::controller::deactivate(&self.active);
     }
 }

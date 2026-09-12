@@ -189,11 +189,17 @@ Other shortcuts: gym leaders 1–8, Blue 9, Elite Four/Champion Ctrl+1…Ctrl+7 
 
 ## 12. Recorder
 
-Needs GameHook running with a mapper (per gen) and/or Super Shuckie.
+Needs GameHook running with a mapper (per gen) and/or Super Shuckie. Without
+an emulator, `docs/rust_port/recording/run_pair.py --scenario <name>` replays
+a scripted session to both apps and diffs the saved routes (Emerald, Yellow,
+Crystal, Platinum and Black scenarios; all byte-identical as of 2026-09-11) —
+run it after any change to `xpr-recorder`, the route engine's event
+handling, or the route list's folder handling.
 
 - [ ] Record button in the status bar (needs an open route): enables record mode, status text updates (connecting / connected / lost), "↻" reconnect button, automatic reconnect with backoff after killing GameHook.
-- [ ] Gen 1 (Yellow/Red/Blue), Gen 2 (G/S/C), Gen 3 (RS/E/FRLG), Gen 4/5: start a fresh game; the recorder inserts trainer fights, wild fights, items get/use/sell/buy, rare candies, vitamins, level-up moves, TM/HM, evolutions, heals/saves/blackouts, in the same order and folders as the Python recorder on the same session. Compare the saved route files afterwards.
-- [ ] Gen 1 `UninitializedState` start condition (KNOWN_ISSUES B-11): recording starts at the same point as Python on a Yellow capture.
+- [ ] Gen 1 (Yellow/Red/Blue), Gen 2 (G/S/C), Gen 3 (RS/E/FRLG), Gen 4/5: start a fresh game; the recorder inserts trainer fights, wild fights, items get/use/sell/buy, rare candies, vitamins, level-up moves, TM/HM, evolutions, heals/saves/blackouts, in the same order and folders as the Python recorder on the same session. Compare the saved route files afterwards. (Covered without an emulator by the replay harness above.)
+- [x] Recorded events land in an enabled, expanded folder that is scrolled into view, with the new event selected (the folder-defaults bug of 2026-09-11; `xpr-app/tests/recorder_folders.rs`).
+- [x] Gen 1 `UninitializedState` start condition (KNOWN_ISSUES B-11): ported as-is, recording always starts in the overworld like Python.
 - [ ] Missing mapper property → warning in the log, no crash (B-13), for every gen.
 - [ ] Automatically Stop Recording + Final Trainers: recording stops after the configured final trainer.
 - [ ] Recording error fragments appear as notes events with the error message (`RECORDING_ERROR_FRAGMENT`) and mark the row invalid.

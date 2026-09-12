@@ -176,7 +176,12 @@ def flatten(route: dict):
 
 def describe(ev: dict) -> str:
     if "folder" in ev:
-        return f"FOLDER {ev['folder']!r} enabled={ev['enabled']} expanded={ev['expanded']} notes={ev['notes']!r}"
+        return f"FOLDER {ev['folder']!r} enabled={ev['enabled']} notes={ev['notes']!r}"
+    ev = dict(ev)
+    # the Super Shuckie timestamp is wall-clock (when the timer is running); only
+    # its presence is comparable
+    if "Recorded Time" in ev:
+        ev["Recorded Time"] = "<set>" if ev["Recorded Time"] is not None else None
     return json.dumps(ev, sort_keys=True)
 
 
