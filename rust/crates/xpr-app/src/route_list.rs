@@ -215,7 +215,49 @@ impl RouteList {
         self.anchor = ids.last().copied();
     }
 
-    pub fn scroll_to_selected_events(&mut self) {
+    /// `scroll_to_selected_events`: Qt's `scrollTo()` is a no-op for a row
+    /// hidden inside a collapsed parent, so the Qt list expands every
+    /// collapsed ancestor of the (last) selected row first — the `expanded`
+    /// signal then flips the folder's `expanded` flag like a click would.
+    /// Without this a recorded event lands in a folder the user has collapsed
+    /// and never comes into view.
+    pub fn scroll_to_selected_events(&mut self, ctrl: &mut MainController) {
+        if let Some(target) = self.selection.last().copied() {
+            let mut ancestors: Vec<NodeId> = Vec::new();
+            let mut cur = ctrl.router.parent_of(target);
+            while let Some(a) = cur {
+                if a == ctrl.router.root_id {
+                    break;
+                }
+                ancestors.push(a);
+                cur = ctrl.router.parent_of(a);
+            }
+            for anc in ancestors.into_iter().rev() {
+                match ctrl.router.obj_kind(anc) {
+                    Some(ObjKind::Folder) => {
+                        let path = self.path_of_row(ctrl, anc);
+                        let already = match self.persistent_expand_state.get(&path) {
+                            Some(e) => *e,
+                            None => ctrl.router.folder(anc).map(|f| f.is_expanded()).unwrap_or(false),
+                        };
+                        if !already {
+                            if let Some(f) = ctrl.router.node_mut(anc).and_then(|n| n.as_folder_mut()) {
+                                f.expanded = Some(true);
+                            }
+                            self.persistent_expand_state.insert(path, true);
+                            self.dirty = true;
+                        }
+                    }
+                    // an item row lives under its (expandable) group row
+                    Some(ObjKind::Group) => {
+                        if self.group_expanded.insert(anc) {
+                            self.dirty = true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
         self.scroll_target = Some(ScrollTarget::Selected);
     }
 

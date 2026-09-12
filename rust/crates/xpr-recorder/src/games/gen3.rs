@@ -1403,7 +1403,8 @@ impl Gen3Machine {
             }
         } else if new.path == self.keys.battle_player_mon_hp {
             let player_mon_pos = store_i64(store, &self.keys.battle_player_mon_party_pos);
-            let hp = new.as_i64().unwrap_or(0);
+            // a non-numeric HP makes Python's `<= 0` raise (and the change is dropped)
+            let Some(hp) = new.as_i64() else { return state };
             if player_mon_pos == 0 && hp <= 0 {
                 if self.battle.battle_started {
                     self.battle.loss_detected = true;

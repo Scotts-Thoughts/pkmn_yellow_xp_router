@@ -228,7 +228,7 @@ impl GameHookClient {
             stop: client.stop.clone(),
             reconnect_now: client.reconnect_now.clone(),
             session,
-            watched: HashSet::new(),
+            watched: HashMap::new(),
             store: PropertyStore::default(),
             ignore_properties: HashSet::new(),
             ignored_updates: HashMap::new(),
@@ -253,7 +253,10 @@ impl GameHookClient {
         s.game_name = None;
     }
 
-    /// The "reconnect" button: retry immediately instead of waiting out the backoff.
+    /// The "reconnect" button (`connect()` again in Python): while the socket
+    /// is down, retry immediately instead of waiting out the backoff; while it
+    /// is up, reload the mapper (`_establish_connection`), which is how a
+    /// mapper loaded in GameHook *after* recording started gets picked up.
     pub fn reconnect(&self) {
         self.reconnect_now.store(true, Ordering::SeqCst);
     }
@@ -330,7 +333,10 @@ struct Worker {
     stop: Arc<AtomicBool>,
     reconnect_now: Arc<AtomicBool>,
     session: Box<dyn SessionEvents>,
-    watched: HashSet<String>,
+    /// path -> how many times it was registered. Python appends one callback
+    /// per `.change()` call, so a path listed twice in `ALL_KEYS_TO_REGISTER`
+    /// (every gen has `player.team.0.species` twice) delivers each change twice.
+    watched: HashMap<String, usize>,
     store: PropertyStore,
     ignore_properties: HashSet<String>,
     ignored_updates: HashMap<String, Value>,
@@ -478,8 +484,9 @@ impl Worker {
             log::info!("[GameHook Client] Mapper loaded successfully!");
             // clear_callbacks_on_load=True: the session re-registers what it wants
             self.watched.clear();
-            let watched = self.session.on_mapper_loaded(&self.store);
-            self.watched = watched.into_iter().collect();
+            for key in self.session.on_mapper_loaded(&self.store) {
+                *self.watched.entry(key).or_insert(0) += 1;
+            }
         }
         Ok(())
     }
@@ -529,6 +536,11 @@ impl Worker {
                 if socket.send(Message::Text(format!("{{\"type\":6}}{}", RECORD_SEPARATOR).into())).is_err() {
                     return;
                 }
+            }
+            // the reconnect button while connected: `_establish_connection()` again
+            if self.reconnect_now.swap(false, Ordering::SeqCst) {
+                log::info!("[GameHook Client] Reconnect requested while connected; reloading the mapper");
+                self.establish_connection();
             }
             // `_refresh_mapper_helper`: silent reload every minute while loaded
             if let Some(t) = self.last_mapper_load {
@@ -655,16 +667,20 @@ impl Worker {
             p.frozen = frozen;
             p.clone()
         };
-        if fields_changed.iter().any(|f| f == "value") && new_property.value != old_property.value && self.watched.contains(&path) {
-            // the FSM must never take the client down: a panic becomes a game hook error
-            let store = &self.store;
-            let session = &mut self.session;
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                session.on_property_changed(store, &new_property, &old_property);
-            }));
-            if let Err(panic) = result {
-                let msg = panic_message(&panic);
-                log::error!("error encountered running callback_fn for {}: {}", path, msg);
+        if fields_changed.iter().any(|f| f == "value") && new_property.value != old_property.value {
+            // one delivery per registration (see `watched`)
+            let deliveries = self.watched.get(&path).copied().unwrap_or(0);
+            for _ in 0..deliveries {
+                // the FSM must never take the client down: a panic becomes a game hook error
+                let store = &self.store;
+                let session = &mut self.session;
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    session.on_property_changed(store, &new_property, &old_property);
+                }));
+                if let Err(panic) = result {
+                    let msg = panic_message(&panic);
+                    log::error!("error encountered running callback_fn for {}: {}", path, msg);
+                }
             }
         }
         Ok(())

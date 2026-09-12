@@ -980,12 +980,12 @@ impl Gen1Machine {
             GameState::Uninitialized => {
                 if new.path == self.keys.gametime_seconds {
                     if self.uninit.seconds_delay <= 0 {
-                        // Appendix B item 11: Python compared the property *object* to a
-                        // string (always false); the intended value comparison is used here
-                        let mode = store.value(&self.keys.battle_type);
-                        if mode.as_str() == Some(WILD_BATTLE_TYPE) || mode.as_str() == Some(TRAINER_BATTLE_TYPE) {
-                            return GameState::Battle;
-                        }
+                        // Appendix B item 11: Python compares the battle-type property
+                        // *object* to the "Wild"/"Trainer" strings, which is always false, so
+                        // gen 1 always starts in the overworld (a battle in progress when
+                        // recording starts is picked up on its next battle-type change).
+                        // Reproduced for parity with the Python recorder.
+                        let _ = (WILD_BATTLE_TYPE, TRAINER_BATTLE_TYPE);
                         return GameState::Overworld;
                     } else if !self.uninit.is_waiting && !store.get(&self.keys.player_id).map(|p| p.eq_i64(0)).unwrap_or(false) {
                         self.uninit.is_waiting = true;
@@ -1173,8 +1173,11 @@ impl Gen1Machine {
         if new.path == self.keys.battle_type {
             return GameState::Battle;
         } else if new.path == self.keys.overworld_map {
-            let area = self.conv.area_name_convert(new.as_str().unwrap_or(""));
-            self.controller.entered_new_area(&area);
+            // (a null map name makes Python's `split` raise; the change is dropped)
+            if let Some(map) = new.as_str() {
+                let area = self.conv.area_name_convert(map);
+                self.controller.entered_new_area(&area);
+            }
         } else if new.path == self.keys.player_id {
             if prev.truthy() && self.player_id.as_ref() != Some(&store.value(&self.keys.player_id)) {
                 self.overworld.waiting_for_new_file = true;

@@ -471,6 +471,18 @@ impl LearnMoveEventDefinition {
     pub fn to_string(&self) -> String {
         let mon = self.mon.as_deref().unwrap_or("None");
         match (&self.destination, &self.move_to_learn) {
+            // the recorder's unresolved destination is a move *name* in Python
+            (None, Some(m)) if self.destination_name.is_some() => {
+                format!("Learning {} over: {}, from {} (mon: {})", m, self.destination_name.as_deref().unwrap_or(""), self.source, mon)
+            }
+            (None, None) if self.destination_name.is_some() => {
+                // `move_to_learn is None` with a str destination: Python's "Deleting" branch raises on `str + 1`
+                let level = match &self.level {
+                    LevelVal::Str(l) => format!("'{}'", l),
+                    other => other.display(),
+                };
+                format!("LearnMove: (None, '{}', '{}', {})", self.destination_name.as_deref().unwrap_or(""), self.source, level)
+            }
             (None, _) => format!(
                 "Ignoring {}, from {} (mon: {})",
                 self.move_to_learn.as_deref().unwrap_or("None"),
@@ -939,9 +951,11 @@ impl EventDefinition {
         }
     }
 
+    /// `EventDefinition(blackout=BlackoutEventDefinition())`: the location
+    /// defaults to `""` (saved as `[""]`), not `None`.
     pub fn with_blackout() -> EventDefinition {
         EventDefinition {
-            blackout: Some(LocationEventDefinition::default()),
+            blackout: Some(LocationEventDefinition::new("")),
             ..Default::default()
         }
     }

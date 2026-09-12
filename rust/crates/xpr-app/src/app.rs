@@ -115,6 +115,10 @@ pub struct XprApp {
     frame_parts: (Duration, Duration),
     /// `XPR_SMOKE_ACTION=candy`: the candy clicks still to send, and when.
     smoke_candy: Option<(u32, Instant)>,
+    /// `XPR_SMOKE_ACTION=record`: (save-as name, when to stop recording at the latest)
+    smoke_record: Option<(Option<String>, Instant)>,
+    /// set by the `XPR_SMOKE_STOP_URL` poller once the mock reports the scenario is done
+    smoke_stop_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl XprApp {
@@ -192,6 +196,8 @@ impl XprApp {
             frame_log: std::env::var_os("XPR_FRAME_LOG").is_some(),
             frame_parts: (Duration::ZERO, Duration::ZERO),
             smoke_candy: None,
+            smoke_record: None,
+            smoke_stop_flag: None,
         }
     }
 
@@ -304,14 +310,14 @@ impl XprApp {
         }
         if sig.filter_changed {
             self.route_list.mark_dirty();
-            self.route_list.scroll_to_selected_events();
+            self.route_list.scroll_to_selected_events(&mut self.ctrl);
         }
         if sig.selection_changed || sig.record_mode_changed {
             // sync the list selection when the controller changed it programmatically
             let ids = self.ctrl.get_all_selected_ids(true);
             if ids != self.route_list.get_all_selected_event_ids(&self.ctrl, true) {
                 self.route_list.set_all_selected_event_ids(&ids);
-                self.route_list.scroll_to_selected_events();
+                self.route_list.scroll_to_selected_events(&mut self.ctrl);
             }
             self.details.handle_selection(&self.cfg, &mut self.ctrl, &mut actions);
         }
@@ -1714,6 +1720,38 @@ impl XprApp {
                             self.smoke = Some((path.clone(), Instant::now() + Duration::from_secs(8), false));
                         }
                     }
+                    Ok("record") => {
+                        // start recording against `XPR_GAMEHOOK_URL`, record for
+                        // `XPR_SMOKE_RECORD_SECS` (default 30), save the route as
+                        // `XPR_SMOKE_SAVE_NAME` (if set), then screenshot and exit
+                        let secs: u64 = std::env::var("XPR_SMOKE_RECORD_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(30);
+                        let save_name = std::env::var("XPR_SMOKE_SAVE_NAME").ok().filter(|n| !n.is_empty());
+                        if !self.ctrl.is_record_mode_active() {
+                            self.record_button_clicked();
+                        }
+                        let stop_at = Instant::now() + Duration::from_secs(secs);
+                        self.smoke_record = Some((save_name, stop_at));
+                        self.smoke = Some((path.clone(), stop_at + Duration::from_millis(1500), false));
+                        // `XPR_SMOKE_STOP_URL`: stop earlier, ~3 s after this JSON endpoint
+                        // reports `"done": true` (the mock GameHook's /mock/status)
+                        if let Ok(url) = std::env::var("XPR_SMOKE_STOP_URL") {
+                            let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                            self.smoke_stop_flag = Some(flag.clone());
+                            std::thread::spawn(move || {
+                                let mut done_since: Option<Instant> = None;
+                                loop {
+                                    std::thread::sleep(Duration::from_millis(500));
+                                    if smoke_http_get(&url).map(|body| body.contains("\"done\": true") || body.contains("\"done\":true")).unwrap_or(false) {
+                                        let since = *done_since.get_or_insert_with(Instant::now);
+                                        if since.elapsed() >= Duration::from_secs(3) {
+                                            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                                            return;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
                     Ok("newroute") => self.open_new_route_window(),
                     Ok("summary") => self.open_summary_window(),
                     Ok("inline") => {
@@ -1727,6 +1765,26 @@ impl XprApp {
                     }
                     _ => {}
                 }
+            }
+            if let Some((save_name, stop_at)) = self.smoke_record.clone() {
+                let early = self.smoke_stop_flag.as_ref().map(|f| f.load(std::sync::atomic::Ordering::SeqCst)).unwrap_or(false);
+                if early {
+                    // the screenshot still happens 1.5 s after the stop
+                    self.smoke = Some((path.clone(), Instant::now() + Duration::from_millis(1500), false));
+                }
+                if early || Instant::now() >= stop_at {
+                    self.smoke_record = None;
+                    log::info!("smoke: stopping recording");
+                    if self.ctrl.is_record_mode_active() {
+                        self.record_button_clicked();
+                    }
+                    if let Some(name) = save_name {
+                        log::info!("smoke: saving route as {}", name);
+                        self.route_name_text = name;
+                        self.save_route();
+                    }
+                }
+                ctx.request_repaint_after(Duration::from_millis(50));
             }
             if let Some((left, when)) = self.smoke_candy {
                 if Instant::now() >= when {
@@ -1763,6 +1821,26 @@ impl XprApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
     }
+}
+
+/// Minimal blocking `GET` for the smoke poller (no HTTP client dependency in this crate).
+fn smoke_http_get(url: &str) -> Option<String> {
+    use std::io::{Read, Write};
+    let rest = url.strip_prefix("http://")?;
+    let (host_port, path) = match rest.find('/') {
+        Some(i) => (&rest[..i], &rest[i..]),
+        None => (rest, "/"),
+    };
+    let mut stream = std::net::TcpStream::connect(host_port).ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
+    write!(stream, "GET {} HTTP/1.1
+Host: {}
+Connection: close
+
+", path, host_port).ok()?;
+    let mut body = String::new();
+    stream.read_to_string(&mut body).ok()?;
+    Some(body)
 }
 
 impl eframe::App for XprApp {

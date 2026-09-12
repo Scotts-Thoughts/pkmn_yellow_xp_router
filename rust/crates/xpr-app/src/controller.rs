@@ -695,9 +695,13 @@ impl MainController {
         let new_folder_name = self.generate_unique_folder_name(&old_folder_name);
         self.undo_before();
         let spec = InsertSpec { insert_after: Some(parent_id), dest_folder_name: Some(grand_parent_name), ..Default::default() };
+        // `add_event_object(new_folder_name=...)` builds an `EventFolder` with its
+        // defaults (`expanded=True, enabled=True`); `None` here would be a *disabled*
+        // (and collapsed) folder, which also hides every event in it from
+        // `get_previous_event` and the route state
         let r = self
             .router
-            .add_event_object(None, Some(&new_folder_name), spec, false, None, None)
+            .add_event_object(None, Some(&new_folder_name), spec, false, Some(true), Some(true))
             .and_then(|new_id| self.router.transfer_events(&events_to_move, &new_folder_name).map(|_| new_id));
         self.undo.save_state(&self.router, true);
         if let Some(new_folder_id) = self.report(r, "split_folder_at_current_event") {
@@ -745,10 +749,11 @@ impl MainController {
     pub fn finalize_new_folder(&mut self, new_folder_name: &str, prev_folder_name: Option<&str>, insert_after: Option<NodeId>) {
         let name = new_folder_name.to_string();
         let prev = prev_folder_name.map(|s| s.to_string());
+        // new folders are enabled and expanded (the `EventFolder` defaults)
         if self.undoable("finalize_new_folder", |r| match (prev, insert_after) {
-            (None, None) => r.add_event_object(None, Some(&name), InsertSpec::default(), true, None, None).map(|_| ()),
+            (None, None) => r.add_event_object(None, Some(&name), InsertSpec::default(), true, Some(true), Some(true)).map(|_| ()),
             (None, Some(after)) => r
-                .add_event_object(None, Some(&name), InsertSpec { insert_after: Some(after), ..Default::default() }, true, None, None)
+                .add_event_object(None, Some(&name), InsertSpec { insert_after: Some(after), ..Default::default() }, true, Some(true), Some(true))
                 .map(|_| ()),
             (Some(p), _) => r.rename_event_folder(&p, &name),
         }) {
