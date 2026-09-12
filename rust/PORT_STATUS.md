@@ -7,7 +7,13 @@ Nothing has been committed.
 
 Build: `cd rust && cargo build --release -p xpr-app` (toolchain 1.98, msvc);
 the resulting exe is self-contained (data and images embedded at build time,
-see `TESTING.md` § 0).
+MSVC CRT linked statically via `rust/.cargo/config.toml`; see `TESTING.md`
+§ 0).
+Standalone program / release zip: `py -3.14 rust/windows_build.py --smoke`
+→ `dist/rust/pkmn_xp_router.exe` and
+`dist/rust/windows_pkmn_xp_router_<version>.zip` (one top-level exe, the
+layout both updaters expect), verified by running the packaged exe from an
+empty directory.
 Run: `cd rust && cargo run --release -p xpr-app [-- --debug]` (uses the same
 config / data directories as the Python app; see `TESTING.md` § 0 for an
 isolated run and the test-hook environment variables).

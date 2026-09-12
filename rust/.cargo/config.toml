@@ -1,0 +1,5 @@
+# Release builds must run on a clean Windows install: link the MSVC CRT
+# statically so the exe does not need VCRUNTIME140.dll / the VC++
+# redistributable (rust_port_plan.md §4.4, "one statically linked .exe").
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

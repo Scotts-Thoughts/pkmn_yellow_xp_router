@@ -27,6 +27,18 @@ triggers the rebuild automatically. `cargo test -p xpr-app --test
 embedded_data` checks the pack with a `raw_pkmn_data` path that does not
 exist.
 
+Standalone program (what a release ships): `py -3.14 rust/windows_build.py
+[--smoke]` builds the release exe, checks that it imports only Windows
+system DLLs (the MSVC CRT is linked statically through
+`rust/.cargo/config.toml`, so no VC++ redistributable is needed), copies it
+to `dist/rust/pkmn_xp_router.exe` and zips it as
+`dist/rust/windows_pkmn_xp_router_<APP_VERSION>.zip` — one exe at the top
+level, the layout the old Python updater and `xpr-update` require. `--smoke`
+then runs the packaged exe from an empty temp directory (nothing from the
+repo in reach, a scratch config dir, `XPR_SMOKE_NEW_ROUTE=Yellow|Charmander`)
+and fails unless it exits cleanly with a screenshot and no `ERROR` in its
+log. `--no-build` packages the existing `target/release/xpr-app.exe`.
+
 Isolated run (does not touch the real config / routes):
 
 ```
@@ -43,9 +55,10 @@ Test-hook environment variables (all optional):
 | Var | Effect |
 |---|---|
 | `XPR_GLOBAL_CONFIG_DIR` | where `config.json`, the log and `xpr_route_index.json` live |
-| `XPR_DISABLE_AUTO_UPDATE=1` | skip the GitHub check at start |
+| `XPR_DISABLE_AUTO_UPDATE=1` | no request to GitHub at start, updates count as not possible (nothing prompted) |
 | `XPR_GAMEHOOK_URL` | recorder base URL (default `http://localhost:8085`) |
 | `XPR_SMOKE_SCREENSHOT=<png>` | capture the window ~4 s after start, then exit |
+| `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | with a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of the auto-load preference |
 | `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy` | drive the UI into a state before the smoke capture; `candy` clicks "+" candy six times on the biggest fight (or `XPR_SMOKE_FIGHT=<substring>`) |
 | `XPR_FRAME_LOG=1` | log every frame slower than 1 ms (with the route-list / details draw split) and every route-list rebuild |
 

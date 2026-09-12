@@ -139,7 +139,10 @@ impl XprApp {
         });
         let (utx, urx) = channel();
         std::thread::spawn(move || {
-            let info = xpr_update::get_new_version_info();
+            // `XPR_DISABLE_AUTO_UPDATE`: no request to GitHub at start
+            // (isolated / offline test runs), so the check just reports "no
+            // release information" and nothing is prompted.
+            let info = if std::env::var_os("XPR_DISABLE_AUTO_UPDATE").is_some() { xpr_update::ReleaseInfo::default() } else { xpr_update::get_new_version_info() };
             let _ = utx.send(info);
         });
         let shortcuts = ShortcutMap::from_config(&cfg);
@@ -246,6 +249,16 @@ impl XprApp {
         // `XPR_SMOKE_ROUTE=<route name>` (smoke test only): load that route
         // instead of honouring the auto-load preference.
         let smoke_route = if self.smoke.is_some() { std::env::var("XPR_SMOKE_ROUTE").ok().map(|n| io_utils::get_existing_route_path(&self.paths, &n)) } else { None };
+        // `XPR_SMOKE_NEW_ROUTE=<version>|<solo mon>` (smoke test only): start a
+        // fresh route from the built-in data, e.g. for the standalone build check.
+        if self.smoke.is_some() {
+            if let Some((version, mon)) = std::env::var("XPR_SMOKE_NEW_ROUTE").ok().and_then(|v| v.split_once('|').map(|(a, b)| (a.to_string(), b.to_string()))) {
+                log::info!("smoke: creating a new {} route with {}", version, mon);
+                self.ctrl.create_new_route(&mon, None, &version, None, None, None);
+                self.show_route_controls();
+                return;
+            }
+        }
         if smoke_route.is_some() || (self.cfg.get_auto_load_most_recent_route() && !self.auto_load_checked) {
             self.auto_load_checked = true;
             if let Some(p) = smoke_route.or_else(|| self.find_most_recent_route()) {
@@ -1851,6 +1864,16 @@ impl eframe::App for XprApp {
             self.frame_parts = (Duration::ZERO, Duration::ZERO);
         }
     }
+
+    /// Hands the deferred update request to `main`, which runs the updater
+    /// once the window is gone.
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.details.force_and_clear_event_update(&self.cfg, &mut self.ctrl);
+        let mut e = self.exit.lock().unwrap();
+        e.update_requested = self.update.requested;
+        e.update_version = self.update.deferred_version.clone();
+        e.update_url = self.update.deferred_url.clone();
+    }
 }
 
 impl XprApp {
@@ -2048,14 +2071,6 @@ impl XprApp {
         self.resolve_shot(ctx, event_list_rect, run_summary_rect, setup_summary_rect);
         self.dispatch_signals(ctx);
         self.smoke_tick(ctx);
-    }
-
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        self.details.force_and_clear_event_update(&self.cfg, &mut self.ctrl);
-        let mut e = self.exit.lock().unwrap();
-        e.update_requested = self.update.requested;
-        e.update_version = self.update.deferred_version.clone();
-        e.update_url = self.update.deferred_url.clone();
     }
 }
 

@@ -188,8 +188,9 @@ could not do either:
 | Env var | Effect |
 |---|---|
 | `XPR_GLOBAL_CONFIG_DIR=<dir>` | Read/write `config.json`, the log and the route index there instead of the appdirs location |
-| `XPR_DISABLE_AUTO_UPDATE=1` | Skip the GitHub release check at start |
+| `XPR_DISABLE_AUTO_UPDATE=1` | No request to GitHub at start (the check reports "no release information") and updates count as not possible, so nothing is prompted |
 | `XPR_GAMEHOOK_URL=<url>` | GameHook base URL for the recorder (default `http://localhost:8085`) |
 | `XPR_SMOKE_SCREENSHOT=<file.png>` | Capture the window ~4 s after start and exit (unattended smoke run) |
+| `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | With a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of honouring the auto-load preference (`rust/windows_build.py --smoke` uses the latter to prove the packaged exe runs on its own) |
 | `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy\|record` | Before the smoke screenshot: open the battle tab of the first / last trainer, the new-route page, the docked run summary, or the inline creator; `candy` opens the biggest trainer fight (or the one named by `XPR_SMOKE_FIGHT=<substring>`) and clicks "+" candy six times, 700 ms apart, before an 8 s screenshot; `record` starts recording against `XPR_GAMEHOOK_URL`, stops after `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL` (a JSON endpoint) reports `"done": true`, saves the route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshots and exits |
 | `XPR_FRAME_LOG=1` | Log every frame slower than 1 ms with the route-list and event-details draw times, and every route-list rebuild |
