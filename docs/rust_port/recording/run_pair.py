@@ -234,6 +234,7 @@ def main():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     route = getattr(mod, "ROUTE", {"species": "Geodude", "version": "Emerald", "dvs": None})
+    args.rust_exe = os.path.abspath(args.rust_exe)
     work = args.work or tempfile.mkdtemp(prefix="xpr_rec_")
     os.makedirs(work, exist_ok=True)
     print(f"work dir: {work}")
