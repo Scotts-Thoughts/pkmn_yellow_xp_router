@@ -598,40 +598,45 @@ impl BattleSummaryUi {
                     ui.add_space(1.0);
                     let mut max_h: f32 = 0.0;
                     let mut col_rects: Vec<Rect> = Vec::new();
+                    // Resolve every column first so the row shares one kill-frame
+                    // height (Qt's grid stretched each cell to the tallest; a
+                    // recoil line must grow the whole row, not just its column).
+                    let mut columns: Vec<Option<(usize, bool, bool, Option<MoveRenderInfo>)>> = Vec::with_capacity(8);
                     for cur_idx in 0..8usize {
                         let is_player = cur_idx < 4;
                         let move_idx = cur_idx % 4;
+                        // Test move slots take the enemy columns when enabled.
+                        if cur_idx >= 4 && test_moves_enabled {
+                            let slot_idx = cur_idx - 4;
+                            let tmv = bc.get_move_info(cfg, ctrl, mon_idx, 4 + slot_idx, true);
+                            columns.push(Some((4 + slot_idx, true, true, tmv)));
+                            continue;
+                        }
+                        let mv = bc.get_move_info(cfg, ctrl, mon_idx, move_idx, is_player);
+                        columns.push(mv.map(|m| (move_idx, is_player, false, Some(m))));
+                    }
+                    let kill_h = columns
+                        .iter()
+                        .flatten()
+                        .map(|(_, _, _, mv)| kill_frame_height(theme, mv.as_ref()))
+                        .fold(0.0_f32, f32::max);
+                    for (cur_idx, col) in columns.into_iter().enumerate() {
                         if cur_idx == 4 {
                             // divider column
                             let (drect, _) = ui.allocate_exact_size(Vec2::new(12.0, 1.0), Sense::hover());
                             divider = Some((drect.center().x - 1.0, drect.center().x + 1.0));
                             col_rects.push(drect);
                         }
-                        let show_enemy = !(cur_idx >= 4 && test_moves_enabled);
-                        let mv = if is_player {
-                            bc.get_move_info(cfg, ctrl, mon_idx, move_idx, true)
-                        } else if show_enemy {
-                            bc.get_move_info(cfg, ctrl, mon_idx, move_idx, false)
-                        } else {
-                            None
-                        };
-                        let column_visible = if is_player { mv.is_some() } else { show_enemy && mv.is_some() };
-                        // Test move slots take the enemy columns when enabled.
-                        if cur_idx >= 4 && test_moves_enabled {
-                            let slot_idx = cur_idx - 4;
-                            let tmv = bc.get_move_info(cfg, ctrl, mon_idx, 4 + slot_idx, true);
-                            let r = self.damage_summary(ui, theme, cfg, bc, ctrl, mon_idx, 4 + slot_idx, true, true, tmv.as_ref(), col_w, actions);
-                            max_h = max_h.max(r.height());
-                            col_rects.push(r);
-                            continue;
-                        }
-                        if column_visible {
-                            let r = self.damage_summary(ui, theme, cfg, bc, ctrl, mon_idx, move_idx, is_player, false, mv.as_ref(), col_w, actions);
-                            max_h = max_h.max(r.height());
-                            col_rects.push(r);
-                        } else {
-                            let (r, _) = ui.allocate_exact_size(Vec2::new(col_w, 1.0), Sense::hover());
-                            col_rects.push(r);
+                        match col {
+                            Some((move_idx, is_player, is_test_move, mv)) => {
+                                let r = self.damage_summary(ui, theme, cfg, bc, ctrl, mon_idx, move_idx, is_player, is_test_move, mv.as_ref(), col_w, kill_h, actions);
+                                max_h = max_h.max(r.height());
+                                col_rects.push(r);
+                            }
+                            None => {
+                                let (r, _) = ui.allocate_exact_size(Vec2::new(col_w, 1.0), Sense::hover());
+                                col_rects.push(r);
+                            }
                         }
                     }
                     // paint the divider now that the row height is known
@@ -682,6 +687,7 @@ impl BattleSummaryUi {
         is_test_move: bool,
         mv: Option<&MoveRenderInfo>,
         col_w: f32,
+        kill_h: f32,
         actions: &mut BattleUiActions,
     ) -> Rect {
         let primary_bg = theme::lighten(theme.bg, 0.12);
@@ -890,18 +896,11 @@ impl BattleSummaryUi {
                     ui.painter().text(Pos2::new(rrect.max.x - 4.0, row2_y), Align2::RIGHT_CENTER, format!("{} - {}%", pct(m.crit_min_damage), pct(m.crit_max_damage)), font, range_fg);
                 }
             }
-            // ---- kill frame (>= 52 px) ----
+            // ---- kill frame (>= 52 px; `kill_h` is shared by the whole row) ----
             let mut desc_lines: Vec<(String, Color32)> = Vec::new();
             let mut pct_lines: Vec<(String, Color32)> = Vec::new();
             if let Some(m) = mv {
-                let mut kill_ranges = m.kill_ranges.clone();
-                let max_num = 3usize;
-                if kill_ranges.len() > max_num {
-                    let last = *kill_ranges.last().unwrap();
-                    kill_ranges.truncate(max_num - 1);
-                    kill_ranges.push(last);
-                }
-                for kr in &kill_ranges {
+                for kr in &shown_kill_ranges(m) {
                     let (d, p) = format_message(cfg, *kr);
                     desc_lines.push((d, kill_fg));
                     pct_lines.push((p, kill_fg));
@@ -912,7 +911,6 @@ impl BattleSummaryUi {
                 }
             }
             let line_h = theme.body().size * 1.3;
-            let kill_h = (desc_lines.len() as f32 * line_h + 2.0).max(52.0);
             let (krect, _) = ui.allocate_exact_size(Vec2::new(w, kill_h), Sense::hover());
             ui.painter().rect_filled(krect, CornerRadius { sw: 6, se: 6, nw: 0, ne: 0 }, kill_bg);
             let font = if kill_bold { theme.body_bold() } else { theme.body() };
@@ -928,6 +926,25 @@ impl BattleSummaryUi {
         });
         inner.response.rect
     }
+}
+
+/// The kill ranges a column lists: at most three, keeping the last one.
+fn shown_kill_ranges(m: &MoveRenderInfo) -> Vec<(i64, f64)> {
+    let mut kill_ranges = m.kill_ranges.clone();
+    let max_num = 3usize;
+    if kill_ranges.len() > max_num {
+        let last = *kill_ranges.last().unwrap();
+        kill_ranges.truncate(max_num - 1);
+        kill_ranges.push(last);
+    }
+    kill_ranges
+}
+
+/// Height of one column's kill frame: its kill lines plus a recoil line, at least 52 px.
+fn kill_frame_height(theme: &Theme, mv: Option<&MoveRenderInfo>) -> f32 {
+    let lines = mv.map(|m| shown_kill_ranges(m).len() + usize::from(format_recoil_line(m).is_some())).unwrap_or(0);
+    let line_h = theme.body().size * 1.3;
+    (lines as f32 * line_h + 2.0).max(52.0)
 }
 
 /// `format_message(kill_info)`: (description, percentage) of a kill range.

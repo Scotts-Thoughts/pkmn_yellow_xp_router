@@ -194,7 +194,11 @@ impl XprApp {
             exit,
             allow_close: false,
             fonts_installed: true,
-            smoke: std::env::var_os("XPR_SMOKE_SCREENSHOT").map(|p| (PathBuf::from(p), Instant::now() + Duration::from_secs(4), false)),
+            smoke: std::env::var_os("XPR_SMOKE_SCREENSHOT").map(|p| {
+                // `XPR_SMOKE_DELAY_MS`: how long to wait before the capture (default 4 s)
+                let delay = std::env::var("XPR_SMOKE_DELAY_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(4000);
+                (PathBuf::from(p), Instant::now() + Duration::from_millis(delay), false)
+            }),
             smoke_action_done: false,
             frame_log: std::env::var_os("XPR_FRAME_LOG").is_some(),
             frame_parts: (Duration::ZERO, Duration::ZERO),
