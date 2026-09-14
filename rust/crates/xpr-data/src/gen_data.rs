@@ -427,12 +427,9 @@ impl GenData {
 
     pub fn get_ev_berry_reduced_value(&self, cur_stat_xp: i64) -> i64 {
         match self.gen {
-            Gen::Four => {
-                if cur_stat_xp > stats::EV_BERRY_DROP_TARGET_GEN4 {
-                    return stats::EV_BERRY_DROP_TARGET_GEN4;
-                }
-                (cur_stat_xp - stats::EV_BERRY_AMT).max(0)
-            }
+            // subtract first, then clamp to 100 (pokeplatinum CalculateEVUpdate,
+            // pokeheartgold TryModEV): 255 -> 100 and 110 -> 100, but 105 -> 95
+            Gen::Four => (cur_stat_xp - stats::EV_BERRY_AMT).min(stats::EV_BERRY_DROP_TARGET_GEN4).max(0),
             _ => (cur_stat_xp - stats::EV_BERRY_AMT).max(0),
         }
     }

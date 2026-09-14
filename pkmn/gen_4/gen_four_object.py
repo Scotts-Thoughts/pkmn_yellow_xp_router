@@ -333,9 +333,9 @@ class GenFour(CurrentGen):
         raise ValueError(f"Unknown EV berry: {berry_name}")
 
     def get_ev_berry_reduced_value(self, cur_stat_xp: int) -> int:
-        if cur_stat_xp > EV_BERRY_DROP_TARGET:
-            return EV_BERRY_DROP_TARGET
-        return max(cur_stat_xp - EV_BERRY_AMT, 0)
+        # the game subtracts first and only then clamps to 100 (pokeplatinum CalculateEVUpdate,
+        # pokeheartgold TryModEV), so 255 -> 100 and 110 -> 100, but 105 -> 95
+        return max(min(cur_stat_xp - EV_BERRY_AMT, EV_BERRY_DROP_TARGET), 0)
 
     def create_new_custom_gen(self, new_version_name):
         folder_name = io_utils.get_safe_path_no_collision(const.CUSTOM_GENS_DIR, new_version_name)
