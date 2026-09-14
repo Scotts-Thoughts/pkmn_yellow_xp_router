@@ -499,7 +499,7 @@ impl BattleSummaryUi {
                     Some(ScreenshotMode::Enemy) => (false, None, enemy_icon.is_some()),
                 };
                 let draw_titled = |ui: &mut Ui, center_x: f32, text: &str, icon: Option<&egui::TextureHandle>| {
-                    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), bold.clone(), Color32::WHITE));
+                    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), bold.clone(), text_color));
                     let icon_w = if icon.is_some() { 32.0 } else { 0.0 };
                     let total = galley.size().x + icon_w;
                     let mut x = center_x - total / 2.0;
