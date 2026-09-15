@@ -2088,7 +2088,14 @@
             "priority": 0,
             "type": "Normal",
             "target": "target_single_enemy",
-            "effects": [],
+            "effects": [
+                {
+                    "chance": 100,
+                    "modifier": 1,
+                    "stat": "atk",
+                    "target": "self"
+                }
+            ],
             "attack_flavor": [
                 "rage"
             ],

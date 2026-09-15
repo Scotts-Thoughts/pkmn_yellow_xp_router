@@ -16209,36 +16209,32 @@
    "attacking_field": null,
    "defending_field": null,
    "is_crit": false,
-   "custom_move_data": "1",
+   "custom_move_data": "",
    "weather": "None",
    "is_double_battle": false,
    "attacking_battle_stats": null,
    "defending_battle_stats": null,
    "attacker_is_enemy": false,
    "result": {
-    "min_damage": 17,
-    "max_damage": 21,
+    "min_damage": 12,
+    "max_damage": 15,
     "size": 16,
     "num_attacks": 1,
     "damage_vals": [
      [
-      17,
-      1
+      12,
+      2
      ],
      [
-      18,
-      5
+      13,
+      7
      ],
      [
-      19,
-      5
+      14,
+      6
      ],
      [
-      20,
-      4
-     ],
-     [
-      21,
+      15,
       1
      ]
     ]
@@ -16370,12 +16366,24 @@
     "ability": "",
     "nature": "Hardy"
    },
-   "attacking_stages": null,
+   "attacking_stages": {
+    "attack_stage": 3,
+    "defense_stage": 0,
+    "speed_stage": 0,
+    "special_attack_stage": 0,
+    "special_defense_stage": 0,
+    "accuracy_stage": 0,
+    "evasion_stage": 0,
+    "attack_badge_boosts": 0,
+    "defense_badge_boosts": 0,
+    "speed_badge_boosts": 0,
+    "special_badge_boosts": 0
+   },
    "defending_stages": null,
    "attacking_field": null,
    "defending_field": null,
    "is_crit": false,
-   "custom_move_data": "3",
+   "custom_move_data": "",
    "weather": "None",
    "is_double_battle": false,
    "attacking_battle_stats": null,
@@ -16413,6 +16421,366 @@
      ],
      [
       35,
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "kind": "calculate_damage",
+   "test": "tests/test_damage_gen3.py::TestRage::test_rage_boost_carries_over_to_other_moves (call)",
+   "version": "Emerald",
+   "attacking": {
+    "name": "Machop",
+    "level": 50,
+    "xp": 942,
+    "move_list": [
+     "Submission",
+     "Cross Chop",
+     "Scary Face",
+     "Dynamic Punch"
+    ],
+    "cur_stats": {
+     "hp": 134,
+     "attack": 89,
+     "defense": 59,
+     "special_attack": 44,
+     "special_defense": 44,
+     "speed": 44,
+     "is_stat_xp": false
+    },
+    "base_stats": {
+     "hp": 70,
+     "attack": 80,
+     "defense": 50,
+     "special_attack": 35,
+     "special_defense": 35,
+     "speed": 35,
+     "is_stat_xp": false
+    },
+    "dvs": {
+     "hp": 8,
+     "attack": 9,
+     "defense": 8,
+     "special_attack": 8,
+     "special_defense": 8,
+     "speed": 8,
+     "is_stat_xp": false
+    },
+    "stat_xp": {
+     "hp": 0,
+     "attack": 0,
+     "defense": 0,
+     "special_attack": 0,
+     "special_defense": 0,
+     "speed": 0,
+     "is_stat_xp": true
+    },
+    "badges": null,
+    "held_item": null,
+    "custom_move_data": null,
+    "is_trainer_mon": true,
+    "exp_split": 1,
+    "mon_order": 1,
+    "definition_order": 1,
+    "ability": "",
+    "nature": "Hardy"
+   },
+   "move": {
+    "name": "Tackle",
+    "accuracy": 95,
+    "pp": 35,
+    "base_power": 35,
+    "move_type": "Normal",
+    "attack_flavor": []
+   },
+   "defending": {
+    "name": "Machop",
+    "level": 50,
+    "xp": 942,
+    "move_list": [
+     "Submission",
+     "Cross Chop",
+     "Scary Face",
+     "Dynamic Punch"
+    ],
+    "cur_stats": {
+     "hp": 134,
+     "attack": 89,
+     "defense": 59,
+     "special_attack": 44,
+     "special_defense": 44,
+     "speed": 44,
+     "is_stat_xp": false
+    },
+    "base_stats": {
+     "hp": 70,
+     "attack": 80,
+     "defense": 50,
+     "special_attack": 35,
+     "special_defense": 35,
+     "speed": 35,
+     "is_stat_xp": false
+    },
+    "dvs": {
+     "hp": 8,
+     "attack": 9,
+     "defense": 8,
+     "special_attack": 8,
+     "special_defense": 8,
+     "speed": 8,
+     "is_stat_xp": false
+    },
+    "stat_xp": {
+     "hp": 0,
+     "attack": 0,
+     "defense": 0,
+     "special_attack": 0,
+     "special_defense": 0,
+     "speed": 0,
+     "is_stat_xp": true
+    },
+    "badges": null,
+    "held_item": null,
+    "custom_move_data": null,
+    "is_trainer_mon": true,
+    "exp_split": 1,
+    "mon_order": 1,
+    "definition_order": 1,
+    "ability": "",
+    "nature": "Hardy"
+   },
+   "attacking_stages": null,
+   "defending_stages": null,
+   "attacking_field": null,
+   "defending_field": null,
+   "is_crit": false,
+   "custom_move_data": "",
+   "weather": "None",
+   "is_double_battle": false,
+   "attacking_battle_stats": null,
+   "defending_battle_stats": null,
+   "attacker_is_enemy": false,
+   "result": {
+    "min_damage": 21,
+    "max_damage": 25,
+    "size": 16,
+    "num_attacks": 1,
+    "damage_vals": [
+     [
+      21,
+      3
+     ],
+     [
+      22,
+      4
+     ],
+     [
+      23,
+      4
+     ],
+     [
+      24,
+      4
+     ],
+     [
+      25,
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "kind": "calculate_damage",
+   "test": "tests/test_damage_gen3.py::TestRage::test_rage_boost_carries_over_to_other_moves (call)",
+   "version": "Emerald",
+   "attacking": {
+    "name": "Machop",
+    "level": 50,
+    "xp": 942,
+    "move_list": [
+     "Submission",
+     "Cross Chop",
+     "Scary Face",
+     "Dynamic Punch"
+    ],
+    "cur_stats": {
+     "hp": 134,
+     "attack": 89,
+     "defense": 59,
+     "special_attack": 44,
+     "special_defense": 44,
+     "speed": 44,
+     "is_stat_xp": false
+    },
+    "base_stats": {
+     "hp": 70,
+     "attack": 80,
+     "defense": 50,
+     "special_attack": 35,
+     "special_defense": 35,
+     "speed": 35,
+     "is_stat_xp": false
+    },
+    "dvs": {
+     "hp": 8,
+     "attack": 9,
+     "defense": 8,
+     "special_attack": 8,
+     "special_defense": 8,
+     "speed": 8,
+     "is_stat_xp": false
+    },
+    "stat_xp": {
+     "hp": 0,
+     "attack": 0,
+     "defense": 0,
+     "special_attack": 0,
+     "special_defense": 0,
+     "speed": 0,
+     "is_stat_xp": true
+    },
+    "badges": null,
+    "held_item": null,
+    "custom_move_data": null,
+    "is_trainer_mon": true,
+    "exp_split": 1,
+    "mon_order": 1,
+    "definition_order": 1,
+    "ability": "",
+    "nature": "Hardy"
+   },
+   "move": {
+    "name": "Tackle",
+    "accuracy": 95,
+    "pp": 35,
+    "base_power": 35,
+    "move_type": "Normal",
+    "attack_flavor": []
+   },
+   "defending": {
+    "name": "Machop",
+    "level": 50,
+    "xp": 942,
+    "move_list": [
+     "Submission",
+     "Cross Chop",
+     "Scary Face",
+     "Dynamic Punch"
+    ],
+    "cur_stats": {
+     "hp": 134,
+     "attack": 89,
+     "defense": 59,
+     "special_attack": 44,
+     "special_defense": 44,
+     "speed": 44,
+     "is_stat_xp": false
+    },
+    "base_stats": {
+     "hp": 70,
+     "attack": 80,
+     "defense": 50,
+     "special_attack": 35,
+     "special_defense": 35,
+     "speed": 35,
+     "is_stat_xp": false
+    },
+    "dvs": {
+     "hp": 8,
+     "attack": 9,
+     "defense": 8,
+     "special_attack": 8,
+     "special_defense": 8,
+     "speed": 8,
+     "is_stat_xp": false
+    },
+    "stat_xp": {
+     "hp": 0,
+     "attack": 0,
+     "defense": 0,
+     "special_attack": 0,
+     "special_defense": 0,
+     "speed": 0,
+     "is_stat_xp": true
+    },
+    "badges": null,
+    "held_item": null,
+    "custom_move_data": null,
+    "is_trainer_mon": true,
+    "exp_split": 1,
+    "mon_order": 1,
+    "definition_order": 1,
+    "ability": "",
+    "nature": "Hardy"
+   },
+   "attacking_stages": {
+    "attack_stage": 3,
+    "defense_stage": 0,
+    "speed_stage": 0,
+    "special_attack_stage": 0,
+    "special_defense_stage": 0,
+    "accuracy_stage": 0,
+    "evasion_stage": 0,
+    "attack_badge_boosts": 0,
+    "defense_badge_boosts": 0,
+    "speed_badge_boosts": 0,
+    "special_badge_boosts": 0
+   },
+   "defending_stages": null,
+   "attacking_field": null,
+   "defending_field": null,
+   "is_crit": false,
+   "custom_move_data": "",
+   "weather": "None",
+   "is_double_battle": false,
+   "attacking_battle_stats": null,
+   "defending_battle_stats": null,
+   "attacker_is_enemy": false,
+   "result": {
+    "min_damage": 50,
+    "max_damage": 59,
+    "size": 16,
+    "num_attacks": 1,
+    "damage_vals": [
+     [
+      50,
+      2
+     ],
+     [
+      51,
+      2
+     ],
+     [
+      52,
+      1
+     ],
+     [
+      53,
+      2
+     ],
+     [
+      54,
+      2
+     ],
+     [
+      55,
+      1
+     ],
+     [
+      56,
+      2
+     ],
+     [
+      57,
+      2
+     ],
+     [
+      58,
+      1
+     ],
+     [
+      59,
       1
      ]
     ]

@@ -602,7 +602,6 @@ pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<S
         m.insert(ROLLOUT_MOVE, vec![s("1"), s("2"), s("3"), s("4"), s("5"), s("5 + DefenseCurl")]);
         m.insert(ICE_BALL_MOVE, vec![s("1"), s("2"), s("3"), s("4"), s("5"), s("5 + DefenseCurl")]);
         m.insert(TRIPLE_KICK_MOVE, range_strings(1, 4, 1));
-        m.insert(RAGE_MOVE, range_strings(1, 7, 1));
         m.insert(PURSUIT_MOVE, two(NO_BONUS, SWITCH_BONUS));
         m.insert(STOMP_MOVE, two(NO_BONUS, MINIMIZE_BONUS));
         m.insert(ASTONISH_MOVE, two(NO_BONUS, MINIMIZE_BONUS));

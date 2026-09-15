@@ -4985,7 +4985,14 @@
         "attack_flavor": [
             "rage"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "atk",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Defog": {

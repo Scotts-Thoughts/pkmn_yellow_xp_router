@@ -353,11 +353,10 @@ pub fn calculate_damage(gen: &GenData, a: &DamageArgs) -> Option<DamageRange> {
     let mut attacking_stages = *original_attacking_stages;
     let mut defending_stages = *original_defending_stages;
 
-    if mv.name == gc::RAGE_MOVE && !custom.is_empty() {
-        if let Some(rage_hits) = py_int(custom) {
-            attacking_stages.attack_stage = (attacking_stages.attack_stage + rage_hits).min(6);
-        }
-    }
+    // Rage's Attack-stage change is driven by its moves.json ATK+1-self effect entry
+    // through the normal stat-stage-setup dropdown (like Metal Claw/Charge Beam), not a
+    // per-call custom-data override here -- that lets the boost persist and affect every
+    // other move in the matchup, not just Rage's own damage number.
 
     let is_real_crit = a.is_crit
         && ![consts::SPIT_UP_MOVE_NAME, consts::FUTURE_SIGHT_MOVE_NAME, consts::DOOM_DESIRE_MOVE_NAME].contains(&mv.name.as_str());

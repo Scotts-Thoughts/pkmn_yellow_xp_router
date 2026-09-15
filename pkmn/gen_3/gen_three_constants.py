@@ -205,7 +205,6 @@ class GenThreeConstants:
             self.ROLLOUT_MOVE_NAME: ["1", "2", "3", "4", "5", "5 + DefenseCurl"],
             self.ICE_BALL_MOVE_NAME: ["1", "2", "3", "4", "5", "5 + DefenseCurl"],
             self.TRIPLE_KICK_MOVE_NAME: ["1", "2", "3"],
-            self.RAGE_MOVE_NAME: ["1", "2", "3", "4", "5", "6"],
 
             self.PURSUIT_MOVE_NAME: [self.NO_BONUS, self.SWITCH_BONUS],
             self.STOMP_MOVE_NAME: [self.NO_BONUS, self.MINIMIZE_BONUS],

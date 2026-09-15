@@ -161,20 +161,53 @@ class TestStatModifierOrder:
 
 class TestRage:
     def test_rage_deals_plain_vanilla_damage_with_no_hits_yet(self):
-        """Bug #10: gen 3 Rage has no damage multiplier at all -- with no custom_move_data
-        (i.e. no hits landed on the Rage user yet) it's a plain 20 BP hit."""
+        """Bug #10: gen 3 Rage has no damage multiplier at all -- with no Attack-stage
+        boost yet (no hits landed on the Rage user), it's a plain 20 BP hit."""
         gen, attacker, defender = _setup()
         rage = gen.move_db().get_move("Rage")
         result = gen.calculate_damage(attacker, rage, defender)
         assert result.min_damage == 12
         assert result.max_damage == 15
 
+    def test_rage_is_registered_as_a_guaranteed_self_attack_boost(self):
+        """Rage's Attack-stage change must flow through the same moves.json `effects` /
+        stat-stage-setup dropdown machinery as other self-buffing damaging moves (e.g.
+        Metal Claw, Charge Beam) so the boost persists and affects every other move in
+        the matchup, not just Rage's own damage number (regression: previously this was
+        a one-off custom_move_data hack scoped only to Rage's own calculate_damage call)."""
+        gen, attacker, defender = _setup()
+        info = gen.move_db().get_stat_stage_info("Rage")
+        assert info["has_stat_effect"] is True
+        assert info["is_guaranteed"] is True
+        assert info["targets_self"] is True
+        assert info["is_damaging"] is True
+        assert gen.move_db().get_stat_mod_for_target("Rage", target_self=True) == [(const.ATK, 1)]
+
     def test_rage_hits_raise_attack_stage(self):
+        """The Attack-stage boost (as applied via the stat-stage-setup mechanism, i.e.
+        the same `attacking_stage_modifiers` every other move uses) increases Rage's own
+        damage too."""
         gen, attacker, defender = _setup()
         rage = gen.move_db().get_move("Rage")
-        one_hit = gen.calculate_damage(attacker, rage, defender, custom_move_data="1")
-        three_hits = gen.calculate_damage(attacker, rage, defender, custom_move_data="3")
-        assert three_hits.max_damage > one_hit.max_damage
+        no_boost = gen.calculate_damage(attacker, rage, defender)
+        boosted = gen.calculate_damage(
+            attacker, rage, defender,
+            attacking_stage_modifiers=universal_data_objects.StageModifiers(attack=3),
+        )
+        assert boosted.max_damage > no_boost.max_damage
+
+    def test_rage_boost_carries_over_to_other_moves(self):
+        """The whole point of the fix: an Attack-stage boost attributed to Rage must
+        raise the damage of a completely different move for the same matchup, since in
+        the real game the stage change persists for as long as the mon is in battle."""
+        gen, attacker, defender = _setup()
+        tackle = gen.move_db().get_move("Tackle")
+        no_boost = gen.calculate_damage(attacker, tackle, defender)
+        boosted = gen.calculate_damage(
+            attacker, tackle, defender,
+            attacking_stage_modifiers=universal_data_objects.StageModifiers(attack=3),
+        )
+        assert boosted.max_damage > no_boost.max_damage
 
 
 class TestSoulDewAndDeepSea:

@@ -444,7 +444,7 @@ def calculate_gen_three_damage(
     if defending_stage_modifiers is None:
         defending_stage_modifiers = universal_data_objects.StageModifiers()
 
-    # Saved before the Rage bump / crit-only reset below so the multi-hit recursion at the
+    # Saved before the crit-only reset below so the multi-hit recursion at the
     # bottom of this function can pass the TRUE stage modifiers for its non-crit hits
     # instead of the (possibly zeroed) crit-adjusted ones (bug #14).
     original_attacking_stage_modifiers = attacking_stage_modifiers
@@ -452,14 +452,10 @@ def calculate_gen_three_damage(
 
     # Gen 3 Rage has no damage multiplier at all -- it is a plain 20 BP hit whose ONLY
     # effect is +1 Attack stage each time the user is hit while it's active (bug #10).
-    # Model the "N" dropdown as N stacked Attack-stage increases instead of an Nx multiplier.
-    if move.name == gen_three_const.RAGE_MOVE_NAME and custom_move_data:
-        try:
-            rage_hits = int(custom_move_data)
-            attacking_stage_modifiers = copy.deepcopy(attacking_stage_modifiers)
-            attacking_stage_modifiers.attack_stage = min(attacking_stage_modifiers.attack_stage + rage_hits, 6)
-        except ValueError:
-            pass
+    # That stage change is driven by the move's ATK+1-self `effects` entry through the
+    # normal stat-stage-setup dropdown (like Metal Claw/Charge Beam), not a per-call
+    # custom_move_data override here -- doing it that way lets the boost persist and
+    # affect every other move in the matchup, not just Rage's own damage number.
 
     # Spit Up / Future Sight / Doom Desire never actually crit (their scripts never call
     # critcalc) even though the UI may still ask for their "crit" range -- treat that as
@@ -653,8 +649,9 @@ def calculate_gen_three_damage(
         temp *= 2
     
     # handle all the special moves that may affect the damage formula in other ways
-    # (Rollout, Fury Cutter, Rage and Triple Kick are now resolved as base-power/stage
-    # changes earlier, not as a final-damage multiplier -- bugs #1, #3, #4, #10)
+    # (Rollout, Fury Cutter and Triple Kick are now resolved as base-power changes
+    # earlier, not as a final-damage multiplier -- bugs #1, #3, #4; Rage's stage
+    # change is handled via its moves.json effect entry -- bug #10)
     move_modifier = 1
 
     if move.name == gen_three_const.SPIT_UP_MOVE_NAME:
