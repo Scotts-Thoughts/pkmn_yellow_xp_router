@@ -688,6 +688,10 @@ class Constants:
         self.GAME_SAVED_FRAGMENT = "Game Saved: "
         self.RECORDING_ERROR_FRAGMENT = "ERROR RECORDING! "
         self.BACKPORT_SPECIES_CHECK = "backport"
+        # trainer_class of the champion in the trainer DBs; recorders use it to
+        # know a win is followed by the Hall of Fame autosave + credits reboot
+        self.CHAMPION_TRAINER_CLASS = "Champion"
+        self.POST_CHAMPION_AUTOSAVE_LOCATION = "Post-Champion Autosave"
 
         self.RECORDING_STATUS_DISCONNECTED = "Disconnected"
         self.RECORDING_STATUS_CONNECTED = "Connected"

@@ -523,6 +523,7 @@ pub const RECOIL_FLAVOR_DIVISORS: [(&str, i64); 3] = [
     (FLAVOR_RECOIL_HALF, 2),
 ];
 pub const RECOIL_MAX_HP_FLAVOR_DIVISORS: [(&str, i64); 1] = [(FLAVOR_RECOIL_QUARTER_MAX_HP, 4)];
+pub const ROCK_HEAD_ABILITY: &str = "Rock Head";
 
 pub const STRUGGLE_MOVE_NAME: &str = "Struggle";
 pub const MIMIC_MOVE_NAME: &str = "Mimic";
@@ -657,6 +658,10 @@ pub const DEFAULT_SEND_OUT_TIME: f64 = 0.75;
 pub const GAME_SAVED_FRAGMENT: &str = "Game Saved: ";
 pub const RECORDING_ERROR_FRAGMENT: &str = "ERROR RECORDING! ";
 pub const BACKPORT_SPECIES_CHECK: &str = "backport";
+// trainer_class of the champion in the trainer DBs; recorders use it to know a
+// win is followed by the Hall of Fame autosave + credits reboot
+pub const CHAMPION_TRAINER_CLASS: &str = "Champion";
+pub const POST_CHAMPION_AUTOSAVE_LOCATION: &str = "Post-Champion Autosave";
 
 pub const RECORDING_STATUS_DISCONNECTED: &str = "Disconnected";
 pub const RECORDING_STATUS_CONNECTED: &str = "Connected";

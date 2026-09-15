@@ -872,6 +872,13 @@ class OverworldState(WatchForResetState):
                 )
         elif new_prop.path in gh_gen_three_const.ALL_KEYS_ALL_ITEM_FIELDS:
             return StateType.INVENTORY_CHANGE
+        elif new_prop.path == gh_gen_three_const.KEY_PLAYER_MONEY:
+            # Money can move in the overworld without a bag change arriving first:
+            # the whiteout halving, or a sale whose money update lands before the
+            # bag slot update. Let InventoryChangeState classify it against the
+            # money cache; otherwise the cache goes stale and the next sale
+            # after a blackout is recorded as a plain Use/Drop
+            return StateType.INVENTORY_CHANGE
         elif new_prop.path == gh_gen_three_const.KEY_PLAYER_MON_SPECIES:
             if not prev_prop.value:
                 self._waiting_for_registration = True

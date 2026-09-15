@@ -37,7 +37,12 @@ generation: registration, area folders (and "Trip 2"), wild / trainer /
 multi-mon / double battles with switches, level-ups with and without a learned
 move, pickups, purchases, sales, item use, rare candy, vitamin, TM, HM, tutor,
 held items, heal / save, trainer losses with blackouts, and soft resets. All
-five record byte-identical routes in both apps.
+five record byte-identical routes in both apps. `emerald_geodude` also covers
+two gen 3 recorder regressions: a sale right after a whiteout (the halving is a
+money change with no bag change, and the sale's money lands before the bag
+slot) must come out as a sale, and a champion win must survive the credits
+reboot (the recorder adds the Hall of Fame autosave so the "reset" has nothing
+to roll back).
 
 ## Reading a difference
 

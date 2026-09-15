@@ -617,6 +617,17 @@ class Machine:
                                 for e in self._events_to_generate
                             )
                             if not _has_pending_loss:
+                                # Beating the champion runs the Hall of Fame, which saves the
+                                # game, then the credits reboot to the title screen. The reboot
+                                # looks exactly like a soft reset to the FSM, so record the
+                                # autosave here or game_reset() rolls the route back past the
+                                # champion fight (and anything done between the last manual
+                                # save and it)
+                                if trainer.trainer_class == const.CHAMPION_TRAINER_CLASS:
+                                    logger.info(f"Champion {_trn} defeated, recording the Hall of Fame autosave")
+                                    self._controller.add_event(
+                                        EventDefinition(save=SaveEventDefinition(location=const.POST_CHAMPION_AUTOSAVE_LOCATION))
+                                    )
                                 self._controller.check_final_trainer(_trn)
 
                             continue

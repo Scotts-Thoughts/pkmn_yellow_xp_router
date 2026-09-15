@@ -21,6 +21,7 @@ RICK = 615            # Bug Catcher Rick, Route102: Wurmple L4, Wurmple L4, $64
 ALLEN = 333           # Youngster Allen, Route102: Zigzagoon L4, Taillow L3, $48
 GINA_MIA = 483        # Twins Gina & Mia, Route104 (double): Seedot L6, Lotad L6, $144
 CINDY = 114           # Lady Cindy, Route104: Zigzagoon L7, $1400
+WALLACE = 335         # Champion Wallace, EverGrandeCity: Wailord L57 ... Milotic L58, $11600
 
 
 def initial_properties() -> dict:
@@ -343,17 +344,60 @@ def build() -> Scenario:
     s.set("battle.yourPokemon.hp", 0)
     s.tick(2)
     g.end_battle(outcome="LOST")
+    s.note("the whiteout halves the money in the overworld: a money change with no bag change")
+    g.set_money(g.money // 2)
+    s.tick(4)
     g.go_to("PETALBURG_CITY")
     s.set("pointers.sStpTracking", "HEAL")
     s.tick(2)
     s.set("pointers.sStpTracking", None)
     s.tick(1)
 
+    s.note("sell a potion right after the whiteout; the money lands in the same batch, before the bag slot")
+    # the sale price (75) is below the halved amount, so a recorder that missed the
+    # halving compares against the old total and calls this a Use/Drop
+    g.money += 75
+    s.set("player.bag.money", g.money, "player.bag.items.0.quantity", 1)
+    s.tick(4)
+
     s.note("Route 104 again (a second trip), one more wild fight")
     g.go_to("ROUTE_104")
     g.start_wild("Taillow", 4, 16)
     g.ko_first(17)
     g.end_battle()
+
+    s.note("champion: save, beat Wallace, then the Hall of Fame autosave and the credits reboot")
+    g.go_to("EVER_GRANDE_CITY")
+    s.set("pointers.sStpTracking", "SAVE")
+    s.tick(2)
+    s.set("pointers.sStpTracking", None)
+    s.tick(1)
+    g.start_trainer(WALLACE, [("Wailord", 57, 200), ("Tentacruel", 55, 180), ("Ludicolo", 56, 190), ("Whiscash", 56, 190), ("Gyarados", 56, 190), ("Milotic", 58, 200)])
+    g.ko_first(2000)
+    g.next_enemy(1, "Tentacruel", 55, 180)
+    g.ko_first(1900)
+    g.next_enemy(2, "Ludicolo", 56, 190)
+    g.ko_first(1900)
+    g.next_enemy(3, "Whiscash", 56, 190)
+    g.ko_first(1900)
+    g.next_enemy(4, "Gyarados", 56, 190)
+    g.ko_first(2000)
+    g.next_enemy(5, "Milotic", 58, 200)
+    g.ko_first(2100)
+    g.level_up(11)
+    g.end_battle(prize=11600)
+    # the credits end with a reboot to the title screen; the game itself saved during
+    # the Hall of Fame, so nothing between the Ever Grande save and here may be lost
+    s.wait(0.75)
+    s.set("player.playerId", 0, "pointers.dma1", 0)
+    s.tick(2)
+    s.set("player.playerId", 54321, "pointers.dma1", 0x2024000)
+    s.set("overworld.mapName", "LITTLEROOT_TOWN")
+    s.tick(4)
+
+    s.note("post-game: pick up the S.S. Ticket")
+    s.set("player.bag.keyItems.1.item", "SS TICKET")
+    s.tick(4)
 
     s.note("done")
     s.tick(3)

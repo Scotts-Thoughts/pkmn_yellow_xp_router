@@ -1563,6 +1563,13 @@ impl Gen3Machine {
             self.overworld.propagate_held_item_flag = true;
         } else if self.keys.all_item_fields.contains(&new.path) {
             return GameState::InventoryChange;
+        } else if new.path == self.keys.player_money {
+            // Money can move in the overworld without a bag change arriving first:
+            // the whiteout halving, or a sale whose money update lands before the
+            // bag slot update. Let InventoryChange classify it against the money
+            // cache; otherwise the cache goes stale and the next sale after a
+            // blackout is recorded as a plain Use/Drop
+            return GameState::InventoryChange;
         } else if new.path == self.keys.mon_species {
             if !prev.truthy() {
                 self.overworld.waiting_for_registration = true;
@@ -1716,6 +1723,15 @@ fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv: &Gen3Conv
             let loss_flag = trainer_loss_flag();
             let has_pending_loss = ctx.queue.any(|e| e.trainer_def.as_ref().map(|t| t.trainer_name == td.trainer_name).unwrap_or(false) && e.notes == loss_flag);
             if !has_pending_loss {
+                // Beating the champion runs the Hall of Fame, which saves the game,
+                // then the credits reboot to the title screen. The reboot looks
+                // exactly like a soft reset to the FSM, so record the autosave here
+                // or game_reset() rolls the route back past the champion fight (and
+                // anything done between the last manual save and it)
+                if trainer.trainer_class == consts::CHAMPION_TRAINER_CLASS {
+                    log::info!("Champion {} defeated, recording the Hall of Fame autosave", trainer_name);
+                    ctx.controller.add_event(EventDefinition::with_save(consts::POST_CHAMPION_AUTOSAVE_LOCATION));
+                }
                 ctx.controller.check_final_trainer(&trainer_name);
             }
             return;

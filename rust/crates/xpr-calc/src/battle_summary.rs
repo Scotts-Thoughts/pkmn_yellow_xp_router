@@ -895,9 +895,24 @@ impl BattleSummary {
             (opts, info, sel)
         };
 
+        let attack_flavor = if attacking_mon.ability == consts::ROCK_HEAD_ABILITY {
+            mv.attack_flavor
+                .iter()
+                .filter(|f| {
+                    f.as_str() != consts::FLAVOR_RECOIL_QUARTER
+                        && f.as_str() != consts::FLAVOR_RECOIL_THIRD
+                        && f.as_str() != consts::FLAVOR_RECOIL_HALF
+                        && f.as_str() != consts::FLAVOR_RECOIL_QUARTER_MAX_HP
+                })
+                .cloned()
+                .collect()
+        } else {
+            mv.attack_flavor.clone()
+        };
+
         Some(MoveRenderInfo {
             name: display_name,
-            attack_flavor: mv.attack_flavor.clone(),
+            attack_flavor,
             min_damage: normal_ranges.as_ref().map(|r| r.min_damage).unwrap_or(-1),
             max_damage: normal_ranges.as_ref().map(|r| r.max_damage).unwrap_or(-1),
             crit_min_damage: crit_ranges.as_ref().map(|r| r.min_damage).unwrap_or(-1),
