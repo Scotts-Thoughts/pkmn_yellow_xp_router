@@ -1081,13 +1081,11 @@ class BattleSummaryController:
         if trainer_def.stat_stage_setup:
             self._stat_stage_setup = []
             num_pokemon = len(event_group.event_definition.get_pokemon_list())
+            display_to_def = self._display_to_def_map()
             for display_idx in range(num_pokemon):
-                if display_idx < len(self._cached_definition_order):
-                    def_idx = self._cached_definition_order[display_idx]
-                    if def_idx < len(trainer_def.stat_stage_setup):
-                        self._stat_stage_setup.append(copy.deepcopy(trainer_def.stat_stage_setup[def_idx]))
-                    else:
-                        self._stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
+                def_idx = display_to_def.get(display_idx)
+                if def_idx is not None and def_idx < len(trainer_def.stat_stage_setup):
+                    self._stat_stage_setup.append(copy.deepcopy(trainer_def.stat_stage_setup[def_idx]))
                 else:
                     self._stat_stage_setup.append({const.PLAYER_KEY: {}, const.ENEMY_KEY: {}})
         else:
@@ -1099,7 +1097,7 @@ class BattleSummaryController:
         self._collapsed_mons = set()
         if trainer_def.collapsed_mons:
             stored = set(trainer_def.collapsed_mons)
-            for display_idx, def_idx in enumerate(self._cached_definition_order):
+            for def_idx, display_idx in enumerate(self._cached_definition_order):
                 if def_idx in stored:
                     self._collapsed_mons.add(display_idx)
 
@@ -1267,13 +1265,9 @@ class BattleSummaryController:
 
         if is_stat_stage_setup_present:
             # Convert from display order back to definition order
-            def_to_display = {}
-            for display_idx, def_idx in enumerate(self._cached_definition_order):
-                def_to_display[def_idx] = display_idx
-
             final_stat_stage_setup = []
-            for def_idx in sorted(def_to_display.keys()):
-                display_idx = def_to_display[def_idx]
+            for def_idx in range(len(self._cached_definition_order)):
+                display_idx = self._cached_definition_order[def_idx]
                 if display_idx < len(self._stat_stage_setup):
                     final_stat_stage_setup.append(copy.deepcopy(self._stat_stage_setup[display_idx]))
                 else:
@@ -1282,10 +1276,11 @@ class BattleSummaryController:
             final_stat_stage_setup = None
 
         # Convert collapsed_mons from display order (controller state) back to definition order (storage)
+        display_to_def = self._display_to_def_map()
         final_collapsed_mons = sorted({
-            self._cached_definition_order[display_idx]
+            display_to_def[display_idx]
             for display_idx in self._collapsed_mons
-            if 0 <= display_idx < len(self._cached_definition_order)
+            if display_idx in display_to_def
         })
 
         return TrainerEventDefinition(
@@ -1403,20 +1398,23 @@ class BattleSummaryController:
     # Intimidate ability handling
     # ------------------------------------------------------------------
 
+    def _display_to_def_map(self) -> dict:
+        """Inverts `_cached_definition_order` (def_idx -> display_idx) into a
+        display_idx -> def_idx lookup."""
+        return {
+            display_idx: def_idx
+            for def_idx, display_idx in enumerate(self._cached_definition_order)
+        }
+
     def _intimidate_from_def_order(self, raw):
         """Convert a stored definition-order intimidate list to a display-order
         set. Returns None when *raw* is None (apply defaults at use time)."""
         if raw is None:
             return None
-        def_to_display = {
-            def_idx: display_idx
-            for display_idx, def_idx in enumerate(self._cached_definition_order)
-        }
         result = set()
         for def_idx in raw:
-            display_idx = def_to_display.get(def_idx)
-            if display_idx is not None:
-                result.add(display_idx)
+            if 0 <= def_idx < len(self._cached_definition_order):
+                result.add(self._cached_definition_order[def_idx])
         return result
 
     def _intimidate_to_def_order(self, display_set):
@@ -1424,10 +1422,12 @@ class BattleSummaryController:
         indices for storage. Returns None when *display_set* is None."""
         if display_set is None:
             return None
+        display_to_def = self._display_to_def_map()
         result = []
         for display_idx in display_set:
-            if 0 <= display_idx < len(self._cached_definition_order):
-                result.append(self._cached_definition_order[display_idx])
+            def_idx = display_to_def.get(display_idx)
+            if def_idx is not None:
+                result.append(def_idx)
         return sorted(result)
 
     def _player_has_intimidate(self, mon_idx:int) -> bool:

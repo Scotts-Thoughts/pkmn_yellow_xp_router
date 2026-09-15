@@ -455,7 +455,17 @@ class EventDetails(QWidget):
         editor edits first so notes/order being typed aren't clobbered when
         the route reload reseeds the editors."""
         self.force_and_clear_event_update()
-        self._battle_summary_controller.reorder_matchup(from_idx, to_idx)
+        event_to_update = self._controller.get_single_selected_event_id()
+        if self._battle_summary_controller.reorder_matchup(from_idx, to_idx):
+            # The trainer editor (order dropdowns, exp split, pay day) caches
+            # its own copy of the event on load and isn't told about this
+            # out-of-band mon_order change. Resync it now so the next edit
+            # made through the editor (e.g. toggling pay day) saves the new
+            # order instead of clobbering it with its stale snapshot.
+            if self._current_event_editor is not None and event_to_update is not None:
+                live_event_group = self._controller.get_event_by_id(event_to_update)
+                if live_event_group is not None and live_event_group.event_definition is not None:
+                    self._current_event_editor.load_event(live_event_group.event_definition)
 
     # ------------------------------------------------------------------
     # Notes visibility

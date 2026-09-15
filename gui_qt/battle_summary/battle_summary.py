@@ -276,7 +276,7 @@ class BattleSummary(QWidget):
         self._candy_plus_btn.clicked.connect(lambda: self._on_candy_adjust(+1))
         candy_group_layout.addWidget(self._candy_plus_btn)
 
-        controls_layout.addWidget(candy_group)
+        controls_layout.addWidget(candy_group, 0, Qt.AlignVCenter)
 
         # Vitamin-per-stat indicators: [-] [label] [+] per stat.
         # Shows how many vitamins boosting that stat have been used before
@@ -333,20 +333,20 @@ class BattleSummary(QWidget):
             )
             stat_group_layout.addWidget(plus_btn)
 
-            controls_layout.addWidget(stat_group)
+            controls_layout.addWidget(stat_group, 0, Qt.AlignVCenter)
 
             self._vitamin_stat_widgets[stat_key] = (minus_btn, lbl, plus_btn, stat_label)
 
         # Small gap before held item / stat readouts
         _spacer2 = QLabel("")
         _spacer2.setFixedWidth(10)
-        controls_layout.addWidget(_spacer2)
+        controls_layout.addWidget(_spacer2, 0, Qt.AlignVCenter)
 
         # Typable held-item dropdown. Selecting (or typing + Enter / focus-out)
         # adds/updates a Hold event right before the battle.
         held_lbl = QLabel("Held:")
         held_lbl.setStyleSheet("QLabel { border: none; }")
-        controls_layout.addWidget(held_lbl)
+        controls_layout.addWidget(held_lbl, 0, Qt.AlignVCenter)
 
         self._held_item_combo = QComboBox()
         self._held_item_combo.setEditable(True)
@@ -364,7 +364,7 @@ class BattleSummary(QWidget):
         self._held_item_combo.activated.connect(self._on_held_item_activated)
         self._held_item_combo.lineEdit().editingFinished.connect(self._on_held_item_editing_finished)
         self._held_item_options_cache = []
-        controls_layout.addWidget(self._held_item_combo)
+        controls_layout.addWidget(self._held_item_combo, 0, Qt.AlignVCenter)
 
         # Player HP / Speed readouts (going into the battle)
         self._player_hp_label = QLabel("HP -")
@@ -373,7 +373,7 @@ class BattleSummary(QWidget):
             "QLabel { border: 1px solid rgba(255, 255, 255, 0.15);"
             " border-radius: 3px; padding: 1px 3px; }"
         )
-        controls_layout.addWidget(self._player_hp_label)
+        controls_layout.addWidget(self._player_hp_label, 0, Qt.AlignVCenter)
 
         self._player_speed_label = QLabel("Spe -")
         self._player_speed_label.setToolTip("Player Speed entering this battle")
@@ -381,7 +381,7 @@ class BattleSummary(QWidget):
             "QLabel { border: 1px solid rgba(255, 255, 255, 0.15);"
             " border-radius: 3px; padding: 1px 3px; }"
         )
-        controls_layout.addWidget(self._player_speed_label)
+        controls_layout.addWidget(self._player_speed_label, 0, Qt.AlignVCenter)
 
         controls_layout.addStretch(1)
 
