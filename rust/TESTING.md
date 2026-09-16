@@ -124,8 +124,9 @@ Re-run the golden verify with the config toggles that change battle output
 - [ ] Drag & drop: single and multi-select rows onto another row / into a folder; insert indicator line; drop outside the list cancels.
 - [ ] Empty route: "Add New Event" placeholder button.
 - [ ] Scrolling to the selection after keyboard nav never scrolls horizontally.
-- [ ] Filter bar: every type toggle (Trainer, Rare Candy, TM/HM, Vitamin, Wild Pkmn, Acquire, Purchase, Use, Sell, Hold, Level-up move, Save, Heal, Blackout, Evolution, Notes), "Common" and "Reset", the search box (300 ms) — same rows shown as Qt for the same filter.
+- [ ] Filter bar: every type toggle (Trainer, Rare Candy, TM/HM, Vitamin, Wild Pkmn, Acquire, Purchase, Use, Reorder Bag, Sell, Hold, Level-up move, Save, Heal, Blackout, Evolution, Notes), "Common" and "Reset", the search box (300 ms) — same rows shown as Qt for the same filter (Reorder Bag is Rust only).
 - [ ] Run Status chip: "Invalid" when any event errors; clicking it cycles through the invalid events.
+- [ ] Bag reorder (gen 1, Rust only): quick-add "Reorder" / inline "Reorder Bag" insert an empty event; its editor lists the pre-event bag with a drag handle and ▲/▼ per row, a change saves after the 2 s delay and the row label reads `Reorder Bag: A (n) <-> B (m)`; the pre-event inventory panel counts slots from 1. Insert a purchase before a reorder: the row turns amber (not red), the run stays Valid, the details panel shows "Warning: … was at slot …", and rearranging + saving clears it. Recording on Yellow: a SELECT swap in the bag records one reorder event; using up the first item (everything shifts up) records none.
 
 ## 5. Inline event creator
 

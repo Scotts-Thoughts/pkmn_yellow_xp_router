@@ -33,6 +33,9 @@ pub struct EventItem {
     pub init_state: Option<Arc<RouteState>>,
     pub final_state: Option<Arc<RouteState>>,
     pub error_message: String,
+    /// The event applied, but not exactly as written (see
+    /// [`crate::Inventory::swap_items`]). Never counts as an error.
+    pub warning_message: String,
 }
 
 impl EventItem {
@@ -40,9 +43,15 @@ impl EventItem {
         !self.error_message.is_empty()
     }
 
+    pub fn has_warnings(&self) -> bool {
+        !self.warning_message.is_empty()
+    }
+
     pub fn get_tags(&self) -> Vec<&'static str> {
         if self.has_errors() {
             vec![consts::EVENT_TAG_ERRORS]
+        } else if self.has_warnings() {
+            vec![consts::EVENT_TAG_WARNINGS]
         } else {
             Vec::new()
         }
@@ -61,12 +70,18 @@ pub struct EventGroup {
     pub event_definition: EventDefinition,
     pub pkmn_after_levelups: Vec<String>,
     pub error_messages: Vec<String>,
+    /// Warnings collected from the items (the label is kept, unlike errors).
+    pub warning_messages: Vec<String>,
     pub level_up_learn_event_defs: Vec<LearnMoveEventDefinition>,
 }
 
 impl EventGroup {
     pub fn has_errors(&self) -> bool {
         !self.error_messages.is_empty()
+    }
+
+    pub fn has_warnings(&self) -> bool {
+        !self.warning_messages.is_empty()
     }
 
     pub fn get_pkmn_after_levelups(&self) -> String {

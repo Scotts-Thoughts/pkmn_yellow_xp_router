@@ -9,7 +9,7 @@ use xpr_core::Config;
 use xpr_data::model::EnemyPkmn;
 use xpr_data::GenData;
 use xpr_engine::{
-    EventDefinition, EvolutionEventDefinition, HoldItemEventDefinition, InventoryEventDefinition,
+    swaps_between, BagSwap, EventDefinition, EvolutionEventDefinition, HoldItemEventDefinition, InventoryEventDefinition,
     LearnMoveEventDefinition, LevelVal, LocationEventDefinition, RouteState,
     TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition,
 };
@@ -1077,6 +1077,163 @@ impl EvolutionEditor {
 }
 
 // ---------------------------------------------------------------------------
+// Bag reorder editor (gen 1)
+// ---------------------------------------------------------------------------
+
+/// The bag as it is right before the event, rearranged by dragging rows (or
+/// with the arrow buttons). Saving stores the swaps that turn the pre-event
+/// order into the displayed one, so a re-save also refreshes stale slots.
+#[derive(Default)]
+pub struct BagReorderEditor {
+    /// item names in the pre-event order
+    base: Vec<String>,
+    /// `(name, count)` as displayed
+    order: Vec<(String, i64)>,
+    /// the swaps as loaded; handed back untouched until the user rearranges
+    /// the list (every save, a notes edit included, goes through `get_event`)
+    loaded: Vec<BagSwap>,
+    modified: bool,
+    /// the stored swaps did not apply exactly to `base` (the details panel
+    /// shows the engine's warning text above the editor)
+    stale: bool,
+}
+
+impl BagReorderEditor {
+    fn rows_of(inv: &xpr_engine::Inventory) -> Vec<(String, i64)> {
+        inv.cur_items.iter().map(|x| (x.base_item.name.clone(), x.num)).collect()
+    }
+
+    pub fn load_event(&mut self, ctx: &EditorCtx, def: &EventDefinition) {
+        self.base = ctx.cur_state.map(|s| s.inventory.item_names()).unwrap_or_default();
+        self.order = ctx.cur_state.map(|s| Self::rows_of(&s.inventory)).unwrap_or_default();
+        self.loaded = def.bag_reorder.as_ref().map(|r| r.swaps.clone()).unwrap_or_default();
+        self.modified = false;
+        self.stale = false;
+        if let (Some(r), Some(st)) = (&def.bag_reorder, ctx.cur_state) {
+            let (inv, warnings) = st.inventory.swap_items(&r.swaps);
+            self.order = Self::rows_of(&inv);
+            self.stale = !warnings.is_empty();
+        }
+    }
+
+    /// The loaded swaps unless the user rearranged the list, in which case
+    /// the swaps that turn the pre-event bag into the displayed order (which
+    /// is also how stale slots get refreshed).
+    pub fn get_event(&self) -> Result<EventDefinition, String> {
+        if !self.modified {
+            return Ok(EventDefinition::with_bag_reorder(self.loaded.clone()));
+        }
+        let order: Vec<String> = self.order.iter().map(|x| x.0.clone()).collect();
+        Ok(EventDefinition::with_bag_reorder(swaps_between(&self.base, &order)?))
+    }
+
+    /// Move the item at `from` so that it lands before the item currently at
+    /// `to` (`to == len` appends).
+    fn move_item(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.order.len() || to > self.order.len() {
+            return false;
+        }
+        let dest = if to > from { to - 1 } else { to };
+        if dest == from {
+            return false;
+        }
+        let item = self.order.remove(from);
+        self.order.insert(dest, item);
+        true
+    }
+
+    pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx) -> EditorOutput {
+        let theme = ctx.theme;
+        let mut out = EditorOutput::default();
+        if self.order.is_empty() {
+            widgets::label(ui, theme, "The bag is empty before this event.");
+            return out;
+        }
+        widgets::label(ui, theme, "Drag a row (or use the arrows) to rearrange the bag:");
+        let font = theme.body();
+        let n = self.order.len();
+        let mut drop: Option<(usize, usize)> = None;
+        let mut nudge: Option<(usize, bool)> = None;
+        let mut row_rects: Vec<egui::Rect> = Vec::with_capacity(n);
+        let zone = egui::Frame::new().inner_margin(egui::Margin::same(2));
+        let (_, dropped_on_zone) = ui.dnd_drop_zone::<usize, ()>(zone, |ui| {
+            ui.spacing_mut().item_spacing = Vec2::new(4.0, 2.0);
+            for idx in 0..n {
+                let (name, count) = self.order[idx].clone();
+                let row_id = ui.id().with(("bag_row", idx));
+                let row = ui.horizontal(|ui| {
+                    let handle = |ui: &mut Ui| {
+                        let (r, _) = ui.allocate_exact_size(Vec2::new(16.0, font.size * 1.4), Sense::hover());
+                        ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "\u{2630}", font.clone(), theme.secondary);
+                    };
+                    if ctx.enabled {
+                        ui.dnd_drag_source(row_id, idx, handle);
+                    } else {
+                        handle(ui);
+                    }
+                    let label = format!("{:>2}. {}x {}", idx + 1, count, name);
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(220.0_f32.max(widgets::text_width(ui, &label, &font) + 4.0), font.size * 1.4), Sense::hover());
+                    ui.painter().text(Pos2::new(r.min.x + 2.0, r.center().y), egui::Align2::LEFT_CENTER, &label, font.clone(), theme.text);
+                    if widgets::amount_button(ui, theme, "\u{25B2}", ctx.enabled && idx > 0).clicked() {
+                        nudge = Some((idx, true));
+                    }
+                    if widgets::amount_button(ui, theme, "\u{25BC}", ctx.enabled && idx + 1 < n).clicked() {
+                        nudge = Some((idx, false));
+                    }
+                });
+                row_rects.push(row.response.rect);
+                if !ctx.enabled {
+                    continue;
+                }
+                let response = &row.response;
+                if let (Some(pointer), Some(hovered)) = (ui.input(|i| i.pointer.interact_pos()), response.dnd_hover_payload::<usize>()) {
+                    let rect = response.rect;
+                    let stroke = egui::Stroke::new(2.0_f32, theme.accent);
+                    let insert_at = if *hovered == idx {
+                        idx
+                    } else if pointer.y < rect.center().y {
+                        ui.painter().hline(rect.x_range(), rect.top(), stroke);
+                        idx
+                    } else {
+                        ui.painter().hline(rect.x_range(), rect.bottom(), stroke);
+                        idx + 1
+                    };
+                    if let Some(from) = response.dnd_release_payload::<usize>() {
+                        drop = Some((*from, insert_at));
+                    }
+                }
+            }
+        });
+        if let Some(from) = dropped_on_zone {
+            // released on the list but between rows (or on its padding): insert
+            // before the first row below the pointer, else append
+            let pointer_y = ui.input(|i| i.pointer.interact_pos()).map(|p| p.y);
+            let insert_at = pointer_y.and_then(|y| row_rects.iter().position(|r| y < r.center().y)).unwrap_or(n);
+            drop = Some((*from, insert_at));
+        }
+        let mut changed = false;
+        if let Some((from, to)) = drop {
+            changed |= self.move_item(from, to);
+        }
+        if let Some((idx, up)) = nudge {
+            // the buttons are only enabled where the neighbour exists
+            let other = if up { idx - 1 } else { idx + 1 };
+            self.order.swap(idx, other);
+            changed = true;
+        }
+        if changed {
+            self.modified = true;
+            self.stale = false;
+            out.merge(EditorOutput::delayed());
+        }
+        if self.stale {
+            widgets::label_colored(ui, theme, "The bag before this event no longer matches what was recorded; rearranging it here saves the order as shown.", theme.warning);
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Notes editor (the footer)
 // ---------------------------------------------------------------------------
 
@@ -1185,6 +1342,7 @@ pub struct EventEditors {
     pub inventory: InventoryEventEditor,
     pub location: LocationEditor,
     pub evolution: EvolutionEditor,
+    pub bag_reorder: BagReorderEditor,
 }
 
 impl EventEditors {
@@ -1214,6 +1372,7 @@ impl EventEditors {
                 self.evolution.configure(ctx);
                 self.evolution.load_event(ctx, def);
             }
+            consts::TASK_REORDER_BAG => self.bag_reorder.load_event(ctx, def),
             _ => {}
         }
     }
@@ -1228,6 +1387,7 @@ impl EventEditors {
             consts::TASK_GET_FREE_ITEM | consts::TASK_PURCHASE_ITEM | consts::TASK_USE_ITEM | consts::TASK_SELL_ITEM | consts::TASK_HOLD_ITEM => self.inventory.get_event(),
             consts::TASK_SAVE | consts::TASK_HEAL | consts::TASK_BLACKOUT => Ok(self.location.get_event(ctx.event_type)),
             consts::TASK_EVOLUTION => Ok(self.evolution.get_event()),
+            consts::TASK_REORDER_BAG => self.bag_reorder.get_event(),
             _ => Ok(EventDefinition::default()),
         }
     }
@@ -1247,6 +1407,7 @@ impl EventEditors {
                 }
                 consts::TASK_SAVE | consts::TASK_HEAL | consts::TASK_BLACKOUT => (self.location.ui(ui, ctx), false),
                 consts::TASK_EVOLUTION => (self.evolution.ui(ui, ctx), false),
+                consts::TASK_REORDER_BAG => (self.bag_reorder.ui(ui, ctx), false),
                 _ => (EditorOutput::default(), false),
             }
         })

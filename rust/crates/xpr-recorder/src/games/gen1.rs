@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use xpr_core::consts;
 use xpr_data::GenData;
-use xpr_engine::{EventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
+use xpr_engine::{swaps_between, BagSwap, EventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
 
 use super::common::*;
 use crate::controller::{fix_key, fix_keys, dedupe, is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
@@ -766,9 +766,44 @@ impl Gen1Machine {
         new_cache
     }
 
+    /// The swaps that explain a bag whose surviving items changed relative
+    /// order between two snapshots (the in-game SELECT swap). Computed
+    /// against the bag as the engine will see it *after* the quantity events
+    /// of the same window: survivors in their old order, then the new items
+    /// in bag order. Oak's Parcel never reaches the route, so it is dropped
+    /// from both orders before the slots are numbered.
+    fn detect_bag_reorder(&self, old: &ItemCache, new: &ItemCache) -> Option<Vec<BagSwap>> {
+        // the deprecated mapper reports the bag terminator as an item
+        let is_real = |raw: &&Value| !raw.as_str().map(|s| s == END_OF_ITEM_LIST).unwrap_or(false);
+        let to_app = |raw: &Value| -> String { self.conv.item_name_convert(raw.as_str()).unwrap_or_else(|| "None".into()) };
+        // only what the engine's bag can hold counts as a slot: no parcel, and
+        // no item the item DB does not know (its acquire never reached the route)
+        let in_route = |n: &String| n != OAKS_PARCEL && self.gen.item_db().get_item(n).is_some();
+        let old_names: Vec<String> = old.keys().filter(is_real).map(to_app).filter(in_route).collect();
+        let new_names: Vec<String> = new.keys().filter(is_real).map(to_app).filter(in_route).collect();
+        let mut expected: Vec<String> = old_names.iter().filter(|n| new_names.contains(n)).cloned().collect();
+        let survivors_new: Vec<&String> = new_names.iter().filter(|n| old_names.contains(n)).collect();
+        if expected.iter().eq(survivors_new.iter().copied()) {
+            return None;
+        }
+        // the survivors differ in order, so at least one swap follows
+        expected.extend(new_names.iter().filter(|n| !old_names.contains(n)).cloned());
+        match swaps_between(&expected, &new_names) {
+            Ok(swaps) => {
+                log::info!("Bag reorder detected: {}", swaps.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", "));
+                Some(swaps)
+            }
+            Err(e) => {
+                log::error!("Bag order changed but could not be expressed as swaps ({}): from {:?} to {:?}", e, old_names, new_names);
+                None
+            }
+        }
+    }
+
     fn item_cache_update(&mut self, store: &PropertyStore, generate_events: bool, purchase_expected: bool, sale_expected: bool, vitamin_flag: bool, candy_flag: bool, tm_flag: bool) {
         let new_cache = self.item_cache(store);
         let (gained_items, lost_items) = item_diff(&self.cached_items, &new_cache);
+        let reorder = if generate_events { self.detect_bag_reorder(&self.cached_items, &new_cache) } else { None };
         self.cached_items = new_cache;
         if !generate_events {
             return;
@@ -814,6 +849,10 @@ impl Gen1Machine {
             } else {
                 self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_lost_num, false, sale_expected, None)));
             }
+        }
+        // after the quantity events, so the engine applies it to the bag they produce
+        if let Some(swaps) = reorder {
+            self.queue_new_event(EventDefinition::with_bag_reorder(swaps));
         }
     }
 
@@ -1357,6 +1396,15 @@ fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition) {
         if gen.pkmn_db().get_pkmn(&w.name).is_none() {
             ctx.add_error(format!("Failed to find wild pokemon from GameHook: {} for event {}", w.name, event_str(gen, &cur_event)));
             return;
+        }
+    } else if let Some(r) = &cur_event.bag_reorder {
+        for swap in &r.swaps {
+            for name in [&swap.item_a, &swap.item_b] {
+                if gen.item_db().get_item(name).is_none() {
+                    ctx.add_error(format!("Failed to find item from GameHook: {} for event {}", name, event_str(gen, &cur_event)));
+                    return;
+                }
+            }
         }
     }
     log::info!("adding new event: {}", event_str(gen, &cur_event));

@@ -7,8 +7,8 @@ use egui::{Color32, CornerRadius, Id, Stroke, Ui};
 use xpr_core::consts;
 use xpr_data::GenData;
 use xpr_engine::{
-    EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, NodeId,
-    RouteState, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition,
+    BagSwap, EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal,
+    NodeId, RouteState, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition,
 };
 use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets::{self, AmountEntry, Entry, SearchableDropdown, StyledButton};
@@ -19,13 +19,14 @@ use crate::editors::slot_template;
 pub const INLINE_ROW_HEIGHT: f32 = 34.0;
 
 /// (display name, internal key)
-pub const EVENT_TYPES: [(&str, &str); 16] = [
+pub const EVENT_TYPES: [(&str, &str); 17] = [
     ("Fight Trainer", "trainer"),
     ("Get Item", "get_item"),
     ("Buy Item", "buy_item"),
     ("Sell Item", "sell_item"),
     ("Use/Drop Item", "use_item"),
     ("Hold Item", "hold_item"),
+    ("Reorder Bag", "reorder_bag"),
     ("Wild Pkmn", "wild_pkmn"),
     ("Rare Candy", "rare_candy"),
     ("Vitamin", "vitamin"),
@@ -47,6 +48,7 @@ pub fn key_for_event_type(event_type: &str) -> Option<&'static str> {
         consts::TASK_SELL_ITEM => "sell_item",
         consts::TASK_USE_ITEM => "use_item",
         consts::TASK_HOLD_ITEM => "hold_item",
+        consts::TASK_REORDER_BAG => "reorder_bag",
         consts::TASK_FIGHT_WILD_PKMN => "wild_pkmn",
         consts::TASK_RARE_CANDY => "rare_candy",
         consts::TASK_VITAMIN => "vitamin",
@@ -83,6 +85,9 @@ struct ConfigState {
     dest: String,
     dest_options: Vec<String>,
     note: String,
+    /// the swaps of a reorder event being edited (the strip has no field for
+    /// them; the details panel is where the order is arranged)
+    swaps: Vec<BagSwap>,
 }
 
 /// Focus targets in layout order.
@@ -368,6 +373,11 @@ impl InlineEventCreator {
                 }
             }
             "notes" => self.cfg.note = def.notes.clone(),
+            "reorder_bag" => {
+                if let Some(r) = &def.bag_reorder {
+                    self.cfg.swaps = r.swaps.clone();
+                }
+            }
             _ => {}
         }
     }
@@ -511,6 +521,8 @@ impl InlineEventCreator {
                 }
             }
             Some("notes") => Some(EventDefinition::notes_only(&self.cfg.note)),
+            // a new reorder starts empty: the order is arranged in the details panel
+            Some("reorder_bag") => Some(EventDefinition::with_bag_reorder(self.cfg.swaps.clone())),
             Some("save") => Some(EventDefinition::with_save("")),
             Some("heal") => Some(EventDefinition::with_heal("")),
             Some("blackout") => Some(EventDefinition::with_blackout()),
@@ -555,7 +567,10 @@ impl InlineEventCreator {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 // ---- type combo ----
-                let names: Vec<String> = EVENT_TYPES.iter().map(|(d, _)| d.to_string()).collect();
+                // the bag can only be reordered in gen 1
+                // (still offered while editing an existing one, whatever the route's gen)
+                let gen1 = ctrl.gen().map(|g| g.supports_bag_reorder()).unwrap_or(false) || self.type_key == Some("reorder_bag");
+                let names: Vec<String> = EVENT_TYPES.iter().filter(|(_, k)| gen1 || *k != "reorder_bag").map(|(d, _)| d.to_string()).collect();
                 let before = self.type_text.clone();
                 let r = SearchableDropdown::new(theme, self.id.with("type"), &mut self.type_text, &names)
                     .widths(110.0, 140.0)

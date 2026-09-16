@@ -110,6 +110,10 @@ impl Router {
                     }
                     return vec![consts::HIGHLIGHT_LABEL];
                 }
+                // a warning is not an error: the user's highlight still wins
+                if g.has_warnings() {
+                    return vec![consts::EVENT_TAG_WARNINGS];
+                }
                 if self.is_major_fight(id) {
                     if color_major_battles {
                         if let Some(td) = &g.event_definition.trainer_def {

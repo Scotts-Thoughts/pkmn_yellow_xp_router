@@ -10,9 +10,10 @@ pub mod undo;
 pub mod view;
 
 pub use events::{
-    EvolutionEventDefinition, EventDefinition, HoldItemEventDefinition, InventoryEventDefinition,
-    LearnMoveEventDefinition, LevelUpKey, LevelVal, LocationEventDefinition, RareCandyEventDefinition,
-    TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition,
+    swaps_between, BagReorderEventDefinition, BagSwap, EvolutionEventDefinition, EventDefinition,
+    HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelUpKey, LevelVal,
+    LocationEventDefinition, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition,
+    WildPkmnEventDefinition,
 };
 pub use router::{InsertSpec, Router};
 pub use state::{BagItem, Inventory, RouteState, SoloPokemon};

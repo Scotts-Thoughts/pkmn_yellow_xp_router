@@ -562,7 +562,7 @@ impl XprApp {
             }
         }
         // filters (application-wide; the handlers check the text-field flag)
-        let filters: [(&str, &str); 16] = [
+        let filters: [(&str, &str); 17] = [
             ("filter_trainer", consts::TASK_TRAINER_BATTLE),
             ("filter_rare_candy", consts::TASK_RARE_CANDY),
             ("filter_tm_hm", consts::TASK_LEARN_MOVE_TM),
@@ -571,6 +571,7 @@ impl XprApp {
             ("filter_acquire_item", consts::TASK_GET_FREE_ITEM),
             ("filter_purchase_item", consts::TASK_PURCHASE_ITEM),
             ("filter_use_item", consts::TASK_USE_ITEM),
+            ("filter_reorder_bag", consts::TASK_REORDER_BAG),
             ("filter_sell_item", consts::TASK_SELL_ITEM),
             ("filter_hold_item", consts::TASK_HOLD_ITEM),
             ("filter_levelup_move", consts::TASK_LEARN_MOVE_LEVELUP),
@@ -582,6 +583,13 @@ impl XprApp {
         ];
         for (aid, et) in filters {
             if fire(aid) && !text_focus {
+                // the reorder filter only exists on gen 1 routes (turning an active one off is always allowed)
+                if et == consts::TASK_REORDER_BAG {
+                    let active = self.ctrl.get_route_filter_types().map(|f| f.iter().any(|t| t == et)).unwrap_or(false);
+                    if !active && !self.ctrl.gen().map(|g| g.supports_bag_reorder()).unwrap_or(false) {
+                        continue;
+                    }
+                }
                 FilterBar::toggle_filter_type(&mut self.ctrl, et);
             }
         }
@@ -1714,6 +1722,12 @@ impl XprApp {
                     Ok("battle_last") => {
                         let last = self.ctrl.router.all_groups().into_iter().filter(|g| self.ctrl.router.group(*g).map(|x| x.event_definition.trainer_def.is_some()).unwrap_or(false)).last();
                         if let Some(g) = last {
+                            self.ctrl.select_new_events(vec![g]);
+                        }
+                    }
+                    Ok("last") => {
+                        // select the last event of the route (its editor shows in the details panel)
+                        if let Some(g) = self.ctrl.router.all_groups().into_iter().last() {
                             self.ctrl.select_new_events(vec![g]);
                         }
                     }

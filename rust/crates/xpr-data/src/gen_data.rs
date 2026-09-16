@@ -83,6 +83,13 @@ impl GenData {
         self.gen.number()
     }
 
+    /// Whether the route can hold bag-reorder events (the gen 1 SELECT swap).
+    /// The engine applies such events whatever the version; this gates the
+    /// recorder and the UI's ways of creating and filtering them.
+    pub fn supports_bag_reorder(&self) -> bool {
+        self.get_generation() == 1
+    }
+
     pub fn pkmn_db(&self) -> &PkmnDB {
         &self.pkmn_db
     }

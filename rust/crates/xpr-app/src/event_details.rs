@@ -447,6 +447,22 @@ impl EventDetails {
         true
     }
 
+    /// The warnings of the selected event (an event that applied, but not
+    /// exactly as written); shown above its editor.
+    fn selected_warnings(ctrl: &MainController) -> Vec<String> {
+        let Some(id) = ctrl.get_single_selected_event_id(true) else { return Vec::new() };
+        match ctrl.router.obj_kind(id) {
+            Some(ObjKind::Group) => ctrl.router.group(id).map(|g| g.warning_messages.clone()).unwrap_or_default(),
+            Some(ObjKind::Item) => ctrl
+                .router
+                .item(id)
+                .filter(|i| i.has_warnings())
+                .map(|i| vec![i.warning_message.clone()])
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        }
+    }
+
     fn pre_state_tab(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, ctrl: &mut MainController) {
         egui::ScrollArea::both().id_salt("pre_state_scroll").auto_shrink([false, false]).show(ui, |ui| {
             egui::Frame::new().inner_margin(egui::Margin::same(4)).show(ui, |ui| {
@@ -454,6 +470,9 @@ impl EventDetails {
                 let gen = ctrl.gen();
                 let state = self.current_init_state.clone();
                 state_views::state_viewer(ui, theme, gen.as_deref(), state.as_deref(), &mut self.last_pkmn);
+                for w in Self::selected_warnings(ctrl) {
+                    widgets::label_colored(ui, theme, format!("Warning: {}", w), theme.warning);
+                }
                 if let (Some(et), Some(gen)) = (self.current_event_type.clone(), gen) {
                     let init = self.current_init_state.clone();
                     let ctx = EditorCtx { theme, gen: &gen, cfg, cur_state: init.as_deref(), event_type: &et, enabled: self.allow_updates };

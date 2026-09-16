@@ -119,6 +119,34 @@ down while getting there:
 - Gen 4's `[EXP_SPLIT]` / `InventoryChangeState._on_exit` debug logging is
   not reproduced line for line.
 
+### Bag reordering (gen 1, Rust only; added 2026-09-16)
+
+The gen 1 recorder records the in-game SELECT swap as a `"Reorder Bag"`
+event (`docs/rust_port/BAG_REORDER_PLAN.md`): a list of
+`[item, slot, item, slot]` swaps, 1-based, computed against the bag as the
+engine holds it after the quantity events of the same detection window
+(Oak's Parcel, which never reaches the route, is not a slot). The Python app
+has no such event type, so it opens one as an empty notes event and drops it
+on re-save; the replay harness cannot compare it. Things to know:
+
+- **Slots are exact only when recorded.** The engine applies a swap by item
+  *name*; a stored slot that no longer matches (an item was added or removed
+  earlier in the route, or the route's starting bag differs from the
+  console's) still swaps and flags a **warning** (amber row, label kept, run
+  status still Valid, not an "invalid event"); a swap naming an item that is
+  no longer in the bag is skipped with a warning. Re-saving the event from
+  its editor stores the order as shown, which refreshes the slots.
+- Warnings are a new third row state (`EVENT_TAG_WARNINGS`,
+  `EventItem::warning_message`, `EventGroup::warning_messages`); folders do
+  not propagate them (errors keep their `child_errors` propagation).
+- The pre-event inventory panel numbers slots from 1 (the Qt panel counts
+  from 0) so that it matches the event text.
+- Two stacks of the same item (99 cap) collapse to one in the recorder's
+  cache, as before (first stack's position, second stack's quantity). A swap
+  that only moves the second stack is not seen, and SELECT-merging the two
+  stacks in the game can record a spurious acquire plus a reorder. Needs
+  more than 99 of one item.
+
 ## UI divergences (egui vs. Qt)
 
 Things that are different by design of the toolkit swap, or that the Qt code
@@ -193,5 +221,5 @@ could not do either:
 | `XPR_SMOKE_SCREENSHOT=<file.png>` | Capture the window ~4 s after start and exit (unattended smoke run) |
 | `XPR_SMOKE_DELAY_MS=<ms>` | How long the smoke run waits before the capture (default 4000); raise it to drive the window by hand or with injected input first |
 | `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | With a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of honouring the auto-load preference (`rust/windows_build.py --smoke` uses the latter to prove the packaged exe runs on its own) |
-| `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy\|record` | Before the smoke screenshot: open the battle tab of the first / last trainer, the new-route page, the docked run summary, or the inline creator; `candy` opens the biggest trainer fight (or the one named by `XPR_SMOKE_FIGHT=<substring>`) and clicks "+" candy six times, 700 ms apart, before an 8 s screenshot; `record` starts recording against `XPR_GAMEHOOK_URL`, stops after `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL` (a JSON endpoint) reports `"done": true`, saves the route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshots and exits |
+| `XPR_SMOKE_ACTION=battle\|battle_last\|last\|newroute\|summary\|inline\|candy\|record` | Before the smoke screenshot: open the battle tab of the first / last trainer, select the last event of the route (its editor shows in the details panel), open the new-route page, the docked run summary, or the inline creator; `candy` opens the biggest trainer fight (or the one named by `XPR_SMOKE_FIGHT=<substring>`) and clicks "+" candy six times, 700 ms apart, before an 8 s screenshot; `record` starts recording against `XPR_GAMEHOOK_URL`, stops after `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL` (a JSON endpoint) reports `"done": true`, saves the route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshots and exits |
 | `XPR_FRAME_LOG=1` | Log every frame slower than 1 ms with the route-list and event-details draw times, and every route-list rebuild |

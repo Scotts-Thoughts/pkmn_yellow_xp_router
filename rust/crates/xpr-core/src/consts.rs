@@ -226,6 +226,8 @@ pub const TASK_SAVE: &str = "Game Save";
 pub const TASK_HEAL: &str = "PkmnCenter Heal";
 pub const TASK_BLACKOUT: &str = "Blackout";
 pub const TASK_EVOLUTION: &str = "Evolution";
+/// Gen 1 bag reordering (the in-game SELECT swap). Event type and route-file key.
+pub const TASK_REORDER_BAG: &str = "Reorder Bag";
 pub const TASK_NOTES_ONLY: &str = "Just Notes";
 pub const ERROR_SEARCH: &str = "Invalid Events";
 pub const MAJOR_BATTLE_FILTER: &str = "Major Battles";
@@ -238,7 +240,7 @@ pub const ITEM_ROUTE_EVENT_TYPES: [&str; 5] = [
     TASK_HOLD_ITEM,
 ];
 
-pub const ROUTE_EVENT_TYPES: [&str; 17] = [
+pub const ROUTE_EVENT_TYPES: [&str; 18] = [
     TASK_TRAINER_BATTLE,
     TASK_LEARN_MOVE_LEVELUP,
     TASK_SELL_ITEM,
@@ -249,6 +251,7 @@ pub const ROUTE_EVENT_TYPES: [&str; 17] = [
     TASK_GET_FREE_ITEM,
     TASK_PURCHASE_ITEM,
     TASK_USE_ITEM,
+    TASK_REORDER_BAG,
     TASK_VITAMIN,
     TASK_SAVE,
     TASK_HEAL,
@@ -315,6 +318,9 @@ pub const MARTS: &str = "marts";
 
 pub const EVENT_TAG_IMPORTANT: &str = "important";
 pub const EVENT_TAG_ERRORS: &str = "errors";
+/// An event that applied, but not exactly as written (e.g. a bag swap whose
+/// items were found at other slots). Never makes the run invalid.
+pub const EVENT_TAG_WARNINGS: &str = "warnings";
 pub const EVENT_TAG_BRANCHED_MANDATORY: &str = "branched_mandatory";
 pub const EVENT_TAG_FOLDER: &str = "folder";
 

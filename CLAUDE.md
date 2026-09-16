@@ -1,5 +1,12 @@
 # CLAUDE.md
 
+## Python version is deprecated
+
+The Python version of this program (the `gui`/`controllers` tkinter app and
+its Qt rewrite under `gui_qt`) is deprecated. It should NOT receive updates
+going forward by default. All new work should go into the Rust port instead,
+unless the user explicitly says otherwise for a specific task.
+
 ## Game decompilation repos (reference)
 
 Local clones of the Pokémon decomp projects. Consult these whenever we need to

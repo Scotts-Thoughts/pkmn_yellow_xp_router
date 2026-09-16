@@ -13,6 +13,8 @@ use xpr_data::exp;
 use xpr_data::model::{BaseItem, EnemyPkmn, Nature, PokemonSpecies, StageModifiers, StatBlock};
 use xpr_data::GenData;
 
+use crate::events::BagSwap;
+
 // ---------------------------------------------------------------------------
 // Inventory
 // ---------------------------------------------------------------------------
@@ -150,6 +152,42 @@ impl Inventory {
 
     pub fn has_item(&self, name: &str) -> bool {
         self.cur_items.iter().any(|x| x.base_item.name == name)
+    }
+
+    /// The bag order as item names (slot 1 first).
+    pub fn item_names(&self) -> Vec<String> {
+        self.cur_items.iter().map(|x| x.base_item.name.clone()).collect()
+    }
+
+    /// Apply the swaps of a bag-reorder event, in order. Items are matched by
+    /// name; the recorded slots only decide whether a swap is reported. The
+    /// returned messages are warnings, not errors: a swap whose items sit at
+    /// other slots is still applied, a swap naming an item that is not in the
+    /// bag is skipped, and the bag always ends up in the best order that can
+    /// be made from what is there.
+    pub fn swap_items(&self, swaps: &[BagSwap]) -> (Inventory, Vec<String>) {
+        let mut result = self.clone();
+        let mut warnings = Vec::new();
+        for swap in swaps {
+            let idx_a = result.index_of(&swap.item_a);
+            let idx_b = result.index_of(&swap.item_b);
+            let (Some(a), Some(b)) = (idx_a, idx_b) else {
+                for (name, idx) in [(&swap.item_a, idx_a), (&swap.item_b, idx_b)] {
+                    if idx.is_none() {
+                        warnings.push(format!("Cannot swap {}: no {} in bag", swap.to_string(), name));
+                    }
+                }
+                continue;
+            };
+            if a + 1 != swap.slot_a {
+                warnings.push(format!("{} was at slot {}, not slot {}", swap.item_a, a + 1, swap.slot_a));
+            }
+            if b + 1 != swap.slot_b {
+                warnings.push(format!("{} was at slot {}, not slot {}", swap.item_b, b + 1, swap.slot_b));
+            }
+            result.cur_items.swap(a, b);
+        }
+        (result, warnings)
     }
 }
 
@@ -774,6 +812,13 @@ impl RouteState {
             None,
         )?;
         Ok((RouteState::new(mon, self.badges.clone(), inv), error_message))
+    }
+
+    /// Bag reorder: the state always advances to the swapped bag; the
+    /// returned messages are warnings (see [`Inventory::swap_items`]).
+    pub fn reorder_bag(&self, swaps: &[BagSwap]) -> (RouteState, Vec<String>) {
+        let (inv, warnings) = self.inventory.swap_items(swaps);
+        (RouteState::new(self.solo_pkmn.clone(), self.badges.clone(), inv), warnings)
     }
 
     /// `blackout()`

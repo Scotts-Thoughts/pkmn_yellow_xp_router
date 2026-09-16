@@ -132,10 +132,12 @@ mod tests {
         for version in xpr_core::consts::VERSION_LIST {
             assert!(embedded::BOX_ART.iter().any(|(v, _)| *v == version), "no box art for {}", version);
         }
-        for icon in ["trainer.png", "item.png", "misc.png", "moves.png", "wild.png", "filter icons/TASK_RARE_CANDY.png", "filter icons/ERROR_SEARCH.png"] {
+        for icon in ["trainer.png", "item.png", "misc.png", "moves.png", "wild.png", "filter icons/TASK_RARE_CANDY.png", "filter icons/ERROR_SEARCH.png", "filter icons/TASK_REORDER_BAG.png"] {
             assert!(Assets::icon_bytes(icon).is_some(), "missing {}", icon);
         }
         assert!(load_png(embedded::PKMN_ICONS[0].1, false).is_some());
         assert!(load_png(Assets::icon_bytes("filter icons/TASK_HEAL.png").unwrap(), true).is_some());
+        let reorder = load_png(Assets::icon_bytes("filter icons/TASK_REORDER_BAG.png").unwrap(), true).unwrap();
+        assert_eq!(reorder.size, [24, 24]);
     }
 }

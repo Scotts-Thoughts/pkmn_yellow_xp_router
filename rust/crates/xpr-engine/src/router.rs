@@ -510,6 +510,7 @@ impl Router {
                 event_definition: def,
                 pkmn_after_levelups: Vec::new(),
                 error_messages: Vec::new(),
+                warning_messages: Vec::new(),
                 level_up_learn_event_defs: Vec::new(),
             });
             self.nodes.insert(new_id, node);

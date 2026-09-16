@@ -204,6 +204,7 @@ impl Router {
                 init_state: None,
                 final_state: None,
                 error_message: String::new(),
+                warning_message: String::new(),
             },
         );
         id
@@ -222,6 +223,7 @@ impl Router {
         if !(item.enabled.unwrap_or(false) && parent_enabled) {
             item.final_state = Some(cur_state);
             item.error_message = String::new();
+            item.warning_message = String::new();
             item.name = format!("Disabled: {}", item.event_definition.get_label(&gen)?);
             return Ok(());
         }
@@ -230,6 +232,7 @@ impl Router {
             item.name = item.event_definition.get_item_label(&gen)?;
         }
 
+        let mut warning_message = String::new();
         let (final_state, error_message): (Arc<RouteState>, String) = if let Some(mon) = item.to_defeat_mon.clone() {
             let (defeated_trainer_name, render_trainer_name): (Option<String>, String) = if let Some(td) = &item.event_definition.trainer_def {
                 (
@@ -283,6 +286,16 @@ impl Router {
         } else if let Some(e) = &item.event_definition.evolution {
             let (st, e) = cur_state.evolve(&gen, e.evolved_species.as_deref(), e.by_stone.as_deref())?;
             (Arc::new(st), e)
+        } else if let Some(r) = &item.event_definition.bag_reorder {
+            // a reorder never fails: items are matched by name and any
+            // slot mismatch is a warning, not an error
+            if r.swaps.is_empty() {
+                (cur_state, String::new())
+            } else {
+                let (st, warnings) = cur_state.reorder_bag(&r.swaps);
+                warning_message = warnings.join(", ");
+                (Arc::new(st), String::new())
+            }
         } else {
             // notes / save / heal: the state passes through unchanged
             (cur_state, String::new())
@@ -290,6 +303,7 @@ impl Router {
         let item = self.items.get_mut(&item_id).unwrap();
         item.final_state = Some(final_state);
         item.error_message = error_message;
+        item.warning_message = warning_message;
         if item.event_definition.notes.starts_with(consts::RECORDING_ERROR_FRAGMENT) {
             item.error_message = item.event_definition.notes.clone();
         }
@@ -350,6 +364,7 @@ impl Router {
             if !(g.enabled.unwrap_or(false) && parent_enabled) {
                 g.final_state = Some(cur_state);
                 g.error_messages.clear();
+                g.warning_messages.clear();
                 g.name = format!("Disabled: {}", label);
                 return Ok(());
             }
@@ -461,22 +476,16 @@ impl Router {
             return Err(format!("Something went wrong generating event group: {}", label));
         }
 
-        let error_messages: Vec<String> = items
-            .iter()
-            .filter_map(|i| {
-                let e = &self.items[i].error_message;
-                if e.is_empty() {
-                    None
-                } else {
-                    Some(e.clone())
-                }
-            })
-            .collect();
+        let collect = |field: fn(&EventItem) -> &String| -> Vec<String> { items.iter().map(|i| field(&self.items[i])).filter(|m| !m.is_empty()).cloned().collect() };
+        let error_messages = collect(|i| &i.error_message);
+        let warning_messages = collect(|i| &i.warning_message);
         let last_final = self.item_final(*items.last().unwrap());
         if let Some(Node::Group(g)) = self.nodes.get_mut(&group_id) {
             g.event_items = items;
+            // errors replace the label; warnings keep it
             g.name = if error_messages.is_empty() { label } else { error_messages.join(", ") };
             g.error_messages = error_messages;
+            g.warning_messages = warning_messages;
             g.final_state = Some(last_final);
         }
         Ok(())

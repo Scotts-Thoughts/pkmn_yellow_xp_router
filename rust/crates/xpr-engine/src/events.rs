@@ -854,6 +854,136 @@ impl EvolutionEventDefinition {
 }
 
 // ---------------------------------------------------------------------------
+// Bag reordering (gen 1)
+// ---------------------------------------------------------------------------
+
+/// One in-game SELECT swap: the two items exchanged and the (1-based) slots
+/// they occupied when the swap was recorded. Slots are exact at recording
+/// time; when the event is applied the items are matched by name and the
+/// slots only decide whether the application warns (see
+/// [`crate::Inventory::swap_items`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BagSwap {
+    pub item_a: String,
+    pub slot_a: usize,
+    pub item_b: String,
+    pub slot_b: usize,
+}
+
+impl BagSwap {
+    pub fn new(item_a: &str, slot_a: usize, item_b: &str, slot_b: usize) -> BagSwap {
+        BagSwap {
+            item_a: item_a.to_string(),
+            slot_a,
+            item_b: item_b.to_string(),
+            slot_b,
+        }
+    }
+
+    /// `Potion (3) <-> Master Ball (7)`
+    pub fn to_string(&self) -> String {
+        format!("{} ({}) <-> {} ({})", self.item_a, self.slot_a, self.item_b, self.slot_b)
+    }
+
+    fn serialize(&self) -> Value {
+        Value::Array(vec![
+            Value::String(self.item_a.clone()),
+            Value::from(self.slot_a as i64),
+            Value::String(self.item_b.clone()),
+            Value::from(self.slot_b as i64),
+        ])
+    }
+
+    fn deserialize(raw: &Value) -> Option<BagSwap> {
+        let Value::Array(parts) = raw else { return None };
+        if parts.len() != 4 {
+            return None;
+        }
+        let slot = |v: &Value| -> Option<usize> {
+            let n = pyjson::value_as_i64(v)?;
+            if n < 1 {
+                None
+            } else {
+                Some(n as usize)
+            }
+        };
+        Some(BagSwap {
+            item_a: str_of(&parts[0]),
+            slot_a: slot(&parts[1])?,
+            item_b: str_of(&parts[2]),
+            slot_b: slot(&parts[3])?,
+        })
+    }
+}
+
+/// The swaps of one bag-reorder event, applied in order; the slots of a later
+/// swap refer to the bag after the earlier swaps of the same event.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BagReorderEventDefinition {
+    pub swaps: Vec<BagSwap>,
+}
+
+impl BagReorderEventDefinition {
+    pub fn new(swaps: Vec<BagSwap>) -> Self {
+        BagReorderEventDefinition { swaps }
+    }
+
+    pub fn serialize(&self) -> Value {
+        Value::Array(self.swaps.iter().map(|s| s.serialize()).collect())
+    }
+
+    /// Any array of `[name, slot, name, slot]` entries (an empty array is a
+    /// valid, empty reorder). A malformed entry fails the load, like a
+    /// malformed trainer or evolution does: degrading to notes would drop the
+    /// swaps for good on the next save.
+    pub fn deserialize(raw: Option<&Value>) -> Result<Option<Self>, String> {
+        let raw = match raw {
+            None | Some(Value::Null) => return Ok(None),
+            Some(v) => v,
+        };
+        let Value::Array(items) = raw else {
+            return Err(format!("Invalid {} entry: {}", consts::TASK_REORDER_BAG, raw));
+        };
+        let mut swaps = Vec::with_capacity(items.len());
+        for item in items {
+            swaps.push(BagSwap::deserialize(item).ok_or_else(|| format!("Invalid {} swap (expected [item, slot, item, slot] with slots from 1): {}", consts::TASK_REORDER_BAG, item))?);
+        }
+        Ok(Some(BagReorderEventDefinition { swaps }))
+    }
+
+    pub fn to_string(&self) -> String {
+        if self.swaps.is_empty() {
+            return "Reorder Bag: (no swaps)".to_string();
+        }
+        let parts: Vec<String> = self.swaps.iter().map(|s| s.to_string()).collect();
+        format!("Reorder Bag: {}", parts.join(", "))
+    }
+}
+
+/// The swaps that turn the bag order `old` into `new` (a selection-style
+/// walk: one swap per misplaced slot, so a single transposition is exactly
+/// one swap and a k-cycle is k-1). Both lists must hold the same names,
+/// each once; otherwise `Err` names the first item that does not line up.
+pub fn swaps_between(old: &[String], new: &[String]) -> Result<Vec<BagSwap>, String> {
+    if old.len() != new.len() {
+        return Err(format!("Bag has {} items before and {} after; a reorder cannot change the item count", old.len(), new.len()));
+    }
+    let mut cur: Vec<String> = old.to_vec();
+    let mut swaps = Vec::new();
+    for i in 0..new.len() {
+        if cur[i] == new[i] {
+            continue;
+        }
+        let Some(j) = (i + 1..cur.len()).find(|j| cur[*j] == new[i]) else {
+            return Err(format!("Cannot reorder bag: {} is not in the bag", new[i]));
+        };
+        swaps.push(BagSwap::new(&cur[i], i + 1, &cur[j], j + 1));
+        cur.swap(i, j);
+    }
+    Ok(swaps)
+}
+
+// ---------------------------------------------------------------------------
 // EventDefinition
 // ---------------------------------------------------------------------------
 
@@ -874,6 +1004,7 @@ pub struct EventDefinition {
     pub heal: Option<LocationEventDefinition>,
     pub blackout: Option<LocationEventDefinition>,
     pub evolution: Option<EvolutionEventDefinition>,
+    pub bag_reorder: Option<BagReorderEventDefinition>,
     pub tags: Vec<String>,
     pub notes: String,
 }
@@ -895,6 +1026,7 @@ impl Default for EventDefinition {
             heal: None,
             blackout: None,
             evolution: None,
+            bag_reorder: None,
             tags: Vec::new(),
             notes: String::new(),
         }
@@ -1000,6 +1132,13 @@ impl EventDefinition {
     pub fn with_evolution(species: &str) -> EventDefinition {
         EventDefinition {
             evolution: Some(EvolutionEventDefinition::new(species, None)),
+            ..Default::default()
+        }
+    }
+
+    pub fn with_bag_reorder(swaps: Vec<BagSwap>) -> EventDefinition {
+        EventDefinition {
+            bag_reorder: Some(BagReorderEventDefinition::new(swaps)),
             ..Default::default()
         }
     }
@@ -1166,6 +1305,8 @@ impl EventDefinition {
             consts::TASK_BLACKOUT
         } else if self.evolution.is_some() {
             consts::TASK_EVOLUTION
+        } else if self.bag_reorder.is_some() {
+            consts::TASK_REORDER_BAG
         } else {
             consts::TASK_NOTES_ONLY
         }
@@ -1219,6 +1360,8 @@ impl EventDefinition {
             b.blackout_string()
         } else if let Some(e) = &self.evolution {
             e.to_string()
+        } else if let Some(r) = &self.bag_reorder {
+            r.to_string()
         } else {
             let _ = gen;
             format!("Notes: {}", self.notes)
@@ -1341,6 +1484,8 @@ impl EventDefinition {
             pairs.push((consts::TASK_BLACKOUT, b.serialize()));
         } else if let Some(e) = &self.evolution {
             pairs.push((consts::TASK_EVOLUTION, e.serialize()));
+        } else if let Some(r) = &self.bag_reorder {
+            pairs.push((consts::TASK_REORDER_BAG, r.serialize()));
         }
         pyjson::object(pairs)
     }
@@ -1368,6 +1513,7 @@ impl EventDefinition {
             heal: LocationEventDefinition::deserialize(get(raw, consts::TASK_HEAL)),
             blackout: LocationEventDefinition::deserialize(get(raw, consts::TASK_BLACKOUT)),
             evolution: EvolutionEventDefinition::deserialize(get(raw, consts::TASK_EVOLUTION))?,
+            bag_reorder: BagReorderEventDefinition::deserialize(get(raw, consts::TASK_REORDER_BAG))?,
         };
         if result.wild_pkmn_info.is_some() {
             result.trainer_def = None;

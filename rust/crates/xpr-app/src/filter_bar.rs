@@ -15,7 +15,7 @@ use xpr_ui_kit::ShortcutMap;
 use crate::assets::Assets;
 use crate::controller::MainController;
 
-const TOGGLE_ORDER: [&str; 17] = [
+const TOGGLE_ORDER: [&str; 18] = [
     consts::MAJOR_BATTLE_FILTER,
     consts::TASK_TRAINER_BATTLE,
     consts::TASK_RARE_CANDY,
@@ -28,6 +28,7 @@ const TOGGLE_ORDER: [&str; 17] = [
     consts::TASK_PURCHASE_ITEM,
     consts::TASK_SELL_ITEM,
     consts::TASK_USE_ITEM,
+    consts::TASK_REORDER_BAG,
     consts::TASK_BLACKOUT,
     consts::TASK_HEAL,
     consts::TASK_EVOLUTION,
@@ -48,6 +49,7 @@ fn short_label(et: &str) -> &'static str {
         consts::TASK_GET_FREE_ITEM => "Gt",
         consts::TASK_PURCHASE_ITEM => "Bu",
         consts::TASK_USE_ITEM => "Us",
+        consts::TASK_REORDER_BAG => "Rb",
         consts::TASK_VITAMIN => "Vt",
         consts::TASK_SAVE => "Sv",
         consts::TASK_HEAL => "He",
@@ -71,6 +73,7 @@ fn icon_file(et: &str) -> Option<&'static str> {
         consts::TASK_GET_FREE_ITEM => "TASK_GET_FREE_ITEM",
         consts::TASK_PURCHASE_ITEM => "TASK_PURCHASE_ITEM",
         consts::TASK_USE_ITEM => "TASK_USE_ITEM",
+        consts::TASK_REORDER_BAG => "TASK_REORDER_BAG",
         consts::TASK_VITAMIN => "TASK_VITAMIN",
         consts::TASK_HEAL => "TASK_HEAL",
         consts::TASK_BLACKOUT => "TASK_BLACKOUT",
@@ -94,6 +97,7 @@ fn tooltip(et: &str) -> &'static str {
         consts::TASK_GET_FREE_ITEM => "Get Free Item",
         consts::TASK_PURCHASE_ITEM => "Purchase Item",
         consts::TASK_USE_ITEM => "Use / Drop Item",
+        consts::TASK_REORDER_BAG => "Reorder Bag",
         consts::TASK_VITAMIN => "Vitamin",
         consts::TASK_SAVE => "Save",
         consts::TASK_HEAL => "Heal",
@@ -116,6 +120,7 @@ pub fn shortcut_id(et: &str) -> Option<&'static str> {
         consts::TASK_GET_FREE_ITEM => "filter_acquire_item",
         consts::TASK_PURCHASE_ITEM => "filter_purchase_item",
         consts::TASK_USE_ITEM => "filter_use_item",
+        consts::TASK_REORDER_BAG => "filter_reorder_bag",
         consts::TASK_SELL_ITEM => "filter_sell_item",
         consts::TASK_HOLD_ITEM => "filter_hold_item",
         consts::TASK_LEARN_MOVE_LEVELUP => "filter_levelup_move",
@@ -169,11 +174,17 @@ impl FilterBar {
 
     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, _cfg: &Config, ctrl: &mut MainController, assets: &mut Assets, shortcuts: &ShortcutMap) {
         let active: Vec<String> = ctrl.get_route_filter_types().map(|f| f.to_vec()).unwrap_or_default();
+        // bag reordering only exists in gen 1
+        let gen1 = ctrl.gen().map(|g| g.supports_bag_reorder()).unwrap_or(false);
         egui::Frame::new().inner_margin(egui::Margin { left: 4, right: 4, top: 2, bottom: 2 }).show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
                 for et in TOGGLE_ORDER {
                     let checked = active.iter().any(|a| a == et);
+                    // (an active filter stays visible so it can be turned off)
+                    if et == consts::TASK_REORDER_BAG && !gen1 && !checked {
+                        continue;
+                    }
                     let mut tip = tooltip(et).to_string();
                     if let Some(aid) = shortcut_id(et) {
                         let key = shortcuts.label(aid);

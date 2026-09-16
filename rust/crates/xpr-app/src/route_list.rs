@@ -179,6 +179,9 @@ impl RouteList {
             self.highlight_colors.insert(tag.to_string(), theme::parse_hex(&cfg.get_fight_category_color(cat)));
         }
         self.highlight_colors.insert(consts::EVENT_TAG_ERRORS.to_string(), theme::parse_hex("#61520f"));
+        // applied, but not as written (bag reorder slots): the configured warning
+        // colour dimmed to a row tint, brighter than the olive error rows
+        self.highlight_colors.insert(consts::EVENT_TAG_WARNINGS.to_string(), theme::darken(theme::parse_hex(cfg.get_warning_color()), 0.42));
         self.highlight_colors.insert(consts::EVENT_TAG_IMPORTANT.to_string(), theme::parse_hex("#1f1f1f"));
         self.highlight_colors.insert(consts::HIGHLIGHT_LABEL.to_string(), theme::parse_hex("#156152"));
         self.highlight_colors.insert(consts::EVENT_TAG_BRANCHED_MANDATORY.to_string(), theme::parse_hex("#5a5142"));

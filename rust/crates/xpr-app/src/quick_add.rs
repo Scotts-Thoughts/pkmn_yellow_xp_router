@@ -332,6 +332,9 @@ impl QuickItemAdd {
             }
             _ => (false, false, false, false),
         };
+        // the bag can only be rearranged in gen 1; the new event starts empty
+        // and is arranged in the details panel
+        let reorder_ok = can_insert && gen.as_ref().map(|g| g.supports_bag_reorder()).unwrap_or(false);
         widgets::group_box(ui, theme, "Items", |ui| {
             let mut filter_changed = false;
             let mut sel_changed = false;
@@ -411,6 +414,12 @@ impl QuickItemAdd {
                 if StyledButton::new(theme, "Sell").fixed_width(60.0).enabled(get_ok).show(ui).clicked() && get_ok {
                     ctrl.new_event(EventDefinition::with_item(InventoryEventDefinition::new(&name, amt, false, true, None)), after, None, None, true);
                 }
+                ui.add_space(10.0);
+                let reorder = StyledButton::new(theme, "Reorder").fixed_width(70.0).enabled(reorder_ok).show(ui);
+                if reorder.clicked() && reorder_ok {
+                    ctrl.new_event(EventDefinition::with_bag_reorder(Vec::new()), after, None, None, true);
+                }
+                reorder.on_hover_text("Insert a bag reorder (gen 1); arrange the bag in the event's details");
             });
         });
     }

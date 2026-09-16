@@ -213,6 +213,7 @@ pub fn stat_exp_viewer(ui: &mut Ui, theme: &Theme, gen: &GenData, state: Option<
 }
 
 /// `InventoryViewer`: money line + 20 numbered item slots in two columns.
+/// Slots are numbered from 1, matching the bag-reorder event text.
 pub fn inventory_viewer(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory>) {
     let max_render = 20usize;
     let split = max_render / 2;
@@ -234,18 +235,18 @@ pub fn inventory_viewer(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory
             for idx in 0..max_render {
                 if idx < inv.cur_items.len() {
                     if too_many && idx == max_render - 1 {
-                        out.push(format!("# {:0>2}+: More items...", idx));
+                        out.push(format!("# {:0>2}+: More items...", idx + 1));
                     } else {
                         let it = &inv.cur_items[idx];
-                        out.push(format!("# {:0>2}: {}x {}", idx, it.num, it.base_item.name));
+                        out.push(format!("# {:0>2}: {}x {}", idx + 1, it.num, it.base_item.name));
                     }
                 } else {
-                    out.push(format!("# {:0>2}:", idx));
+                    out.push(format!("# {:0>2}:", idx + 1));
                 }
             }
             out
         }
-        None => (0..max_render).map(|i| format!("# {:0>2}:", i)).collect(),
+        None => (0..max_render).map(|i| format!("# {:0>2}:", i + 1)).collect(),
     };
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
