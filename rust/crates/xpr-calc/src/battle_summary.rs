@@ -603,9 +603,6 @@ impl BattleSummary {
                 };
                 let cur_enemy = if move_idx < enemy_mon.move_list.len() {
                     let move_name = enemy_mon.move_list[move_idx].clone().unwrap_or_default();
-                    if !move_name.is_empty() && !self.mimic_options.contains(&move_name) {
-                        self.mimic_options.push(move_name.clone());
-                    }
                     self.recalculate_single_move(gen, cfg, mon_idx, false, &move_name, None)
                 } else {
                     None
@@ -613,6 +610,13 @@ impl BattleSummary {
                 self.player_move_data[mon_idx].push(cur_player);
                 self.enemy_move_data[mon_idx].push(cur_enemy);
             }
+            // Each matchup's Mimic dropdown only offers the moves of the enemy
+            // Pokémon currently being faced, not every enemy seen so far.
+            let matchup_mimic_options = self.matchup_mimic_options(mon_idx);
+            for m in self.player_move_data[mon_idx].iter_mut().chain(self.enemy_move_data[mon_idx].iter_mut()).flatten() {
+                m.mimic_options = matchup_mimic_options.clone();
+            }
+            self.mimic_options = matchup_mimic_options;
 
             let has_test_moves = cfg.test_moves.iter().take(4).any(|m| !m.trim().is_empty());
             if has_test_moves || cfg.test_moves_enabled {
@@ -629,14 +633,6 @@ impl BattleSummary {
 
             self.update_best_move_inplace(cfg, mon_idx, true);
             self.update_best_move_inplace(cfg, mon_idx, false);
-        }
-        // Python hands every MoveRenderInfo the *same* list object, which keeps
-        // growing during the refresh; at rest they all show the final list.
-        let final_options = self.mimic_options.clone();
-        for list in self.player_move_data.iter_mut().chain(self.enemy_move_data.iter_mut()) {
-            for m in list.iter_mut().flatten() {
-                m.mimic_options = final_options.clone();
-            }
         }
     }
 
@@ -681,6 +677,20 @@ impl BattleSummary {
     }
 
     /// `_recalculate_single_move`
+    /// Moves the enemy Pokémon in this specific matchup knows — the only
+    /// choices a Mimic dropdown for this matchup should offer.
+    pub fn matchup_mimic_options(&self, mon_idx: usize) -> Vec<String> {
+        let mut opts = Vec::new();
+        if let Some(enemy_mon) = self.original_enemy_mon_list.get(mon_idx) {
+            for mv in enemy_mon.move_list.iter().flatten() {
+                if !mv.is_empty() && !opts.contains(mv) {
+                    opts.push(mv.clone());
+                }
+            }
+        }
+        opts
+    }
+
     pub fn recalculate_single_move(&self, gen: &GenData, cfg: &SummaryConfig, mon_idx: usize, is_player: bool, move_name: &str, move_display_name: Option<&str>) -> Option<MoveRenderInfo> {
         let current_weather = self.get_weather_for_mon_idx(mon_idx as i64).to_string();
         let default_field = FieldStatus::default();
@@ -943,7 +953,10 @@ impl BattleSummary {
             }
             let move_name = if target_found { self.mimic_selection.clone() } else { "Leer".to_string() };
             if let Some(mimic_idx) = self.original_player_mon_list.get(mon_idx).and_then(|m| m.move_index(consts::MIMIC_MOVE_NAME)) {
-                let data = self.recalculate_single_move(gen, cfg, mon_idx, true, &move_name, Some(consts::MIMIC_MOVE_NAME));
+                let mut data = self.recalculate_single_move(gen, cfg, mon_idx, true, &move_name, Some(consts::MIMIC_MOVE_NAME));
+                if let Some(m) = data.as_mut() {
+                    m.mimic_options = self.matchup_mimic_options(mon_idx);
+                }
                 if let Some(list) = self.player_move_data.get_mut(mon_idx) {
                     if mimic_idx < list.len() {
                         list[mimic_idx] = data;
@@ -1470,6 +1483,13 @@ impl BattleSummary {
                     if move_name.is_empty() {
                         continue;
                     }
+                    // A Mimic slot's stepper is stored under (and resolves its
+                    // stat effect from) the mimicked move, not "Mimic" itself.
+                    let move_name: &str = if move_name == consts::MIMIC_MOVE_NAME && !self.mimic_selection.is_empty() {
+                        &self.mimic_selection
+                    } else {
+                        move_name
+                    };
                     let count = matchup_setup
                         .player
                         .get(move_name)
@@ -1615,6 +1635,7 @@ impl BattleSummary {
         let move_name = {
             let data = if is_player { &self.player_move_data } else { &self.enemy_move_data };
             match data.get(pkmn_idx).and_then(|l| l.get(move_idx)).and_then(|m| m.as_ref()) {
+                Some(m) if m.name == consts::MIMIC_MOVE_NAME => self.mimic_selection.clone(),
                 Some(m) => m.name.clone(),
                 None => return,
             }

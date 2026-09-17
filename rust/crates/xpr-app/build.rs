@@ -76,6 +76,34 @@ fn main() {
     src.push_str("];\n");
 
     std::fs::write(out_dir.join("embedded_assets.rs"), src).unwrap();
+
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        let ico_path = out_dir.join("app_icon.ico");
+        write_ico(&icons.join("app_icon.png"), &ico_path);
+        winresource::WindowsResource::new().set_icon(ico_path.to_str().unwrap()).compile().unwrap_or_else(|e| {
+            println!("cargo:warning=failed to embed exe icon: {}", e);
+        });
+    }
+}
+
+/// Build a multi-resolution `.ico` from the (small, pixel-art) source PNG:
+/// integer nearest-neighbor upscales stay crisp, the one downscale to 16px
+/// uses Lanczos since there's no clean integer ratio down.
+fn write_ico(src: &Path, dst: &Path) {
+    let img = image::open(src).unwrap_or_else(|e| panic!("{}: {}", src.display(), e)).to_rgba8();
+    let sizes = [16u32, 32, 48, 64, 128, 256];
+    let native = img.width().max(img.height());
+    let frames: Vec<image::codecs::ico::IcoFrame> = sizes
+        .iter()
+        .map(|&size| {
+            let filter = if size <= native { FilterType::Lanczos3 } else { FilterType::Nearest };
+            let resized = image::imageops::resize(&img, size, size, filter);
+            image::codecs::ico::IcoFrame::as_png(resized.as_raw(), size, size, image::ExtendedColorType::Rgba8)
+                .unwrap_or_else(|e| panic!("ico frame {}px: {}", size, e))
+        })
+        .collect();
+    let file = std::io::BufWriter::new(std::fs::File::create(dst).unwrap_or_else(|e| panic!("{}: {}", dst.display(), e)));
+    image::codecs::ico::IcoEncoder::new(file).encode_images(&frames).unwrap_or_else(|e| panic!("{}: {}", dst.display(), e));
 }
 
 fn lit(p: &Path) -> String {

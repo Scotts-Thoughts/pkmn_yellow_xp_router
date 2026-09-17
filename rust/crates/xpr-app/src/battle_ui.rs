@@ -275,6 +275,11 @@ impl BattleSummaryUi {
         let mut divider_x: Option<(f32, f32)> = None;
         let inner = base_frame.show(ui, |ui| {
             ui.spacing_mut().item_spacing = Vec2::new(4.0, 6.0);
+            // Capture the panel width before anything above the matchups is
+            // drawn: if the controls bar overflows (narrow window), egui grows
+            // this ui's max_rect to include the overflow and every later
+            // `available_width()` would push the matchup cards off-screen.
+            let panel_w = ui.available_width();
             if self.screenshot_mode.is_none() {
                 self.controls_bar(ui, theme, cfg, bc, ctrl, assets, actions);
                 if cfg.get_show_legacy_controls() {
@@ -286,7 +291,12 @@ impl BattleSummaryUi {
                 if !has {
                     continue;
                 }
-                let (rect, div) = self.mon_pair(ui, theme, cfg, bc, ctrl, assets, idx, actions);
+                let (rect, div) = ui
+                    .allocate_ui_with_layout(Vec2::new(panel_w, 0.0), egui::Layout::top_down(egui::Align::Min), |ui| {
+                        ui.set_width(panel_w);
+                        self.mon_pair(ui, theme, cfg, bc, ctrl, assets, idx, actions)
+                    })
+                    .inner;
                 mon_pair_rects.push(rect);
                 if divider_x.is_none() {
                     divider_x = div;
@@ -313,8 +323,13 @@ impl BattleSummaryUi {
     #[allow(clippy::too_many_arguments)]
     fn controls_bar(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, bc: &mut BattleController, ctrl: &mut MainController, assets: &mut Assets, _actions: &mut BattleUiActions) {
         let can_candies = bc.can_support_prefight_candies();
+        // Horizontal scroll so a narrow window can't widen the whole panel.
+        egui::ScrollArea::horizontal().id_salt("battle_controls_scroll").auto_shrink([false, true]).show(ui, |ui| {
         egui::Frame::new().inner_margin(egui::Margin { left: 6, right: 6, top: 2, bottom: 2 }).show(ui, |ui| {
-            ui.horizontal(|ui| {
+            // Fixed-height row so every group is centered on the same
+            // baseline (see `widgets::stepper_group`).
+            let row_size = Vec2::new(ui.available_width(), widgets::STEPPER_H);
+            ui.allocate_ui_with_layout(row_size, egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 10.0;
                 // candy stepper
                 let minus_ok = can_candies && self.candy_displayed_count > 0;
@@ -326,7 +341,7 @@ impl BattleSummaryUi {
                         crate::assets::draw_fit(ui, tex, 20.0).on_hover_text("Pre-Fight Rare Candies");
                     }
                     ui.add_space(4.0);
-                    let (r, _) = ui.allocate_exact_size(Vec2::new(widgets::text_width(ui, &count.to_string(), &theme.font_bold(10.0)).max(20.0) + 12.0, 26.0), Sense::hover());
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(widgets::text_width(ui, &count.to_string(), &theme.font_bold(10.0)).max(20.0) + 12.0, widgets::STEPPER_H), Sense::hover());
                     ui.painter().text(Pos2::new(r.max.x - 8.0, r.center().y), Align2::RIGHT_CENTER, count.to_string(), theme.font_bold(10.0), Color32::WHITE);
                 });
                 if delta != 0 {
@@ -341,7 +356,7 @@ impl BattleSummaryUi {
                         let count_s = count.to_string();
                         let count_w = widgets::text_width(ui, &count_s, &theme.body_bold());
                         let w = (label_w + 8.0 + count_w + 16.0).max(46.0);
-                        let (r, resp) = ui.allocate_exact_size(Vec2::new(w, 26.0), Sense::hover());
+                        let (r, resp) = ui.allocate_exact_size(Vec2::new(w, widgets::STEPPER_H), Sense::hover());
                         resp.on_hover_text(format!("Vitamins boosting {} used before this battle", stat_label));
                         ui.painter().text(Pos2::new(r.min.x + 8.0, r.center().y), Align2::LEFT_CENTER, stat_label, theme.body(), Color32::from_rgb(0x88, 0x88, 0x88));
                         ui.painter().text(Pos2::new(r.max.x - 8.0, r.center().y), Align2::RIGHT_CENTER, count_s, theme.body_bold(), Color32::WHITE);
@@ -379,6 +394,7 @@ impl BattleSummaryUi {
                 chip(ui, format!("HP {}", bc.summary.get_player_battle_hp()), "Player HP entering this battle");
                 chip(ui, format!("Spe {}", bc.summary.get_player_battle_speed()), "Player Speed entering this battle");
             });
+        });
         });
     }
 
@@ -778,8 +794,15 @@ impl BattleSummaryUi {
             let mut reserved_right = 0.0;
             let show_custom = !is_test_move && custom_data_options.as_ref().map(|o| !o.is_empty()).unwrap_or(false) && !(should_fade);
             let show_stat = !is_test_move && stat_stage_options.as_ref().map(|o| !o.is_empty()).unwrap_or(false);
-            let weather_for_move = move_name.as_deref().and_then(|n| ctrl.gen().and_then(|g| BattleSummary::get_weather_for_move(&g, n)));
-            let screen_for_move = move_name.as_deref().and_then(BattleSummary::get_screen_for_move);
+            // For a Mimic slot, the weather/screen source move is whatever move is
+            // currently being mimicked, not the literal "Mimic" display name.
+            let resolved_move_name = if move_name.as_deref() == Some(consts::MIMIC_MOVE_NAME) {
+                mv.map(|m| m.mimic_data.clone())
+            } else {
+                move_name.clone()
+            };
+            let weather_for_move = resolved_move_name.as_deref().and_then(|n| ctrl.gen().and_then(|g| BattleSummary::get_weather_for_move(&g, n)));
+            let screen_for_move = resolved_move_name.as_deref().and_then(BattleSummary::get_screen_for_move);
             let cur_weather_active = weather_for_move.map(|w| bc.summary.get_weather() == w && bc.summary.weather_source_mon_idx == Some(mon_idx as i64)).unwrap_or(false);
             let screen_active = screen_for_move.map(|s| bc.summary.get_screen_source_mon_idx(is_player, s) == Some(mon_idx as i64)).unwrap_or(false);
             let custom_default = custom_data_options.as_ref().and_then(|o| o.first().cloned());
@@ -788,20 +811,56 @@ impl BattleSummaryUi {
             let show_stat_now = show_stat && !(screenshot && stat_stage_selection == "0");
             let show_weather = weather_for_move.is_some() && !(screenshot && !cur_weather_active);
             let show_screen = screen_for_move.is_some() && !(screenshot && !screen_active);
-            // each trailing widget also costs one item_spacing after the name
+            // each trailing widget also costs one item_spacing after the name.
+            // All `reserved_right` arithmetic lives here so the numbers can't
+            // drift: weather/screen/stepper are fixed-width, and the
+            // custom-data dropdown (Mimic etc.) is normally 70 px but shrinks
+            // — dropping the move name entirely — when the header is too
+            // narrow to fit everything without overflowing.
+            let avail = hrect.width() - 6.0;
             if show_weather {
                 reserved_right += 20.0 + header_spacing_x;
             }
             if show_screen {
                 reserved_right += 20.0 + header_spacing_x;
             }
-            if show_custom_now {
-                reserved_right += 70.0 + header_spacing_x;
-            }
             if show_stat_now {
-                reserved_right += 50.0 + header_spacing_x;
+                reserved_right += widgets::OPTION_STEPPER_W + header_spacing_x;
             }
-            let name_w = (hrect.width() - 6.0 - reserved_right).max(20.0);
+            // `reserved_right` here covers everything except the custom-data
+            // dropdown; decide the dropdown's width against what's left.
+            // The dropdown never gets less than an arrow's worth of width, and
+            // never takes more than what's left after the fixed widgets. The
+            // name label (or the blank space standing in for it) is sized to
+            // exactly `avail - reserved_right`, so the trailing widgets always
+            // end flush with the header's right edge and the stepper's "+"
+            // can never be pushed out of view.
+            let custom_w = if show_custom_now {
+                let fits_at_70 = avail - (reserved_right + 70.0 + header_spacing_x) >= 20.0;
+                if fits_at_70 {
+                    70.0
+                } else {
+                    (avail - reserved_right - header_spacing_x).clamp(24.0, 70.0)
+                }
+            } else {
+                0.0
+            };
+            let is_mimic = move_name.as_deref() == Some(consts::MIMIC_MOVE_NAME);
+            if show_custom_now {
+                reserved_right += custom_w + header_spacing_x;
+            }
+            // Exact, never floored: a floor here is what pushed the "+" off
+            // the right edge at narrow widths.
+            let name_w = (avail - reserved_right).max(0.0);
+            // Mimic's dropdown already shows the mimicked move name, so its
+            // "Mimic" label goes away as soon as it would have to be elided
+            // rather than lingering as a lone "…".
+            let name_full_w = move_name.as_deref().map(|n| widgets::text_width(&header_ui, n, &theme.body_bold())).unwrap_or(0.0);
+            let hide_name = show_custom_now && (custom_w < 70.0 || (is_mimic && name_full_w > name_w - 8.0));
+            // The test-move branch (mon_idx == 0) renders a search dropdown,
+            // not the move name label, and Mimic never appears there — leave
+            // its width computation unaffected by `hide_name`.
+            let hide_name = hide_name && !(is_test_move && mon_idx == 0);
             if is_test_move && mon_idx == 0 {
                 let slot_idx = move_idx - 4;
                 let current = test_moves.get(slot_idx).cloned().unwrap_or_default();
@@ -815,7 +874,17 @@ impl BattleSummaryUi {
                 if resp.changed || (resp.enter_pressed && typed != current) {
                     bc.update_test_move(cfg, ctrl, slot_idx, &typed);
                 }
+            } else if hide_name {
+                // No label: the dropdown stands in for the move name, so
+                // center it within the name's space. Half the slack goes
+                // here, the other half after the dropdown (below), which
+                // keeps the trailing widgets flush right.
+                // Both halves are added around the dropdown below.
             } else {
+                // Mimic (and any other move with both custom data and a
+                // stat-stage stepper) shows the mimicked move name in the
+                // custom-data dropdown already, so dropping the name label
+                // here when space is tight loses no information.
                 let text = if is_test_move {
                     test_moves.get(move_idx - 4).cloned().unwrap_or_default()
                 } else {
@@ -841,12 +910,16 @@ impl BattleSummaryUi {
                     }
                 }
             }
+            // Trailing widgets, left to right: weather, screen, custom, stepper.
+            // Their combined width is exactly `reserved_right`, and the name
+            // (or its stand-in space) consumed exactly the remainder, so the
+            // stepper ends flush with the header's right edge.
             if show_weather {
                 let mut checked = cur_weather_active;
                 let r = widgets::checkbox(&mut header_ui, theme, &mut checked, "", !screenshot);
                 r.on_hover_text(format!("Set weather to {} for this matchup and later", weather_for_move.unwrap_or("")));
                 if checked != cur_weather_active {
-                    if let Some(n) = &move_name {
+                    if let Some(n) = &resolved_move_name {
                         bc.toggle_weather_from_move(cfg, ctrl, n, checked, Some(mon_idx as i64));
                     }
                 }
@@ -854,9 +927,9 @@ impl BattleSummaryUi {
             if show_screen {
                 let mut checked = screen_active;
                 let r = widgets::checkbox(&mut header_ui, theme, &mut checked, "", !screenshot);
-                r.on_hover_text(format!("Apply {} for this matchup and later", move_name.clone().unwrap_or_default()));
+                r.on_hover_text(format!("Apply {} for this matchup and later", resolved_move_name.clone().unwrap_or_default()));
                 if checked != screen_active {
-                    if let Some(n) = &move_name {
+                    if let Some(n) = &resolved_move_name {
                         bc.toggle_screen_from_move(cfg, ctrl, n, checked, mon_idx as i64, is_player);
                     }
                 }
@@ -865,18 +938,27 @@ impl BattleSummaryUi {
                 let opts = custom_data_options.clone().unwrap_or_default();
                 let mut cur = custom_data_selection.clone().unwrap_or_else(|| opts.first().cloned().unwrap_or_default());
                 let enabled = !screenshot && !(should_fade && !is_player);
-                if widgets::option_menu(&mut header_ui, theme, ui.id().with(("custom", mon_idx, move_idx, is_player)), &mut cur, &opts, Some(70.0), enabled) {
-                    if move_name.as_deref() == Some(consts::MIMIC_MOVE_NAME) {
+                // Mimic's dropdown is cramped; hard-truncate instead of "…"
+                // so every pixel goes to the mimicked move's name.
+                if hide_name && name_w > 0.0 {
+                    header_ui.add_space(name_w / 2.0 + header_spacing_x);
+                }
+                if widgets::option_menu_ex(&mut header_ui, theme, ui.id().with(("custom", mon_idx, move_idx, is_player)), &mut cur, &opts, Some(custom_w), enabled, !is_mimic) {
+                    if is_mimic {
                         bc.update_mimic_selection(cfg, ctrl, &cur);
                     } else {
                         bc.update_custom_move_data(cfg, ctrl, mon_idx, move_idx, is_player, &cur);
                     }
                 }
+                // Second half of the centering slack (see the `hide_name` branch).
+                if hide_name && name_w > 0.0 {
+                    header_ui.add_space(name_w / 2.0);
+                }
             }
             if show_stat_now {
                 let opts = stat_stage_options.clone().unwrap_or_default();
                 let mut cur = stat_stage_selection.clone();
-                if widgets::option_menu(&mut header_ui, theme, ui.id().with(("stage", mon_idx, move_idx, is_player)), &mut cur, &opts, Some(50.0), !screenshot) {
+                if widgets::option_stepper(&mut header_ui, theme, ui.id().with(("stage", mon_idx, move_idx, is_player)), &mut cur, &opts, !screenshot) {
                     bc.update_stat_stage_setup(cfg, ctrl, mon_idx, move_idx, is_player, &cur);
                 }
             }

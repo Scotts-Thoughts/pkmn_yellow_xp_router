@@ -64,6 +64,15 @@ being fixed on both sides.
   `xpr-calc::battle_summary`).
 - **Route-file text that is not valid UTF-8** is read lossily in Rust
   (Python raises); the golden corpus has no such file.
+- **Mimic dropdown options are per-matchup, not per-battle (deliberate fix,
+  2026-09-16).** Python's `_mimic_options` accumulates every move seen across
+  every enemy Pokémon in the whole fight, so every Mimic dropdown in a
+  multi-Pokémon battle offers the same combined list. Rust's
+  `BattleSummary::matchup_mimic_options` scopes the list to the enemy
+  Pokémon actually being faced in that matchup. `battles.py`'s golden dump
+  still reproduces the Python (whole-battle) list, so `xpr-golden verify`
+  will report a `mimic_options` diff on any multi-Pokémon battle that has
+  Mimic — expected, not a bug.
 
 ## Recorder (verified with the replay harness, 2026-09-11)
 

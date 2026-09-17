@@ -88,6 +88,14 @@ impl Assets {
     }
 }
 
+/// The window/taskbar icon, decoded from `icons/app_icon.png`.
+pub fn app_icon() -> Option<egui::IconData> {
+    let bytes = Assets::icon_bytes("app_icon.png")?;
+    let img = image::load_from_memory(bytes).ok()?.to_rgba8();
+    let (width, height) = img.dimensions();
+    Some(egui::IconData { rgba: img.into_raw(), width, height })
+}
+
 /// Decode a PNG into an egui image; `grayscale` reproduces the filter bar's
 /// `Format_Grayscale8` conversion with the original alpha kept.
 fn load_png(bytes: &[u8], grayscale: bool) -> Option<ColorImage> {

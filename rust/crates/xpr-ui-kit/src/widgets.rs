@@ -41,6 +41,16 @@ pub fn label_elided(ui: &mut Ui, text: &str, font: FontId, color: Color32, max_w
 
 /// Qt `elidedText(..., ElideRight, width)`.
 pub fn elide(ui: &Ui, text: &str, font: &FontId, max_width: f32) -> String {
+    elide_with(ui, text, font, max_width, "…")
+}
+
+/// Hard-truncate to `max_width` with no ellipsis marker at all — for cramped
+/// slots (the Mimic dropdown) where the "…" costs more room than it's worth.
+pub fn truncate_plain(ui: &Ui, text: &str, font: &FontId, max_width: f32) -> String {
+    elide_with(ui, text, font, max_width, "")
+}
+
+fn elide_with(ui: &Ui, text: &str, font: &FontId, max_width: f32, marker: &str) -> String {
     if text.is_empty() {
         return String::new();
     }
@@ -53,7 +63,7 @@ pub fn elide(ui: &Ui, text: &str, font: &FontId, max_width: f32) -> String {
     let mut hi = chars.len();
     while lo < hi {
         let mid = (lo + hi + 1) / 2;
-        let candidate: String = chars[..mid].iter().collect::<String>() + "…";
+        let candidate: String = chars[..mid].iter().collect::<String>() + marker;
         if text_width(ui, &candidate, font) <= max_width {
             lo = mid;
         } else {
@@ -61,9 +71,9 @@ pub fn elide(ui: &Ui, text: &str, font: &FontId, max_width: f32) -> String {
         }
     }
     if lo == 0 {
-        return "…".to_string();
+        return marker.to_string();
     }
-    chars[..lo].iter().collect::<String>() + "…"
+    chars[..lo].iter().collect::<String>() + marker
 }
 
 pub fn text_width(ui: &Ui, text: &str, font: &FontId) -> f32 {
@@ -433,6 +443,13 @@ pub fn text_area(ui: &mut Ui, theme: &Theme, text: &mut String, id: Id, height: 
 /// changed. The current value is kept even if it is not in `options` (Qt's
 /// `set` ignores unknown values; here the caller decides).
 pub fn option_menu(ui: &mut Ui, theme: &Theme, id: Id, current: &mut String, options: &[String], width: Option<f32>, enabled: bool) -> bool {
+    option_menu_ex(ui, theme, id, current, options, width, enabled, true)
+}
+
+/// `option_menu` with control over how an over-long selection is shortened:
+/// `ellipsis == false` hard-truncates instead of appending "…".
+#[allow(clippy::too_many_arguments)]
+pub fn option_menu_ex(ui: &mut Ui, theme: &Theme, id: Id, current: &mut String, options: &[String], width: Option<f32>, enabled: bool, ellipsis: bool) -> bool {
     let font = theme.body();
     let widest = options.iter().map(|o| text_width(ui, o, &font)).fold(0.0f32, f32::max);
     let cur_w = text_width(ui, current, &font);
@@ -467,7 +484,8 @@ pub fn option_menu(ui: &mut Ui, theme: &Theme, id: Id, current: &mut String, opt
         visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, theme.text);
         visuals.widgets.active.corner_radius = CornerRadius::same(2);
         visuals.widgets.open.corner_radius = CornerRadius::same(2);
-        let selected_text = egui::RichText::new(elide(ui, current, &font, (w - chrome).max(10.0))).font(font.clone()).color(if enabled { theme.text } else { theme.disabled_text });
+        let shown = if ellipsis { elide(ui, current, &font, (w - chrome).max(10.0)) } else { truncate_plain(ui, current, &font, (w - chrome).max(10.0)) };
+        let selected_text = egui::RichText::new(shown).font(font.clone()).color(if enabled { theme.text } else { theme.disabled_text });
         egui::ComboBox::from_id_salt(id)
             .width(w)
             .selected_text(selected_text)
@@ -1245,18 +1263,31 @@ pub fn menu_separator(ui: &mut Ui, theme: &Theme) {
 
 /// The battle summary's stepper (`stepper-group` / `stepper-btn` rules).
 /// Returns -1/0/+1 for which button was clicked.
+/// Height of a stepper group (buttons and content alike).
+pub const STEPPER_H: f32 = 26.0;
+
 pub fn stepper_group(ui: &mut Ui, theme: &Theme, id: Id, button_w: f32, minus_enabled: bool, plus_enabled: bool, tooltips: (&str, &str), content: impl FnOnce(&mut Ui)) -> i32 {
+    stepper_group_with_height(ui, theme, id, button_w, STEPPER_H, minus_enabled, plus_enabled, tooltips, content)
+}
+
+/// `stepper_group` at an explicit row height (the move-header stepper
+/// matches the dropdowns beside it rather than the toolbar's `STEPPER_H`).
+#[allow(clippy::too_many_arguments)]
+pub fn stepper_group_with_height(ui: &mut Ui, theme: &Theme, id: Id, button_w: f32, h: f32, minus_enabled: bool, plus_enabled: bool, tooltips: (&str, &str), content: impl FnOnce(&mut Ui)) -> i32 {
     let mut delta = 0;
     let _ = theme;
     let frame = egui::Frame::new().fill(crate::theme::rgba(255, 255, 255, 0.04)).corner_radius(CornerRadius::same(6)).inner_margin(egui::Margin::ZERO);
     frame.show(ui, |ui| {
-        ui.horizontal(|ui| {
+        // Fixed-height row: `ui.horizontal` starts at `interact_size.y` and
+        // grows as taller children arrive, which shifts already-placed
+        // (centered) children and staircases consecutive groups in the bar.
+        ui.allocate_ui_with_layout(Vec2::new(0.0, h), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
-            if stepper_button(ui, id.with("minus"), "−", button_w, true, minus_enabled).on_hover_text(tooltips.0).clicked() {
+            if stepper_button(ui, id.with("minus"), "−", button_w, h, true, minus_enabled).on_hover_text(tooltips.0).clicked() {
                 delta = -1;
             }
             content(ui);
-            if stepper_button(ui, id.with("plus"), "+", button_w, false, plus_enabled).on_hover_text(tooltips.1).clicked() {
+            if stepper_button(ui, id.with("plus"), "+", button_w, h, false, plus_enabled).on_hover_text(tooltips.1).clicked() {
                 delta = 1;
             }
         });
@@ -1264,8 +1295,17 @@ pub fn stepper_group(ui: &mut Ui, theme: &Theme, id: Id, button_w: f32, minus_en
     delta
 }
 
-fn stepper_button(ui: &mut Ui, id: Id, text: &str, w: f32, left: bool, enabled: bool) -> Response {
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 26.0), if enabled { Sense::click() } else { Sense::hover() });
+/// Height egui gives an `option_menu` combo button: the body font's row
+/// height (or the dropdown icon, whichever is taller) plus the theme's
+/// vertical button padding. Inline widgets that sit beside a dropdown use it.
+pub fn option_menu_height(ui: &Ui, theme: &Theme) -> f32 {
+    let row_h = ui.fonts_mut(|f| f.row_height(&theme.body()));
+    let sp = ui.spacing();
+    row_h.max(sp.icon_width) + 2.0 * sp.button_padding.y
+}
+
+fn stepper_button(ui: &mut Ui, id: Id, text: &str, w: f32, h: f32, left: bool, enabled: bool) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, h), if enabled { Sense::click() } else { Sense::hover() });
     let _ = id;
     if ui.is_rect_visible(rect) {
         let hovered = enabled && resp.hovered();
@@ -1289,6 +1329,232 @@ fn stepper_button(ui: &mut Ui, id: Id, text: &str, w: f32, left: bool, enabled: 
         ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, text, FontId::new(crate::theme::pt(13.0), egui::FontFamily::Name(std::sync::Arc::from(crate::theme::FAMILY_BOLD))), color);
     }
     resp
+}
+
+// ---------------------------------------------------------------------------
+// Option stepper: flat inline `− value +`, stepping through an option list
+// by index (never raw ±1 arithmetic — some option lists are non-contiguous,
+// e.g. Belly Drum's ["0","2","6"]). No frame, no boxed chrome — it reads as
+// part of the header row. Clicking the value switches it to a click-to-edit
+// `Entry` for the duration of the edit.
+// ---------------------------------------------------------------------------
+
+/// Width of the stat-stage stepper in the battle summary move header:
+/// 14 px minus button + 30 px value + 14 px plus button.
+pub const OPTION_STEPPER_W: f32 = 58.0;
+const OPTION_STEPPER_BUTTON_W: f32 = 14.0;
+const OPTION_STEPPER_VALUE_W: f32 = 30.0;
+/// The click-to-edit `Entry` fills the value cell exactly, so it never
+/// overlaps the minus/plus buttons on either side.
+const OPTION_STEPPER_EDIT_W: f32 = OPTION_STEPPER_VALUE_W;
+
+/// Map free-typed text onto the closest entry of an ascending numeric option
+/// list. `None` when the text is not an integer or `options` is empty.
+fn snap_to_option(typed: &str, options: &[String]) -> Option<String> {
+    let trimmed = typed.trim();
+    if options.iter().any(|o| o == trimmed) {
+        return Some(trimmed.to_string());
+    }
+    let value: i64 = trimmed.parse().ok()?;
+    let mut best: Option<(i64, &String)> = None;
+    for opt in options {
+        let Ok(n) = opt.parse::<i64>() else { continue };
+        let dist = (n - value).abs();
+        best = match best {
+            None => Some((dist, opt)),
+            Some((bd, bopt)) => {
+                let bn: i64 = bopt.parse().unwrap_or(0);
+                if dist < bd || (dist == bd && n < bn) {
+                    Some((dist, opt))
+                } else {
+                    Some((bd, bopt))
+                }
+            }
+        };
+    }
+    best.map(|(_, opt)| opt.clone())
+}
+
+/// `− value +` stepper through an ordered `options` list, stepping by index
+/// so the call signature mirrors `option_menu`'s. Flat, inline layout —
+/// clicking the value switches it to a click-to-edit `Entry`; Enter commits
+/// via `snap_to_option`, Escape/focus-loss reverts. Returns true iff
+/// `current` changed this frame.
+pub fn option_stepper(ui: &mut Ui, theme: &Theme, id: Id, current: &mut String, options: &[String], enabled: bool) -> bool {
+    let idx = options.iter().position(|o| o == current);
+    let minus_enabled = enabled && idx.map_or(!options.is_empty(), |i| i > 0);
+    let plus_enabled = enabled && idx.map_or(!options.is_empty(), |i| i + 1 < options.len());
+    let edit_id = id.with("edit");
+    let editing_key = id.with("editing");
+    let typed_key = id.with("typed");
+
+    let mut changed = false;
+    let mut editing: bool = ui.data(|d| d.get_temp::<bool>(editing_key)).unwrap_or(false);
+
+    // Same `[−] value [+]` control as the pre-fight candy / vitamin steppers
+    // at the top of the summary, just with narrower buttons.
+    let mut delta = 0i32;
+    let mut cancel_edit = false;
+    // Same height as the `option_menu` dropdowns it sits beside in the header.
+    let h = option_menu_height(ui, theme);
+    let group_delta = stepper_group_with_height(ui, theme, id, OPTION_STEPPER_BUTTON_W, h, minus_enabled, plus_enabled, ("Remove one use of this move", "Add one use of this move"), |ui| {
+        let (value_rect, _) = ui.allocate_exact_size(Vec2::new(OPTION_STEPPER_VALUE_W, h), Sense::hover());
+        if editing {
+            let edit_rect = Rect::from_center_size(value_rect.center(), Vec2::new(OPTION_STEPPER_EDIT_W, h));
+            let mut child = ui.new_child(egui::UiBuilder::new().max_rect(edit_rect).layout(egui::Layout::left_to_right(egui::Align::Center)));
+            let mut typed: String = ui.data_mut(|d| d.get_temp_mut_or_insert_with(typed_key, || current.clone()).clone());
+            if !ui.memory(|m| m.has_focus(edit_id)) {
+                ui.memory_mut(|m| m.request_focus(edit_id));
+                let mut tes = TextEdit::load_state(ui.ctx(), edit_id).unwrap_or_default();
+                let n = typed.chars().count();
+                let range = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(n));
+                tes.cursor.set_char_range(Some(range));
+                TextEdit::store_state(ui.ctx(), edit_id, tes);
+            }
+            let er = Entry::new(theme, &mut typed).width(OPTION_STEPPER_EDIT_W).centered().enabled(true).id(edit_id).show(&mut child);
+            if let Some(resp) = &er.response {
+                if resp.gained_focus() {
+                    let mut tes = TextEdit::load_state(ui.ctx(), edit_id).unwrap_or_default();
+                    let n = typed.chars().count();
+                    let range = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(n));
+                    tes.cursor.set_char_range(Some(range));
+                    TextEdit::store_state(ui.ctx(), edit_id, tes);
+                }
+            }
+            if er.enter_pressed {
+                if let Some(v) = snap_to_option(&typed, options) {
+                    if v != *current {
+                        *current = v;
+                        changed = true;
+                    }
+                }
+                cancel_edit = true;
+            } else if er.escape_pressed || (er.lost_focus && !er.enter_pressed) {
+                cancel_edit = true;
+            }
+            ui.data_mut(|d| d.insert_temp(typed_key, typed));
+        } else {
+            let value_resp = ui.interact(value_rect, id.with("value"), if enabled { Sense::click() } else { Sense::hover() });
+            if ui.is_rect_visible(value_rect) {
+                let hovered = enabled && value_resp.hovered();
+                if hovered {
+                    ui.painter().rect_stroke(value_rect.shrink(1.0), CornerRadius::same(3), Stroke::new(1.0_f32, crate::theme::rgba(255, 255, 255, 0.18)), egui::StrokeKind::Inside);
+                }
+                let color = if !enabled { Color32::from_rgb(0x77, 0x77, 0x77) } else { Color32::WHITE };
+                ui.painter().text(value_rect.center(), egui::Align2::CENTER_CENTER, current.as_str(), theme.body_bold(), color);
+            }
+            let value_resp = if enabled { value_resp.on_hover_cursor(egui::CursorIcon::PointingHand) } else { value_resp };
+            if enabled && value_resp.clicked() {
+                editing = true;
+                ui.data_mut(|d| d.insert_temp(typed_key, current.clone()));
+            }
+        }
+    });
+    if cancel_edit {
+        editing = false;
+        ui.memory_mut(|m| m.surrender_focus(edit_id));
+    }
+    if group_delta < 0 && minus_enabled {
+        delta = -1;
+    } else if group_delta > 0 && plus_enabled {
+        delta = 1;
+    }
+    if delta != 0 && editing {
+        // Clicking a button while editing cancels the edit, then steps.
+        editing = false;
+        ui.memory_mut(|m| m.surrender_focus(edit_id));
+    }
+
+    ui.data_mut(|d| d.insert_temp(editing_key, editing));
+
+    if delta != 0 {
+        if let Some(i) = idx {
+            let ni = if delta < 0 { i.saturating_sub(1) } else { (i + 1).min(options.len().saturating_sub(1)) };
+            if let Some(v) = options.get(ni) {
+                if v != current {
+                    *current = v.clone();
+                    changed = true;
+                }
+            }
+        } else if !options.is_empty() {
+            let parsed: Option<i64> = current.trim().parse().ok();
+            let snapped = match parsed {
+                Some(cv) if delta < 0 => options
+                    .iter()
+                    .filter_map(|o| o.parse::<i64>().ok().map(|n| (n, o)))
+                    .filter(|(n, _)| *n < cv)
+                    .max_by_key(|(n, _)| *n)
+                    .map(|(_, o)| o.clone())
+                    .unwrap_or_else(|| options.first().cloned().unwrap()),
+                Some(cv) if delta > 0 => options
+                    .iter()
+                    .filter_map(|o| o.parse::<i64>().ok().map(|n| (n, o)))
+                    .filter(|(n, _)| *n > cv)
+                    .min_by_key(|(n, _)| *n)
+                    .map(|(_, o)| o.clone())
+                    .unwrap_or_else(|| options.last().cloned().unwrap()),
+                _ => options[0].clone(),
+            };
+            if snapped != *current {
+                *current = snapped.clone();
+                changed = true;
+            }
+        }
+        // Stepping discards any in-progress typed text and shows the new value.
+        ui.data_mut(|d| d.insert_temp(typed_key, current.clone()));
+    }
+
+    changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::snap_to_option;
+
+    fn opts(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn exact_match() {
+        assert_eq!(snap_to_option("2", &opts(&["0", "2", "6"])), Some("2".to_string()));
+    }
+
+    #[test]
+    fn clamp_below() {
+        assert_eq!(snap_to_option("-5", &opts(&["0", "1", "2", "3"])), Some("0".to_string()));
+    }
+
+    #[test]
+    fn clamp_above() {
+        assert_eq!(snap_to_option("9", &opts(&["0", "1", "2", "3"])), Some("3".to_string()));
+    }
+
+    #[test]
+    fn nearest() {
+        assert_eq!(snap_to_option("5", &opts(&["0", "2", "6"])), Some("6".to_string()));
+    }
+
+    #[test]
+    fn tie_goes_to_lower() {
+        assert_eq!(snap_to_option("4", &opts(&["0", "2", "6"])), Some("2".to_string()));
+        assert_eq!(snap_to_option("1", &opts(&["0", "2", "6"])), Some("0".to_string()));
+    }
+
+    #[test]
+    fn non_numeric_is_none() {
+        assert_eq!(snap_to_option("abc", &opts(&["0", "1", "2"])), None);
+    }
+
+    #[test]
+    fn trims_whitespace() {
+        assert_eq!(snap_to_option("  3 ", &opts(&["0", "1", "2", "3"])), Some("3".to_string()));
+    }
+
+    #[test]
+    fn empty_options_is_none() {
+        assert_eq!(snap_to_option("3", &[]), None);
+    }
 }
 
 // ---------------------------------------------------------------------------

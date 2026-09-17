@@ -35,3 +35,6 @@ over guessing or relying on wiki-level summaries.
 Gen 1/2 repos are assembly (`.asm`) based; Gen 3 is C; Gen 4 is C/assembly with
 data in `.narc`/`.c` files. These are outside the project working directory, so
 read them with absolute paths.
+
+# Sub-Agents
+When starting sub-agents for complex tasks use Sonnet at high effort unless the user states otherwise.
