@@ -881,6 +881,13 @@ impl Gen2Machine {
                 self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_gain_num, true, purchase_expected, None)));
             }
         }
+        // taking the held item off: the bag gains it back and the mon holds
+        // nothing; the engine's "hold nothing" event returns the held item
+        // to the bag, so nothing else is recorded for the gain
+        if held_item_changed && lost_items.is_empty() && !gained_items.is_empty() && store.value(&self.keys.mon_held_item).is_null() {
+            log::info!("held item taken off: {}", repr_items(&gained_items));
+            self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, false)));
+        }
         if !lost_items.is_empty() {
             if purchase_expected {
                 log::error!("Lost the following items when expecting to be gain items to purchasing... {}", repr_items(&lost_items));

@@ -178,8 +178,19 @@ the Sell. Things to know:
   change from nothing to something as a `Hold Item` event (which failed:
   the item was never in the bag). In a trainer battle it ticks the current
   first enemy mon's flag (a double battle's second enemy is not told apart);
-  in a wild battle it records `Acquire` + `Hold` of the item. The gen 2
-  recorder never watched the held item mid-battle and still does not.
+  in a wild battle it records `Acquire` + `Hold` of the item, which lands
+  before the wild fight when the steal was not the KO hit (the wild event
+  is only queued at the KO). The held item is now sampled as the battle
+  *starts* rather than when the delayed initialisation fires, so a Thief on
+  the first turn is still seen as a change. The gen 2 recorder never
+  watched the held item mid-battle and still does not.
+- **Taking the held item off** in the overworld (bag gains it, the mon holds
+  nothing) is recorded as `Hold Item` (hold nothing) by the gen 2, 3 and 4/5
+  recorders; Python recorded nothing, so a route that stole twice erred on
+  the second steal ("already holding"). The replay scenario
+  `emerald_thief` (Rust only, `run_pair.py --only rust`) covers both steals,
+  the take-offs, the sale and a wild steal; the recorded route must load
+  without errors.
 - Emerald's trainer data spells Bug Maniac Jeffrey (rematch 4)'s held item
   `Silver Powder` where the item DB has `Silverpowder`; stealing it reports
   an unknown item.

@@ -851,6 +851,14 @@ impl Gen3Machine {
                 self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_gain_num, true, purchase_expected, None)));
             }
         }
+        // taking the held item off: the bag gains it back and the mon holds
+        // nothing; the engine's "hold nothing" event returns the held item
+        // to the bag, so nothing else is recorded for the gain
+        if held_item_changed && lost_items.is_empty() && !gained_items.is_empty() && store.value(&self.keys.mon_held_item).is_null() {
+            log::info!("held item taken off: {}", repr_items(&gained_items));
+            self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, false)));
+            expected_event_generated = true;
+        }
         if !lost_items.is_empty() && purchase_expected {
             log::error!("Lost the following items when expecting to be gain items to purchasing... {}", repr_items(&lost_items));
         }
@@ -956,7 +964,6 @@ impl Gen3Machine {
             return;
         }
         self.battle.battle_started = true;
-        self.battle.init_held_item = store.value(&self.keys.mon_held_item);
         self.battle.is_double_battle = store.truthy(&self.keys.double_battle_flag);
         self.battle.is_tutorial_battle = self.keys.tutorial_battle_flag.as_ref().map(|k| store.truthy(k)).unwrap_or(false);
         self.battle.is_trainer_battle = store.truthy(&self.keys.trainer_battle_flag);
@@ -1074,6 +1081,7 @@ impl Gen3Machine {
             }
             GameState::Battle => {
                 let money = store_i64(store, &self.keys.player_money);
+                let held_at_start = store.value(&self.keys.mon_held_item);
                 let b = &mut self.battle;
                 b.defeated_trainer_mons.clear();
                 b.delayed_move_updater.reset();
@@ -1098,7 +1106,10 @@ impl Gen3Machine {
                 b.is_double_battle = false;
                 b.is_tutorial_battle = false;
                 b.initial_money = money;
-                b.init_held_item = Value::Null;
+                // the held item as the battle starts (not as the delayed
+                // initialisation fires): a Thief on the first turn must still
+                // read as a change
+                b.init_held_item = held_at_start;
                 b.delayed_initialization.begin_waiting(true);
             }
             GameState::InventoryChange => {

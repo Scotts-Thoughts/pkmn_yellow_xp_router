@@ -36,7 +36,10 @@ Scenarios: `emerald_geodude` (gen 3), `yellow_charmander` (gen 1, deprecated
 mapper), `crystal_totodile` (gen 2, deprecated mapper), `platinum_chimchar`
 (gen 4), `black_tepig` (gen 5); `quickstart_yellow` and `quickstart_emerald`
 are for `run_quickstart.py` (the party starts empty and the starter lands in
-slot 1 a few seconds in). Each replay scenario walks every recorder path of its
+slot 1 a few seconds in); `emerald_thief` is Rust only (`--only rust`: Thief
+in trainer and wild battles, taking the loot off, selling it — the Python
+recorder has no equivalent, check the saved route by hand or load it with
+the engine). Each replay scenario walks every recorder path of its
 generation: registration, area folders (and "Trip 2"), wild / trainer /
 multi-mon / double battles with switches, level-ups with and without a learned
 move, pickups, purchases, sales, item use, rare candy, vitamin, TM, HM, tutor,

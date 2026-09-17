@@ -1137,6 +1137,14 @@ impl Gen45Machine {
                 }
             }
         }
+        // taking the held item off: the bag gains it back and the mon holds
+        // nothing; the engine's "hold nothing" event returns the held item
+        // to the bag, so nothing else is recorded for the gain
+        if held_item_changed && lost_items.is_empty() && !gained_items.is_empty() && store.get_value(Some(&self.keys.mon_held_item)).is_null() {
+            log::info!("held item taken off: {}", repr_items(&gained_items));
+            self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, false)));
+            expected_event_generated = true;
+        }
         if !lost_items.is_empty() && purchase_expected {
             log::error!("Lost the following items when expecting to be gain items to purchasing... {}", repr_items(&lost_items));
         }
@@ -1323,7 +1331,6 @@ impl Gen45Machine {
         self.battle.trainer_1 = store.get_value(Some(&self.keys.battle_trainer_a_number));
         self.battle.trainer_2 = store.get_value(Some(&self.keys.battle_trainer_b_number));
         self.battle.battle_started = true;
-        self.battle.init_held_item = store.get_value(Some(&self.keys.mon_held_item));
         if !xpr_core::pyjson::truthy(&self.battle.trainer_2) {
             self.battle.is_double_battle = false;
         } else {
@@ -1532,6 +1539,7 @@ impl Gen45Machine {
             GameState::Battle => {
                 let ally_id = self.opt_value(store, &self.keys.battle_ally_number);
                 let money = store_i64(store, &self.keys.player_money);
+                let held_at_start = store.get_value(Some(&self.keys.mon_held_item));
                 let initial_map = store.get_value(Some(&self.keys.overworld_map));
                 let solo_pid = store.get_value(Some(&self.keys.mon_pid));
                 let b = &mut self.battle;
@@ -1560,7 +1568,10 @@ impl Gen45Machine {
                 b.ally_id = ally_id;
                 log::info!("ally id: {}", py_str(&b.ally_id));
                 b.initial_money = money;
-                b.init_held_item = Value::Null;
+                // the held item as the battle starts (not as the delayed
+                // initialisation fires): a Thief on the first turn must still
+                // read as a change
+                b.init_held_item = held_at_start;
                 b.solo_hp_zero = false;
                 b.team_hp_zero = false;
                 b.watching_for_map_change = false;
