@@ -514,6 +514,9 @@ struct SearchState {
     editing: bool,
     highlighted: usize,
     open: bool,
+    /// Scroll the popup to the highlighted row on the next frame it is shown
+    /// (set when the list opens on the current value).
+    scroll_to_highlighted: bool,
 }
 
 /// What a searchable dropdown reported this frame.
@@ -631,11 +634,16 @@ impl<'a> SearchableDropdown<'a> {
         if !st.editing {
             st.typed = self.current.clone();
         }
+        // Opening on the untouched current value lists everything with that
+        // value highlighted (a plain combo box), rather than filtering the
+        // list down to the single option equal to the current text.
+        let current_index = self.options.iter().position(|o| o == self.current).unwrap_or(0);
         if self.request_focus {
             ui.memory_mut(|m| m.request_focus(edit_id));
             st.editing = true;
             st.open = true;
-            st.highlighted = 0;
+            st.highlighted = current_index;
+            st.scroll_to_highlighted = true;
             // select all so typing replaces the text
             let mut tes = TextEdit::load_state(ui.ctx(), edit_id).unwrap_or_default();
             let range = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(st.typed.chars().count()));
@@ -697,7 +705,8 @@ impl<'a> SearchableDropdown<'a> {
         if response.gained_focus() {
             st.editing = true;
             st.open = true;
-            st.highlighted = 0;
+            st.highlighted = current_index;
+            st.scroll_to_highlighted = true;
             // select all on focus
             let mut tes = TextEdit::load_state(ui.ctx(), edit_id).unwrap_or_default();
             let range = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(st.typed.chars().count()));
@@ -707,6 +716,10 @@ impl<'a> SearchableDropdown<'a> {
         if arrow_resp.clicked() && self.enabled {
             st.open = !st.open;
             st.editing = true;
+            if st.open {
+                st.highlighted = current_index;
+                st.scroll_to_highlighted = true;
+            }
             ui.memory_mut(|m| m.request_focus(edit_id));
         }
         if response.changed() {
@@ -714,7 +727,9 @@ impl<'a> SearchableDropdown<'a> {
             st.highlighted = 0;
         }
 
-        let matches = matching_indices(&st.typed, self.options);
+        // Untouched text (still the current value) is not a filter.
+        let unedited = st.typed == *self.current;
+        let matches = if unedited { (0..self.options.len()).collect::<Vec<usize>>() } else { matching_indices(&st.typed, self.options) };
         let mut commit: Option<usize> = None;
         let mut advance_forward = false;
         let mut advance_back = false;
@@ -782,6 +797,9 @@ impl<'a> SearchableDropdown<'a> {
                                     Color32::TRANSPARENT
                                 };
                                 ui.painter().rect_filled(r, CornerRadius::ZERO, fill);
+                                if is_hl && st.scroll_to_highlighted {
+                                    ui.scroll_to_rect(r, None);
+                                }
                                 let color = if is_hl || hovered { Color32::WHITE } else { Color32::from_rgb(0xc8, 0xc8, 0xc8) };
                                 let f = if is_hl { theme.body_bold() } else { font.clone() };
                                 ui.painter().text(Pos2::new(r.min.x + 8.0, r.center().y), egui::Align2::LEFT_CENTER, opt, f, color);
@@ -795,6 +813,7 @@ impl<'a> SearchableDropdown<'a> {
                         });
                     });
             });
+            st.scroll_to_highlighted = false;
             // click outside closes
             if ui.input(|i| i.pointer.any_click()) {
                 let pos = ui.input(|i| i.pointer.interact_pos());

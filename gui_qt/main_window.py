@@ -135,7 +135,7 @@ class MainWindow(QMainWindow):
         self._deferred_update_url = None
         self._update_requested_via_menu = False
 
-        self.setWindowTitle("Pokemon RBY XP Router")
+        self.setWindowTitle("Pokemon Solo Challenge Router")
         self._restore_geometry()
 
         # ---- Build UI ------------------------------------------------

@@ -76,7 +76,7 @@ class LandingPage(QWidget):
         outer.setAlignment(Qt.AlignHCenter)
 
         # ---- Title ---------------------------------------------------
-        title = QLabel("Pokemon XP Router")
+        title = QLabel("Pokemon Solo Challenge Router")
         title.setProperty("class", "title")
         title.setAlignment(Qt.AlignCenter)
         title_font = title.font()

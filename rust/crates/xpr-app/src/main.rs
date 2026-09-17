@@ -38,7 +38,7 @@ fn main() {
         ..Default::default()
     };
     let result = eframe::run_native(
-        "Pokemon RBY XP Router",
+        "Pokemon Solo Challenge Router",
         options,
         Box::new(move |cc| Ok(Box::new(XprApp::new(cc, cfg, paths, registry, exit_for_app)))),
     );

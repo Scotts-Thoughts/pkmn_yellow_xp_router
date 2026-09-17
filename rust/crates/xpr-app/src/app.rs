@@ -2094,7 +2094,7 @@ impl XprApp {
 
 /// Font/geometry helpers used by `main`.
 pub fn initial_viewport(cfg: &Config) -> egui::ViewportBuilder {
-    let mut vb = egui::ViewportBuilder::default().with_title("Pokemon RBY XP Router").with_app_id("pkmn_xp_router");
+    let mut vb = egui::ViewportBuilder::default().with_title("Pokemon Solo Challenge Router").with_app_id("pkmn_xp_router");
     if let Some(icon) = crate::assets::app_icon() {
         vb = vb.with_icon(icon);
     }

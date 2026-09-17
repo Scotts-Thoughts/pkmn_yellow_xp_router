@@ -33,7 +33,7 @@ if __name__ == '__main__':
     setup.init_base_generations()
 
     qt_app = QApplication(sys.argv)
-    qt_app.setApplicationName("Pokemon RBY XP Router")
+    qt_app.setApplicationName("Pokemon Solo Challenge Router")
 
     class _FastTooltipStyle(QProxyStyle):
         def styleHint(self, hint, option=None, widget=None, returnData=None):

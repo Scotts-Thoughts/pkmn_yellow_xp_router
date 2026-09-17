@@ -71,7 +71,7 @@ def main():
     setup.init_base_generations()
 
     qt_app = QApplication(sys.argv)
-    qt_app.setApplicationName("Pokemon RBY XP Router (harness)")
+    qt_app.setApplicationName("Pokemon Solo Challenge Router (harness)")
     qt_app.setStyleSheet(generate_stylesheet())
     controller = MainController()
     window = MainWindow(controller)

@@ -93,7 +93,7 @@ impl LandingPage {
         let key_load = ui.input(|i| i.key_pressed(egui::Key::Enter));
         ui.vertical_centered(|ui| {
             ui.add_space(50.0);
-            ui.label(egui::RichText::new("Pokemon XP Router").font(theme.font_bold(24.0)).color(theme.text));
+            ui.label(egui::RichText::new("Pokemon Solo Challenge Router").font(theme.font_bold(24.0)).color(theme.text));
             ui.add_space(20.0);
             let create = StyledButton::new(theme, egui::RichText::new("Create New Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
             if create.clicked() {

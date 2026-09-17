@@ -1,4 +1,4 @@
-# Pokemon Yellow XP Router
+# Pokemon Solo Challenge Router
 
 This is a tool that is intended to allow easy experience routing of Solo Pokemon playthroughs of Pokemon, generations 1-3.
 It keeps track of the experience and stat experience gained over the course of a run, as well as your moveset.
