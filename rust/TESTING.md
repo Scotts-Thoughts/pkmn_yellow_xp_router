@@ -98,6 +98,7 @@ Re-run the golden verify with the config toggles that change battle output
 - [ ] Landing page lists every route in `saved_routes/` with game and species columns; the index file (`xpr_route_index.json`) is written and reused; adding/removing/re-saving a route file externally is picked up on the next start.
 - [ ] Sort: Most Recent / Alphabetical / Game. Game filter dropdown. Search box (300 ms debounce). Enter or double-click loads.
 - [ ] "New Route" button → new-route page; "Load Route" → load dialog.
+- [ ] "Start Recording" button → connects to GameHook at once (panel shows connecting / no mapper / unsupported mapper / waiting); the game comes from the mapper name (Red-and-Blue, FireRed-and-LeafGreen, HeartGold-and-SoulSilver mappers pick the first of the pair); with a Pokémon already in slot 1 the panel waits for a new game to clear the party and offers "Use this X instead"; once the first Pokémon lands in slot 1 its fields settle for 1 s, then the route is created with its species, DVs/IVs (gens 1-2 derive the HP DV), nature and ability, the editor opens and recording starts. Cancel / Escape returns to the landing page. Without an emulator: `docs/rust_port/recording/run_quickstart.py --scenario quickstart_yellow|quickstart_emerald`.
 - [ ] Big data dir (the user's ~5,000 routes): landing page stays responsive; index scan runs on a thread.
 
 ## 3. New route page
@@ -127,6 +128,7 @@ Re-run the golden verify with the config toggles that change battle output
 - [ ] Filter bar: every type toggle (Trainer, Rare Candy, TM/HM, Vitamin, Wild Pkmn, Acquire, Purchase, Use, Reorder Bag, Sell, Hold, Level-up move, Save, Heal, Blackout, Evolution, Notes), "Common" and "Reset", the search box (300 ms) — same rows shown as Qt for the same filter (Reorder Bag is Rust only).
 - [ ] Run Status chip: "Invalid" when any event errors; clicking it cycles through the invalid events.
 - [ ] Bag reorder (gen 1, Rust only): quick-add "Reorder" / inline "Reorder Bag" insert an empty event; its editor lists the pre-event bag with a drag handle and ▲/▼ per row, a change saves after the 2 s delay and the row label reads `Reorder Bag: A (n) <-> B (m)`; the pre-event inventory panel counts slots from 1. Insert a purchase before a reorder: the row turns amber (not red), the run stays Valid, the details panel shows "Warning: … was at slot …", and rearranging + saving clears it. Recording on Yellow: a SELECT swap in the bag records one reorder event; using up the first item (everything shifts up) records none.
+- [ ] Thief / Covet (gens 2-5, Rust only): on a trainer fight's editor, each enemy mon card that shows an `Item:` line has a "Thief / Covet held item" checkbox (no box on item-less mons, none anywhere in gen 1). Ticking it saves after the delay; the fight's sub-row reads `Trainer: Mon (stole Nugget)`, the state panel after the fight shows `Held Item: Nugget` with the bag unchanged, and a later "Hold Item" (hold nothing) puts the Nugget in the bag so a Sell event of it succeeds. Ticking it while the solo mon already holds something turns the fight red ("… is already holding …"); the fight still counts. Recording on Emerald / Platinum: using Thief on a trainer's held item records no Hold Item event and ticks the box on that mon instead (also when the steal is the KO on the last mon); on a wild mon it records Acquire + Hold of the item.
 
 ## 5. Inline event creator
 
@@ -211,6 +213,7 @@ run it after any change to `xpr-recorder`, the route engine's event
 handling, or the route list's folder handling.
 
 - [ ] Record button in the status bar (needs an open route): enables record mode, status text updates (connecting / connected / lost), "↻" reconnect button, automatic reconnect with backoff after killing GameHook.
+- [x] Landing page "Start Recording" (2026-09-17): the route is built from the mapper and the first Pokémon, then the ordinary recorder takes over; `run_quickstart.py` covers Yellow (DVs, HP DV derived) and Emerald (IVs, nature, second-ability bit).
 - [ ] Gen 1 (Yellow/Red/Blue), Gen 2 (G/S/C), Gen 3 (RS/E/FRLG), Gen 4/5: start a fresh game; the recorder inserts trainer fights, wild fights, items get/use/sell/buy, rare candies, vitamins, level-up moves, TM/HM, evolutions, heals/saves/blackouts, in the same order and folders as the Python recorder on the same session. Compare the saved route files afterwards. (Covered without an emulator by the replay harness above.)
 - [x] Recorded events land in an enabled, expanded folder that is scrolled into view, with the new event selected (the folder-defaults bug of 2026-09-11; `xpr-app/tests/recorder_folders.rs`).
 - [x] Gen 1 `UninitializedState` start condition (KNOWN_ISSUES B-11): ported as-is, recording always starts in the overworld like Python.

@@ -352,6 +352,7 @@ impl EventDetails {
                     td.exp_split = editor_td.exp_split;
                     td.pay_day_amount = editor_td.pay_day_amount;
                     td.mon_order = editor_td.mon_order;
+                    td.thief_mons = editor_td.thief_mons;
                     new_event.trainer_def = Some(td);
                 }
             }

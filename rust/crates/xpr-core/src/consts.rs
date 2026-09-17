@@ -155,6 +155,9 @@ pub const PAY_DAY_AMOUNT: &str = "pay_day_amount";
 pub const MON_ORDER: &str = "mon_order";
 pub const TRANSFORMED: &str = "transformed";
 pub const COLLAPSED_MONS_KEY: &str = "collapsed_mons";
+/// Definition indices of the enemy mons whose held item the solo mon steals
+/// (Thief / Covet) during a trainer fight.
+pub const THIEF_MONS_KEY: &str = "thief_mons";
 pub const PLAYER_KEY: &str = "player";
 pub const ENEMY_KEY: &str = "enemy";
 pub const EVOLVED_SPECIES: &str = "evolved_species";

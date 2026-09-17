@@ -156,6 +156,34 @@ on re-save; the replay harness cannot compare it. Things to know:
   stacks in the game can record a spurious acquire plus a reorder. Needs
   more than 99 of one item.
 
+### Thief / Covet (gens 2-5, Rust only; added 2026-09-17)
+
+A trainer fight's definition can name the enemy mons the solo mon robs
+(`"thief_mons": [definition indices]`, the `collapsed_mons` convention; the
+key is written only when set, so untouched routes stay byte-identical). The
+engine applies it the way Crystal's `BattleCommand_Thief` and Emerald's
+`MOVE_EFFECT_STEAL_ITEM` do: the item goes into the solo mon's **held slot**
+(never the bag), only when it holds nothing, before that mon's KO (a stolen
+Lucky Egg / Macho Brace counts for it). Selling the loot is a "Hold Item"
+(hold nothing) event, which returns the held item to the bag, followed by
+the Sell. Things to know:
+
+- The Python app ignores the key on load and drops it on re-save; the
+  golden `verify` and the replay harness cannot compare a route that uses
+  it.
+- A steal that cannot happen (already holding something, the mon has no
+  item, unknown item name) is an **error** on the fight; the fight still
+  resolves.
+- The gen 3 and gen 4/5 recorders no longer record an in-battle held-item
+  change from nothing to something as a `Hold Item` event (which failed:
+  the item was never in the bag). In a trainer battle it ticks the current
+  first enemy mon's flag (a double battle's second enemy is not told apart);
+  in a wild battle it records `Acquire` + `Hold` of the item. The gen 2
+  recorder never watched the held item mid-battle and still does not.
+- Emerald's trainer data spells Bug Maniac Jeffrey (rematch 4)'s held item
+  `Silver Powder` where the item DB has `Silverpowder`; stealing it reports
+  an unknown item.
+
 ## UI divergences (egui vs. Qt)
 
 Things that are different by design of the toolkit swap, or that the Qt code
@@ -230,5 +258,5 @@ could not do either:
 | `XPR_SMOKE_SCREENSHOT=<file.png>` | Capture the window ~4 s after start and exit (unattended smoke run) |
 | `XPR_SMOKE_DELAY_MS=<ms>` | How long the smoke run waits before the capture (default 4000); raise it to drive the window by hand or with injected input first |
 | `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | With a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of honouring the auto-load preference (`rust/windows_build.py --smoke` uses the latter to prove the packaged exe runs on its own) |
-| `XPR_SMOKE_ACTION=battle\|battle_last\|last\|newroute\|summary\|inline\|candy\|record` | Before the smoke screenshot: open the battle tab of the first / last trainer, select the last event of the route (its editor shows in the details panel), open the new-route page, the docked run summary, or the inline creator; `candy` opens the biggest trainer fight (or the one named by `XPR_SMOKE_FIGHT=<substring>`) and clicks "+" candy six times, 700 ms apart, before an 8 s screenshot; `record` starts recording against `XPR_GAMEHOOK_URL`, stops after `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL` (a JSON endpoint) reports `"done": true`, saves the route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshots and exits |
+| `XPR_SMOKE_ACTION=battle\|battle_last\|last\|newroute\|summary\|inline\|candy\|record\|quickstart` | Before the smoke screenshot: open the battle tab of the first / last trainer, select the last event of the route (its editor shows in the details panel), open the new-route page, the docked run summary, or the inline creator; `candy` opens the biggest trainer fight (or the one named by `XPR_SMOKE_FIGHT=<substring>`) and clicks "+" candy six times, 700 ms apart, before an 8 s screenshot; `record` starts recording against `XPR_GAMEHOOK_URL`, stops after `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL` (a JSON endpoint) reports `"done": true`, saves the route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshots and exits; `quickstart` presses the landing page's "Start Recording" (no route loaded) and then behaves like `record` |
 | `XPR_FRAME_LOG=1` | Log every frame slower than 1 ms with the route-list and event-details draw times, and every route-list rebuild |

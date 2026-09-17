@@ -191,6 +191,10 @@ pub trait SessionEvents: Send {
     fn on_mapper_load_error(&mut self, err: &str);
     /// A watched property's value changed.
     fn on_property_changed(&mut self, store: &PropertyStore, new: &GameHookProperty, old: &GameHookProperty);
+    /// One pass of the read loop went by (at most `READ_TIMEOUT` apart while
+    /// the hub is quiet): for sessions that act on a timer rather than on a
+    /// property change. Only called while the mapper is loaded.
+    fn on_idle(&mut self, _store: &PropertyStore) {}
     /// The client is shutting down for good.
     fn on_shutdown(&mut self) {}
 }
@@ -550,6 +554,9 @@ impl Worker {
                         self.last_mapper_load = Some(Instant::now());
                     }
                 }
+            }
+            if self.store.is_loaded() {
+                self.session.on_idle(&self.store);
             }
         }
         let _ = socket.close(None);

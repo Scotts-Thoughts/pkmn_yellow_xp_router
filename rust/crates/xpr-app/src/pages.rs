@@ -13,6 +13,7 @@ use xpr_core::io_utils;
 use xpr_core::{Config, Paths};
 use xpr_data::model::Nature;
 use xpr_data::{GenData, Registry};
+use xpr_recorder::QuickStartPhase;
 use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets::{self, Entry, StyledButton};
 
@@ -30,8 +31,21 @@ const NO_ROUTES: &str = "No saved routes found";
 #[derive(Clone, Debug, Default)]
 pub struct LandingActions {
     pub create_route: bool,
+    /// "Start Recording": connect to GameHook and build the route from the
+    /// game (version from the mapper, solo mon from the first Pokémon).
+    pub start_recording: bool,
     pub load_route: Option<PathBuf>,
     pub auto_load_toggled: bool,
+}
+
+/// What the quick-start panel asks for.
+#[derive(Clone, Debug, Default)]
+pub struct QuickStartActions {
+    pub cancel: bool,
+    /// take the Pokémon already in slot 1 instead of waiting for a new game
+    pub use_current: bool,
+    /// retry the connection / reload the mapper
+    pub reconnect: bool,
 }
 
 pub struct LandingPage {
@@ -98,6 +112,15 @@ impl LandingPage {
             let create = StyledButton::new(theme, egui::RichText::new("Create New Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
             if create.clicked() {
                 actions.create_route = true;
+            }
+            ui.add_space(10.0);
+            let record = StyledButton::new(theme, egui::RichText::new("● Start Recording").font(theme.font_bold(14.0)).color(Color32::from_rgb(0xe7, 0x4c, 0x3c)))
+                .min_size(Vec2::new(350.0, 50.0))
+                .text_color(Color32::from_rgb(0xe7, 0x4c, 0x3c))
+                .show(ui)
+                .on_hover_text("Connect to GameHook now: the game comes from the loaded mapper and the route is set up from your first Pokémon (species, DVs/IVs, nature, ability) the moment you receive it.");
+            if record.clicked() {
+                actions.start_recording = true;
             }
             ui.add_space(10.0);
             let can_load = self.selected_route.as_ref().map(|r| r != NO_ROUTES).unwrap_or(false);
@@ -249,6 +272,95 @@ impl LandingPage {
             });
         });
     }
+}
+
+// ---------------------------------------------------------------------------
+// Quick start ("Start Recording") panel
+// ---------------------------------------------------------------------------
+
+/// The landing page while a quick start is running: what the GameHook
+/// session is doing, what it found, and the ways out.
+pub fn quick_start_ui(ui: &mut Ui, theme: &Theme, phase: &QuickStartPhase, url: &str, actions: &mut QuickStartActions) {
+    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        actions.cancel = true;
+    }
+    let red = Color32::from_rgb(0xe7, 0x4c, 0x3c);
+    let green = Color32::from_rgb(0x2e, 0xcc, 0x71);
+    let busy = !matches!(phase, QuickStartPhase::Failed(_) | QuickStartPhase::UnsupportedGame(_));
+    ui.vertical_centered(|ui| {
+        ui.add_space(50.0);
+        ui.label(egui::RichText::new("Pokemon Solo Challenge Router").font(theme.font_bold(24.0)).color(theme.text));
+        ui.add_space(30.0);
+        let width = 600.0;
+        let frame = egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border)).inner_margin(egui::Margin::same(20)).corner_radius(CornerRadius::same(4));
+        frame.show(ui, |ui| {
+            ui.set_width(width);
+            ui.vertical_centered(|ui| {
+                ui.horizontal(|ui| {
+                    ui.add_space((width - 200.0) / 2.0);
+                    if busy {
+                        ui.add(egui::Spinner::new().size(18.0).color(red));
+                    }
+                    ui.label(egui::RichText::new("● Start Recording").font(theme.font_bold(18.0)).color(red));
+                });
+                ui.add_space(14.0);
+                // game line
+                if let Some(game) = phase.game() {
+                    let line = match &game.sibling {
+                        None => format!("Game: {}   (route version: {})", game.mapper_name, game.version),
+                        Some(other) => format!("Game: {}   (route version: {} — the mapper serves {} too; both share one data set)", game.mapper_name, game.version, other),
+                    };
+                    widgets::label_colored(ui, theme, line, green);
+                    ui.add_space(8.0);
+                }
+                let body = theme.font(13.0);
+                let say = |ui: &mut Ui, text: String, color: Color32| {
+                    ui.add(egui::Label::new(egui::RichText::new(text).font(body.clone()).color(color)).wrap());
+                };
+                match phase {
+                    QuickStartPhase::Connecting(msg) => say(ui, msg.clone(), theme.text),
+                    QuickStartPhase::NoMapper => say(
+                        ui,
+                        "GameHook is connected but has no mapper loaded.\nOpen your game in the emulator and load its mapper in GameHook / Poke-A-Byte; the router picks it up automatically.".to_string(),
+                        theme.text,
+                    ),
+                    QuickStartPhase::UnsupportedGame(name) => say(ui, format!("The loaded mapper ('{}') is not a game the router supports.\nLoad the mapper of a supported game, then retry.", name), red),
+                    QuickStartPhase::WaitingForNewGame { current, .. } => {
+                        say(
+                            ui,
+                            format!(
+                                "Party slot 1 already holds {} (Lv {}).\nStart a new game: the route is set up, and recording begins, the moment you receive your first Pokémon.",
+                                current.species, current.level
+                            ),
+                            theme.text,
+                        );
+                        ui.add_space(10.0);
+                        if StyledButton::new(theme, format!("Use this {} instead", current.species)).fixed_width(260.0).show(ui).clicked() {
+                            actions.use_current = true;
+                        }
+                    }
+                    QuickStartPhase::WaitingForStarter(_) => say(ui, "Waiting for you to receive your first Pokémon...\nThe route takes its species, DVs/IVs, nature and ability from the game.".to_string(), theme.text),
+                    QuickStartPhase::Settling { current, .. } => say(ui, format!("Received {} (Lv {})! Reading its stats...", current.species, current.level), green),
+                    QuickStartPhase::Done(info) => say(ui, format!("Creating the route: {}", info.summary()), green),
+                    QuickStartPhase::Failed(msg) => say(ui, msg.clone(), red),
+                }
+                ui.add_space(14.0);
+                widgets::label_colored(ui, theme, format!("GameHook: {}", url), theme.secondary);
+                ui.add_space(14.0);
+                ui.horizontal(|ui| {
+                    let retry = matches!(phase, QuickStartPhase::Connecting(_) | QuickStartPhase::NoMapper | QuickStartPhase::UnsupportedGame(_) | QuickStartPhase::Failed(_));
+                    let n = if retry { 2.0 } else { 1.0 };
+                    ui.add_space((width - n * 180.0 - (n - 1.0) * 10.0) / 2.0);
+                    if retry && StyledButton::new(theme, "Retry / Reload Mapper").fixed_width(180.0).show(ui).clicked() {
+                        actions.reconnect = true;
+                    }
+                    if StyledButton::new(theme, "Cancel").fixed_width(180.0).show(ui).clicked() {
+                        actions.cancel = true;
+                    }
+                });
+            });
+        });
+    });
 }
 
 // ---------------------------------------------------------------------------

@@ -540,6 +540,9 @@ struct BattleData {
     cached_second_mon_level: i64,
     exp_split: Vec<HashSet<i64>>,
     enemy_mon_order: Vec<i64>,
+    /// Enemy party positions the solo mon stole the held item from
+    /// (Thief / Covet); the trainer event's `thief_mons`.
+    thief_mons: Vec<i64>,
     friendship_data: Vec<i64>,
     battle_started: bool,
     is_double_battle: bool,
@@ -582,6 +585,7 @@ impl Default for BattleData {
             cached_second_mon_level: 0,
             exp_split: Vec::new(),
             enemy_mon_order: Vec::new(),
+            thief_mons: Vec::new(),
             friendship_data: Vec::new(),
             battle_started: false,
             is_double_battle: false,
@@ -1415,9 +1419,27 @@ impl Gen45Machine {
             if held.is_null() {
                 self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, true)));
             } else if held != self.battle.init_held_item {
-                let do_consume = !self.battle.init_held_item.is_null();
+                let stolen = self.battle.init_held_item.is_null();
                 self.battle.init_held_item = held.clone();
-                self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(held.as_str(), do_consume)));
+                if stolen && self.is_trainer() {
+                    // Thief / Covet: the item never touches the bag, so the
+                    // trainer event carries the steal (see `thief_mons`)
+                    match self.first_enemy_mon_pos(store, None) {
+                        Some(pos) if !self.battle.thief_mons.contains(&pos) => {
+                            log::info!("stole {} from the enemy mon at party position {}", py_str(&held), pos);
+                            self.battle.thief_mons.push(pos);
+                        }
+                        Some(_) => {}
+                        None => log::warn!("stole {} but could not tell which enemy mon held it", py_str(&held)),
+                    }
+                } else if stolen {
+                    // a wild mon's item: it was never in the bag, so acquire it first
+                    let app_item_name = self.conv.item_name_convert(held.as_str()).unwrap_or_else(|| py_str(&held));
+                    self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, 1, true, false, None)));
+                    self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(Some(&app_item_name), false)));
+                } else {
+                    self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(held.as_str(), true)));
+                }
             }
         }
     }
@@ -1530,6 +1552,7 @@ impl Gen45Machine {
                 b.enemy_pos_lookup.clear();
                 b.exp_split.clear();
                 b.enemy_mon_order.clear();
+                b.thief_mons.clear();
                 b.friendship_data.clear();
                 b.battle_started = false;
                 b.is_double_battle = false;
@@ -1676,6 +1699,11 @@ impl Gen45Machine {
                         self.blackout.trainer_name = self.battle.trainer_name.clone();
                         self.blackout.initial_map = self.battle.initial_map.clone();
                     }
+                    // a steal on the final turn must reach the trainer
+                    // event, so the held-item check runs before it is built
+                    if self.battle.delayed_held_item_updater.trigger(false) {
+                        self.delayed_held_item_update(store);
+                    }
                     if self.is_trainer() {
                         log::info!("[EXP_SPLIT] ===== BATTLE EXIT =====");
                         let mut final_exp_split: Vec<i64> = Vec::new();
@@ -1701,6 +1729,7 @@ impl Gen45Machine {
                         td.second_trainer_name = self.battle.second_trainer_name.clone();
                         td.exp_split = final_exp_split;
                         td.mon_order = final_mon_order;
+                        td.thief_mons = self.battle.thief_mons.clone();
                         if self.has_return() {
                             td.custom_move_data = Self::return_custom_data(&self.battle.friendship_data);
                         }
@@ -1714,9 +1743,6 @@ impl Gen45Machine {
                     }
                     if self.battle.delayed_item_updater.trigger(false) {
                         self.item_cache_update(store, true, false, false, None, false, false, false, false);
-                    }
-                    if self.battle.delayed_held_item_updater.trigger(false) {
-                        self.delayed_held_item_update(store);
                     }
                     if self.battle.delayed_levelup.trigger(false) {
                         self.delayed_level_update(store);

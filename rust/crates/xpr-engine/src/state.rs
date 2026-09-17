@@ -734,6 +734,41 @@ impl RouteState {
         Ok((RouteState::new(mon, new_badges, inventory), String::new()))
     }
 
+    /// Thief / Covet on `enemy_pkmn`: its held item moves into the solo
+    /// mon's held slot (gens 2-5 all give the stolen item to the attacker,
+    /// and only when it holds nothing; the bag is untouched). A steal that
+    /// cannot happen leaves the state as it is and reports why.
+    pub fn steal_held_item(&self, gen: &GenData, enemy_pkmn: &EnemyPkmn) -> Result<(RouteState, String), String> {
+        let is_item = |name: &str| !name.is_empty() && name != "None" && name != consts::NO_ITEM;
+        let Some(stolen) = enemy_pkmn.held_item.as_deref().filter(|n| is_item(n)) else {
+            return Ok((self.clone(), format!("Cannot steal from {}: it has no held item", enemy_pkmn.name)));
+        };
+        let cur = &self.solo_pkmn;
+        if let Some(existing) = cur.held_item.as_deref().filter(|n| is_item(n)) {
+            return Ok((
+                self.clone(),
+                format!("Cannot steal {} from {}: {} is already holding {}", stolen, enemy_pkmn.name, cur.name, existing),
+            ));
+        }
+        if gen.item_db().get_item(stolen).is_none() {
+            return Ok((self.clone(), format!("Cannot steal from {}: unknown item {}", enemy_pkmn.name, stolen)));
+        }
+        let mon = self.rebuild(
+            SoloPokemonArgs {
+                move_list: Some(cur.move_list.clone()),
+                cur_xp: cur.cur_xp,
+                realized_stat_xp: Some(cur.realized_stat_xp),
+                unrealized_stat_xp: Some(cur.unrealized_stat_xp),
+                held_item: Some(stolen.to_string()),
+                ..Default::default()
+            },
+            self.badges.clone(),
+            None,
+            None,
+        )?;
+        Ok((RouteState::new(mon, self.badges.clone(), self.inventory.clone()), String::new()))
+    }
+
     /// `add_item(item_name, amount, is_purchase, custom_price)`
     pub fn add_item(&self, gen: &GenData, item_name: &str, amount: i64, is_purchase: bool, custom_price: Option<i64>) -> (RouteState, String) {
         let Some(base_item) = gen.item_db().get_item(item_name) else {

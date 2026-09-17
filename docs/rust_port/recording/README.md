@@ -12,6 +12,7 @@ in the saved bytes is a port divergence (or a timing artifact — see below).
 | `scenarios/*.py` | One module per game: `initial_properties()` (the mapper) and `build()` (the steps, through the small `Scenario` DSL: `set`, `tick`, `wait`, `note`). `ROUTE` names the species/version of the empty route both apps record into. |
 | `python_app_harness.py` | Boots the Qt app like `main.pyw` but with the global config dir and the GameHook URL redirected (monkeypatches, nothing in the Python tree changes), loads the route, records until the mock reports it is done, saves and quits. |
 | `run_pair.py` | The driver: private config + data dirs per app, a fresh base route (made with the Python engine), a mock per app on a free port, both launches, then the comparison. |
+| `run_quickstart.py` | The landing page's "Start Recording" (Rust only): the mock in `--shared-playback` mode, the app launched with no route and `XPR_SMOKE_ACTION=quickstart`, then a check of the saved route (version from the mapper name, solo mon / DVs / nature / ability from the first Pokémon, events recorded after the hand-off). |
 
 The Rust app is driven with its smoke hooks (`XPR_SMOKE_ACTION=record`,
 `XPR_SMOKE_STOP_URL`, `XPR_SMOKE_SAVE_NAME`, …; see `KNOWN_ISSUES.md`).
@@ -19,6 +20,7 @@ The Rust app is driven with its smoke hooks (`XPR_SMOKE_ACTION=record`,
 ## Running
 
 ```
+py -3.14 docs/rust_port/recording/run_quickstart.py --scenario quickstart_yellow
 py -3.14 docs/rust_port/recording/run_pair.py --scenario emerald_geodude
 py -3.14 docs/rust_port/recording/run_pair.py --scenario yellow_charmander --only rust --work C:\tmp\rec
 py -3.14 docs/rust_port/recording/run_pair.py --compare-only a.json b.json
@@ -32,7 +34,9 @@ the Rust screenshot and both routes.
 
 Scenarios: `emerald_geodude` (gen 3), `yellow_charmander` (gen 1, deprecated
 mapper), `crystal_totodile` (gen 2, deprecated mapper), `platinum_chimchar`
-(gen 4), `black_tepig` (gen 5). Each walks every recorder path of its
+(gen 4), `black_tepig` (gen 5); `quickstart_yellow` and `quickstart_emerald`
+are for `run_quickstart.py` (the party starts empty and the starter lands in
+slot 1 a few seconds in). Each replay scenario walks every recorder path of its
 generation: registration, area folders (and "Trip 2"), wild / trainer /
 multi-mon / double battles with switches, level-ups with and without a learned
 move, pickups, purchases, sales, item use, rare candy, vitamin, TM, HM, tutor,
@@ -55,5 +59,9 @@ to roll back).
   scenario that changes the map a few milliseconds after a battle can still
   land an event on either side of the folder boundary. The scenarios pause
   0.75 s before a map change for that reason; real map changes take longer.
+* The mock plays a scenario to the first client only (or to every client with
+  `--loop`). `--shared-playback` instead plays it once, to whichever clients are
+  connected as it goes: what a quick start needs, since the app swaps its
+  detection client for the real recorder once the starter has been read.
 * `Recorded Time` comes from Super Shuckie's live timer; the comparer only
   checks that both apps stamped (or did not stamp) an event.

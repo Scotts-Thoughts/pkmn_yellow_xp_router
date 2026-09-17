@@ -122,6 +122,8 @@ pub struct TrainerFightEditor {
     cards: Vec<TrainerCard>,
     order_menus: Vec<OptionMenu>,
     exp_splits: Vec<OptionMenu>,
+    /// Display-indexed: the solo mon steals this mon's held item.
+    thief_flags: Vec<bool>,
     cached_definition_order: Vec<usize>,
 }
 
@@ -149,6 +151,14 @@ impl TrainerFightEditor {
         while self.order_menus.len() < 6 {
             self.order_menus.push(OptionMenu::new((1..=6).map(|v| v.to_string()).collect(), None));
             self.exp_splits.push(OptionMenu::new((1..=6).map(|v| v.to_string()).collect(), None));
+        }
+        self.thief_flags = vec![false; 6];
+        for (def_idx, display_idx) in self.cached_definition_order.iter().enumerate() {
+            if td.thief_mons.contains(&(def_idx as i64)) {
+                if let Some(flag) = self.thief_flags.get_mut(*display_idx) {
+                    *flag = true;
+                }
+            }
         }
         for (idx, cur_pkmn) in ordered.iter().enumerate() {
             let speed_class = match &cur_state {
@@ -243,11 +253,19 @@ impl TrainerFightEditor {
             .map(|x| self.order_menus.get(*x).and_then(|m| m.get().parse::<i64>().ok()).ok_or_else(|| "invalid mon order".to_string()))
             .collect::<Result<_, _>>()?;
         let pay_day_amount: i64 = self.pay_day.trim().parse().unwrap_or(0);
+        let thief_mons: Vec<i64> = self
+            .cached_definition_order
+            .iter()
+            .enumerate()
+            .filter(|(_, x)| self.thief_flags.get(**x).copied().unwrap_or(false))
+            .map(|(def_idx, _)| def_idx as i64)
+            .collect();
         let mut td = TrainerEventDefinition::new(&self.cur_trainer);
         td.second_trainer_name = self.second_trainer.clone();
         td.exp_split = exp_split;
         td.pay_day_amount = Some(pay_day_amount);
         td.mon_order = mon_order;
+        td.thief_mons = thief_mons;
         Ok(EventDefinition::with_trainer(td))
     }
 
@@ -316,6 +334,14 @@ impl TrainerFightEditor {
                                 out.merge(EditorOutput::save());
                             }
                         });
+                        // only mons that hold something can be stolen from
+                        if self.cards[idx].item_line.is_some() {
+                            let r = widgets::checkbox(ui, theme, &mut self.thief_flags[idx], "Thief / Covet held item", ctx.enabled)
+                                .on_hover_text("The stolen item ends up held by your Pokemon (it must be holding nothing); take it off with a Hold Item event to sell it");
+                            if r.changed() {
+                                out.merge(EditorOutput::save());
+                            }
+                        }
                     });
                 }
             });

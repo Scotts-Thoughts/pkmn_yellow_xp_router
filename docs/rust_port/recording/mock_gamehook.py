@@ -127,18 +127,24 @@ def _read_request(conn: socket.socket, initial: bytes = b""):
 
 
 class MockGameHook:
-    def __init__(self, port: int, scenario: Scenario, start_delay: float = 1.5, loop: bool = False, mapper_loaded: bool = True):
+    def __init__(self, port: int, scenario: Scenario, start_delay: float = 1.5, loop: bool = False, mapper_loaded: bool = True, shared_playback: bool = False):
         self.port = port
         self.scenario = scenario
         self.start_delay = start_delay
         self.loop = loop
         self.mapper_loaded = mapper_loaded
+        # shared playback: one run of the scenario, broadcast to every client
+        # connected at the time of each step (for flows that hand the session
+        # from one client to another, like the app's "Start Recording")
+        self.shared_playback = shared_playback
         self.values = dict(scenario.initial)
         self.lock = threading.Lock()
         self.mapper_fetched = threading.Event()
         self.playback_done = threading.Event()
         self._addresses = {p: 0x2000000 + i * 4 for i, p in enumerate(scenario.initial)}
         self._played = False
+        self._clients: dict[int, object] = {}
+        self._clients_lock = threading.Lock()
 
     # -- HTTP -------------------------------------------------------------
     def mapper_json(self) -> dict:
@@ -247,7 +253,8 @@ class MockGameHook:
                 self._send_frame(conn, 0x1, text.encode("utf-8"))
 
         handshake_done = threading.Event()
-        player = threading.Thread(target=self._play, args=(send_text, handshake_done, alive), daemon=True)
+        client_id = id(conn)
+        player = threading.Thread(target=self._play, args=(send_text, handshake_done, alive, client_id), daemon=True)
         player.start()
         buf = b""
         last_ping = time.time()
@@ -296,6 +303,8 @@ class MockGameHook:
                         break
         finally:
             alive.clear()
+            with self._clients_lock:
+                self._clients.pop(client_id, None)
             log("websocket client gone")
 
     @staticmethod
@@ -343,17 +352,44 @@ class MockGameHook:
         return opcode, payload, buf[idx + n:]
 
     # -- playback -----------------------------------------------------------
-    def _play(self, send_text, handshake_done: threading.Event, alive: threading.Event):
+    def _play(self, send_text, handshake_done: threading.Event, alive: threading.Event, client_id: int = 0):
         if not handshake_done.wait(15):
             log("no handshake; not playing")
             return
+        with self._clients_lock:
+            self._clients[client_id] = send_text
         if not self.mapper_fetched.wait(15):
             log("client never fetched the mapper; not playing")
+            return
+        if self.shared_playback:
+            # one broadcast run, started by the first ready client and outliving it
+            with self._clients_lock:
+                if self._played:
+                    log("shared playback already running; this client joins it")
+                    return
+                self._played = True
+
+            def broadcast(text: str):
+                with self._clients_lock:
+                    targets = list(self._clients.items())
+                for cid, send in targets:
+                    try:
+                        send(text)
+                    except OSError:
+                        with self._clients_lock:
+                            self._clients.pop(cid, None)
+
+            always = threading.Event()
+            always.set()
+            threading.Thread(target=self._play_steps, args=(broadcast, always), daemon=True).start()
             return
         if self._played and not self.loop:
             log("scenario already played to an earlier client; idle")
             return
         self._played = True
+        self._play_steps(send_text, alive)
+
+    def _play_steps(self, send_text, alive: threading.Event):
         log(f"starting playback in {self.start_delay:.1f}s")
         time.sleep(self.start_delay)
         for step in self.scenario.steps:
@@ -387,9 +423,10 @@ def main():
     ap.add_argument("--scenario", required=True)
     ap.add_argument("--start-delay", type=float, default=1.5)
     ap.add_argument("--loop", action="store_true", help="replay the scenario to every client (default: only the first)")
+    ap.add_argument("--shared-playback", action="store_true", help="play the scenario once, to whichever clients are connected as it goes")
     args = ap.parse_args()
     scenario = load_scenario(args.scenario)
-    MockGameHook(args.port, scenario, start_delay=args.start_delay, loop=args.loop).serve_forever()
+    MockGameHook(args.port, scenario, start_delay=args.start_delay, loop=args.loop, shared_playback=args.shared_playback).serve_forever()
 
 
 if __name__ == "__main__":

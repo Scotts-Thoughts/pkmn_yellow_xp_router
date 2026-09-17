@@ -520,6 +520,10 @@ pub struct TrainerEventDefinition {
     pub transformed: Value,
     pub stat_stage_setup: Vec<CustomMoveData>,
     pub collapsed_mons: Vec<i64>,
+    /// Definition indices (same convention as `collapsed_mons`) of the enemy
+    /// mons the solo mon steals the held item from with Thief / Covet. The
+    /// stolen item lands in the solo mon's held slot, as in the games.
+    pub thief_mons: Vec<i64>,
 }
 
 impl TrainerEventDefinition {
@@ -546,6 +550,7 @@ impl TrainerEventDefinition {
             transformed: Value::Bool(false),
             stat_stage_setup: Vec::new(),
             collapsed_mons: Vec::new(),
+            thief_mons: Vec::new(),
         }
     }
 
@@ -608,7 +613,7 @@ impl TrainerEventDefinition {
                 None => Value::Null,
             }
         };
-        pyjson::object(vec![
+        let mut result = pyjson::object(vec![
             (consts::TRAINER_NAME, Value::String(self.trainer_name.clone())),
             (consts::SECOND_TRAINER_NAME, self.second_trainer_name.clone()),
             (consts::VERBOSE_KEY, self.verbose_export.clone()),
@@ -653,7 +658,15 @@ impl TrainerEventDefinition {
                     i64_list_value(&self.collapsed_mons)
                 },
             ),
-        ])
+        ]);
+        // Rust-only key: written only when set so that routes without a
+        // Thief stay byte-identical to the Python reference
+        if !self.thief_mons.is_empty() {
+            if let Value::Object(o) = &mut result {
+                o.insert(consts::THIEF_MONS_KEY.to_string(), i64_list_value(&self.thief_mons));
+            }
+        }
+        result
     }
 
     pub fn deserialize(raw: Option<&Value>) -> Result<Option<Self>, String> {
@@ -731,6 +744,7 @@ impl TrainerEventDefinition {
                     _ => Vec::new(),
                 };
                 result.collapsed_mons = i64_list(get(raw, consts::COLLAPSED_MONS_KEY));
+                result.thief_mons = i64_list(get(raw, consts::THIEF_MONS_KEY));
                 Ok(Some(result))
             }
             _ => Ok(None),

@@ -14,6 +14,7 @@ use xpr_core::io_utils;
 use xpr_core::{Config, Paths};
 use xpr_data::Registry;
 use xpr_engine::{NodeId, ObjKind};
+use xpr_recorder::{starter, QuickStart, QuickStartPhase, StarterInfo};
 use xpr_ui_kit::theme::{self, Theme};
 use xpr_ui_kit::widgets::{self, Entry};
 use xpr_ui_kit::{AutoClearingLabel, Geometry, ShortcutMap, ToastHost};
@@ -28,9 +29,9 @@ use crate::dialogs::{
 };
 use crate::event_details::{DetailsActions, EventDetails, BATTLE_SUMMARY_TAB};
 use crate::filter_bar::FilterBar;
-use crate::pages::{LandingActions, LandingPage, NewRouteActions, NewRoutePage};
+use crate::pages::{quick_start_ui, LandingActions, LandingPage, NewRouteActions, NewRoutePage, QuickStartActions};
 use crate::quick_add::QuickAddPopover;
-use crate::recorder_glue::Recorder;
+use crate::recorder_glue::{gamehook_url, Recorder};
 use crate::route_index::RouteIndex;
 use crate::route_list::{ListActions, RouteList};
 use crate::screenshot::{save_cropped, PendingShot, ShotKind};
@@ -86,6 +87,9 @@ pub struct XprApp {
     run_summary: Option<RunSummary>,
     setup_summary_open: bool,
     recorder: Recorder,
+    /// the landing page's "Start Recording": the GameHook session that
+    /// detects the game and the first Pokémon before a route exists
+    quick_start: Option<QuickStart>,
     route_name_text: String,
     image_path_text: String,
     route_loaded_before_new_route: bool,
@@ -175,6 +179,7 @@ impl XprApp {
             run_summary: None,
             setup_summary_open: false,
             recorder,
+            quick_start: None,
             route_name_text: String::new(),
             image_path_text: String::new(),
             route_loaded_before_new_route: false,
@@ -817,6 +822,86 @@ impl XprApp {
     fn record_button_clicked(&mut self) {
         let new_mode = !self.ctrl.is_record_mode_active();
         self.ctrl.set_record_mode(new_mode);
+    }
+
+    // ---- quick start ("Start Recording" on the landing page) --------------------------------
+
+    /// Connect to GameHook right away and watch for the first Pokémon; the
+    /// route is created (and recording started) when it arrives.
+    fn begin_quick_start(&mut self, ctx: &egui::Context) {
+        if self.quick_start.is_some() {
+            return;
+        }
+        if self.ctrl.is_record_mode_active() {
+            self.ctrl.set_record_mode(false);
+        }
+        let wake_ctx = ctx.clone();
+        let wake: Arc<dyn Fn() + Send + Sync> = Arc::new(move || wake_ctx.request_repaint());
+        self.quick_start = Some(QuickStart::start(&gamehook_url(), wake));
+        self.page = Page::Landing;
+    }
+
+    fn cancel_quick_start(&mut self) {
+        if let Some(qs) = self.quick_start.take() {
+            log::info!("[Quick Start] cancelled");
+            qs.stop();
+        }
+    }
+
+    /// Runs every frame: repaint while the session is busy, and act on its
+    /// terminal phase.
+    fn poll_quick_start(&mut self, ctx: &egui::Context) {
+        let Some(qs) = &self.quick_start else { return };
+        let phase = qs.phase();
+        match phase {
+            QuickStartPhase::Done(info) => {
+                let qs = self.quick_start.take().unwrap();
+                qs.stop();
+                self.finish_quick_start(info);
+            }
+            QuickStartPhase::Failed(_) | QuickStartPhase::UnsupportedGame(_) => {}
+            // the spinner, and the mapper poll the connection thread does at its own pace
+            _ => ctx.request_repaint_after(Duration::from_millis(100)),
+        }
+    }
+
+    /// The first Pokémon arrived: build the route from it and start the
+    /// ordinary recorder.
+    fn finish_quick_start(&mut self, info: StarterInfo) {
+        let version = info.game.version.clone();
+        let gen = match self.registry.get_version(&version) {
+            Ok(g) => g,
+            Err(e) => {
+                self.show_message("Start Recording", &format!("The mapper says the game is {} ({}), but that version could not be loaded: {}", info.game.mapper_name, version, e), MsgButtons::Ok, MsgTag::NewRouteError);
+                return;
+            }
+        };
+        // the mapper's species names sanitize to the DB's keys ("Mr. Mime" -> "mrmime")
+        let Some(species) = gen.pkmn_db().get_pkmn(&info.species).cloned() else {
+            self.show_message(
+                "Start Recording",
+                &format!("The game reports your first Pokémon as '{}', which is not in the {} data set, so no route could be created. Use Create New Route instead.", info.species, version),
+                MsgButtons::Ok,
+                MsgTag::NewRouteError,
+            );
+            return;
+        };
+        let ability_idx = if info.game.generation >= 3 { starter::resolve_ability_idx(&info.ability, &species.abilities) } else { 0 };
+        log::info!("[Quick Start] creating a {} route for {} (ability {}, nature {:?}, DVs {})", version, species.name, ability_idx, info.nature, info.dvs.py_repr());
+        self.ctrl.create_new_route(&species.name, None, &version, Some(info.dvs), Some(ability_idx), info.nature);
+        if self.ctrl.get_version().is_none() {
+            self.show_message("Start Recording", "The route could not be created; see the log for details.", MsgButtons::Ok, MsgTag::NewRouteError);
+            return;
+        }
+        self.show_route_controls();
+        self.ctrl.set_record_mode(true);
+        let mut msg = format!("Recording started: {}", info.summary());
+        if info.game.generation >= 3 {
+            if let Some(a) = species.abilities.get(ability_idx as usize) {
+                msg.push_str(&format!(" {}", a));
+            }
+        }
+        self.message_label.set_message(msg);
     }
 
     fn open_final_trainers_dialog(&mut self) {
@@ -1703,11 +1788,48 @@ impl XprApp {
 }
 
 impl XprApp {
+    /// The `record` / `quickstart` smoke actions: stop recording after
+    /// `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL`
+    /// (the mock GameHook's /mock/status) reports `"done": true`, save the
+    /// route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshot and exit.
+    fn smoke_arm_record_stop(&mut self, shot_path: &std::path::Path) {
+        let secs: u64 = std::env::var("XPR_SMOKE_RECORD_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(30);
+        let save_name = std::env::var("XPR_SMOKE_SAVE_NAME").ok().filter(|n| !n.is_empty());
+        let stop_at = Instant::now() + Duration::from_secs(secs);
+        self.smoke_record = Some((save_name, stop_at));
+        self.smoke = Some((shot_path.to_path_buf(), stop_at + Duration::from_millis(1500), false));
+        if let Ok(url) = std::env::var("XPR_SMOKE_STOP_URL") {
+            let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            self.smoke_stop_flag = Some(flag.clone());
+            std::thread::spawn(move || {
+                let mut done_since: Option<Instant> = None;
+                loop {
+                    std::thread::sleep(Duration::from_millis(500));
+                    if smoke_http_get(&url).map(|body| body.contains("\"done\": true") || body.contains("\"done\":true")).unwrap_or(false) {
+                        let since = *done_since.get_or_insert_with(Instant::now);
+                        if since.elapsed() >= Duration::from_secs(3) {
+                            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     /// The unattended smoke test: screenshot, then close.
     fn smoke_tick(&mut self, ctx: &egui::Context) {
         let Some((path, at, requested)) = self.smoke.clone() else { return };
         ctx.request_repaint_after(Duration::from_millis(100));
         if !requested {
+            // `XPR_SMOKE_ACTION=quickstart`: press "Start Recording" on the landing
+            // page (no route loaded) and then behave like `record`
+            if !self.smoke_action_done && self.page == Page::Landing && self.deferred_post_init.is_none() && std::env::var("XPR_SMOKE_ACTION").as_deref() == Ok("quickstart") {
+                self.smoke_action_done = true;
+                log::info!("smoke: quick start");
+                self.begin_quick_start(ctx);
+                self.smoke_arm_record_stop(&path);
+            }
             // `XPR_SMOKE_ACTION` drives the window into a state before the capture.
             if !self.smoke_action_done && Instant::now() >= at - Duration::from_millis(1500) && self.page == Page::Editor {
                 self.smoke_action_done = true;
@@ -1755,33 +1877,10 @@ impl XprApp {
                         // start recording against `XPR_GAMEHOOK_URL`, record for
                         // `XPR_SMOKE_RECORD_SECS` (default 30), save the route as
                         // `XPR_SMOKE_SAVE_NAME` (if set), then screenshot and exit
-                        let secs: u64 = std::env::var("XPR_SMOKE_RECORD_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(30);
-                        let save_name = std::env::var("XPR_SMOKE_SAVE_NAME").ok().filter(|n| !n.is_empty());
                         if !self.ctrl.is_record_mode_active() {
                             self.record_button_clicked();
                         }
-                        let stop_at = Instant::now() + Duration::from_secs(secs);
-                        self.smoke_record = Some((save_name, stop_at));
-                        self.smoke = Some((path.clone(), stop_at + Duration::from_millis(1500), false));
-                        // `XPR_SMOKE_STOP_URL`: stop earlier, ~3 s after this JSON endpoint
-                        // reports `"done": true` (the mock GameHook's /mock/status)
-                        if let Ok(url) = std::env::var("XPR_SMOKE_STOP_URL") {
-                            let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-                            self.smoke_stop_flag = Some(flag.clone());
-                            std::thread::spawn(move || {
-                                let mut done_since: Option<Instant> = None;
-                                loop {
-                                    std::thread::sleep(Duration::from_millis(500));
-                                    if smoke_http_get(&url).map(|body| body.contains("\"done\": true") || body.contains("\"done\":true")).unwrap_or(false) {
-                                        let since = *done_since.get_or_insert_with(Instant::now);
-                                        if since.elapsed() >= Duration::from_secs(3) {
-                                            flag.store(true, std::sync::atomic::Ordering::SeqCst);
-                                            return;
-                                        }
-                                    }
-                                }
-                            });
-                        }
+                        self.smoke_arm_record_stop(&path);
                     }
                     Ok("newroute") => self.open_new_route_window(),
                     Ok("summary") => self.open_summary_window(),
@@ -1923,6 +2022,7 @@ impl XprApp {
         // recorder: queued host calls + status
         self.recorder.pump(&mut self.ctrl, &self.cfg);
         self.recorder.refresh_status();
+        self.poll_quick_start(ctx);
         // timers, signals, shortcuts
         self.tick_timers(ctx);
         self.dispatch_signals(ctx);
@@ -1977,14 +2077,31 @@ impl XprApp {
         let mut event_list_rect: Option<Rect> = None;
         egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(ctx, |ui| match self.page {
             Page::Landing => {
-                let mut actions = LandingActions::default();
-                self.landing.ui(ui, &theme, &mut self.cfg, &self.paths, &self.registry, &self.index, &mut actions);
-                if actions.create_route {
-                    self.open_new_route_window();
-                }
-                if let Some(p) = actions.load_route {
-                    self.ctrl.load_route(&p);
-                    self.show_route_controls();
+                if let Some(qs) = &self.quick_start {
+                    let mut actions = QuickStartActions::default();
+                    quick_start_ui(ui, &theme, &qs.phase(), qs.url(), &mut actions);
+                    if actions.use_current {
+                        qs.accept_current_pokemon();
+                    }
+                    if actions.reconnect {
+                        qs.reconnect();
+                    }
+                    if actions.cancel {
+                        self.cancel_quick_start();
+                    }
+                } else {
+                    let mut actions = LandingActions::default();
+                    self.landing.ui(ui, &theme, &mut self.cfg, &self.paths, &self.registry, &self.index, &mut actions);
+                    if actions.create_route {
+                        self.open_new_route_window();
+                    }
+                    if actions.start_recording {
+                        self.begin_quick_start(ctx);
+                    }
+                    if let Some(p) = actions.load_route {
+                        self.ctrl.load_route(&p);
+                        self.show_route_controls();
+                    }
                 }
             }
             Page::NewRoute => {

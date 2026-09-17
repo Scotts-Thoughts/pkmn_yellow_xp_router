@@ -25,6 +25,9 @@ pub struct EventItem {
     pub exp_split_num: i64,
     pub pay_day_amount: i64,
     pub defeating_trainer: bool,
+    /// The solo mon steals this enemy's held item (Thief / Covet) before
+    /// the KO; see [`RouteState::steal_held_item`].
+    pub thief: bool,
     /// The item's definition: a copy of the group's definition, or, for the
     /// level-up move items the engine injects, its own learn-move definition.
     pub event_definition: EventDefinition,

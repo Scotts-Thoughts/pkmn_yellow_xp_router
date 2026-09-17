@@ -186,7 +186,7 @@ impl Router {
         Ok(())
     }
 
-    fn new_item(&mut self, parent: NodeId, def: EventDefinition, shares_group_definition: bool, to_defeat_mon: Option<EnemyPkmn>, exp_split_num: i64, pay_day_amount: i64, defeating_trainer: bool) -> NodeId {
+    fn new_item(&mut self, parent: NodeId, def: EventDefinition, shares_group_definition: bool, to_defeat_mon: Option<EnemyPkmn>, exp_split_num: i64, pay_day_amount: i64, defeating_trainer: bool, thief: bool) -> NodeId {
         let id = self.mint_id();
         self.items.insert(
             id,
@@ -199,6 +199,7 @@ impl Router {
                 exp_split_num,
                 pay_day_amount,
                 defeating_trainer,
+                thief,
                 event_definition: def,
                 shares_group_definition,
                 init_state: None,
@@ -249,7 +250,23 @@ impl Router {
                 (None, if is_trainer_pkmn { "TrainerPkmn".to_string() } else { "WildPkmn".to_string() })
             };
             item.name = format!("{}: {}", render_trainer_name, mon.name);
-            let (st, e) = cur_state.defeat_pkmn(&gen, &mon, defeated_trainer_name.as_deref(), item.exp_split_num, item.pay_day_amount)?;
+            // the steal lands before the KO, so a stolen Lucky Egg / Macho
+            // Brace already counts for this mon's exp, as in the games
+            let (pre_ko, steal_error) = if item.thief {
+                let (st, e) = cur_state.steal_held_item(&gen, &mon)?;
+                if e.is_empty() {
+                    item.name.push_str(&format!(" (stole {})", mon.held_item_str()));
+                }
+                (Arc::new(st), e)
+            } else {
+                (cur_state, String::new())
+            };
+            let (st, e) = pre_ko.defeat_pkmn(&gen, &mon, defeated_trainer_name.as_deref(), item.exp_split_num, item.pay_day_amount)?;
+            let e = match (steal_error.is_empty(), e.is_empty()) {
+                (true, _) => e,
+                (false, true) => steal_error,
+                (false, false) => format!("{}; {}", steal_error, e),
+            };
             (Arc::new(st), e)
         } else if item.event_definition.rare_candy.is_some() {
             let (st, e) = cur_state.rare_candy(&gen)?;
@@ -399,7 +416,8 @@ impl Router {
                     }
                 };
                 let defeating_trainer = order_idx == n - 1;
-                let item_id = self.new_item(group_id, def.clone(), true, Some(cur_pkmn.clone()), exp_split, pay_day_amount, defeating_trainer);
+                let thief = def.trainer_def.as_ref().map(|t| t.thief_mons.contains(definition_idx)).unwrap_or(false);
+                let item_id = self.new_item(group_id, def.clone(), true, Some(cur_pkmn.clone()), exp_split, pay_day_amount, defeating_trainer, thief);
                 self.apply_item(item_id, state.clone())?;
                 items.push(item_id);
                 *pkmn_counter.entry(cur_pkmn.name.clone()).or_insert(0) += 1;
@@ -408,7 +426,7 @@ impl Router {
                 if next_state.solo_pkmn.cur_level != state.solo_pkmn.cur_level {
                     for lm in level_up_defs.iter() {
                         if matches!(lm.level, crate::events::LevelVal::Int(l) if l == next_state.solo_pkmn.cur_level) {
-                            let lm_id = self.new_item(group_id, EventDefinition::with_learn_move(lm.clone()), false, None, 1, 0, false);
+                            let lm_id = self.new_item(group_id, EventDefinition::with_learn_move(lm.clone()), false, None, 1, 0, false, false);
                             self.apply_item(lm_id, next_state.clone())?;
                             self.write_back_destination(group_id, lm_id);
                             items.push(lm_id);
@@ -429,19 +447,19 @@ impl Router {
             }
         } else if let Some(rc) = &def.rare_candy {
             if rc.amount <= 0 {
-                let item_id = self.new_item(group_id, EventDefinition::default(), false, None, 1, 0, false);
+                let item_id = self.new_item(group_id, EventDefinition::default(), false, None, 1, 0, false, false);
                 self.apply_item(item_id, state.clone())?;
                 items.push(item_id);
             }
             for _ in 0..rc.amount.max(0) {
-                let item_id = self.new_item(group_id, def.clone(), true, None, 1, 0, false);
+                let item_id = self.new_item(group_id, def.clone(), true, None, 1, 0, false, false);
                 self.apply_item(item_id, state.clone())?;
                 items.push(item_id);
                 let mut next_state = self.item_final(item_id);
                 if next_state.solo_pkmn.cur_level != state.solo_pkmn.cur_level {
                     for lm in level_up_defs.iter() {
                         if matches!(lm.level, crate::events::LevelVal::Int(l) if l == next_state.solo_pkmn.cur_level) {
-                            let lm_id = self.new_item(group_id, EventDefinition::with_learn_move(lm.clone()), false, None, 1, 0, false);
+                            let lm_id = self.new_item(group_id, EventDefinition::with_learn_move(lm.clone()), false, None, 1, 0, false, false);
                             self.apply_item(lm_id, next_state.clone())?;
                             self.write_back_destination(group_id, lm_id);
                             items.push(lm_id);
@@ -453,19 +471,19 @@ impl Router {
             }
         } else if let Some(v) = &def.vitamin {
             for _ in 0..v.amount.max(0) {
-                let item_id = self.new_item(group_id, def.clone(), true, None, 1, 0, false);
+                let item_id = self.new_item(group_id, def.clone(), true, None, 1, 0, false, false);
                 self.apply_item(item_id, state.clone())?;
                 items.push(item_id);
                 state = self.item_final(item_id);
             }
         } else {
-            let item_id = self.new_item(group_id, def.clone(), true, None, 1, 0, false);
+            let item_id = self.new_item(group_id, def.clone(), true, None, 1, 0, false, false);
             self.apply_item(item_id, state.clone())?;
             self.write_back_destination(group_id, item_id);
             items.push(item_id);
             if let Some(first) = level_up_defs.first() {
                 let after = self.item_final(item_id);
-                let lm_id = self.new_item(group_id, EventDefinition::with_learn_move(first.clone()), false, None, 1, 0, false);
+                let lm_id = self.new_item(group_id, EventDefinition::with_learn_move(first.clone()), false, None, 1, 0, false, false);
                 self.apply_item(lm_id, after)?;
                 self.write_back_destination(group_id, lm_id);
                 items.push(lm_id);

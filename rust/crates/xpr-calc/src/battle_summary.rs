@@ -1416,6 +1416,7 @@ impl BattleSummary {
         new_td.exp_split = orig_td.exp_split.clone();
         new_td.pay_day_amount = orig_td.pay_day_amount;
         new_td.mon_order = new_mon_order;
+        new_td.thief_mons = orig_td.thief_mons.clone();
         let mut new_event = EventDefinition::with_trainer(new_td);
         new_event.notes = group.event_definition.notes.clone();
         Ok(Some(new_event))
