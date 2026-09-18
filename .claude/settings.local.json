@@ -1,18 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \"import py_compile; py_compile.compile\\('routing/route_events.py', doraise=True\\); py_compile.compile\\('routing/full_route_state.py', doraise=True\\); py_compile.compile\\('routing/state_objects.py', doraise=True\\); py_compile.compile\\('route_recording/game_recorders/gen_four/platinum_fsm.py', doraise=True\\); print\\('All files compile OK'\\)\")",
-      "Bash(python -c \"import py_compile; py_compile.compile\\('utils/constants.py', doraise=True\\); py_compile.compile\\('utils/config_manager.py', doraise=True\\); py_compile.compile\\('gui/main_window.py', doraise=True\\); py_compile.compile\\('gui/pkmn_components/route_list.py', doraise=True\\); print\\('All files compile OK'\\)\")",
-      "Bash(python -c \"import py_compile; py_compile.compile\\('gui/popups/base_popup.py', doraise=True\\); py_compile.compile\\('gui/main_window.py', doraise=True\\); print\\('All files compile OK'\\)\")",
-      "Bash(python -c \"import py_compile; py_compile.compile\\('gui/main_window.py', doraise=True\\); print\\('OK'\\)\")",
-      "Bash(python -c \"import py_compile; py_compile.compile\\('routing/router.py', doraise=True\\); print\\('OK'\\)\")",
-      "Bash(python -c \"import py_compile; py_compile.compile\\('gui/pkmn_components/route_list.py', doraise=True\\); print\\('OK'\\)\")",
-      "Bash(python -m py_compile gui/custom_components.py 2>&1 && echo \"OK\")",
-      "Bash(python -m py_compile gui/battle_summary.py 2>&1 && echo \"OK\")",
-      "Bash(python -m py_compile gui/pkmn_components/route_list.py 2>&1 && echo \"OK\")",
-      "Bash(python -m py_compile gui/main_window.py 2>&1 && echo \"OK\")",
-      "Bash(python -m py_compile pkmn/gen_4/gen_four_object.py 2>&1 && echo \"OK\")",
-      "Bash(grep -r \"multi\" ./route_recording/game_recorders/ --include=\"*.py\" 2>/dev/null | head -20)"
+      "Bash(find /a/pkmn_yellow_xp_router -name *.json -path *route* -o -name *.json -path *test*)",
+      "Bash(find /a/pkmn_yellow_xp_router -name *.Pokemon*)",
+      "Bash(cp \"A:/Dropbox/stp-projects/programs/router_data/saved_routes/yellow-pinsir-lv10brock.json\" /a/pkmn_yellow_xp_router/tests/test_data/)",
+      "Bash(cp \"A:/Dropbox/stp-projects/programs/router_data/saved_routes/c-porygon-1-.json\" /a/pkmn_yellow_xp_router/tests/test_data/)",
+      "Bash(cp \"A:/Dropbox/stp-projects/programs/router_data/saved_routes/f-ditto-tests.json\" /a/pkmn_yellow_xp_router/tests/test_data/)",
+      "Bash(cp \"A:/Dropbox/stp-projects/programs/router_data/saved_routes/qwe.json\" /a/pkmn_yellow_xp_router/tests/test_data/platinum_chimchar.json)",
+      "Bash(python3:*)",
+      "Bash(pip install:*)"
     ]
   }
 }

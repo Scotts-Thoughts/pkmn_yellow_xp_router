@@ -1,0 +1,15 @@
+[package]
+name = "xpr-recorder"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+xpr-core = { path = "../xpr-core" }
+xpr-data = { path = "../xpr-data" }
+xpr-engine = { path = "../xpr-engine" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+log = { workspace = true }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls", "system-proxy"] }
+tungstenite = { version = "0.29", default-features = false, features = ["handshake"] }

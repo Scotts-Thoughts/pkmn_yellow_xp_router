@@ -276,7 +276,14 @@
         "affected_by_kings_rock": false,
         "description": "The user draws power from nature and fires it at the foe. It may also lower the target\u2019s Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Wood Hammer": {
@@ -298,7 +305,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user slams its rugged body into the foe to attack. The user also sustains serious damage.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "third_recoil"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -490,7 +499,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user stabs the foe with a sharpened stone. It has a high critical-hit ratio. ",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -892,7 +903,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -1054,7 +1065,7 @@
             {
                 "chance": 10,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -1166,7 +1177,14 @@
         "affected_by_kings_rock": true,
         "description": "The user creates a gust of repulsive wind. It may also raise all the user\u2019s stats at once.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": 1,
+                "stat": "omni",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Scary Face": {
@@ -1193,7 +1211,7 @@
             {
                 "chance": 100,
                 "modifier": -2,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -1329,7 +1347,14 @@
         "affected_by_kings_rock": true,
         "description": "The user swings and hits with its strong and heavy fist. It lowers the user\u2019s Speed, however.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -1,
+                "stat": "spe",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Shadow Sneak": {
@@ -1456,7 +1481,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "self"
             },
             {
@@ -1524,7 +1549,7 @@
         "affected_by_kings_rock": true,
         "description": "An attack that is used in desperation only if the user has no PP. It also hurts the user slightly.",
         "attack_flavor": [
-            "quarter_recoil"
+            "quarter_max_hp_recoil"
         ],
         "effects": [],
         "has_field_effect": false
@@ -2048,7 +2073,7 @@
             {
                 "chance": 100,
                 "modifier": -2,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -2102,7 +2127,8 @@
         "affected_by_kings_rock": true,
         "description": "A two-turn attack. Blades of wind hit the foe on the second turn. It has a high critical-hit ratio.",
         "attack_flavor": [
-            "two_turn"
+            "two_turn",
+            "high_crit"
         ],
         "effects": [],
         "has_field_effect": false
@@ -2311,7 +2337,14 @@
         "affected_by_kings_rock": false,
         "description": "The user vibrates its wings to generate a damaging sound wave. It may also lower the foe\u2019s Sp. Def stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Mirror Coat": {
@@ -2411,7 +2444,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user slashes the foe the instant an opportunity arises. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -3111,7 +3146,14 @@
         "affected_by_kings_rock": true,
         "description": "Comets are summoned down from the sky. The attack\u2019s recoil sharply reduces the user\u2019s Sp. Atk stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -2,
+                "stat": "spa",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Captivate": {
@@ -3340,7 +3382,14 @@
         "affected_by_kings_rock": false,
         "description": "The user heightens its mental focus and unleashes its power. It may also lower the target\u2019s Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Sludge": {
@@ -3478,7 +3527,7 @@
             {
                 "chance": 20,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "def",
                 "target": "enemy"
             }
         ],
@@ -4256,7 +4305,20 @@
         "affected_by_kings_rock": true,
         "description": "The user fights the foe in close without guarding itself. It also cuts the user\u2019s Defense and Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -1,
+                "stat": "def",
+                "target": "self"
+            },
+            {
+                "chance": 100,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Pin Missile": {
@@ -4536,7 +4598,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user tucks in its wings and charges from a low altitude. The user also takes serious damage.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "third_recoil"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -4742,7 +4806,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -4921,7 +4985,14 @@
         "attack_flavor": [
             "rage"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "atk",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Defog": {
@@ -5146,7 +5217,7 @@
             {
                 "chance": 10,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -5380,7 +5451,7 @@
             {
                 "chance": 10,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -5559,7 +5630,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -5775,7 +5846,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user tears the foe along with the space around it. This move has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -6344,7 +6417,14 @@
         "affected_by_kings_rock": true,
         "description": "The user fires a concentrated bundle of electricity. It may also raise the user\u2019s Sp. Atk stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 70,
+                "modifier": 1,
+                "stat": "spa",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Headbutt": {
@@ -6496,7 +6576,20 @@
         "affected_by_kings_rock": false,
         "description": "The user calls out its underlings to shield its body, raising its Defense and Sp. Def stats.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "def",
+                "target": "self"
+            },
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "spd",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Ice Beam": {
@@ -6699,7 +6792,14 @@
         "affected_by_kings_rock": true,
         "description": "The user gathers all its light energy and releases it at once. It may also lower the foe\u2019s Sp. Def stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Withdraw": {
@@ -7341,7 +7441,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user calls out its underlings to pummel the foe. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -7548,7 +7650,7 @@
             {
                 "chance": 100,
                 "modifier": -1,
-                "stat": "spd",
+                "stat": "spe",
                 "target": "enemy"
             }
         ],
@@ -7623,7 +7725,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
         "description": "The user cloaks itself in fire and charges at the foe. The user sustains serious damage, too.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "third_recoil"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -8594,7 +8698,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user tears at the foe with blades formed by psychic power. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -8933,7 +9039,14 @@
         "affected_by_kings_rock": true,
         "description": "The user makes the ground under the foe erupt with power. It may also lower the target\u2019s Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "modifier": -1,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Harden": {
@@ -9165,7 +9278,14 @@
         "affected_by_kings_rock": false,
         "description": "The user polishes its body to reduce drag. It can sharply raise the Speed stat. ",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 2,
+                "stat": "spe",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Ice Ball": {
@@ -9266,7 +9386,14 @@
         "affected_by_kings_rock": true,
         "description": "The user generates a shock wave from within its body. It may also lower the target\u2019s Sp. Def.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 40,
+                "modifier": -2,
+                "stat": "spd",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Vital Throw": {
@@ -9313,7 +9440,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user slams the foe with a tail, etc. The target is hit twice in a row. ",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "two_hit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -9362,7 +9491,14 @@
         "affected_by_kings_rock": true,
         "description": "A storm of sharp leaves is whipped up. The attack\u2019s recoil sharply reduces the user\u2019s Sp. Atk stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -2,
+                "stat": "spa",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Guard Swap": {
@@ -9687,7 +9823,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user delivers a life-endangering head butt at full power. The user also takes terrible damage.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "half_recoil"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -9763,7 +9901,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "A slashing attack that may also leave the target poisoned. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -9787,7 +9927,14 @@
         "affected_by_kings_rock": true,
         "description": "The user launches a hard-packed mud ball to attack. It may also lower the target\u2019s accuracy.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "modifier": -1,
+                "stat": "acc",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Swords Dance": {
@@ -10190,7 +10337,14 @@
         "affected_by_kings_rock": false,
         "description": "The user stimulates its brain by thinking bad thoughts. It sharply raises the user\u2019s Sp. Atk.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 2,
+                "stat": "spa",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Sludge Bomb": {
@@ -10605,7 +10759,14 @@
         "affected_by_kings_rock": true,
         "description": "The user looses a flash of energy from its polished body. It may also lower the target\u2019s accuracy.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "modifier": -1,
+                "stat": "acc",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Destiny Bond": {
@@ -11979,7 +12140,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user slashes with a sharp claw made from shadows. It has a high critical-hit ratio.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "high_crit"
+        ],
         "effects": [],
         "has_field_effect": false
     },

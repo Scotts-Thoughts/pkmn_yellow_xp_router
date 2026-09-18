@@ -20,7 +20,7 @@
         "Black Belt": "Fighting",
         "BlackGlasses": "Dark",
         "Charcoal": "Fire",
-        "Dragon Scale": "Dragon",
+        "Dragon Fang": "Dragon",
         "Hard Stone": "Rock",
         "Magnet": "Electric",
         "Metal Coat": "Steel",
@@ -32,7 +32,12 @@
         "SilverPowder": "Bug",
         "Soft Sand": "Ground",
         "Spell Tag": "Ghost",
-        "Nevermeltice": "Ice",
+        "NeverMeltIce": "Ice",
+        "Odd Incense": "Psychic",
+        "Rock Incense": "Rock",
+        "Rose Incense": "Grass",
+        "Sea Incense": "Water",
+        "Wave Incense": "Water",
         "TwistedSpoon": "Psychic"
     },
     "type_chart": {

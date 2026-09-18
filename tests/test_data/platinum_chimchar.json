@@ -1,0 +1,333 @@
+{
+    "name": "Chimchar",
+    "dv": {
+        "hp": 31,
+        "attack": 31,
+        "defense": 31,
+        "speed": 31,
+        "special_attack": 31,
+        "special_defense": 31
+    },
+    "ability": 0,
+    "nature": 0,
+    "Version": "Platinum",
+    "Learn Levelup Move": [
+        {
+            "LearnMove": "Scratch",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 1,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Leer",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 1,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Ember",
+            "destination_slot": 2,
+            "source": "LevelUp",
+            "level_learned": 7,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Taunt",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 9,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Fury Swipes",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 15,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Flame Wheel",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 17,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Nasty Plot",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 23,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Torment",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 25,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Facade",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 31,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Fire Spin",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 33,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Slack Off",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 39,
+            "species_when_learned": "Chimchar"
+        },
+        {
+            "LearnMove": "Flamethrower",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 41,
+            "species_when_learned": "Chimchar"
+        }
+    ],
+    "events": [
+        {
+            "Event Folder Name": "ROOT",
+            "Just Notes": "",
+            "events": [
+                {
+                    "Event Folder Name": "Route 202 - Map 1",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Potion",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Wild Pkmn": [
+                                "Bidoof",
+                                3,
+                                1,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Sandgem Town - Map 2",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Poke Ball",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Antidote",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Parlyz Heal",
+                                1,
+                                true,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Route 202 - Map 1: Trip 2",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Wild Pkmn": [
+                                "Bidoof",
+                                3,
+                                1,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Trainers' School - Map 1",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "School Kid Harrison",
+                                "second_trainer_name": 0,
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "player_field_moves": [],
+                                "enemy_field_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": [
+                                    1
+                                ],
+                                "transformed": false
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "School Kid Christine",
+                                "second_trainer_name": 0,
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "player_field_moves": [],
+                                "enemy_field_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": [
+                                    1
+                                ],
+                                "transformed": false
+                            }
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Jubilife City - Map 1",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Rare Candy",
+                                99,
+                                true,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Twinleaf Town - Map 1",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Game Save": [
+                                "Twinleaf Town - Map 1"
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Game Save": [
+                                "Twinleaf Town - Map 1"
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Game Save": [
+                                "Twinleaf Town - Map 1"
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Game Save": [
+                                "Twinleaf Town - Map 1"
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Lake Verity - Map 1",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Game Save": [
+                                "Lake Verity - Map 1"
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Sandgem Town - Map 1",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "TM27 Return",
+                                1,
+                                true,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                }
+            ],
+            "Expanded": true,
+            "Enabled": true
+        }
+    ]
+}

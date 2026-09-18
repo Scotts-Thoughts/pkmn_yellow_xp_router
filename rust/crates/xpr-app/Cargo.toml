@@ -1,0 +1,33 @@
+[package]
+name = "xpr-app"
+version.workspace = true
+edition.workspace = true
+default-run = "xpr-app"
+
+[[bin]]
+name = "xpr-app"
+path = "src/main.rs"
+
+[dependencies]
+xpr-core = { path = "../xpr-core" }
+xpr-data = { path = "../xpr-data", features = ["embed-data"] }
+xpr-engine = { path = "../xpr-engine" }
+xpr-calc = { path = "../xpr-calc" }
+xpr-recorder = { path = "../xpr-recorder" }
+xpr-update = { path = "../xpr-update" }
+xpr-ui-kit = { path = "../xpr-ui-kit" }
+egui = "0.33.3"
+eframe = { version = "0.33.3", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+rfd = { version = "0.15", default-features = false, features = ["gtk3"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+log = { workspace = true }
+chrono = { workspace = true }
+
+[build-dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "ico"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"

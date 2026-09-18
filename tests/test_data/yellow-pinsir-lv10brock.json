@@ -1,0 +1,384 @@
+{
+    "name": "Pinsir",
+    "dv": {
+        "hp": 15,
+        "atk": 15,
+        "def": 15,
+        "spd": 15,
+        "spc": 15
+    },
+    "Version": "Yellow",
+    "Learn Levelup Move": [
+        [
+            "Bind",
+            null,
+            "LevelUp",
+            21
+        ],
+        [
+            "Seismic Toss",
+            null,
+            "LevelUp",
+            25
+        ],
+        [
+            "Guillotine",
+            null,
+            "LevelUp",
+            30
+        ],
+        [
+            "Focus Energy",
+            null,
+            "LevelUp",
+            36
+        ],
+        [
+            "Harden",
+            null,
+            "LevelUp",
+            43
+        ],
+        [
+            "Slash",
+            null,
+            "LevelUp",
+            49
+        ],
+        [
+            "Swords Dance",
+            null,
+            "LevelUp",
+            54
+        ]
+    ],
+    "events": [
+        {
+            "Event Folder Name": "ROOT",
+            "Just Notes": "",
+            "events": [
+                {
+                    "Event Folder Name": "Pallet Town",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "Rival1 1",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": []
+                            }
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Viridian City",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Poke Ball",
+                                1,
+                                true,
+                                true
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Potion",
+                                8,
+                                true,
+                                true
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Antidote",
+                                3,
+                                true,
+                                true
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Parlyz Heal",
+                                1,
+                                true,
+                                true
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Viridian Forest",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "BugCatcher 1",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": []
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "BugCatcher 2",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": []
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Potion",
+                                1,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Wild Pkmn": [
+                                "Metapod",
+                                4,
+                                1,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Wild Pkmn": [
+                                "Caterpie",
+                                3,
+                                1,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "BugCatcher 15",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": []
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Wild Pkmn": [
+                                "Caterpie",
+                                3,
+                                1,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Wild Pkmn": [
+                                "Caterpie",
+                                4,
+                                1,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Wild Pkmn": [
+                                "Pidgey",
+                                4,
+                                1,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Wild Pkmn": [
+                                "Caterpie",
+                                3,
+                                1,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Potion",
+                                2,
+                                true,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Potion",
+                                1,
+                                false,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "BugCatcher 3",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": []
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Poke Ball",
+                                1,
+                                false,
+                                false
+                            ]
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                },
+                {
+                    "Event Folder Name": "Pewter City",
+                    "Just Notes": "",
+                    "events": [
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "PkmnCenter Heal": [
+                                "Pewter City - Pokecenter"
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "JrTrainerM 1",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": []
+                            }
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Inventory Event": [
+                                "Potion",
+                                1,
+                                false,
+                                false
+                            ]
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Game Save": [
+                                "Pewter City - Gym"
+                            ]
+                        },
+                        {
+                            "Enabled": false,
+                            "Tags": [],
+                            "Use Rare Candy": 2
+                        },
+                        {
+                            "Enabled": true,
+                            "Tags": [],
+                            "Fight Trainer": {
+                                "trainer_name": "Brock 1",
+                                "verbose": false,
+                                "setup_moves": [],
+                                "enemy_setup_moves": [],
+                                "mimic_selection": "",
+                                "custom_move_data": [],
+                                "exp_split": [
+                                    1,
+                                    1
+                                ],
+                                "weather": "None",
+                                "pay_day_amount": 0,
+                                "mon_order": [
+                                    1,
+                                    2
+                                ]
+                            }
+                        }
+                    ],
+                    "Expanded": true,
+                    "Enabled": true
+                }
+            ],
+            "Expanded": true,
+            "Enabled": true
+        }
+    ]
+}

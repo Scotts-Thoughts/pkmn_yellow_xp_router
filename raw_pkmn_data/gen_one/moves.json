@@ -230,7 +230,7 @@
         },
         {
             "name": "Bind",
-            "accuracy": 85,
+            "accuracy": 75,
             "pp": 20,
             "base_power": 15,
             "type": "Normal",
@@ -952,7 +952,13 @@
                 {
                     "chance": 100,
                     "modifier": 1,
-                    "stat": "spc",
+                    "stat": "spd",
+                    "target": "self"
+                },
+                {
+                    "chance": 100,
+                    "modifier": 1,
+                    "stat": "spa",
                     "target": "self"
                 }
             ],
@@ -1226,7 +1232,13 @@
                 {
                     "chance": 33,
                     "modifier": -1,
-                    "stat": "spc",
+                    "stat": "spa",
+                    "target": "enemy"
+                },
+                {
+                    "chance": 33,
+                    "modifier": -1,
+                    "stat": "spd",
                     "target": "enemy"
                 }
             ],
@@ -1775,7 +1787,13 @@
                 {
                     "chance": 100,
                     "modifier": 2,
-                    "stat": "spc",
+                    "stat": "spa",
+                    "target": "self"
+                },
+                {
+                    "chance": 100,
+                    "modifier": 2,
+                    "stat": "spd",
                     "target": "self"
                 }
             ],
@@ -1852,7 +1870,7 @@
         },
         {
             "name": "Poison Gas",
-            "accuracy": 90,
+            "accuracy": 55,
             "pp": 40,
             "base_power": null,
             "type": "Poison",
@@ -1989,7 +2007,7 @@
         },
         {
             "name": "Psywave",
-            "accuracy": 100,
+            "accuracy": 80,
             "pp": 15,
             "base_power": -1,
             "type": "Psychic",

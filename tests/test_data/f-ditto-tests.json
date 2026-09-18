@@ -1,0 +1,463 @@
+{
+    "name": "Ditto",
+    "dv": {
+        "hp": 31,
+        "attack": 31,
+        "defense": 31,
+        "speed": 31,
+        "special_attack": 31,
+        "special_defense": 31
+    },
+    "ability": 0,
+    "nature": 3,
+    "Version": "FireRed",
+    "Learn Levelup Move": [
+        {
+            "LearnMove": "Transform",
+            "destination_slot": null,
+            "source": "LevelUp",
+            "level_learned": 1,
+            "species_when_learned": "Ditto"
+        }
+    ],
+    "events": [
+        {
+            "Event Folder Name": "ROOT",
+            "Just Notes": "",
+            "events": [
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Inventory Event": [
+                        "Rare Candy",
+                        100,
+                        true,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Use Rare Candy": 1
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Use Rare Candy": 92
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Use Rare Candy": 43
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        10,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        5,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        5,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        5,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        5,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        5,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        1,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        1,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        1,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        1,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        1,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        1,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": false,
+                    "Tags": [],
+                    "Fight Wild Pkmn": [
+                        "Machop",
+                        32,
+                        1,
+                        false
+                    ]
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Trainer": {
+                        "trainer_name": "Elite Four Lorelei",
+                        "second_trainer_name": "",
+                        "verbose": false,
+                        "setup_moves": [],
+                        "enemy_setup_moves": [],
+                        "mimic_selection": "",
+                        "custom_move_data": [],
+                        "exp_split": [
+                            1,
+                            1,
+                            1,
+                            1,
+                            1
+                        ],
+                        "weather": "None",
+                        "pay_day_amount": 0,
+                        "mon_order": [
+                            1,
+                            2,
+                            3,
+                            5,
+                            4
+                        ]
+                    }
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Trainer": {
+                        "trainer_name": "Elite Four Bruno",
+                        "second_trainer_name": "",
+                        "verbose": false,
+                        "setup_moves": [],
+                        "enemy_setup_moves": [],
+                        "mimic_selection": "",
+                        "custom_move_data": [],
+                        "exp_split": [
+                            1,
+                            1,
+                            1,
+                            1,
+                            1
+                        ],
+                        "weather": "None",
+                        "pay_day_amount": 0,
+                        "mon_order": [
+                            1,
+                            2,
+                            3,
+                            4,
+                            5
+                        ]
+                    }
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Trainer": {
+                        "trainer_name": "Elite Four Agatha",
+                        "second_trainer_name": "",
+                        "verbose": false,
+                        "setup_moves": [],
+                        "enemy_setup_moves": [],
+                        "mimic_selection": "",
+                        "custom_move_data": [],
+                        "exp_split": [],
+                        "weather": "None",
+                        "pay_day_amount": 0,
+                        "mon_order": []
+                    }
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Trainer": {
+                        "trainer_name": "Elite Four Lance",
+                        "second_trainer_name": "",
+                        "verbose": false,
+                        "setup_moves": [],
+                        "enemy_setup_moves": [],
+                        "mimic_selection": "",
+                        "custom_move_data": [],
+                        "exp_split": [
+                            1,
+                            1,
+                            1,
+                            1,
+                            1
+                        ],
+                        "weather": "None",
+                        "pay_day_amount": 0,
+                        "mon_order": [
+                            1,
+                            5,
+                            4,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "Enabled": true,
+                    "Tags": [],
+                    "Fight Trainer": {
+                        "trainer_name": "Champion Charmander",
+                        "second_trainer_name": "",
+                        "verbose": false,
+                        "setup_moves": [],
+                        "enemy_setup_moves": [],
+                        "mimic_selection": "",
+                        "custom_move_data": [],
+                        "exp_split": [
+                            1,
+                            1,
+                            1,
+                            1,
+                            1,
+                            1
+                        ],
+                        "weather": "None",
+                        "pay_day_amount": 0,
+                        "mon_order": [
+                            1,
+                            4,
+                            5,
+                            2,
+                            6,
+                            3
+                        ]
+                    }
+                }
+            ],
+            "Expanded": true,
+            "Enabled": true
+        }
+    ]
+}

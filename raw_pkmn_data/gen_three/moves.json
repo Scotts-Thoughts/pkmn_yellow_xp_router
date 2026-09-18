@@ -2088,7 +2088,14 @@
             "priority": 0,
             "type": "Normal",
             "target": "target_single_enemy",
-            "effects": [],
+            "effects": [
+                {
+                    "chance": 100,
+                    "modifier": 1,
+                    "stat": "atk",
+                    "target": "self"
+                }
+            ],
             "attack_flavor": [
                 "rage"
             ],
@@ -5753,7 +5760,7 @@
             "name": "Nature Power",
             "accuracy": 95,
             "pp": 20,
-            "base_power": 0,
+            "base_power": 1,
             "priority": 0,
             "type": "Normal",
             "target": "target_depends",
@@ -6093,7 +6100,7 @@
             "name": "Endeavor",
             "accuracy": 100,
             "pp": 5,
-            "base_power": 0,
+            "base_power": 1,
             "priority": 0,
             "type": "Normal",
             "target": "target_single_enemy",

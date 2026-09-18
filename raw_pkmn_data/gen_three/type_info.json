@@ -13,7 +13,7 @@
         "Black Belt": "Fighting",
         "Blackglasses": "Dark",
         "Charcoal": "Fire",
-        "Dragon Scale": "Dragon",
+        "Dragon Fang": "Dragon",
         "Hard Stone": "Rock",
         "Magnet": "Electric",
         "Metal Coat": "Steel",
@@ -22,11 +22,11 @@
         "Silk Scarf": "Normal",
         "Poison Barb": "Poison",
         "Sharp Beak": "Flying",
-        "SilverPowder": "Bug",
+        "Silverpowder": "Bug",
         "Soft Sand": "Ground",
         "Spell Tag": "Ghost",
         "Nevermeltice": "Ice",
-        "TwistedSpoon": "Psychic"
+        "Twistedspoon": "Psychic"
     },
     "type_chart": {
         "none": {},

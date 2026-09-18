@@ -16,10 +16,9 @@ Abilities to consider later:
 		Flash Fire, Lightning Rod, Marvel Scale, Guts, Overgrow, Blaze, Torrent, Swarm
 	
 	Weather-base abilities:
-		Swift Swim, Chlorophyll, Forecast
+		Swift Swim, Chlorophyll
 		Swift Swim Boosts the Pokémon's Speed stat in rain. 
 		Chlorophyll Boosts the Pokémon's Speed stat in harsh sunlight. 
-		Forecast The Pokémon transforms with the weather to change its type to Water, Fire, or Ice.
 	
 	Just fucking annoying:
 		Soundproof
