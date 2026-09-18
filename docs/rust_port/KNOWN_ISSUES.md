@@ -131,7 +131,7 @@ down while getting there:
 ### Bag reordering (gen 1, Rust only; added 2026-09-16)
 
 The gen 1 recorder records the in-game SELECT swap as a `"Reorder Bag"`
-event (`docs/rust_port/BAG_REORDER_PLAN.md`): a list of
+event: a list of
 `[item, slot, item, slot]` swaps, 1-based, computed against the bag as the
 engine holds it after the quantity events of the same detection window
 (Oak's Parcel, which never reaches the route, is not a slot). The Python app

@@ -18,7 +18,7 @@ Run: `cd rust && cargo run --release -p xpr-app [-- --debug]` (uses the same
 config / data directories as the Python app; see `TESTING.md` § 0 for an
 isolated run and the test-hook environment variables).
 Tests: `cd rust && cargo test --workspace`.
-Golden verification: `docs/rust_port/golden/README.md`.
+Golden verification: `cargo run --release -p xpr-golden -- verify <golden_dir>` (usage in `crates/xpr-golden/src/main.rs`; the Python corpus generator was removed with the Python app).
 Test plan: `TESTING.md`. Divergences: `docs/rust_port/KNOWN_ISSUES.md`.
 
 ## Crates

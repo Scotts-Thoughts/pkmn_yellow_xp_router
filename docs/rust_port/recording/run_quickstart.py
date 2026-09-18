@@ -15,14 +15,70 @@ import importlib.util
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-from run_pair import ROOT, PY, flatten, free_port, wait_http, write_config  # noqa: E402
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
+PY = [sys.executable]
+FOLDER_KEY = "Event Folder Name"
+
+
+def free_port() -> int:
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def wait_http(url: str, timeout: float = 20) -> bool:
+    end = time.time() + timeout
+    while time.time() < end:
+        try:
+            with urllib.request.urlopen(url, timeout=1) as r:
+                r.read()
+                return True
+        except Exception:
+            time.sleep(0.2)
+    return False
+
+
+def write_config(cfg_dir: str, data_dir: str, debug: bool):
+    os.makedirs(cfg_dir, exist_ok=True)
+    os.makedirs(os.path.join(data_dir, "saved_routes"), exist_ok=True)
+    cfg = {
+        "user_data_location": data_dir,
+        "debug_mode": debug,
+        "auto_load_most_recent_route": False,
+        "recording_auto_stop_enabled": False,
+    }
+    with open(os.path.join(cfg_dir, "config.json"), "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=4)
+
+
+def flatten(route: dict):
+    """(folder path, event json) for every folder and event group, depth first."""
+    out = []
+
+    def walk(events, path):
+        for ev in events:
+            if FOLDER_KEY in ev:
+                out.append((path, {"folder": ev[FOLDER_KEY], "enabled": ev.get("Enabled"), "expanded": ev.get("Expanded"), "notes": ev.get("Just Notes")}))
+                walk(ev.get("events", []), path + [ev[FOLDER_KEY]])
+            else:
+                out.append((path, ev))
+
+    root = route.get("events")
+    if isinstance(root, dict):
+        walk([root], [])
+    else:
+        walk(root or [], [])
+    return out
 
 
 def load_expected(scenario_path: str) -> dict:
