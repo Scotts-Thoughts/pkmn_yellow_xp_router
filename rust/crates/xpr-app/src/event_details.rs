@@ -9,7 +9,6 @@ use egui::{Ui, Vec2};
 
 use xpr_core::consts;
 use xpr_core::Config;
-use xpr_data::model::EnemyPkmn;
 use xpr_engine::{EventDefinition, NodeId, ObjKind, RouteState};
 use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets;
@@ -19,7 +18,13 @@ use crate::battle::BattleController;
 use crate::battle_ui::{BattleSummaryUi, BattleUiActions};
 use crate::controller::MainController;
 use crate::editors::{EditorCtx, EventEditors, NotesEditor};
-use crate::state_views;
+use crate::state_views::{self, BeforeInfo, LastPkmn};
+
+/// Side gutter of the pre-event state pane.
+const PANE_PAD: f32 = 16.0;
+/// Reserved height of the pinned notes footer (collapsed / expanded).
+const NOTES_H_COLLAPSED: f32 = 40.0;
+const NOTES_H_EXPANDED: f32 = 168.0;
 
 pub const SAVE_DELAY_MS: u64 = 2000;
 pub const PRE_STATE_TAB: usize = 0;
@@ -31,6 +36,10 @@ pub struct DetailsActions {
     pub battle: BattleUiActions,
     /// the tab changed (the splitter re-proportions)
     pub tab_changed: Option<bool>,
+    /// a move slot was clicked in the Pre-Event State moves card
+    pub pre_state_assign_move_slot: Option<i64>,
+    /// the EV column was clicked in the Pre-Event State stats card
+    pub pre_state_override_evs: bool,
 }
 
 pub struct EventDetails {
@@ -48,7 +57,7 @@ pub struct EventDetails {
     cur_delayed_event_id: Option<NodeId>,
     cur_delayed_deadline: Option<Instant>,
     deferred_show_at: Option<Instant>,
-    last_pkmn: Option<(EnemyPkmn, xpr_data::BadgeList)>,
+    last_pkmn: Option<LastPkmn>,
     editor_reload_pending: bool,
 }
 
@@ -401,51 +410,120 @@ impl EventDetails {
 
     #[allow(clippy::too_many_arguments)]
     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, ctrl: &mut MainController, assets: &mut Assets, actions: &mut DetailsActions) {
-        egui::Frame::new().inner_margin(egui::Margin::same(4)).show(ui, |ui| {
-            ui.spacing_mut().item_spacing = Vec2::new(2.0, 2.0);
-            let total_h = ui.available_height();
-            // footer first? No: Qt lays out tabs (stretch) / auto-switch / notes; egui top-down
-            // needs the notes height reserved. Draw the notes into a bottom panel.
-            let notes_h_estimate = if self.notes_expanded(cfg) { 160.0 } else { 24.0 };
-            let tabs_h = (total_h - notes_h_estimate - 26.0).max(100.0);
-            ui.allocate_ui_with_layout(Vec2::new(ui.available_width(), tabs_h), egui::Layout::top_down(egui::Align::Min), |ui| {
-                ui.set_height(tabs_h);
-                let mut tab = self.tab;
-                if widgets::tab_bar(ui, theme, &["Pre-Event State", "Battle Summary"], &mut tab) {
-                    self.tab = tab;
-                    self.tab_changed(cfg, actions);
+        ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+        let total_h = ui.available_height();
+        // egui lays out top-down, so the pinned notes footer's height is
+        // reserved up front and the tab body gets the rest.
+        let notes_h = if self.notes_expanded() { NOTES_H_EXPANDED } else { NOTES_H_COLLAPSED };
+        let body_h = (total_h - notes_h).max(100.0);
+        let width = ui.available_width();
+        ui.allocate_ui_with_layout(Vec2::new(width, body_h), egui::Layout::top_down(egui::Align::Min), |ui| {
+            ui.set_width(width);
+            ui.set_height(body_h);
+            ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+            let mut tab = self.tab;
+            let mut auto = self.auto_switch;
+            let mut auto_toggled = false;
+            if widgets::tab_bar(ui, theme, &["Pre-Event State", "Battle Summary"], &mut tab, |ui| {
+                ui.spacing_mut().item_spacing.x = 8.0;
+                let r = ui.add(egui::Label::new(egui::RichText::new("Auto-switch tabs").font(theme.body()).color(theme.secondary)).sense(egui::Sense::click()));
+                if r.clicked() {
+                    auto = !auto;
+                    auto_toggled = true;
                 }
+                if widgets::checkbox(ui, theme, &mut auto, "", true).changed() {
+                    auto_toggled = true;
+                }
+            }) {
+                self.tab = tab;
+                self.tab_changed(cfg, actions);
+            }
+            if auto_toggled {
+                self.auto_switch = auto;
+                cfg.set_auto_switch(auto);
+            }
+            let content_h = (body_h - widgets::TAB_STRIP_H).max(50.0);
+            if self.tab == PRE_STATE_TAB {
+                self.pre_state_tab(ui, theme, cfg, ctrl, assets, content_h, actions);
+            } else {
                 let pane = egui::Frame::new().stroke(theme.border_stroke()).inner_margin(egui::Margin::same(0));
                 pane.show(ui, |ui| {
-                    ui.set_min_height(tabs_h - 30.0);
+                    ui.set_min_height(content_h);
                     ui.set_width(ui.available_width());
-                    if self.tab == PRE_STATE_TAB {
-                        self.pre_state_tab(ui, theme, cfg, ctrl);
-                    } else {
-                        self.battle_tab(ui, theme, cfg, ctrl, assets, actions);
-                    }
+                    self.battle_tab(ui, theme, cfg, ctrl, assets, actions);
                 });
-            });
-            let mut auto = self.auto_switch;
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if widgets::checkbox_label(ui, theme, &mut auto, "Switch tabs automatically", true, true) {
-                    self.auto_switch = auto;
-                    cfg.set_auto_switch(auto);
-                }
-            });
-            let (out, mode_changed) = self.notes.ui(ui, theme, cfg);
-            if mode_changed {
-                self.update_notes_visibility(cfg);
-            }
-            if out.delayed_save {
-                self.update_existing_event_after_delay(ctrl);
             }
         });
+        let (out, mode_changed) = self.notes.ui(ui, theme, cfg);
+        if mode_changed {
+            self.update_notes_visibility(cfg);
+        }
+        if out.delayed_save {
+            self.update_existing_event_after_delay(ctrl);
+        }
     }
 
-    fn notes_expanded(&self, cfg: &Config) -> bool {
-        let _ = cfg;
-        true
+    fn notes_expanded(&self) -> bool {
+        self.notes.is_expanded()
+    }
+
+    /// The header's "Before" block: what the selected node is and where.
+    fn before_info(ctrl: &MainController) -> BeforeInfo {
+        let Some(id) = ctrl.get_single_selected_event_id(true) else {
+            return BeforeInfo { label: "Route start".to_string(), location: None };
+        };
+        // the invisible root folder is nobody's location
+        let folder_name = |fid: Option<NodeId>| fid.filter(|f| *f != ctrl.router.root_id).and_then(|f| ctrl.router.folder(f)).map(|f| f.name.clone());
+        // the nearest folder above `id`
+        let enclosing_folder = |mut cur: NodeId| -> Option<String> {
+            loop {
+                let parent = ctrl.router.parent_of(cur)?;
+                if ctrl.router.obj_kind(parent) == Some(ObjKind::Folder) {
+                    return folder_name(Some(parent));
+                }
+                cur = parent;
+            }
+        };
+        match ctrl.router.obj_kind(id) {
+            Some(ObjKind::Folder) => {
+                let f = ctrl.router.folder(id);
+                BeforeInfo { label: f.map(|f| f.name.clone()).unwrap_or_default(), location: folder_name(f.and_then(|f| f.parent)) }
+            }
+            Some(kind) => {
+                let (def, name) = match kind {
+                    ObjKind::Group => ctrl.router.group(id).map(|g| (g.event_definition.clone(), g.name.clone())),
+                    _ => ctrl.router.item(id).map(|i| (i.event_definition.clone(), i.name.clone())),
+                }
+                .unwrap_or_default();
+                let gen = ctrl.gen();
+                let mut label = gen.as_ref().and_then(|g| def.get_label(g).ok()).unwrap_or(name);
+                let mut location = None;
+                if def.trainer_def.is_some() {
+                    let trainer = gen.as_ref().and_then(|g| def.get_first_trainer_obj(g).ok().flatten().cloned());
+                    // "Trainer: Name (Location)" / "Multi: A, B (Location)" -> "Name" / "A, B"
+                    for prefix in ["Trainer: ", "Multi: "] {
+                        if let Some(rest) = label.strip_prefix(prefix) {
+                            label = rest.to_string();
+                            break;
+                        }
+                    }
+                    if let Some(t) = &trainer {
+                        if !t.location.is_empty() {
+                            let suffix = format!(" ({})", t.location);
+                            if let Some(rest) = label.strip_suffix(&suffix) {
+                                label = rest.to_string();
+                            }
+                            location = Some(t.location.clone());
+                        }
+                    }
+                }
+                if location.is_none() {
+                    location = enclosing_folder(id);
+                }
+                BeforeInfo { label, location }
+            }
+            None => BeforeInfo { label: "Route start".to_string(), location: None },
+        }
     }
 
     /// The warnings of the selected event (an event that applied, but not
@@ -464,20 +542,38 @@ impl EventDetails {
         }
     }
 
-    fn pre_state_tab(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, ctrl: &mut MainController) {
-        egui::ScrollArea::both().id_salt("pre_state_scroll").auto_shrink([false, false]).show(ui, |ui| {
-            egui::Frame::new().inner_margin(egui::Margin::same(4)).show(ui, |ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(4.0, 4.0);
+    #[allow(clippy::too_many_arguments)]
+    fn pre_state_tab(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, ctrl: &mut MainController, assets: &mut Assets, height: f32, actions: &mut DetailsActions) {
+        widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("pre_state_scroll").max_height(height).auto_shrink([false, false]), |ui| {
+            let pad = PANE_PAD as i8;
+            egui::Frame::new().inner_margin(egui::Margin { left: pad, right: pad, top: pad, bottom: pad }).show(ui, |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+                ui.set_width(ui.available_width());
                 let gen = ctrl.gen();
                 let state = self.current_init_state.clone();
-                state_views::state_viewer(ui, theme, gen.as_deref(), state.as_deref(), &mut self.last_pkmn);
-                for w in Self::selected_warnings(ctrl) {
-                    widgets::label_colored(ui, theme, format!("Warning: {}", w), theme.warning);
+                let before = Self::before_info(ctrl);
+                let clicks = state_views::state_viewer(ui, theme, gen.as_deref(), state.as_deref(), &mut self.last_pkmn, assets, &before);
+                if clicks.move_slot.is_some() {
+                    actions.pre_state_assign_move_slot = clicks.move_slot;
+                }
+                if clicks.evs {
+                    actions.pre_state_override_evs = true;
+                }
+                let warnings = Self::selected_warnings(ctrl);
+                if !warnings.is_empty() {
+                    ui.add_space(state_views::CARD_GAP);
+                    for (i, w) in warnings.iter().enumerate() {
+                        if i > 0 {
+                            ui.add_space(6.0);
+                        }
+                        widgets::warning_banner(ui, theme, w);
+                    }
                 }
                 if let (Some(et), Some(gen)) = (self.current_event_type.clone(), gen) {
+                    ui.add_space(state_views::CARD_GAP);
                     let init = self.current_init_state.clone();
                     let ctx = EditorCtx { theme, gen: &gen, cfg, cur_state: init.as_deref(), event_type: &et, enabled: self.allow_updates };
-                    let (out, reload) = self.editors.ui(ui, &ctx);
+                    let (out, reload) = self.editors.ui(ui, &ctx, assets, &before);
                     if out.save {
                         self.update_existing_event(cfg, ctrl);
                     }
@@ -507,7 +603,7 @@ impl EventDetails {
         if !self.battle_ui.should_render {
             return;
         }
-        egui::ScrollArea::vertical().id_salt("battle_scroll").auto_shrink([false, false]).show(ui, |ui| {
+        widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("battle_scroll").auto_shrink([false, false]), |ui| {
             self.battle_ui.ui(ui, theme, cfg, &mut self.bc, ctrl, assets, &mut actions.battle);
         });
     }

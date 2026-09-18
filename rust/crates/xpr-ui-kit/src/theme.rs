@@ -193,6 +193,85 @@ impl Theme {
         lighten(self.bg, 0.06)
     }
 
+    // ---- pre-event state pane tokens (docs/rust_port/design/pre_event_state/SPEC.md §3.1)
+
+    /// Card fill (= `bg_input`).
+    pub fn card_bg(&self) -> Color32 {
+        lighten(self.bg, 0.04)
+    }
+
+    /// 1 px card outline (= `hover_bg`).
+    pub fn card_border(&self) -> Color32 {
+        lighten(self.bg, 0.10)
+    }
+
+    /// Hairlines between rows inside a card.
+    pub fn row_divider(&self) -> Color32 {
+        lighten(self.bg, 0.085)
+    }
+
+    /// Hairlines between pane regions (under the tab strip, above the notes
+    /// footer, under an editor title strip).
+    pub fn pane_divider(&self) -> Color32 {
+        lighten(self.bg, 0.095)
+    }
+
+    /// Recessed fill: text inputs, enemy mon cards, drag rows, the icon tile.
+    pub fn well_bg(&self) -> Color32 {
+        self.bg
+    }
+
+    /// Editor card title strip fill.
+    pub fn strip_bg(&self) -> Color32 {
+        self.section_bg()
+    }
+
+    /// Brightest text: names, stat values, money, card titles.
+    pub fn text_strong(&self) -> Color32 {
+        lighten(self.text, 0.7)
+    }
+
+    /// Stroke of outline icons (the empty-bag glyph).
+    pub fn icon_stroke(&self) -> Color32 {
+        lighten(self.bg, 0.3)
+    }
+
+    /// Event-type chip fill / border.
+    pub fn chip_bg(&self) -> Color32 {
+        self.tinted_bg("Header", 0.14)
+    }
+
+    pub fn chip_border(&self) -> Color32 {
+        self.tinted_bg("Header", 0.28)
+    }
+
+    /// "Lv N" pill fill / border.
+    pub fn pill_bg(&self) -> Color32 {
+        self.tinted_bg("Primary", 0.12)
+    }
+
+    pub fn pill_border(&self) -> Color32 {
+        self.tinted_bg("Primary", 0.25)
+    }
+
+    /// Warning banner fill / border.
+    pub fn warning_bg(&self) -> Color32 {
+        self.tinted_bg("Warning", 0.12)
+    }
+
+    pub fn warning_border(&self) -> Color32 {
+        self.tinted_bg("Warning", 0.32)
+    }
+
+    /// 11 px caption face (column heads, card footers, slot numbers).
+    pub fn caption_font(&self) -> FontId {
+        self.font(8.25)
+    }
+
+    pub fn caption_font_bold(&self) -> FontId {
+        self.font_bold(8.25)
+    }
+
     pub fn font(&self, points: f32) -> FontId {
         FontId::new(pt(points), FontFamily::Name(Arc::from(FAMILY_REGULAR)))
     }

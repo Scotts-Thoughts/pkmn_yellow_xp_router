@@ -998,6 +998,91 @@ pub fn swaps_between(old: &[String], new: &[String]) -> Result<Vec<BagSwap>, Str
 }
 
 // ---------------------------------------------------------------------------
+// EV override
+// ---------------------------------------------------------------------------
+
+/// A testing aid with no in-game equivalent: from this event on, the solo
+/// mon's EVs (stat exp in gens 1-2) are exactly these values, both realized
+/// and unrealized, so damage ranges can be explored without re-routing the
+/// yields that would otherwise produce them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EvOverrideEventDefinition {
+    pub hp: i64,
+    pub attack: i64,
+    pub defense: i64,
+    pub special_attack: i64,
+    pub special_defense: i64,
+    pub speed: i64,
+}
+
+impl EvOverrideEventDefinition {
+    pub fn new(hp: i64, attack: i64, defense: i64, special_attack: i64, special_defense: i64, speed: i64) -> Self {
+        EvOverrideEventDefinition { hp, attack, defense, special_attack, special_defense, speed }
+    }
+
+    /// `[hp, atk, def, spa, spd, spe]`
+    pub fn values(&self) -> [i64; 6] {
+        [self.hp, self.attack, self.defense, self.special_attack, self.special_defense, self.speed]
+    }
+
+    pub fn serialize(&self) -> Value {
+        pyjson::object(vec![
+            (consts::HP, Value::from(self.hp)),
+            (consts::ATTACK, Value::from(self.attack)),
+            (consts::DEFENSE, Value::from(self.defense)),
+            (consts::SPEED, Value::from(self.speed)),
+            (consts::SPECIAL_ATTACK, Value::from(self.special_attack)),
+            (consts::SPECIAL_DEFENSE, Value::from(self.special_defense)),
+        ])
+    }
+
+    /// An object keyed like a serialized `StatBlock`; a missing stat is 0.
+    /// Anything else fails the load (degrading to notes would drop the
+    /// override for good on the next save).
+    pub fn deserialize(raw: Option<&Value>) -> Result<Option<Self>, String> {
+        let raw = match raw {
+            None | Some(Value::Null) => return Ok(None),
+            Some(v) => v,
+        };
+        if !raw.is_object() {
+            return Err(format!("Invalid {} entry: {}", consts::TASK_EV_OVERRIDE, raw));
+        }
+        let field = |key: &str| -> Result<i64, String> {
+            match get(raw, key) {
+                None | Some(Value::Null) => Ok(0),
+                Some(v) => pyjson::value_as_i64(v).ok_or_else(|| format!("Invalid {} value for {}: {}", consts::TASK_EV_OVERRIDE, key, v)),
+            }
+        };
+        Ok(Some(EvOverrideEventDefinition {
+            hp: field(consts::HP)?,
+            attack: field(consts::ATTACK)?,
+            defense: field(consts::DEFENSE)?,
+            special_attack: field(consts::SPECIAL_ATTACK)?,
+            special_defense: field(consts::SPECIAL_DEFENSE)?,
+            speed: field(consts::SPEED)?,
+        }))
+    }
+
+    /// Gens 1-2 have one Special stat exp: the engine reads `special_attack`
+    /// for both special stats, so an override there carries the same value in
+    /// both fields.
+    pub fn has_single_special(gen: &GenData) -> bool {
+        gen.get_generation() <= 2
+    }
+
+    pub fn to_string(&self, gen: &GenData) -> String {
+        if Self::has_single_special(gen) {
+            format!("Stat Exp Override: {} HP, {} Atk, {} Def, {} Spc, {} Spe", self.hp, self.attack, self.defense, self.special_attack, self.speed)
+        } else {
+            format!(
+                "EV Override: {} HP, {} Atk, {} Def, {} SpA, {} SpD, {} Spe",
+                self.hp, self.attack, self.defense, self.special_attack, self.special_defense, self.speed
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // EventDefinition
 // ---------------------------------------------------------------------------
 
@@ -1019,6 +1104,7 @@ pub struct EventDefinition {
     pub blackout: Option<LocationEventDefinition>,
     pub evolution: Option<EvolutionEventDefinition>,
     pub bag_reorder: Option<BagReorderEventDefinition>,
+    pub ev_override: Option<EvOverrideEventDefinition>,
     pub tags: Vec<String>,
     pub notes: String,
 }
@@ -1041,6 +1127,7 @@ impl Default for EventDefinition {
             blackout: None,
             evolution: None,
             bag_reorder: None,
+            ev_override: None,
             tags: Vec::new(),
             notes: String::new(),
         }
@@ -1153,6 +1240,13 @@ impl EventDefinition {
     pub fn with_bag_reorder(swaps: Vec<BagSwap>) -> EventDefinition {
         EventDefinition {
             bag_reorder: Some(BagReorderEventDefinition::new(swaps)),
+            ..Default::default()
+        }
+    }
+
+    pub fn with_ev_override(e: EvOverrideEventDefinition) -> EventDefinition {
+        EventDefinition {
+            ev_override: Some(e),
             ..Default::default()
         }
     }
@@ -1321,6 +1415,8 @@ impl EventDefinition {
             consts::TASK_EVOLUTION
         } else if self.bag_reorder.is_some() {
             consts::TASK_REORDER_BAG
+        } else if self.ev_override.is_some() {
+            consts::TASK_EV_OVERRIDE
         } else {
             consts::TASK_NOTES_ONLY
         }
@@ -1376,6 +1472,8 @@ impl EventDefinition {
             e.to_string()
         } else if let Some(r) = &self.bag_reorder {
             r.to_string()
+        } else if let Some(e) = &self.ev_override {
+            e.to_string(gen)
         } else {
             let _ = gen;
             format!("Notes: {}", self.notes)
@@ -1500,6 +1598,8 @@ impl EventDefinition {
             pairs.push((consts::TASK_EVOLUTION, e.serialize()));
         } else if let Some(r) = &self.bag_reorder {
             pairs.push((consts::TASK_REORDER_BAG, r.serialize()));
+        } else if let Some(e) = &self.ev_override {
+            pairs.push((consts::TASK_EV_OVERRIDE, e.serialize()));
         }
         pyjson::object(pairs)
     }
@@ -1528,6 +1628,7 @@ impl EventDefinition {
             blackout: LocationEventDefinition::deserialize(get(raw, consts::TASK_BLACKOUT)),
             evolution: EvolutionEventDefinition::deserialize(get(raw, consts::TASK_EVOLUTION))?,
             bag_reorder: BagReorderEventDefinition::deserialize(get(raw, consts::TASK_REORDER_BAG))?,
+            ev_override: EvOverrideEventDefinition::deserialize(get(raw, consts::TASK_EV_OVERRIDE))?,
         };
         if result.wild_pkmn_info.is_some() {
             result.trainer_def = None;

@@ -15,7 +15,7 @@ use xpr_ui_kit::ShortcutMap;
 use crate::assets::Assets;
 use crate::controller::MainController;
 
-const TOGGLE_ORDER: [&str; 18] = [
+const TOGGLE_ORDER: [&str; 19] = [
     consts::MAJOR_BATTLE_FILTER,
     consts::TASK_TRAINER_BATTLE,
     consts::TASK_RARE_CANDY,
@@ -32,6 +32,7 @@ const TOGGLE_ORDER: [&str; 18] = [
     consts::TASK_BLACKOUT,
     consts::TASK_HEAL,
     consts::TASK_EVOLUTION,
+    consts::TASK_EV_OVERRIDE,
     consts::TASK_NOTES_ONLY,
     consts::ERROR_SEARCH,
 ];
@@ -56,6 +57,7 @@ fn short_label(et: &str) -> &'static str {
         consts::TASK_BLACKOUT => "BO",
         consts::TASK_EVOLUTION => "Ev",
         consts::TASK_LEARN_MOVE_TM => "TM",
+        consts::TASK_EV_OVERRIDE => "EV",
         consts::ERROR_SEARCH => "Er",
         _ => "??",
     }
@@ -79,6 +81,7 @@ fn icon_file(et: &str) -> Option<&'static str> {
         consts::TASK_BLACKOUT => "TASK_BLACKOUT",
         consts::TASK_EVOLUTION => "TASK_EVOLUTION",
         consts::TASK_LEARN_MOVE_TM => "TASK_LEARN_MOVE_TM",
+        consts::TASK_EV_OVERRIDE => "TASK_EV_OVERRIDE",
         consts::ERROR_SEARCH => "ERROR_SEARCH",
         _ => return None,
     })
@@ -104,6 +107,7 @@ fn tooltip(et: &str) -> &'static str {
         consts::TASK_BLACKOUT => "Blackout",
         consts::TASK_EVOLUTION => "Evolution",
         consts::TASK_LEARN_MOVE_TM => "TM / HM",
+        consts::TASK_EV_OVERRIDE => "EV Override",
         consts::ERROR_SEARCH => "Invalid Events",
         _ => "",
     }
@@ -128,6 +132,7 @@ pub fn shortcut_id(et: &str) -> Option<&'static str> {
         consts::TASK_HEAL => "filter_heal",
         consts::TASK_BLACKOUT => "filter_blackout",
         consts::TASK_EVOLUTION => "filter_evolution",
+        consts::TASK_EV_OVERRIDE => "filter_ev_override",
         consts::TASK_NOTES_ONLY => "filter_notes",
         _ => return None,
     })

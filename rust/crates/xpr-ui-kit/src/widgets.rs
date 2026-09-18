@@ -14,6 +14,36 @@ use egui::{
 use crate::theme::Theme;
 
 // ---------------------------------------------------------------------------
+// Scroll areas
+// ---------------------------------------------------------------------------
+
+/// Show `area` with its scrollbar handle painted in the border colour (the
+/// Qt `QScrollBar::handle` rule). egui draws the handle with
+/// `widgets.inactive.bg_fill`, which the theme sets only 2 % lighter than the
+/// track, so the handle all but vanished. The override is scoped to the
+/// scrollbar: the content ui gets the unmodified style back so check boxes,
+/// radios and sliders inside keep their normal fill.
+pub fn show_scroll<R>(
+    ui: &mut Ui,
+    area: egui::ScrollArea,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+) -> egui::scroll_area::ScrollAreaOutput<R> {
+    let saved = ui.style().clone();
+    {
+        let w = &mut ui.style_mut().visuals.widgets;
+        let handle = w.inactive.bg_stroke.color;
+        w.inactive.bg_fill = handle;
+        w.hovered.bg_fill = crate::theme::lighten(handle, 0.15);
+    }
+    let out = area.show(ui, |ui| {
+        ui.set_style(saved.clone());
+        add_contents(ui)
+    });
+    ui.set_style(saved);
+    out
+}
+
+// ---------------------------------------------------------------------------
 // Labels
 // ---------------------------------------------------------------------------
 
@@ -291,6 +321,9 @@ pub struct Entry<'a> {
     id: Option<Id>,
     center: bool,
     font: Option<FontId>,
+    margin: egui::Margin,
+    radius: u8,
+    min_height: Option<f32>,
 }
 
 /// What an entry reported this frame.
@@ -308,7 +341,25 @@ pub struct EntryResponse {
 
 impl<'a> Entry<'a> {
     pub fn new(theme: &'a Theme, text: &'a mut String) -> Self {
-        Entry { text, theme, width: None, enabled: true, hint: None, id: None, center: false, font: None }
+        Entry { text, theme, width: None, enabled: true, hint: None, id: None, center: false, font: None, margin: egui::Margin::symmetric(4, 2), radius: 2, min_height: None }
+    }
+
+    /// Inner padding (default 4 × 2).
+    pub fn margin(mut self, m: egui::Margin) -> Self {
+        self.margin = m;
+        self
+    }
+
+    /// Corner radius of the outline (default 2).
+    pub fn corner_radius(mut self, r: u8) -> Self {
+        self.radius = r;
+        self
+    }
+
+    /// Minimum height of the control.
+    pub fn min_height(mut self, h: f32) -> Self {
+        self.min_height = Some(h);
+        self
     }
 
     pub fn width(mut self, w: f32) -> Self {
@@ -350,13 +401,17 @@ impl<'a> Entry<'a> {
             .font(self.font.clone().unwrap_or_else(|| theme.body()))
             .text_color(if self.enabled { theme.text } else { theme.disabled_text })
             .background_color(if self.enabled { theme.bg_input } else { theme.bg_darker })
-            .margin(egui::Margin::symmetric(4, 2))
+            .margin(self.margin)
             .interactive(self.enabled)
             .frame(false)
             .lock_focus(true)
             .vertical_align(Align::Center);
+        let pad_x = (self.margin.left + self.margin.right) as f32;
         if let Some(w) = self.width {
-            edit = edit.desired_width(w - 8.0);
+            edit = edit.desired_width(w - pad_x);
+        }
+        if let Some(h) = self.min_height {
+            edit = edit.min_size(Vec2::new(self.width.unwrap_or(0.0), h));
         }
         if let Some(h) = &self.hint {
             edit = edit.hint_text(egui::RichText::new(h.clone()).color(theme.secondary));
@@ -374,7 +429,7 @@ impl<'a> Entry<'a> {
         } else {
             Stroke::new(1.0_f32, theme.border)
         };
-        ui.painter().rect_stroke(response.rect, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(response.rect, CornerRadius::same(self.radius), stroke, egui::StrokeKind::Inside);
         let mut r = EntryResponse {
             changed: response.changed(),
             has_focus,
@@ -412,15 +467,26 @@ pub fn entry(ui: &mut Ui, theme: &Theme, text: &mut String, width: Option<f32>) 
 
 /// `QPlainTextEdit`
 pub fn text_area(ui: &mut Ui, theme: &Theme, text: &mut String, id: Id, height: f32, enabled: bool) -> Response {
-    let rows = ((height - 6.0) / (theme.body().size * 1.3)).floor().max(1.0) as usize;
+    text_area_styled(ui, theme, text, id, height, enabled, egui::Margin::same(3), 2)
+}
+
+/// `text_area` with explicit inner padding and outline radius; the fill is
+/// the well colour when the padding is not the default 3 px (the notes
+/// footer), `bg_input` otherwise.
+#[allow(clippy::too_many_arguments)]
+pub fn text_area_styled(ui: &mut Ui, theme: &Theme, text: &mut String, id: Id, height: f32, enabled: bool, margin: egui::Margin, radius: u8) -> Response {
+    let pad_y = (margin.top + margin.bottom) as f32;
+    let rows = ((height - pad_y) / (theme.body().size * 1.3)).floor().max(1.0) as usize;
+    let fill = if margin == egui::Margin::same(3) { theme.bg_input } else { theme.well_bg() };
     let output = TextEdit::multiline(text)
         .id(id)
         .font(theme.body())
         .text_color(if enabled { theme.text } else { theme.disabled_text })
-        .background_color(theme.bg_input)
-        .margin(egui::Margin::same(3))
+        .background_color(fill)
+        .margin(margin)
         .desired_rows(rows)
         .desired_width(f32::INFINITY)
+        .min_size(Vec2::new(0.0, height))
         .interactive(enabled)
         .frame(false)
         .lock_focus(false)
@@ -431,7 +497,7 @@ pub fn text_area(ui: &mut Ui, theme: &Theme, text: &mut String, id: Id, height: 
     } else {
         Stroke::new(1.0_f32, theme.border)
     };
-    ui.painter().rect_stroke(response.rect, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(response.rect, CornerRadius::same(radius), stroke, egui::StrokeKind::Inside);
     response
 }
 
@@ -783,7 +849,7 @@ impl<'a> SearchableDropdown<'a> {
                     .show(ui, |ui| {
                         ui.set_width(popup_w);
                         let max_h = 22.0 * 10.0;
-                        egui::ScrollArea::vertical().max_height(max_h).show(ui, |ui| {
+                        show_scroll(ui, egui::ScrollArea::vertical().max_height(max_h), |ui| {
                             for (row, opt_idx) in matches.iter().enumerate() {
                                 let opt = &self.options[*opt_idx];
                                 let is_hl = row == st.highlighted;
@@ -1165,51 +1231,57 @@ pub fn vline(ui: &mut Ui, theme: &Theme, height: f32) {
 // Tab bar
 // ---------------------------------------------------------------------------
 
-/// `QTabBar`: returns true when the current tab changed.
-pub fn tab_bar(ui: &mut Ui, theme: &Theme, tabs: &[&str], current: &mut usize) -> bool {
+/// Height of the pane tab strip drawn by [`tab_bar`].
+pub const TAB_STRIP_H: f32 = 40.0;
+
+/// The pane tab strip: a 40 px row spanning the available width with
+/// text-only tabs (12 px horizontal padding; the active one is bold, strong
+/// and sits on a 2 px accent underline flush with the strip's bottom edge), a
+/// pane-divider hairline along the bottom, and `trailing` drawn right-aligned
+/// inside the row. Returns true when the current tab changed.
+pub fn tab_bar(ui: &mut Ui, theme: &Theme, tabs: &[&str], current: &mut usize, trailing: impl FnOnce(&mut Ui)) -> bool {
     let mut changed = false;
-    let font = theme.body();
-    let start_x = ui.cursor().min.x;
-    let mut bottom_y = 0.0f32;
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 1.0;
-        for (i, t) in tabs.iter().enumerate() {
-            let galley = ui.fonts_mut(|f| f.layout_no_wrap(t.to_string(), font.clone(), Color32::WHITE));
-            let desired = Vec2::new(galley.size().x + 24.0, galley.size().y + 8.0);
-            let (rect, resp) = ui.allocate_exact_size(desired, Sense::click());
-            bottom_y = rect.max.y;
-            let selected = i == *current;
-            let fill = if selected {
-                theme.bg
+    let (strip, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), TAB_STRIP_H), Sense::hover());
+    let pad = 16.0;
+    let mut x = strip.min.x + pad;
+    let strong = theme.text_strong();
+    for (i, t) in tabs.iter().enumerate() {
+        let selected = i == *current;
+        let font = if selected { theme.body_bold() } else { theme.body() };
+        let galley = ui.fonts_mut(|f| f.layout_no_wrap(t.to_string(), font, Color32::WHITE));
+        let w = galley.size().x + 24.0;
+        let rect = Rect::from_min_size(Pos2::new(x, strip.min.y), Vec2::new(w, strip.height()));
+        let resp = ui.interact(rect, ui.id().with(("tab", i)), Sense::click());
+        if ui.is_rect_visible(rect) {
+            let color = if selected {
+                strong
             } else if resp.hovered() {
-                theme.hover_bg
+                theme.text
             } else {
-                theme.bg_darker
+                theme.secondary
             };
             let painter = ui.painter();
-            painter.rect(
-                rect,
-                CornerRadius { nw: 3, ne: 3, sw: 0, se: 0 },
-                fill,
-                Stroke::new(1.0_f32, theme.border),
-                egui::StrokeKind::Inside,
-            );
+            painter.galley(Pos2::new(rect.center().x - galley.size().x / 2.0, rect.center().y - galley.size().y / 2.0), galley, color);
             if selected {
-                let bar = Rect::from_min_max(Pos2::new(rect.min.x + 1.0, rect.max.y - 2.0), Pos2::new(rect.max.x - 1.0, rect.max.y));
+                let bar = Rect::from_min_max(Pos2::new(rect.min.x, strip.max.y - 2.0), Pos2::new(rect.max.x, strip.max.y));
                 painter.rect_filled(bar, CornerRadius::ZERO, theme.accent);
             }
-            let color = if selected { Color32::WHITE } else { theme.text };
-            painter.galley(Pos2::new(rect.center().x - galley.size().x / 2.0, rect.center().y - galley.size().y / 2.0), galley, color);
-            if resp.clicked() && !selected {
-                *current = i;
-                changed = true;
-            }
         }
-    });
-    // pane top border
-    let y = bottom_y;
-    let end_x = ui.max_rect().max.x;
-    ui.painter().line_segment([Pos2::new(start_x, y), Pos2::new(end_x, y)], Stroke::new(1.0_f32, theme.border));
+        if resp.clicked() && !selected {
+            *current = i;
+            changed = true;
+        }
+        if !selected {
+            resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+        }
+        x += w + 4.0;
+    }
+    ui.painter().hline(strip.x_range(), strip.max.y - 0.5, Stroke::new(1.0_f32, theme.pane_divider()));
+    let trailing_rect = Rect::from_min_max(Pos2::new(x, strip.min.y), Pos2::new(strip.max.x - pad, strip.max.y - 1.0));
+    if trailing_rect.width() > 0.0 {
+        let mut child = ui.new_child(egui::UiBuilder::new().max_rect(trailing_rect).layout(Layout::right_to_left(Align::Center)));
+        trailing(&mut child);
+    }
     changed
 }
 
@@ -1605,4 +1677,287 @@ pub fn rich(theme: &Theme, text: impl Into<String>) -> egui::RichText {
 pub fn set_body_style(ui: &mut Ui, theme: &Theme) {
     ui.style_mut().override_font_id = Some(theme.body());
     ui.style_mut().text_styles.insert(TextStyle::Body, theme.body());
+}
+
+// ---------------------------------------------------------------------------
+// Pre-event state pane helpers (docs/rust_port/design/pre_event_state/SPEC.md)
+// ---------------------------------------------------------------------------
+
+/// `1234567` -> `1,234,567`.
+pub fn fmt_thousands(v: i64) -> String {
+    let digits = v.unsigned_abs().to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3 + 1);
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    if v < 0 {
+        out.insert(0, '-');
+    }
+    out
+}
+
+/// Letter spacing of the uppercase captions, in px.
+pub const CAPTION_TRACKING: f32 = 0.9;
+
+/// Lay out `text` upper-cased with the caption tracking.
+pub fn caption_galley(ui: &Ui, text: &str, font: FontId, color: Color32) -> std::sync::Arc<egui::Galley> {
+    let fmt = egui::TextFormat { font_id: font, extra_letter_spacing: CAPTION_TRACKING, color, ..Default::default() };
+    let job = egui::text::LayoutJob::single_section(text.to_uppercase(), fmt);
+    ui.fonts_mut(|f| f.layout_job(job))
+}
+
+/// Small uppercase caption (11 px, letter-spaced); `color` defaults to muted.
+pub fn caption(ui: &mut Ui, theme: &Theme, text: &str, color: Option<Color32>) -> Response {
+    let color = color.unwrap_or(theme.secondary);
+    let galley = caption_galley(ui, text, theme.caption_font(), color);
+    let (rect, resp) = ui.allocate_exact_size(galley.size(), Sense::hover());
+    if ui.is_rect_visible(rect) {
+        ui.painter().galley(rect.min, galley, color);
+    }
+    resp
+}
+
+/// Default card padding: 12 top / 14 sides / 10 bottom.
+pub const CARD_PADDING: egui::Margin = egui::Margin { left: 14, right: 14, top: 12, bottom: 10 };
+
+/// Card frame: card bg, 1 px card border, radius 8, [`CARD_PADDING`] unless overridden.
+pub fn card<R>(ui: &mut Ui, theme: &Theme, padding: Option<egui::Margin>, add: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<R> {
+    egui::Frame::new()
+        .fill(theme.card_bg())
+        .stroke(Stroke::new(1.0_f32, theme.card_border()))
+        .corner_radius(CornerRadius::same(8))
+        .inner_margin(padding.unwrap_or(CARD_PADDING))
+        .show(ui, add)
+}
+
+/// Height of a card title row.
+pub const CARD_TITLE_H: f32 = 22.0;
+
+/// 22 px title row: uppercase section title (header colour) left, optional
+/// muted caption right. Returns the row rect so callers can place column
+/// heads over it.
+pub fn card_title(ui: &mut Ui, theme: &Theme, title: &str, right: Option<&str>) -> Rect {
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), CARD_TITLE_H), Sense::hover());
+    if ui.is_rect_visible(rect) {
+        let g = caption_galley(ui, title, theme.caption_font_bold(), theme.header);
+        ui.painter().galley(Pos2::new(rect.min.x, rect.center().y - g.size().y / 2.0), g, theme.header);
+        if let Some(r) = right {
+            let g = ui.fonts_mut(|f| f.layout_no_wrap(r.to_string(), theme.caption_font(), theme.secondary));
+            ui.painter().galley(Pos2::new(rect.max.x - g.size().x, rect.center().y - g.size().y / 2.0), g, theme.secondary);
+        }
+    }
+    rect
+}
+
+/// Rounded pill ("Lv 5"): 12 px bold text, padding 2 x 8, radius 999.
+pub fn pill(ui: &mut Ui, theme: &Theme, text: &str, fg: Color32, bg: Color32, border: Color32) -> Response {
+    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), theme.body_bold(), fg));
+    let (rect, resp) = ui.allocate_exact_size(galley.size() + Vec2::new(16.0, 4.0), Sense::hover());
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect(rect, CornerRadius::same(255), bg, Stroke::new(1.0_f32, border), egui::StrokeKind::Inside);
+        ui.painter().galley(Pos2::new(rect.min.x + 8.0, rect.center().y - galley.size().y / 2.0), galley, fg);
+    }
+    resp
+}
+
+/// Outlined chip with uppercase caption text (the event-type chip): 11 px
+/// bold, padding 2 x 8, radius 4.
+pub fn chip_outlined(ui: &mut Ui, theme: &Theme, text: &str, fg: Color32, bg: Color32, border: Color32) -> Response {
+    let galley = caption_galley(ui, text, theme.caption_font_bold(), fg);
+    let (rect, resp) = ui.allocate_exact_size(galley.size() + Vec2::new(16.0, 4.0), Sense::hover());
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect(rect, CornerRadius::same(4), bg, Stroke::new(1.0_f32, border), egui::StrokeKind::Inside);
+        ui.painter().galley(Pos2::new(rect.min.x + 8.0, rect.center().y - galley.size().y / 2.0), galley, fg);
+    }
+    resp
+}
+
+/// Paint a progress bar into `rect` (fraction 0..1).
+pub fn paint_progress_bar(ui: &Ui, rect: Rect, fraction: f32, fill: Color32, track: Color32) {
+    let painter = ui.painter();
+    painter.rect_filled(rect, CornerRadius::same(3), track);
+    let w = rect.width() * fraction.clamp(0.0, 1.0);
+    if w > 0.0 {
+        painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(w, rect.height())), CornerRadius::same(3), fill);
+    }
+}
+
+/// 6 px progress bar of the given width; fraction 0..1.
+pub fn progress_bar(ui: &mut Ui, width: f32, fraction: f32, fill: Color32, track: Color32) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 6.0), Sense::hover());
+    if ui.is_rect_visible(rect) {
+        paint_progress_bar(ui, rect, fraction, fill, track);
+    }
+    resp
+}
+
+/// Stroked warning triangle (the banner icon) fitted to `rect`.
+pub fn paint_warning_triangle(ui: &Ui, rect: Rect, color: Color32) {
+    let painter = ui.painter();
+    let s = rect.width();
+    let o = rect.min;
+    let stroke = Stroke::new(1.6_f32, color);
+    let pts = vec![
+        Pos2::new(o.x + s * 0.5, o.y + s * 0.12),
+        Pos2::new(o.x + s * 0.94, o.y + s * 0.86),
+        Pos2::new(o.x + s * 0.06, o.y + s * 0.86),
+        Pos2::new(o.x + s * 0.5, o.y + s * 0.12),
+    ];
+    painter.add(egui::Shape::line(pts, stroke));
+    painter.line_segment([Pos2::new(o.x + s * 0.5, o.y + s * 0.4), Pos2::new(o.x + s * 0.5, o.y + s * 0.6)], stroke);
+    painter.circle_filled(Pos2::new(o.x + s * 0.5, o.y + s * 0.73), 1.0, color);
+}
+
+/// Warning banner: padding 8 x 12, radius 6, warning bg + 1 px warning
+/// border, a 16 px stroked triangle, then **Warning:** + message in the
+/// warning colour.
+pub fn warning_banner(ui: &mut Ui, theme: &Theme, message: &str) -> Response {
+    let bold = ui.fonts_mut(|f| f.layout_no_wrap("Warning:".to_string(), theme.body_bold(), theme.warning));
+    let text_w = (ui.available_width() - 24.0 - 16.0 - 10.0 - bold.size().x - 4.0).max(40.0);
+    let msg = ui.fonts_mut(|f| f.layout(message.to_string(), theme.body(), theme.warning, text_w));
+    let h = (msg.size().y.max(bold.size().y).max(16.0) + 16.0).max(34.0);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), h), Sense::hover());
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect(rect, CornerRadius::same(6), theme.warning_bg(), Stroke::new(1.0_f32, theme.warning_border()), egui::StrokeKind::Inside);
+        let icon = Rect::from_center_size(Pos2::new(rect.min.x + 12.0 + 8.0, rect.center().y), Vec2::splat(16.0));
+        paint_warning_triangle(ui, icon, theme.warning);
+        let x = icon.max.x + 10.0;
+        let y = rect.center().y - bold.size().y / 2.0;
+        let bw = bold.size().x;
+        ui.painter().galley(Pos2::new(x, y), bold, theme.warning);
+        ui.painter().galley(Pos2::new(x + bw + 4.0, rect.center().y - msg.size().y / 2.0), msg, theme.warning);
+    }
+    resp
+}
+
+/// Paint `text` inside `cell` (vertically centred) with the given alignment.
+pub fn col_text(ui: &Ui, cell: Rect, text: &str, font: FontId, color: Color32, align: Align) {
+    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font, color));
+    let x = match align {
+        Align::Min => cell.min.x,
+        Align::Center => cell.center().x - galley.size().x / 2.0,
+        Align::Max => cell.max.x - galley.size().x,
+    };
+    ui.painter().galley(Pos2::new(x, cell.center().y - galley.size().y / 2.0), galley, color);
+}
+
+/// Allocate a full-width row of `height`, drawing a 1 px hairline of
+/// `divider` along its top edge when given.
+pub fn table_row(ui: &mut Ui, height: f32, divider: Option<Color32>) -> Rect {
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), height), Sense::hover());
+    if let Some(c) = divider {
+        if ui.is_rect_visible(rect) {
+            ui.painter().hline(rect.x_range(), rect.min.y + 0.5, Stroke::new(1.0_f32, c));
+        }
+    }
+    rect
+}
+
+/// A 1 px full-width hairline in `color`.
+pub fn hairline(ui: &mut Ui, color: Color32) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 1.0), Sense::hover());
+    ui.painter().rect_filled(rect, CornerRadius::ZERO, color);
+}
+
+/// Stroked chevron (`up`: pointing up, else down) centred in `rect`.
+pub fn paint_chevron(ui: &Ui, rect: Rect, up: bool, color: Color32) {
+    let c = rect.center();
+    let s = rect.width() / 2.0;
+    let dy = if up { s * 0.5 } else { -s * 0.5 };
+    let pts = vec![Pos2::new(c.x - s, c.y + dy), Pos2::new(c.x, c.y - dy), Pos2::new(c.x + s, c.y + dy)];
+    ui.painter().add(egui::Shape::line(pts, Stroke::new(2.0_f32, color)));
+}
+
+/// Stroked chevron pointing right (collapsed) or down (expanded).
+pub fn paint_disclosure_chevron(ui: &Ui, rect: Rect, expanded: bool, color: Color32) {
+    let c = rect.center();
+    let s = rect.width() / 2.0;
+    let pts = if expanded {
+        vec![Pos2::new(c.x - s, c.y - s * 0.5), Pos2::new(c.x, c.y + s * 0.5), Pos2::new(c.x + s, c.y - s * 0.5)]
+    } else {
+        vec![Pos2::new(c.x - s * 0.5, c.y - s), Pos2::new(c.x + s * 0.5, c.y), Pos2::new(c.x - s * 0.5, c.y + s)]
+    };
+    ui.painter().add(egui::Shape::line(pts, Stroke::new(2.0_f32, color)));
+}
+
+/// 26 x 22 outlined arrow button with a 12 px chevron; disabled buttons use
+/// the disabled colour and do not react to hover.
+pub fn chevron_button(ui: &mut Ui, theme: &Theme, up: bool, enabled: bool) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(26.0, 22.0), if enabled { Sense::click() } else { Sense::hover() });
+    if ui.is_rect_visible(rect) {
+        let hovered = enabled && resp.hovered();
+        let (border, fg) = if !enabled {
+            (theme.subtle_border, theme.disabled_text)
+        } else if hovered {
+            (theme.accent, theme.text)
+        } else {
+            (theme.border, theme.text)
+        };
+        let fill = if hovered { theme.hover_bg } else { theme.card_bg() };
+        ui.painter().rect(rect, CornerRadius::same(4), fill, Stroke::new(1.0_f32, border), egui::StrokeKind::Inside);
+        paint_chevron(ui, Rect::from_center_size(rect.center(), Vec2::splat(9.0)), up, fg);
+    }
+    if enabled {
+        resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+    } else {
+        resp
+    }
+}
+
+/// Three horizontal lines (the drag handle) fitted to `rect`.
+pub fn paint_drag_handle(ui: &Ui, rect: Rect, color: Color32) {
+    let painter = ui.painter();
+    let stroke = Stroke::new(1.6_f32, color);
+    let x0 = rect.min.x + rect.width() * 0.15;
+    let x1 = rect.max.x - rect.width() * 0.15;
+    for f in [0.3, 0.5, 0.7] {
+        let y = rect.min.y + rect.height() * f;
+        painter.line_segment([Pos2::new(x0, y), Pos2::new(x1, y)], stroke);
+    }
+}
+
+/// Outline bag glyph (the empty-bag placeholder) fitted to `rect`.
+pub fn paint_bag_glyph(ui: &Ui, rect: Rect, color: Color32) {
+    let painter = ui.painter();
+    let stroke = Stroke::new(1.6_f32, color);
+    let s = rect.width();
+    let o = rect.min;
+    // body: a slightly flared trapezoid
+    let body = vec![
+        Pos2::new(o.x + s * 0.25, o.y + s * 0.34),
+        Pos2::new(o.x + s * 0.75, o.y + s * 0.34),
+        Pos2::new(o.x + s * 0.80, o.y + s * 0.84),
+        Pos2::new(o.x + s * 0.20, o.y + s * 0.84),
+        Pos2::new(o.x + s * 0.25, o.y + s * 0.34),
+    ];
+    painter.add(egui::Shape::line(body, stroke));
+    // handle: a semicircle on short legs
+    let cx = o.x + s * 0.5;
+    let r = s * 0.13;
+    let top_y = o.y + s * 0.34;
+    let mut handle = vec![Pos2::new(cx - r, top_y)];
+    for i in 0..=8 {
+        let t = std::f32::consts::PI * (1.0 + i as f32 / 8.0);
+        handle.push(Pos2::new(cx + r * t.cos(), o.y + s * 0.12 + r + r * t.sin()));
+    }
+    handle.push(Pos2::new(cx + r, top_y));
+    painter.add(egui::Shape::line(handle, stroke));
+}
+
+#[cfg(test)]
+mod pane_tests {
+    use super::fmt_thousands;
+
+    #[test]
+    fn thousands() {
+        assert_eq!(fmt_thousands(0), "0");
+        assert_eq!(fmt_thousands(999), "999");
+        assert_eq!(fmt_thousands(1000), "1,000");
+        assert_eq!(fmt_thousands(12400), "12,400");
+        assert_eq!(fmt_thousands(1234567), "1,234,567");
+        assert_eq!(fmt_thousands(-2210), "-2,210");
+    }
 }

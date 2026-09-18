@@ -163,7 +163,7 @@ Re-run the golden verify with the config toggles that change battle output
 
 Every menu item, with its default shortcut; each must do the same thing as the Qt app.
 
-**File**: Customize DVs (Ctrl+X) · New Route (Ctrl+N) · Load Route (Ctrl+L) · Save Route (Ctrl+S) · Close Route (Ctrl+Shift+C) · Auto-load most recent (F2, check) · Export Notes (Ctrl+Shift+W) · Screenshot Event List (F5) · Screenshot Battle Summary (F6) · Screenshot Player Ranges (F7) · Screenshot Enemy Ranges (F8) · Open Image Folder (F12) · Config Font (Ctrl+Shift+D) · Custom Gens (Ctrl+Shift+E) · App Config (Ctrl+Shift+A) · Open Data Folder (Ctrl+Shift+O) · Keyboard Shortcuts (Ctrl+Shift+K).
+**File**: Customize DVs (Ctrl+X) · New Route (Ctrl+N) · Load Route (Ctrl+L) · Save Route (Ctrl+S) · Close Route (Alt+W) · Auto-load most recent (F2, check) · Export Notes (Ctrl+Shift+W) · Screenshot Event List (F5) · Screenshot Battle Summary (F6) · Screenshot Player Ranges (F7) · Screenshot Enemy Ranges (F8) · Open Image Folder (F12) · Config Font (Ctrl+Shift+D) · Custom Gens (Ctrl+Shift+E) · App Config (Ctrl+Shift+A) · Open Data Folder (Ctrl+Shift+O) · Keyboard Shortcuts (Ctrl+Shift+K).
 
 **Events**: Add New Event · New Route Based on Current Route · Undo (Ctrl+Z) · Move Event Up/Down (Ctrl+E / Ctrl+D) · Move Event Up/Down To Next Folder (Ctrl+Shift+E / Ctrl+Shift+D) · Enable/Disable (Ctrl+C) · Toggle Highlight (Ctrl+V) · Transfer Event · Delete Event (Ctrl+B, Delete) · Highlight Branched Mandatory Battles (check) · Fade Folder Text (check) · Setup Summary · Run Summary.
 

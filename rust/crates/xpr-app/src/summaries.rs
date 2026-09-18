@@ -263,7 +263,7 @@ impl RunSummary {
         });
         ui.painter().line_segment([ui.cursor().left_top(), Pos2::new(ui.max_rect().max.x, ui.cursor().min.y)], Stroke::new(1.0_f32, Color32::from_rgb(0x44, 0x44, 0x44)));
         let _ = ctrl;
-        egui::ScrollArea::horizontal().id_salt("run_summary_scroll").auto_shrink([false, true]).show(ui, |ui| {
+        widgets::show_scroll(ui, egui::ScrollArea::horizontal().id_salt("run_summary_scroll").auto_shrink([false, true]), |ui| {
             let r = self.grid(ui, theme);
             self.cached_size = Vec2::new(r.width() + 16.0 + 12.0, r.height() + 30.0 + 16.0 + 12.0);
         });

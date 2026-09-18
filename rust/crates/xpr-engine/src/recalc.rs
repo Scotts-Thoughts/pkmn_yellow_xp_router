@@ -313,6 +313,11 @@ impl Router {
                 warning_message = warnings.join(", ");
                 (Arc::new(st), String::new())
             }
+        } else if let Some(e) = &item.event_definition.ev_override {
+            // over-cap values are applied capped and flagged, not refused
+            let (st, warnings) = cur_state.override_evs(&gen, e.values())?;
+            warning_message = warnings;
+            (Arc::new(st), String::new())
         } else {
             // notes / save / heal: the state passes through unchanged
             (cur_state, String::new())

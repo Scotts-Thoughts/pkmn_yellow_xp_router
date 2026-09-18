@@ -644,6 +644,45 @@ impl RouteState {
         Ok((RouteState::new(new_mon, self.badges.clone(), inv), errors.join(", ")))
     }
 
+    /// EV override (a testing aid, no in-game equivalent): the mon's stat
+    /// XP becomes exactly `requested`, realized and unrealized alike, so the
+    /// stats reflect it right away. Values beyond what the game can hold are
+    /// capped by the stat block and reported as a warning.
+    ///
+    /// `requested` is `[hp, atk, def, spa, spd, spe]`.
+    pub fn override_evs(&self, gen: &GenData, requested: [i64; 6]) -> Result<(RouteState, String), String> {
+        let [hp, atk, def, spa, spd, spe] = requested;
+        let capped = gen.make_stat_block(hp, atk, def, spa, spd, spe, true);
+        let mut warnings: Vec<String> = Vec::new();
+        for (name, want, got) in [
+            ("HP", hp, capped.hp),
+            ("Atk", atk, capped.attack),
+            ("Def", def, capped.defense),
+            ("SpA", spa, capped.special_attack),
+            ("SpD", spd, capped.special_defense),
+            ("Spe", spe, capped.speed),
+        ] {
+            if want != got {
+                warnings.push(format!("{} {} capped to {}", name, want, got));
+            }
+        }
+        let cur = &self.solo_pkmn;
+        let mon = self.rebuild(
+            SoloPokemonArgs {
+                move_list: Some(cur.move_list.clone()),
+                cur_xp: cur.cur_xp,
+                realized_stat_xp: Some(capped),
+                unrealized_stat_xp: Some(capped),
+                held_item: cur.held_item.clone(),
+                ..Default::default()
+            },
+            self.badges.clone(),
+            None,
+            None,
+        )?;
+        Ok((RouteState::new(mon, self.badges.clone(), self.inventory.clone()), warnings.join(", ")))
+    }
+
     /// `rare_candy()`
     pub fn rare_candy(&self, gen: &GenData) -> Result<(RouteState, String), String> {
         let mut error_message = String::new();

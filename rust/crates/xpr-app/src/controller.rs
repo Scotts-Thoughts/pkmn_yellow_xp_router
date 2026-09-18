@@ -13,8 +13,8 @@ use xpr_core::{Config, Paths};
 use xpr_data::model::{Nature, StatBlock};
 use xpr_data::{GenData, Registry};
 use xpr_engine::{
-    EventDefinition, InsertSpec, LearnMoveEventDefinition, NodeId, ObjKind, Router, RouteState, TrainerEventDefinition,
-    UndoManager,
+    EvOverrideEventDefinition, EventDefinition, InsertSpec, LearnMoveEventDefinition, LevelVal, NodeId, ObjKind, Router, RouteState,
+    TrainerEventDefinition, UndoManager,
 };
 
 /// The callbacks of the Python controller, as "fired this frame" flags.
@@ -743,6 +743,38 @@ impl MainController {
             self.select_new_events(vec![result]);
         }
         Some(result)
+    }
+
+    /// Pre-Event State's "click a move to replace it": insert a Tutor move
+    /// event for slot `slot_idx` immediately before the currently selected
+    /// event, so that event's moveset changes without touching the event
+    /// itself.
+    pub fn assign_move_via_tutor_before_selected(&mut self, slot_idx: i64, move_name: &str) -> Option<NodeId> {
+        if move_name.is_empty() || !(0..=3).contains(&slot_idx) {
+            return None;
+        }
+        let id = self.get_single_selected_event_id(true)?;
+        if !matches!(self.router.obj_kind(id), Some(ObjKind::Group) | Some(ObjKind::Item)) {
+            return None;
+        }
+        self.new_event(
+            EventDefinition::with_learn_move(LearnMoveEventDefinition::new(Some(move_name), Some(slot_idx), consts::MOVE_SOURCE_TUTOR, LevelVal::any(), None, true)),
+            None,
+            Some(id),
+            None,
+            false,
+        )
+    }
+
+    /// Insert an EV Override event (`[hp, atk, def, spa, spd, spe]`) before
+    /// the selected event (the Pre-Event State stats card's EV column).
+    pub fn override_evs_before_selected(&mut self, values: [i64; 6]) -> Option<NodeId> {
+        let id = self.get_single_selected_event_id(true)?;
+        if !matches!(self.router.obj_kind(id), Some(ObjKind::Group) | Some(ObjKind::Item)) {
+            return None;
+        }
+        let [hp, atk, def, spa, spd, spe] = values;
+        self.new_event(EventDefinition::with_ev_override(EvOverrideEventDefinition::new(hp, atk, def, spa, spd, spe)), None, Some(id), None, false)
     }
 
     /// `finalize_new_folder(new_folder_name, prev_folder_name, insert_after)`

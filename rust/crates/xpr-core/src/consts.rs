@@ -231,6 +231,9 @@ pub const TASK_BLACKOUT: &str = "Blackout";
 pub const TASK_EVOLUTION: &str = "Evolution";
 /// Gen 1 bag reordering (the in-game SELECT swap). Event type and route-file key.
 pub const TASK_REORDER_BAG: &str = "Reorder Bag";
+/// Testing aid: sets the solo mon's EVs / stat exp to fixed values from
+/// that point of the route on (no in-game equivalent).
+pub const TASK_EV_OVERRIDE: &str = "EV Override";
 pub const TASK_NOTES_ONLY: &str = "Just Notes";
 pub const ERROR_SEARCH: &str = "Invalid Events";
 pub const MAJOR_BATTLE_FILTER: &str = "Major Battles";
@@ -243,7 +246,7 @@ pub const ITEM_ROUTE_EVENT_TYPES: [&str; 5] = [
     TASK_HOLD_ITEM,
 ];
 
-pub const ROUTE_EVENT_TYPES: [&str; 18] = [
+pub const ROUTE_EVENT_TYPES: [&str; 19] = [
     TASK_TRAINER_BATTLE,
     TASK_LEARN_MOVE_LEVELUP,
     TASK_SELL_ITEM,
@@ -261,6 +264,7 @@ pub const ROUTE_EVENT_TYPES: [&str; 18] = [
     TASK_BLACKOUT,
     TASK_EVOLUTION,
     TASK_LEARN_MOVE_TM,
+    TASK_EV_OVERRIDE,
     ERROR_SEARCH,
 ];
 

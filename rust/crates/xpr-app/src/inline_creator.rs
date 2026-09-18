@@ -7,7 +7,7 @@ use egui::{Color32, CornerRadius, Id, Stroke, Ui};
 use xpr_core::consts;
 use xpr_data::GenData;
 use xpr_engine::{
-    BagSwap, EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal,
+    BagSwap, EvOverrideEventDefinition, EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal,
     NodeId, RouteState, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition,
 };
 use xpr_ui_kit::theme::Theme;
@@ -19,7 +19,7 @@ use crate::editors::slot_template;
 pub const INLINE_ROW_HEIGHT: f32 = 34.0;
 
 /// (display name, internal key)
-pub const EVENT_TYPES: [(&str, &str); 17] = [
+pub const EVENT_TYPES: [(&str, &str); 18] = [
     ("Fight Trainer", "trainer"),
     ("Get Item", "get_item"),
     ("Buy Item", "buy_item"),
@@ -36,6 +36,7 @@ pub const EVENT_TYPES: [(&str, &str); 17] = [
     ("Heal", "heal"),
     ("Blackout", "blackout"),
     ("Evolve", "evolve"),
+    ("EV Override", "ev_override"),
     ("Notes", "notes"),
 ];
 
@@ -57,6 +58,7 @@ pub fn key_for_event_type(event_type: &str) -> Option<&'static str> {
         consts::TASK_HEAL => "heal",
         consts::TASK_BLACKOUT => "blackout",
         consts::TASK_EVOLUTION => "evolve",
+        consts::TASK_EV_OVERRIDE => "ev_override",
         consts::TASK_NOTES_ONLY => "notes",
         _ => return None,
     })
@@ -529,6 +531,16 @@ impl InlineEventCreator {
             Some("evolve") => {
                 let species = self.state_at_insertion_point(ctrl).map(|s| s.solo_pkmn.name.clone()).unwrap_or_default();
                 Some(EventDefinition::with_evolution(&species))
+            }
+            // a new override starts at the mon's current values: the numbers
+            // are set in the details panel
+            Some("ev_override") => {
+                let sx = self.state_at_insertion_point(ctrl).map(|s| s.solo_pkmn.unrealized_stat_xp);
+                let e = match sx {
+                    Some(sx) => EvOverrideEventDefinition::new(sx.hp, sx.attack, sx.defense, sx.special_attack, sx.special_defense, sx.speed),
+                    None => EvOverrideEventDefinition::default(),
+                };
+                Some(EventDefinition::with_ev_override(e))
             }
             _ => None,
         })

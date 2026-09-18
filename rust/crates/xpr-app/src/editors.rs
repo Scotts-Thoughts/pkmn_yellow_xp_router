@@ -1,20 +1,23 @@
 //! Port of `gui_qt/event_editors.py`: one editor per event type, each holding
 //! its own widget state, loading from an `EventDefinition` and producing one.
 
-use egui::{Color32, Id, Pos2, Sense, Ui, Vec2};
+use egui::{Align, Color32, Id, Layout, Pos2, Rect, Sense, Ui, Vec2};
 use serde_json::Value;
 
 use xpr_core::consts;
 use xpr_core::Config;
-use xpr_data::model::EnemyPkmn;
+use xpr_data::model::{EnemyPkmn, SINGLE_STAT_EV_CAP, STAT_XP_CAP_GEN12, TOTAL_EV_CAP};
 use xpr_data::GenData;
 use xpr_engine::{
-    swaps_between, BagSwap, EventDefinition, EvolutionEventDefinition, HoldItemEventDefinition, InventoryEventDefinition,
+    swaps_between, BagSwap, EvOverrideEventDefinition, EventDefinition, EvolutionEventDefinition, HoldItemEventDefinition, InventoryEventDefinition,
     LearnMoveEventDefinition, LevelVal, LocationEventDefinition, RouteState,
     TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition,
 };
 use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets::{self, AmountEntry, Entry};
+
+use crate::assets::Assets;
+use crate::state_views::BeforeInfo;
 
 /// `SimpleOptionMenu`'s option list + selection semantics.
 #[derive(Clone, Debug, Default)]
@@ -103,14 +106,25 @@ pub struct EditorCtx<'a> {
 // Trainer fight editor
 // ---------------------------------------------------------------------------
 
+/// One enemy mon card of the trainer fight editor.
 #[derive(Clone, Debug)]
 struct TrainerCard {
-    html_lines: Vec<(String, String, String)>,
     name: String,
-    ability_line: Option<String>,
-    item_line: Option<String>,
-    spe_color: Color32,
+    level: i64,
+    /// `ability · nature · Exp N` (empty when there is nothing to say)
+    meta: String,
+    /// HP, Atk, Def, SpA, SpD, Spe
+    stats: [i64; 6],
+    /// move names joined with ` · `
+    moves: String,
+    /// only mons that hold something can be stolen from
+    has_item: bool,
+    /// style prefix of the speed comparison (`success` / `warning` / `failure` / `contrast`)
+    spe_style: &'static str,
 }
+
+/// Width of an enemy mon card.
+const ENEMY_CARD_W: f32 = 300.0;
 
 #[derive(Default)]
 pub struct TrainerFightEditor {
@@ -127,7 +141,6 @@ pub struct TrainerFightEditor {
     cached_definition_order: Vec<usize>,
 }
 
-const EXP_PER_SEC_TEXT: &str = "Optimal exp per second (4x speed): ";
 
 impl TrainerFightEditor {
     pub fn load_event(&mut self, ctx: &EditorCtx, def: &EventDefinition) {
@@ -135,7 +148,7 @@ impl TrainerFightEditor {
         self.cur_trainer = td.trainer_name.clone();
         self.second_trainer = td.second_trainer_name.clone();
         let pay_day_val = td.pay_day_amount_int().unwrap_or(0);
-        self.exp_per_sec = format!("{} {}", EXP_PER_SEC_TEXT, def.experience_per_second(ctx.gen).unwrap_or_default());
+        self.exp_per_sec = def.experience_per_second(ctx.gen).unwrap_or_default();
         self.pay_day = pay_day_val.to_string();
         let ordered: Vec<EnemyPkmn> = def.pokemon_list(ctx.gen).unwrap_or_default();
         self.num_pkmn = ordered.len();
@@ -164,43 +177,39 @@ impl TrainerFightEditor {
             let speed_class = match &cur_state {
                 Some(st) => {
                     let c = if st.solo_pkmn.cur_stats.speed > cur_pkmn.cur_stats.speed {
-                        "success"
+                        "Success"
                     } else if st.solo_pkmn.cur_stats.speed == cur_pkmn.cur_stats.speed {
-                        "warning"
+                        "Warning"
                     } else {
-                        "failure"
+                        "Failure"
                     };
                     cur_state = st.defeat_pkmn(ctx.gen, cur_pkmn, None, 1, 0).ok().map(|r| r.0);
                     c
                 }
-                None => "contrast",
-            };
-            let spe_color = match speed_class {
-                "success" => Color32::from_rgb(0x4e, 0xc9, 0x7a),
-                "warning" => Color32::from_rgb(0xe8, 0xb7, 0x30),
-                "failure" => Color32::from_rgb(0xe0, 0x55, 0x55),
-                _ => Color32::from_rgb(0xd4, 0xd4, 0xd4),
+                None => "Contrast",
             };
             let stats = &cur_pkmn.cur_stats;
-            let xp_val = if cur_pkmn.xp != 0 { cur_pkmn.xp.to_string() } else { String::new() };
+            let mut meta: Vec<String> = Vec::new();
+            if !cur_pkmn.ability.is_empty() {
+                meta.push(cur_pkmn.ability.clone());
+            }
+            let nature = cur_pkmn.nature.display_name();
+            if ctx.gen.get_generation() >= 3 && nature != "Hardy" {
+                meta.push(nature);
+            }
+            if cur_pkmn.xp != 0 {
+                meta.push(format!("Exp {}", cur_pkmn.xp));
+            }
             let moves: Vec<String> = cur_pkmn.move_list.iter().filter_map(|m| m.clone()).filter(|m| !m.is_empty()).collect();
-            let right = |i: usize, prefix: &str| if moves.len() > i { format!("{}{}", prefix, moves[i]) } else { String::new() };
-            let rows = vec![
-                ("HP:".to_string(), stats.hp.to_string(), format!("Lv: {}", cur_pkmn.level)),
-                ("Atk:".to_string(), stats.attack.to_string(), if xp_val.is_empty() { String::new() } else { format!("Exp: {}", xp_val) }),
-                ("Def:".to_string(), stats.defense.to_string(), right(0, "Move 1: ")),
-                ("SpA:".to_string(), stats.special_attack.to_string(), right(1, "Move 2: ")),
-                ("SpD:".to_string(), stats.special_defense.to_string(), right(2, "Move 3: ")),
-                ("Spe:".to_string(), stats.speed.to_string(), right(3, "Move 4: ")),
-            ];
-            let ability_line = if !cur_pkmn.ability.is_empty() {
-                let nature_str = if cur_pkmn.nature.display_name() != "Hardy" { format!(" ({})", cur_pkmn.nature.display_name()) } else { String::new() };
-                Some(format!("{}{}", cur_pkmn.ability, nature_str))
-            } else {
-                None
-            };
-            let item_line = cur_pkmn.held_item.as_ref().filter(|h| !h.is_empty()).map(|h| format!("Item: {}", h));
-            self.cards.push(TrainerCard { html_lines: rows, name: cur_pkmn.name.clone(), ability_line, item_line, spe_color });
+            self.cards.push(TrainerCard {
+                name: cur_pkmn.name.clone(),
+                level: cur_pkmn.level,
+                meta: meta.join(" · "),
+                stats: [stats.hp, stats.attack, stats.defense, stats.special_attack, stats.special_defense, stats.speed],
+                moves: moves.join(" · "),
+                has_item: cur_pkmn.held_item.as_ref().map(|h| !h.is_empty()).unwrap_or(false),
+                spe_style: speed_class,
+            });
             self.order_menus[idx].new_values(order_values.clone(), None);
             self.order_menus[idx].set(&cur_pkmn.mon_order.to_string());
             self.exp_splits[idx].set(&cur_pkmn.exp_split.to_string());
@@ -269,78 +278,66 @@ impl TrainerFightEditor {
         Ok(EventDefinition::with_trainer(td))
     }
 
-    pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx) -> (EditorOutput, bool) {
+    /// The title-strip readout: `("Exp/sec", value)`.
+    pub fn exp_per_sec_readout(&self) -> (&'static str, &str) {
+        ("Exp/sec", &self.exp_per_sec)
+    }
+
+    pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx, assets: &mut Assets) -> (EditorOutput, bool) {
         let theme = ctx.theme;
         let mut out = EditorOutput::default();
         let mut reload = false;
-        ui.horizontal(|ui| {
-            ui.add_space(ui.available_width() * 0.05);
-            widgets::label(ui, theme, "Pay Day Amount: ");
-            let r = Entry::new(theme, &mut self.pay_day).width(60.0).enabled(ctx.enabled).id(ui.id().with("pay_day")).show(ui);
+        // control row
+        let w = ui.available_width();
+        ui.allocate_ui_with_layout(Vec2::new(w, 28.0), Layout::left_to_right(Align::Center), |ui| {
+            ui.set_width(w);
+            ui.spacing_mut().item_spacing.x = 10.0;
+            widgets::label_font(ui, "Pay Day amount", theme.body(), theme.secondary);
+            let r = Entry::new(theme, &mut self.pay_day)
+                .width(64.0)
+                .min_height(28.0)
+                .margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 4 })
+                .corner_radius(4)
+                .enabled(ctx.enabled)
+                .id(ui.id().with("pay_day"))
+                .show(ui);
             if r.changed {
                 out.merge(EditorOutput::save());
             }
-            ui.add_space(20.0);
-            widgets::label(ui, theme, self.exp_per_sec.clone());
         });
-        ui.add_space(4.0);
-        let card_bg = theme.section_bg();
+        ui.add_space(12.0);
+        // enemy cards, wrapping
         let n = self.cards.len();
-        let cols = 3usize;
-        let rows = (n + cols - 1) / cols;
-        let card_w = ((ui.available_width() - 6.0 * (cols as f32 - 1.0)) / cols as f32).max(150.0);
+        let gap = 12.0;
+        // three per row, two when they would not fit, one in a very narrow pane
+        let fit = if w < 2.0 * ENEMY_CARD_W + gap {
+            1
+        } else if w < 3.0 * ENEMY_CARD_W + 2.0 * gap {
+            2
+        } else {
+            3
+        };
+        let cols = fit.min(n.max(1));
+        let rows = n.div_ceil(cols);
         let mut reorder_idx: Option<usize> = None;
         for row in 0..rows {
+            if row > 0 {
+                ui.add_space(gap);
+            }
             ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = 6.0;
+                ui.spacing_mut().item_spacing.x = gap;
                 for col in 0..cols {
                     let idx = row * cols + col;
                     if idx >= n {
                         break;
                     }
-                    ui.allocate_ui_with_layout(Vec2::new(card_w, 0.0), egui::Layout::top_down(egui::Align::Min), |ui| {
-                        ui.set_width(card_w);
-                        ui.spacing_mut().item_spacing.y = 2.0;
-                        let card = &self.cards[idx];
-                        widgets::rounded_section(ui, card_bg, 6, egui::Margin { left: 8, right: 8, top: 6, bottom: 6 }, |ui| {
-                            ui.set_width(card_w - 16.0);
-                            let font = theme.body();
-                            let bold = theme.body_bold();
-                            ui.label(egui::RichText::new(&card.name).font(bold.clone()).color(theme.text));
-                            if let Some(a) = &card.ability_line {
-                                ui.label(egui::RichText::new(a).font(font.clone()).color(theme.text));
-                            }
-                            if let Some(i) = &card.item_line {
-                                ui.label(egui::RichText::new(i).font(font.clone()).color(theme.text));
-                            }
-                            let label_w = 30.0;
-                            let val_w = widgets::text_width(ui, "999", &font) + 12.0;
-                            for (sn, sv, right) in &card.html_lines {
-                                let color = if sn == "Spe:" { card.spe_color } else { theme.text };
-                                let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), font.size * 1.3), Sense::hover());
-                                ui.painter().text(Pos2::new(r.min.x, r.center().y), egui::Align2::LEFT_CENTER, sn, font.clone(), color);
-                                ui.painter().text(Pos2::new(r.min.x + label_w + val_w, r.center().y), egui::Align2::RIGHT_CENTER, sv, font.clone(), color);
-                                ui.painter().text(Pos2::new(r.min.x + label_w + val_w + 8.0, r.center().y), egui::Align2::LEFT_CENTER, right, font.clone(), theme.text);
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 4.0;
-                            widgets::label(ui, theme, "Mon Order");
-                            if self.order_menus[idx].ui(ui, theme, ui.id().with(("order", idx)), Some(55.0), ctx.enabled) {
-                                reorder_idx = Some(idx);
-                            }
-                            widgets::label(ui, theme, "Exp Split:");
-                            if self.exp_splits[idx].ui(ui, theme, ui.id().with(("split", idx)), Some(55.0), ctx.enabled) {
-                                out.merge(EditorOutput::save());
-                            }
-                        });
-                        // only mons that hold something can be stolen from
-                        if self.cards[idx].item_line.is_some() {
-                            let r = widgets::checkbox(ui, theme, &mut self.thief_flags[idx], "Thief / Covet held item", ctx.enabled)
-                                .on_hover_text("The stolen item ends up held by your Pokemon (it must be holding nothing); take it off with a Hold Item event to sell it");
-                            if r.changed() {
-                                out.merge(EditorOutput::save());
-                            }
+                    ui.allocate_ui_with_layout(Vec2::new(ENEMY_CARD_W, 0.0), Layout::top_down(Align::Min), |ui| {
+                        ui.set_width(ENEMY_CARD_W);
+                        let card = self.cards[idx].clone();
+                        let (o, reorder) = Self::enemy_card(ui, ctx, assets, idx, &card, &mut self.order_menus[idx], &mut self.exp_splits[idx], &mut self.thief_flags[idx]);
+                        out.merge(o);
+                        if reorder {
+                            reorder_idx = Some(idx);
                         }
                     });
                 }
@@ -352,6 +349,105 @@ impl TrainerFightEditor {
             reload = true;
         }
         (out, reload)
+    }
+
+    /// One enemy mon card: well bg, card border, radius 8, padding 10 × 12.
+    /// Returns (output, order changed).
+    #[allow(clippy::too_many_arguments)]
+    fn enemy_card(ui: &mut Ui, ctx: &EditorCtx, assets: &mut Assets, idx: usize, card: &TrainerCard, order: &mut OptionMenu, split: &mut OptionMenu, thief: &mut bool) -> (EditorOutput, bool) {
+        let theme = ctx.theme;
+        let mut out = EditorOutput::default();
+        let mut reorder = false;
+        let frame = egui::Frame::new()
+            .fill(theme.well_bg())
+            .stroke(egui::Stroke::new(1.0_f32, theme.card_border()))
+            .corner_radius(egui::CornerRadius::same(8))
+            .inner_margin(egui::Margin { left: 12, right: 12, top: 10, bottom: 10 });
+        frame.show(ui, |ui| {
+            let w = ui.available_width();
+            ui.set_width(w);
+            ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+            let body = theme.body();
+            let bold = theme.body_bold();
+            // header: icon + (name  Lv N / meta)
+            let icon_s = 38.0;
+            let (hdr, _) = ui.allocate_exact_size(Vec2::new(w, icon_s), Sense::hover());
+            if let Some(tex) = assets.pkmn_icon(ui.ctx(), &card.name) {
+                let [tw, th] = tex.size();
+                let (tw, th) = (tw as f32, th as f32);
+                let scale = (icon_s / tw).min(icon_s / th);
+                let img = Rect::from_center_size(Pos2::new(hdr.min.x + icon_s / 2.0, hdr.center().y), Vec2::new(tw * scale, th * scale));
+                ui.painter().image(tex.id(), img, Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)), Color32::WHITE);
+            }
+            let text_x = hdr.min.x + icon_s + 10.0;
+            let line_h = ui.fonts_mut(|f| f.row_height(&body));
+            let two_lines = !card.meta.is_empty();
+            let block_h = if two_lines { 2.0 * line_h + 2.0 } else { line_h };
+            let y0 = hdr.center().y - block_h / 2.0;
+            let name_cell = Rect::from_min_size(Pos2::new(text_x, y0), Vec2::new(hdr.max.x - text_x, line_h));
+            let name_w = widgets::text_width(ui, &card.name, &bold);
+            widgets::col_text(ui, name_cell, &card.name, bold.clone(), theme.text_strong(), Align::Min);
+            let lv_cell = Rect::from_min_size(Pos2::new(text_x + name_w + 8.0, y0), Vec2::new((hdr.max.x - text_x - name_w - 8.0).max(0.0), line_h));
+            widgets::col_text(ui, lv_cell, &format!("Lv {}", card.level), bold.clone(), theme.primary, Align::Min);
+            if two_lines {
+                let meta_cell = Rect::from_min_size(Pos2::new(text_x, y0 + line_h + 2.0), Vec2::new(hdr.max.x - text_x, line_h));
+                let shown = widgets::elide(ui, &card.meta, &body, meta_cell.width());
+                widgets::col_text(ui, meta_cell, &shown, body.clone(), theme.secondary, Align::Min);
+            }
+            ui.add_space(8.0);
+            // stat grid 3 × 2
+            let labels = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
+            let cell_w = (w - 2.0 * 8.0) / 3.0;
+            let stat_h = 22.0;
+            for grid_row in 0..2 {
+                let (r, _) = ui.allocate_exact_size(Vec2::new(w, stat_h), Sense::hover());
+                for c in 0..3 {
+                    let i = grid_row * 3 + c;
+                    let x0 = r.min.x + c as f32 * (cell_w + 8.0);
+                    let cell = Rect::from_min_size(Pos2::new(x0, r.min.y), Vec2::new(cell_w, stat_h));
+                    widgets::col_text(ui, cell, labels[i], body.clone(), theme.secondary, Align::Min);
+                    let color = if i == 5 { theme.style_color(card.spe_style) } else { theme.contrast };
+                    widgets::col_text(ui, cell, &card.stats[i].to_string(), bold.clone(), color, Align::Max);
+                    if grid_row == 0 {
+                        ui.painter().hline(cell.x_range(), cell.max.y - 0.5, egui::Stroke::new(1.0_f32, theme.row_divider()));
+                    }
+                }
+            }
+            ui.add_space(8.0);
+            // moves line
+            let (r, _) = ui.allocate_exact_size(Vec2::new(w, line_h), Sense::hover());
+            let mw = widgets::text_width(ui, "Moves", &body);
+            widgets::col_text(ui, r, "Moves", body.clone(), theme.secondary, Align::Min);
+            let moves_cell = Rect::from_min_max(Pos2::new(r.min.x + mw + 8.0, r.min.y), r.max);
+            let shown = widgets::elide(ui, &card.moves, &body, moves_cell.width());
+            widgets::col_text(ui, moves_cell, &shown, body.clone(), theme.text, Align::Min);
+            ui.add_space(8.0);
+            // controls row
+            widgets::hairline(ui, theme.row_divider());
+            ui.add_space(6.0);
+            ui.allocate_ui_with_layout(Vec2::new(w, 26.0), Layout::left_to_right(Align::Center), |ui| {
+                ui.set_width(w);
+                ui.spacing_mut().item_spacing.x = 6.0;
+                widgets::label_font(ui, "Order", body.clone(), theme.secondary);
+                if order.ui(ui, theme, ui.id().with(("order", idx)), Some(55.0), ctx.enabled) {
+                    reorder = true;
+                }
+                ui.add_space(6.0);
+                widgets::label_font(ui, "Exp split", body.clone(), theme.secondary);
+                if split.ui(ui, theme, ui.id().with(("split", idx)), Some(55.0), ctx.enabled) {
+                    out.merge(EditorOutput::save());
+                }
+            });
+            if card.has_item {
+                ui.add_space(6.0);
+                let r = widgets::checkbox(ui, theme, thief, "Thief / Covet held item", ctx.enabled)
+                    .on_hover_text("The stolen item ends up held by your Pokemon (it must be holding nothing); take it off with a Hold Item event to sell it");
+                if r.changed() {
+                    out.merge(EditorOutput::save());
+                }
+            }
+        });
+        (out, reorder)
     }
 }
 
@@ -1175,37 +1271,54 @@ impl BagReorderEditor {
             widgets::label(ui, theme, "The bag is empty before this event.");
             return out;
         }
-        widgets::label(ui, theme, "Drag a row (or use the arrows) to rearrange the bag:");
+        widgets::label_font(ui, "Drag a row (or use the arrows) to rearrange the bag:", theme.body(), theme.secondary);
+        ui.add_space(8.0);
         let font = theme.body();
         let n = self.order.len();
         let mut drop: Option<(usize, usize)> = None;
         let mut nudge: Option<(usize, bool)> = None;
         let mut row_rects: Vec<egui::Rect> = Vec::with_capacity(n);
-        let zone = egui::Frame::new().inner_margin(egui::Margin::same(2));
+        let zone = egui::Frame::new().inner_margin(egui::Margin::same(0));
         let (_, dropped_on_zone) = ui.dnd_drop_zone::<usize, ()>(zone, |ui| {
-            ui.spacing_mut().item_spacing = Vec2::new(4.0, 2.0);
+            ui.spacing_mut().item_spacing = Vec2::new(0.0, 4.0);
+            let w = ui.available_width();
             for idx in 0..n {
                 let (name, count) = self.order[idx].clone();
                 let row_id = ui.id().with(("bag_row", idx));
-                let row = ui.horizontal(|ui| {
+                let row = ui.allocate_ui_with_layout(Vec2::new(w, 30.0), Layout::left_to_right(Align::Center), |ui| {
+                    ui.set_width(w);
+                    let rect = ui.max_rect();
+                    ui.painter().rect(rect, egui::CornerRadius::same(6), theme.well_bg(), egui::Stroke::new(1.0_f32, theme.card_border()), egui::StrokeKind::Inside);
+                    ui.spacing_mut().item_spacing.x = 10.0;
+                    ui.add_space(8.0);
                     let handle = |ui: &mut Ui| {
-                        let (r, _) = ui.allocate_exact_size(Vec2::new(16.0, font.size * 1.4), Sense::hover());
-                        ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "\u{2630}", font.clone(), theme.secondary);
+                        let (r, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
+                        widgets::paint_drag_handle(ui, r, theme.secondary);
                     };
                     if ctx.enabled {
                         ui.dnd_drag_source(row_id, idx, handle);
                     } else {
                         handle(ui);
                     }
-                    let label = format!("{:>2}. {}x {}", idx + 1, count, name);
-                    let (r, _) = ui.allocate_exact_size(Vec2::new(220.0_f32.max(widgets::text_width(ui, &label, &font) + 4.0), font.size * 1.4), Sense::hover());
-                    ui.painter().text(Pos2::new(r.min.x + 2.0, r.center().y), egui::Align2::LEFT_CENTER, &label, font.clone(), theme.text);
-                    if widgets::amount_button(ui, theme, "\u{25B2}", ctx.enabled && idx > 0).clicked() {
-                        nudge = Some((idx, true));
-                    }
-                    if widgets::amount_button(ui, theme, "\u{25BC}", ctx.enabled && idx + 1 < n).clicked() {
-                        nudge = Some((idx, false));
-                    }
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(18.0, 30.0), Sense::hover());
+                    widgets::col_text(ui, r, &format!("{}.", idx + 1), theme.caption_font(), theme.secondary, Align::Min);
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(26.0, 30.0), Sense::hover());
+                    widgets::col_text(ui, r, &format!("{}×", count), font.clone(), theme.secondary, Align::Max);
+                    // arrows on the right, the name takes what is left
+                    let name_w = (ui.available_width() - 8.0 - 2.0 * 26.0 - 6.0 - 10.0).max(20.0);
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(name_w, 30.0), Sense::hover());
+                    let shown = widgets::elide(ui, &name, &font, name_w);
+                    widgets::col_text(ui, r, &shown, font.clone(), theme.contrast, Align::Min);
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = 6.0;
+                        ui.add_space(8.0);
+                        if widgets::chevron_button(ui, theme, false, ctx.enabled && idx + 1 < n).clicked() {
+                            nudge = Some((idx, false));
+                        }
+                        if widgets::chevron_button(ui, theme, true, ctx.enabled && idx > 0).clicked() {
+                            nudge = Some((idx, true));
+                        }
+                    });
                 });
                 row_rects.push(row.response.rect);
                 if !ctx.enabled {
@@ -1253,8 +1366,111 @@ impl BagReorderEditor {
             out.merge(EditorOutput::delayed());
         }
         if self.stale {
+            ui.add_space(8.0);
             widgets::label_colored(ui, theme, "The bag before this event no longer matches what was recorded; rearranging it here saves the order as shown.", theme.warning);
         }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EV override editor
+// ---------------------------------------------------------------------------
+
+/// Field labels; gens 1-2 show one Special (index 3, mirrored into Sp. Def).
+pub const EV_STAT_NAMES: [&str; 6] = ["HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"];
+pub const EV_STAT_NAMES_GEN12: [&str; 6] = ["HP", "Attack", "Defense", "Special", "", "Speed"];
+
+/// Field indices shown for a gen (gens 1-2 skip Sp. Def).
+pub fn ev_field_indices(single_special: bool) -> &'static [usize] {
+    if single_special {
+        &[0, 1, 2, 3, 5]
+    } else {
+        &[0, 1, 2, 3, 4, 5]
+    }
+}
+
+/// Six amount fields (HP, Atk, Def, SpA, SpD, Spe; one Special in gens 1-2),
+/// each next to the value the mon has before the event; "Use current" copies
+/// those across.
+#[derive(Default)]
+pub struct EvOverrideEditor {
+    values: [String; 6],
+    /// the mon's stat XP before the event (None at the route start)
+    before: Option<[i64; 6]>,
+    single_special: bool,
+}
+
+impl EvOverrideEditor {
+    fn before_of(state: Option<&RouteState>) -> Option<[i64; 6]> {
+        let sx = state?.solo_pkmn.unrealized_stat_xp;
+        Some([sx.hp, sx.attack, sx.defense, sx.special_attack, sx.special_defense, sx.speed])
+    }
+
+    pub fn load_event(&mut self, ctx: &EditorCtx, def: &EventDefinition) {
+        self.single_special = EvOverrideEventDefinition::has_single_special(ctx.gen);
+        self.before = Self::before_of(ctx.cur_state);
+        let vals = def.ev_override.map(|e| e.values()).or(self.before).unwrap_or([0; 6]);
+        for (slot, v) in self.values.iter_mut().zip(vals) {
+            *slot = v.to_string();
+        }
+    }
+
+    fn parsed(&self) -> Result<[i64; 6], String> {
+        let mut out = [0i64; 6];
+        for (slot, raw) in out.iter_mut().zip(self.values.iter()) {
+            *slot = raw.trim().parse().map_err(|_| format!("invalid literal for int() with base 10: '{}'", raw))?;
+        }
+        if self.single_special {
+            out[4] = out[3];
+        }
+        Ok(out)
+    }
+
+    pub fn get_event(&self) -> Result<EventDefinition, String> {
+        let [hp, atk, def, spa, spd, spe] = self.parsed()?;
+        Ok(EventDefinition::with_ev_override(EvOverrideEventDefinition::new(hp, atk, def, spa, spd, spe)))
+    }
+
+    pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx) -> EditorOutput {
+        let theme = ctx.theme;
+        let mut out = EditorOutput::default();
+        let gen12 = self.single_special;
+        let (unit, cap) = if gen12 { ("Stat Exp", STAT_XP_CAP_GEN12) } else { ("EVs", SINGLE_STAT_EV_CAP) };
+        let names = if gen12 { &EV_STAT_NAMES_GEN12 } else { &EV_STAT_NAMES };
+        widgets::label_font(ui, format!("{} from this point on (0-{} per stat):", unit, cap), theme.body(), theme.secondary);
+        egui::Grid::new(ui.id().with("ev_grid")).spacing(Vec2::new(8.0, 4.0)).show(ui, |ui| {
+            widgets::label_font(ui, "", theme.caption_font(), theme.secondary);
+            widgets::label_font(ui, "Override", theme.caption_font(), theme.secondary);
+            widgets::label_font(ui, "Before", theme.caption_font(), theme.secondary);
+            ui.end_row();
+            for &idx in ev_field_indices(gen12) {
+                widgets::label(ui, theme, format!("{}:", names[idx]));
+                let r = AmountEntry::new(theme, ui.id().with(("ev_amt", idx)), &mut self.values[idx]).min(Some(0)).max(Some(cap)).width(Some(6)).enabled(ctx.enabled).show(ui);
+                if r.changed {
+                    out.merge(EditorOutput::delayed());
+                }
+                let before = self.before.map(|b| b[idx].to_string()).unwrap_or_else(|| "—".to_string());
+                widgets::label_font(ui, before, theme.body(), theme.secondary);
+                ui.end_row();
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            if !gen12 {
+                let total: i64 = self.parsed().map(|v| v.iter().sum()).unwrap_or(0);
+                let color = if total > TOTAL_EV_CAP { theme.failure } else { theme.secondary };
+                widgets::label_font(ui, format!("Total: {} / {}", total, TOTAL_EV_CAP), theme.body(), color);
+            }
+            if let Some(before) = self.before {
+                if widgets::StyledButton::new(theme, "Use current").enabled(ctx.enabled).show(ui).clicked() {
+                    for (slot, v) in self.values.iter_mut().zip(before) {
+                        *slot = v.to_string();
+                    }
+                    out.merge(EditorOutput::save());
+                }
+            }
+        });
         out
     }
 }
@@ -1263,16 +1479,14 @@ impl BagReorderEditor {
 // Notes editor (the footer)
 // ---------------------------------------------------------------------------
 
-pub const NOTES_OPTIONS: [&str; 3] = [
-    "Show notes in battle summary when space allows",
-    "Show notes in battle summary at all times",
-    "Never show notes in battle summary",
-];
+/// Display strings of the "in battle summary" menu; they map onto the
+/// unchanged config values `when_space_allows` / `always` / `never`.
+pub const NOTES_OPTIONS: [&str; 3] = ["Show when space allows", "Show at all times", "Never show"];
 
 fn notes_mode_for_option(opt: &str) -> &'static str {
     match opt {
-        "Show notes in battle summary at all times" => "always",
-        "Never show notes in battle summary" => "never",
+        "Show at all times" => "always",
+        "Never show" => "never",
         _ => "when_space_allows",
     }
 }
@@ -1321,35 +1535,74 @@ impl NotesEditor {
         self.enabled = e;
     }
 
-    /// Returns (output, visibility mode changed)
+    pub fn is_expanded(&self) -> bool {
+        !(self.collapsed || self.force_collapsed)
+    }
+
+    /// Expand / collapse without touching the config (smoke runs).
+    pub fn set_collapsed(&mut self, collapsed: bool) {
+        self.collapsed = collapsed;
+    }
+
+    /// The pinned footer: hairline, then `▸ Notes` + hint (collapsed) or the
+    /// header with the visibility menu and the text area (expanded).
+    /// Returns (output, visibility mode changed).
     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config) -> (EditorOutput, bool) {
         let mut out = EditorOutput::default();
         let mut mode_changed = false;
-        let expanded = !(self.collapsed || self.force_collapsed);
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            let tri = widgets::disclosure_triangle(ui, expanded, 14.0, Color32::from_rgb(0xcc, 0xcc, 0xcc));
-            let lbl = ui.add(egui::Label::new(egui::RichText::new("Notes:").font(theme.body()).color(theme.text)).sense(Sense::click()));
-            if tri.clicked() || lbl.clicked() {
-                self.collapsed = !self.collapsed;
-                self.force_collapsed = false;
-                cfg.set_notes_collapsed(self.collapsed);
-            }
+        let expanded = self.is_expanded();
+        ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+        widgets::hairline(ui, theme.pane_divider());
+        let header_h = if expanded { 22.0 } else { 18.0 };
+        let pad = egui::Margin { left: 16, right: 16, top: 10, bottom: if expanded { 12 } else { 11 } };
+        egui::Frame::new().inner_margin(pad).show(ui, |ui| {
+            let w = ui.available_width();
+            ui.set_width(w);
+            ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+            ui.allocate_ui_with_layout(Vec2::new(w, header_h), Layout::left_to_right(Align::Center), |ui| {
+                ui.set_width(w);
+                ui.spacing_mut().item_spacing.x = 10.0;
+                // chevron + "Notes" as one click target
+                let bold = theme.body_bold();
+                let title_w = widgets::text_width(ui, "Notes", &bold);
+                let (r, resp) = ui.allocate_exact_size(Vec2::new(12.0 + 6.0 + title_w, header_h), Sense::click());
+                let chev = Rect::from_center_size(Pos2::new(r.min.x + 6.0, r.center().y), Vec2::splat(9.0));
+                widgets::paint_disclosure_chevron(ui, chev, expanded, theme.text);
+                widgets::col_text(ui, Rect::from_min_max(Pos2::new(r.min.x + 18.0, r.min.y), r.max), "Notes", bold, theme.text, Align::Min);
+                let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+                if resp.clicked() {
+                    self.collapsed = !self.collapsed;
+                    self.force_collapsed = false;
+                    cfg.set_notes_collapsed(self.collapsed);
+                }
+                if expanded {
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = 10.0;
+                        if self.visibility.ui(ui, theme, ui.id().with("notes_vis"), None, true) {
+                            cfg.set_notes_visibility_mode(notes_mode_for_option(self.visibility.get()));
+                            mode_changed = true;
+                        }
+                        widgets::label_font(ui, "In battle summary", theme.body(), theme.secondary);
+                    });
+                } else {
+                    let hint = match self.text.lines().find(|l| !l.trim().is_empty()) {
+                        Some(line) => line.trim().to_string(),
+                        None => "No notes for this event".to_string(),
+                    };
+                    let avail = ui.available_width();
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(avail, header_h), Sense::hover());
+                    let shown = widgets::elide(ui, &hint, &theme.body(), avail);
+                    widgets::col_text(ui, r, &shown, theme.body(), theme.secondary, Align::Min);
+                }
+            });
             if expanded {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if self.visibility.ui(ui, theme, ui.id().with("notes_vis"), None, true) {
-                        cfg.set_notes_visibility_mode(notes_mode_for_option(self.visibility.get()));
-                        mode_changed = true;
-                    }
-                });
+                ui.add_space(8.0);
+                let r = widgets::text_area_styled(ui, theme, &mut self.text, ui.id().with("notes_text"), 100.0, self.enabled, egui::Margin { left: 10, right: 10, top: 8, bottom: 8 }, 6);
+                if r.changed() {
+                    out.merge(EditorOutput::delayed());
+                }
             }
         });
-        if expanded {
-            let r = widgets::text_area(ui, theme, &mut self.text, ui.id().with("notes_text"), 120.0, self.enabled);
-            if r.changed() {
-                out.merge(EditorOutput::delayed());
-            }
-        }
         (out, mode_changed)
     }
 }
@@ -1369,6 +1622,7 @@ pub struct EventEditors {
     pub location: LocationEditor,
     pub evolution: EvolutionEditor,
     pub bag_reorder: BagReorderEditor,
+    pub ev_override: EvOverrideEditor,
 }
 
 impl EventEditors {
@@ -1399,6 +1653,7 @@ impl EventEditors {
                 self.evolution.load_event(ctx, def);
             }
             consts::TASK_REORDER_BAG => self.bag_reorder.load_event(ctx, def),
+            consts::TASK_EV_OVERRIDE => self.ev_override.load_event(ctx, def),
             _ => {}
         }
     }
@@ -1414,29 +1669,98 @@ impl EventEditors {
             consts::TASK_SAVE | consts::TASK_HEAL | consts::TASK_BLACKOUT => Ok(self.location.get_event(ctx.event_type)),
             consts::TASK_EVOLUTION => Ok(self.evolution.get_event()),
             consts::TASK_REORDER_BAG => self.bag_reorder.get_event(),
+            consts::TASK_EV_OVERRIDE => self.ev_override.get_event(),
             _ => Ok(EventDefinition::default()),
         }
     }
 
-    /// Draw the editor for `ctx.event_type`. Returns (output, reload requested).
-    pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx) -> (EditorOutput, bool) {
-        egui::Frame::new().inner_margin(egui::Margin::same(4)).show(ui, |ui| {
-            ui.spacing_mut().item_spacing = Vec2::new(4.0, 4.0);
-            match ctx.event_type {
-                consts::TASK_TRAINER_BATTLE => self.trainer.ui(ui, ctx),
-                consts::TASK_VITAMIN => (self.vitamin.ui(ui, ctx), false),
-                consts::TASK_RARE_CANDY => (self.rare_candy.ui(ui, ctx), false),
-                consts::TASK_LEARN_MOVE_LEVELUP | consts::TASK_LEARN_MOVE_TM => (self.learn_move.ui(ui, ctx), false),
-                consts::TASK_FIGHT_WILD_PKMN => (self.wild.ui(ui, ctx), false),
-                consts::TASK_GET_FREE_ITEM | consts::TASK_PURCHASE_ITEM | consts::TASK_USE_ITEM | consts::TASK_SELL_ITEM | consts::TASK_HOLD_ITEM => {
-                    (self.inventory.ui(ui, ctx), false)
-                }
-                consts::TASK_SAVE | consts::TASK_HEAL | consts::TASK_BLACKOUT => (self.location.ui(ui, ctx), false),
-                consts::TASK_EVOLUTION => (self.evolution.ui(ui, ctx), false),
-                consts::TASK_REORDER_BAG => (self.bag_reorder.ui(ui, ctx), false),
-                _ => (EditorOutput::default(), false),
-            }
-        })
-        .inner
+    /// Draw the editor card for `ctx.event_type`: the title strip (event-type
+    /// chip, label, location, readouts), then the editor body. Returns
+    /// (output, reload requested).
+    pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx, assets: &mut Assets, before: &BeforeInfo) -> (EditorOutput, bool) {
+        let theme = ctx.theme;
+        let outer = egui::Frame::new()
+            .fill(theme.card_bg())
+            .stroke(egui::Stroke::new(1.0_f32, theme.card_border()))
+            .corner_radius(egui::CornerRadius::same(8))
+            .inner_margin(egui::Margin::same(1));
+        outer
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
+                ui.set_width(ui.available_width());
+                // title strip
+                let strip = egui::Frame::new()
+                    .fill(theme.strip_bg())
+                    .corner_radius(egui::CornerRadius { nw: 7, ne: 7, sw: 0, se: 0 })
+                    .inner_margin(egui::Margin { left: 14, right: 14, top: 9, bottom: 9 });
+                let readout: Option<(&str, String)> = match ctx.event_type {
+                    consts::TASK_TRAINER_BATTLE => {
+                        let (k, v) = self.trainer.exp_per_sec_readout();
+                        Some((k, v.to_string()))
+                    }
+                    _ => None,
+                };
+                strip.show(ui, |ui| {
+                    let w = ui.available_width();
+                    ui.set_width(w);
+                    ui.allocate_ui_with_layout(Vec2::new(w, 22.0), Layout::left_to_right(Align::Center), |ui| {
+                        ui.set_width(w);
+                        ui.spacing_mut().item_spacing.x = 10.0;
+                        widgets::chip_outlined(ui, theme, ctx.event_type, theme.header, theme.chip_bg(), theme.chip_border());
+                        let bold = theme.body_bold();
+                        let body = theme.body();
+                        let readout_w = readout
+                            .as_ref()
+                            .map(|(k, v)| widgets::text_width(ui, k, &body) + 4.0 + widgets::text_width(ui, v, &bold))
+                            .unwrap_or(0.0);
+                        let text_w = (ui.available_width() - readout_w - 10.0).max(40.0);
+                        let label_w = widgets::text_width(ui, &before.label, &bold).min(text_w);
+                        let label = widgets::elide(ui, &before.label, &bold, label_w);
+                        widgets::label_font(ui, label, bold.clone(), theme.text_strong());
+                        if let Some(loc) = &before.location {
+                            let loc_w = (text_w - label_w - 10.0).max(0.0);
+                            if loc_w > 20.0 {
+                                let shown = widgets::elide(ui, loc, &body, loc_w);
+                                widgets::label_font(ui, shown, body.clone(), theme.secondary);
+                            }
+                        }
+                        if let Some((k, v)) = &readout {
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.spacing_mut().item_spacing.x = 4.0;
+                                widgets::label_font(ui, v.clone(), bold.clone(), theme.text);
+                                widgets::label_font(ui, *k, body.clone(), theme.secondary);
+                            });
+                        }
+                    });
+                });
+                widgets::hairline(ui, theme.pane_divider());
+                // body
+                let is_trainer = ctx.event_type == consts::TASK_TRAINER_BATTLE;
+                let body_frame = egui::Frame::new().inner_margin(egui::Margin { left: 14, right: 14, top: 12, bottom: 14 });
+                body_frame
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        let gap = if is_trainer { 12.0 } else { 8.0 };
+                        ui.spacing_mut().item_spacing = Vec2::new(gap, gap);
+                        match ctx.event_type {
+                            consts::TASK_TRAINER_BATTLE => self.trainer.ui(ui, ctx, assets),
+                            consts::TASK_VITAMIN => (self.vitamin.ui(ui, ctx), false),
+                            consts::TASK_RARE_CANDY => (self.rare_candy.ui(ui, ctx), false),
+                            consts::TASK_LEARN_MOVE_LEVELUP | consts::TASK_LEARN_MOVE_TM => (self.learn_move.ui(ui, ctx), false),
+                            consts::TASK_FIGHT_WILD_PKMN => (self.wild.ui(ui, ctx), false),
+                            consts::TASK_GET_FREE_ITEM | consts::TASK_PURCHASE_ITEM | consts::TASK_USE_ITEM | consts::TASK_SELL_ITEM | consts::TASK_HOLD_ITEM => {
+                                (self.inventory.ui(ui, ctx), false)
+                            }
+                            consts::TASK_SAVE | consts::TASK_HEAL | consts::TASK_BLACKOUT => (self.location.ui(ui, ctx), false),
+                            consts::TASK_EVOLUTION => (self.evolution.ui(ui, ctx), false),
+                            consts::TASK_REORDER_BAG => (self.bag_reorder.ui(ui, ctx), false),
+                            consts::TASK_EV_OVERRIDE => (self.ev_override.ui(ui, ctx), false),
+                            _ => (EditorOutput::default(), false),
+                        }
+                    })
+                    .inner
+            })
+            .inner
     }
+
 }

@@ -221,7 +221,7 @@ impl LandingPage {
                 ui.painter().text(Pos2::new(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *h, bold.clone(), theme.text);
                 x += widths[i];
             }
-            egui::ScrollArea::vertical().id_salt("landing_routes").auto_shrink([false, false]).max_height(ui.available_height().max(300.0)).show(ui, |ui| {
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("landing_routes").auto_shrink([false, false]).max_height(ui.available_height().max(300.0)), |ui| {
                 if !index.loaded {
                     ui.add_space(4.0);
                     widgets::label_colored(ui, theme, "Loading routes...", theme.secondary);
@@ -673,7 +673,7 @@ impl NewRoutePage {
                         x += widths[i];
                     }
                     let mut clicked: Option<String> = None;
-                    egui::ScrollArea::vertical().id_salt("game_table").max_height(table_h).auto_shrink([false, false]).show(ui, |ui| {
+                    widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("game_table").max_height(table_h).auto_shrink([false, false]), |ui| {
                         for (row_idx, g) in self.games.clone().iter().enumerate() {
                             let (r, resp) = ui.allocate_exact_size(Vec2::new(total_w, 76.0), Sense::click());
                             let selected = self.selected_game.as_deref() == Some(g.name.as_str());

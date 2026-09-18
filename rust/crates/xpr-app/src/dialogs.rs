@@ -12,16 +12,16 @@ use xpr_core::config::{DEFAULT_SHORTCUTS, SHORTCUT_CATEGORIES, SHORTCUT_LABELS};
 use xpr_core::consts;
 use xpr_core::io_utils;
 use xpr_core::{Config, Paths};
-use xpr_data::model::{Nature, StatBlock};
+use xpr_data::model::{Nature, StatBlock, SINGLE_STAT_EV_CAP, STAT_XP_CAP_GEN12, TOTAL_EV_CAP};
 use xpr_data::{GenData, Registry};
-use xpr_engine::NodeId;
+use xpr_engine::{EvOverrideEventDefinition, NodeId};
 use xpr_ui_kit::shortcuts::format_key_sequence;
 use xpr_ui_kit::theme::{self, Theme};
-use xpr_ui_kit::widgets::{self, Entry, StyledButton};
+use xpr_ui_kit::widgets::{self, AmountEntry, Entry, StyledButton};
 
 use crate::controller::MainController;
 use crate::custom_dvs::CustomDvsFrame;
-use crate::editors::OptionMenu;
+use crate::editors::{ev_field_indices, OptionMenu, EV_STAT_NAMES, EV_STAT_NAMES_GEN12};
 
 /// Identifies which prompt a message-box answer belongs to.
 #[derive(Clone, Debug, PartialEq)]
@@ -79,7 +79,9 @@ pub enum DialogOutcome {
     RefreshTheme,
     RefreshBattle,
     ApplyShortcuts,
-    AssignMove { slot: i64, mv: String },
+    AssignMove { slot: i64, mv: String, pre_state: bool },
+    /// `[hp, atk, def, spa, spd, spe]` for an EV override before the selected event
+    EvOverride([i64; 6]),
     MatchupExport { idx: usize, mode: crate::battle_ui::ScreenshotMode },
     RestartForUpdate,
     CreateRouteForBackport { species: String, custom_gen_name: String },
@@ -102,6 +104,7 @@ pub enum Dialog {
     FinalTrainers(FinalTrainersDialog),
     MatchupExport(MatchupExportDialog),
     AssignMove(AssignMoveDialog),
+    EvOverride(EvOverrideDialog),
 }
 
 /// Shared context handed to dialog `ui` calls.
@@ -616,7 +619,7 @@ impl BattleConfigDialog {
         let theme = d.theme;
         let mut close = false;
         modal(ctx, theme, "xpr_battle_config", "Battle Configuration", 600.0, |ui| {
-            egui::ScrollArea::vertical().max_height(500.0).show(ui, |ui| {
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(500.0), |ui| {
                 ui.vertical_centered(|ui| widgets::label(ui, theme, "Battle calcs limitations and edge cases"));
                 ui.add(egui::Label::new(egui::RichText::new(
                     "Possible kills with less than 0.1% chance are not reported.\nFor each move, a full search for kill percents is done, up to a certain # of turns (configurable below).\nUp to 3 ranges are reported: 2 fastest kills, if applicable. The number required for a guaranteed kill is always given as the last range\nFor weaker moves, the maximum number of HITS (assumes attack lands every time) needed to guarantee a kill are given instead\nWith respect to accuracy calculations, Gen 1 misses are ignored\nThe crit damage ranges for multi-hit moves in Gen 2 assume exactly one of the multi-hits crit",
@@ -731,7 +734,7 @@ impl ColorConfigDialog {
         let theme = d.theme;
         let mut close = false;
         modal(ctx, theme, "xpr_color_config", "Font & Color Configuration", 420.0, |ui| {
-            egui::ScrollArea::vertical().max_height(600.0).show(ui, |ui| {
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(600.0), |ui| {
                 egui::Grid::new("font_grid").spacing(Vec2::new(5.0, 3.0)).show(ui, |ui| {
                     widgets::label(ui, theme, "Font Name:");
                     self.fonts.ui(ui, theme, ui.id().with("font"), Some(200.0), true);
@@ -854,7 +857,7 @@ impl HighlightColorDialog {
         let mut close = false;
         let mut refresh = false;
         modal(ctx, theme, "xpr_highlight_colors", "Configure Highlight Colors", 420.0, |ui| {
-            egui::ScrollArea::vertical().max_height(650.0).show(ui, |ui| {
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(650.0), |ui| {
                 ui.vertical_centered(|ui| ui.label(egui::RichText::new("Highlight Color Configuration:").font(theme.font_bold(12.0)).color(theme.text)));
                 for i in 1..=9i64 {
                     let cur = d.cfg.get_highlight_color(i);
@@ -1146,7 +1149,7 @@ impl ShortcutsDialog {
                 Entry::new(theme, &mut self.search).width(300.0).hint("Filter shortcuts...").id(ui.id().with("search")).show(ui);
             });
             let needle = self.search.to_lowercase();
-            egui::ScrollArea::vertical().max_height(480.0).show(ui, |ui| {
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(480.0), |ui| {
                 egui::Grid::new("shortcuts_grid").spacing(Vec2::new(6.0, 4.0)).striped(true).show(ui, |ui| {
                     widgets::label_bold(ui, theme, "Action");
                     widgets::label_bold(ui, theme, "Shortcut");
@@ -1297,7 +1300,7 @@ impl FinalTrainersDialog {
             });
             let needle = self.filter.trim().to_lowercase();
             egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border)).show(ui, |ui| {
-                egui::ScrollArea::vertical().max_height(360.0).auto_shrink([false, false]).show(ui, |ui| {
+                widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(360.0).auto_shrink([false, false]), |ui| {
                     for (name, checked) in self.trainers.iter_mut() {
                         if !needle.is_empty() && !name.to_lowercase().contains(&needle) {
                             continue;
@@ -1374,14 +1377,19 @@ impl MatchupExportDialog {
 
 pub struct AssignMoveDialog {
     pub slot_idx: i64,
+    /// True when opened from the Pre-Event State moves card rather than the
+    /// Battle Summary tab: the Tutor event is inserted before the currently
+    /// selected event instead of before the loaded trainer fight.
+    pre_state: bool,
     moves: Vec<String>,
     filter: String,
     selected: Option<String>,
+    focused: bool,
 }
 
 impl AssignMoveDialog {
-    pub fn new(gen: &GenData, slot_idx: i64) -> AssignMoveDialog {
-        AssignMoveDialog { slot_idx, moves: gen.move_db().get_filtered_names(None, false), filter: String::new(), selected: None }
+    pub fn new(gen: &GenData, slot_idx: i64, pre_state: bool) -> AssignMoveDialog {
+        AssignMoveDialog { slot_idx, pre_state, moves: gen.move_db().get_filtered_names(None, false), filter: String::new(), selected: None, focused: false }
     }
 
     pub fn ui(&mut self, ctx: &egui::Context, d: &mut DialogCtx) -> (bool, Option<DialogOutcome>) {
@@ -1389,11 +1397,21 @@ impl AssignMoveDialog {
         let mut close = false;
         let mut outcome = None;
         modal(ctx, theme, "xpr_assign_move", &format!("Assign Move to Slot {}", self.slot_idx + 1), 360.0, |ui| {
-            let r = Entry::new(theme, &mut self.filter).width(300.0).hint("Filter moves...").id(ui.id().with("filter")).show(ui);
+            let filter_id = ui.id().with("filter");
+            if !self.focused {
+                ui.memory_mut(|m| m.request_focus(filter_id));
+            }
+            let r = Entry::new(theme, &mut self.filter).width(300.0).hint("Filter moves...").id(filter_id).show(ui);
+            // A brand-new Modal id runs an invisible egui "sizing pass" on the
+            // frame it first appears, which silently drops any focus
+            // requested that frame; keep asking until it actually lands.
+            if !self.focused && r.has_focus {
+                self.focused = true;
+            }
             let needle = self.filter.trim().to_lowercase();
             let visible: Vec<String> = self.moves.iter().filter(|m| needle.is_empty() || m.to_lowercase().contains(&needle)).cloned().collect();
             egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border)).show(ui, |ui| {
-                egui::ScrollArea::vertical().max_height(300.0).auto_shrink([false, false]).show(ui, |ui| {
+                widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(300.0).auto_shrink([false, false]), |ui| {
                     for m in &visible {
                         let is_sel = self.selected.as_deref() == Some(m.as_str());
                         let resp = ui.selectable_label(is_sel, egui::RichText::new(m).font(theme.body()));
@@ -1401,7 +1419,7 @@ impl AssignMoveDialog {
                             self.selected = Some(m.clone());
                         }
                         if resp.double_clicked() {
-                            outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: m.clone() });
+                            outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: m.clone(), pre_state: self.pre_state });
                             close = true;
                         }
                     }
@@ -1410,14 +1428,78 @@ impl AssignMoveDialog {
             if r.enter_pressed {
                 let pick = self.selected.clone().or_else(|| visible.first().cloned());
                 if let Some(m) = pick {
-                    outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: m });
+                    outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: m, pre_state: self.pre_state });
                     close = true;
                 }
             }
             ui.horizontal(|ui| {
                 let can = self.selected.is_some();
                 if widgets::button_enabled(ui, theme, "Assign", can).clicked() && can {
-                    outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: self.selected.clone().unwrap() });
+                    outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: self.selected.clone().unwrap(), pre_state: self.pre_state });
+                    close = true;
+                }
+                if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+                    close = true;
+                }
+            });
+        });
+        (close, outcome)
+    }
+}
+
+/// Opened by clicking the EV column of the Pre-Event State stats card: six
+/// fields, prefilled with the mon's stat XP before the selected event, that
+/// become an EV Override event inserted before it.
+pub struct EvOverrideDialog {
+    values: [String; 6],
+    /// gens 1-2: one Special field, mirrored into Sp. Def
+    gen12: bool,
+}
+
+impl EvOverrideDialog {
+    pub fn new(gen: &GenData, current: [i64; 6]) -> EvOverrideDialog {
+        EvOverrideDialog { values: current.map(|v| v.to_string()), gen12: EvOverrideEventDefinition::has_single_special(gen) }
+    }
+
+    fn parsed(&self) -> Option<[i64; 6]> {
+        let mut out = [0i64; 6];
+        for (slot, raw) in out.iter_mut().zip(self.values.iter()) {
+            *slot = raw.trim().parse().ok()?;
+        }
+        if self.gen12 {
+            out[4] = out[3];
+        }
+        Some(out)
+    }
+
+    pub fn ui(&mut self, ctx: &egui::Context, d: &mut DialogCtx) -> (bool, Option<DialogOutcome>) {
+        let theme = d.theme;
+        let mut close = false;
+        let mut outcome = None;
+        let (unit, cap) = if self.gen12 { ("Stat Exp", STAT_XP_CAP_GEN12) } else { ("EVs", SINGLE_STAT_EV_CAP) };
+        let names = if self.gen12 { &EV_STAT_NAMES_GEN12 } else { &EV_STAT_NAMES };
+        let title = if self.gen12 { "Override Stat Exp Before This Event" } else { "Override EVs Before This Event" };
+        modal(ctx, theme, "xpr_ev_override", title, 300.0, |ui| {
+            widgets::label_font(ui, format!("{} from this point on (0-{} per stat):", unit, cap), theme.body(), theme.secondary);
+            let mut enter = false;
+            egui::Grid::new(ui.id().with("ev_grid")).spacing(Vec2::new(8.0, 4.0)).show(ui, |ui| {
+                for &idx in ev_field_indices(self.gen12) {
+                    widgets::label(ui, theme, format!("{}:", names[idx]));
+                    let r = AmountEntry::new(theme, ui.id().with(("ev_amt", idx)), &mut self.values[idx]).min(Some(0)).max(Some(cap)).width(Some(6)).show(ui);
+                    enter |= r.enter_pressed;
+                    ui.end_row();
+                }
+            });
+            let parsed = self.parsed();
+            if !self.gen12 {
+                let total: i64 = parsed.map(|v| v.iter().sum()).unwrap_or(0);
+                let color = if total > TOTAL_EV_CAP { theme.failure } else { theme.secondary };
+                widgets::label_font(ui, format!("Total: {} / {}", total, TOTAL_EV_CAP), theme.body(), color);
+            }
+            ui.horizontal(|ui| {
+                let can = parsed.is_some();
+                if (widgets::button_enabled(ui, theme, "Create Override", can).clicked() || enter) && can {
+                    outcome = Some(DialogOutcome::EvOverride(parsed.unwrap()));
                     close = true;
                 }
                 if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
@@ -1446,6 +1528,7 @@ impl Dialog {
             Dialog::FinalTrainers(x) => x.ui(ctx, d),
             Dialog::MatchupExport(x) => x.ui(ctx, d),
             Dialog::AssignMove(x) => x.ui(ctx, d),
+            Dialog::EvOverride(x) => x.ui(ctx, d),
         }
     }
 }
@@ -1453,4 +1536,59 @@ impl Dialog {
 /// Little helper for keyboard-shortcut labels in menus.
 pub fn label_for(action_id: &str) -> String {
     SHORTCUT_LABELS.iter().find(|(a, _)| *a == action_id).map(|(_, l)| l.to_string()).unwrap_or_else(|| action_id.to_string())
+}
+
+#[cfg(test)]
+mod focus_tests {
+    //! Regression test for the "Assign Move" filter box not gaining
+    //! keyboard focus on open: a brand-new `Modal`/`Area` id runs an
+    //! invisible egui "sizing pass" on the frame it first appears, which
+    //! silently surrenders any focus requested that same frame. Requesting
+    //! focus every frame until the widget actually reports having it (as
+    //! `AssignMoveDialog::ui` now does) survives that first frame.
+    use egui::{Context, FontDefinitions, Id, Modal, RawInput, TextEdit};
+
+    #[test]
+    fn naive_one_shot_request_never_lands() {
+        let ctx = Context::default();
+        ctx.set_fonts(FontDefinitions::empty());
+        let id = Id::new("xpr_assign_move_test").with("filter");
+        let mut text = String::new();
+        let mut focused = false;
+        for _ in 0..2 {
+            let _ = ctx.run(RawInput::default(), |ctx| {
+                Modal::new(Id::new("xpr_assign_move_test")).show(ctx, |ui| {
+                    if !focused {
+                        ui.memory_mut(|m| m.request_focus(id));
+                        focused = true;
+                    }
+                    TextEdit::singleline(&mut text).id(id).show(ui);
+                });
+            });
+        }
+        assert!(!ctx.memory(|m| m.has_focus(id)), "the naive one-shot request was expected to lose the race against the sizing pass");
+    }
+
+    #[test]
+    fn retrying_until_it_sticks_lands_focus() {
+        let ctx = Context::default();
+        ctx.set_fonts(FontDefinitions::empty());
+        let id = Id::new("xpr_assign_move_test_fixed").with("filter");
+        let mut text = String::new();
+        let mut focused = false;
+        for _ in 0..2 {
+            let _ = ctx.run(RawInput::default(), |ctx| {
+                Modal::new(Id::new("xpr_assign_move_test_fixed")).show(ctx, |ui| {
+                    if !focused {
+                        ui.memory_mut(|m| m.request_focus(id));
+                    }
+                    let out = TextEdit::singleline(&mut text).id(id).show(ui);
+                    if !focused && out.response.has_focus() {
+                        focused = true;
+                    }
+                });
+            });
+        }
+        assert!(ctx.memory(|m| m.has_focus(id)), "expected focus to have been (re)acquired by the second frame");
+    }
 }

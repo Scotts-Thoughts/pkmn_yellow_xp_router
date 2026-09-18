@@ -1,309 +1,544 @@
-//! The pre-event state panel: `StateViewer` (Pokémon section, stat-EXP
-//! section, inventory section), built from `StatColumn` / `PkmnViewer` /
-//! `StatExpViewer` / `InventoryViewer`.
+//! The read-only half of the Pre-Event State tab: the identity header card
+//! and the Stats / Moves / Bag cards
+//! (docs/rust_port/design/pre_event_state/SPEC.md §5.2–5.5).
 
-use egui::{Color32, CornerRadius, FontId, Pos2, Sense, Ui, Vec2};
+use egui::{Align, Color32, FontId, Layout, Pos2, Rect, Sense, Ui, Vec2};
 
 use xpr_data::model::{EnemyPkmn, StatBlock};
 use xpr_data::{BadgeList, GenData};
 use xpr_engine::{Inventory, RouteState};
 use xpr_ui_kit::theme::Theme;
-use xpr_ui_kit::widgets;
+use xpr_ui_kit::widgets::{self, fmt_thousands, CARD_TITLE_H};
 
-/// One `StatColumn`: rounded section, optional centred header, label/value rows.
-pub struct StatColumnSpec<'a> {
-    pub header: &'a str,
-    pub rows: Vec<(String, String, Option<&'static str>)>,
-    /// Qt `label_width * 8` / `val_width * 8` minimums
-    pub label_width: Option<f32>,
-    pub val_width: Option<f32>,
-    pub style_prefix: &'a str,
-    pub font: FontId,
+use crate::assets::Assets;
+
+/// Gap between cards.
+pub const CARD_GAP: f32 = 12.0;
+const TITLE_GAP: f32 = 6.0;
+const STAT_ROW_H: f32 = 27.0;
+const CARD_FOOTER_H: f32 = 24.0;
+const MOVE_ROW_H: f32 = 34.0;
+const MONEY_ROW_H: f32 = 34.0;
+const BAG_ROW_H: f32 = 25.0;
+const EMPTY_BAG_H: f32 = 72.0;
+/// Bag rows drawn before the overflow row takes the last slot.
+const MAX_BAG_ROWS: usize = 20;
+/// Column widths of the stats table: (Now, from EVs, real / total).
+const STAT_COLS_EV: [f32; 3] = [56.0, 78.0, 108.0];
+const STAT_COLS_STATEXP: [f32; 3] = [56.0, 86.0, 118.0];
+
+/// The header's right-hand "Before" block: the selected event and where it is.
+#[derive(Clone, Debug, Default)]
+pub struct BeforeInfo {
+    pub label: String,
+    pub location: Option<String>,
 }
 
-pub fn stat_column(ui: &mut Ui, theme: &Theme, spec: &StatColumnSpec) {
-    let bg = theme.tinted_bg(spec.style_prefix, 0.15);
-    let font = spec.font.clone();
-    widgets::rounded_section(ui, bg, 6, egui::Margin { left: 8, right: 8, top: 6, bottom: 6 }, |ui| {
-        ui.spacing_mut().item_spacing.y = 0.0;
-        let label_w = spec.label_width.unwrap_or(0.0);
-        let val_w = spec.val_width.unwrap_or(0.0);
-        // widest label/value so the rows line up
-        let max_label = spec.rows.iter().map(|(l, _, _)| widgets::text_width(ui, l, &font)).fold(0.0f32, f32::max).max(label_w);
-        let max_val = spec.rows.iter().map(|(_, v, _)| widgets::text_width(ui, v, &font)).fold(0.0f32, f32::max).max(val_w);
-        let row_w = (max_label + 2.0 + max_val).max(ui.available_width().min(max_label + max_val + 2.0));
-        let row_w = row_w.max(if spec.header.is_empty() { 0.0 } else { widgets::text_width(ui, spec.header, &font) });
-        if !spec.header.is_empty() {
-            let lines: Vec<&str> = spec.header.split('\n').collect();
-            for line in lines {
-                let (r, _) = ui.allocate_exact_size(Vec2::new(row_w, font.size * 1.3), Sense::hover());
-                ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, line, font.clone(), theme.text);
+/// The last Pokémon shown; kept (with its badges and exp position) while
+/// the selected event has no state, as the Python app did.
+#[derive(Clone, Debug)]
+pub struct LastPkmn {
+    pub pkmn: EnemyPkmn,
+    pub badges: BadgeList,
+    pub cur_xp: i64,
+    pub xp_to_next_level: i64,
+    pub percent_xp_to_next_level: i64,
+}
+
+/// One inline text segment: (text, font, colour).
+type Seg<'a> = (&'a str, FontId, Color32);
+
+fn seg_width(ui: &Ui, segs: &[Seg], gap: f32) -> f32 {
+    let mut w = 0.0;
+    for (i, (t, f, _)) in segs.iter().enumerate() {
+        if i > 0 {
+            w += gap;
+        }
+        w += widgets::text_width(ui, t, f);
+    }
+    w
+}
+
+/// Paint `segs` left to right from `x`, vertically centred on `cy`.
+fn paint_run(ui: &Ui, x: f32, cy: f32, segs: &[Seg], gap: f32) -> f32 {
+    let mut cx = x;
+    for (i, (t, f, c)) in segs.iter().enumerate() {
+        if i > 0 {
+            cx += gap;
+        }
+        let g = ui.fonts_mut(|fonts| fonts.layout_no_wrap(t.to_string(), f.clone(), *c));
+        let size = g.size();
+        ui.painter().galley(Pos2::new(cx, cy - size.y / 2.0), g, *c);
+        cx += size.x;
+    }
+    cx - x
+}
+
+fn row_h(ui: &Ui, font: &FontId) -> f32 {
+    ui.fonts_mut(|f| f.row_height(font))
+}
+
+// ---------------------------------------------------------------------------
+// Identity header
+// ---------------------------------------------------------------------------
+
+pub fn identity_header(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, last: Option<&LastPkmn>, has_state: bool, assets: &mut Assets, before: &BeforeInfo) {
+    let tile = 68.0;
+    let pad = egui::Margin { left: 16, right: 16, top: 14, bottom: 14 };
+    widgets::card(ui, theme, Some(pad), |ui| {
+        let width = ui.available_width();
+        ui.allocate_ui_with_layout(Vec2::new(width, tile), Layout::left_to_right(Align::Center), |ui| {
+            ui.set_width(width);
+            ui.spacing_mut().item_spacing.x = 16.0;
+            // 1. icon tile
+            let (tile_rect, _) = ui.allocate_exact_size(Vec2::splat(tile), Sense::hover());
+            ui.painter().rect(tile_rect, egui::CornerRadius::same(12), theme.well_bg(), egui::Stroke::new(1.0_f32, theme.card_border()), egui::StrokeKind::Inside);
+            if let Some(l) = last {
+                if let Some(tex) = assets.pkmn_icon(ui.ctx(), &l.pkmn.name) {
+                    let [w, h] = tex.size();
+                    let (w, h) = (w as f32, h as f32);
+                    let scale = (60.0 / w).min(60.0 / h);
+                    let img = Rect::from_center_size(tile_rect.center(), Vec2::new(w * scale, h * scale));
+                    ui.painter().image(tex.id(), img, Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)), Color32::WHITE);
+                }
             }
-        }
-        for (label, value, style) in &spec.rows {
-            let color = match style {
-                Some(s) => theme.style_color(s),
-                None => theme.text,
-            };
-            let (r, _) = ui.allocate_exact_size(Vec2::new(row_w, font.size * 1.3 + 2.0), Sense::hover());
-            let text_rect = r.shrink2(Vec2::new(0.0, 1.0));
-            ui.painter().text(Pos2::new(text_rect.min.x, text_rect.center().y), egui::Align2::LEFT_CENTER, label, font.clone(), color);
-            ui.painter().text(Pos2::new(text_rect.max.x, text_rect.center().y), egui::Align2::RIGHT_CENTER, value, font.clone(), color);
-        }
+            // 3. "Before" block (measured first so the main column knows its width)
+            let bold = theme.body_bold();
+            let body = theme.body();
+            let caption = widgets::caption_galley(ui, "Before", theme.caption_font(), theme.secondary);
+            let label_w = widgets::text_width(ui, &before.label, &bold);
+            let loc_w = before.location.as_deref().map(|l| widgets::text_width(ui, l, &body)).unwrap_or(0.0);
+            let before_w = caption.size().x.max(label_w).max(loc_w).min((width - tile - 32.0) * 0.5);
+            let main_w = (ui.available_width() - before_w - 16.0).max(80.0);
+            // 2. main column
+            let name_font = theme.font_bold(16.5);
+            let name_h = row_h(ui, &name_font).max(row_h(ui, &bold) + 4.0);
+            let line_h = row_h(ui, &body).max(16.0);
+            let cur_gen = gen.map(|g| g.get_generation()).unwrap_or(1);
+            let show_meta = cur_gen >= 2 && last.is_some();
+            let col_h = name_h + 6.0 + line_h + if show_meta { 6.0 + line_h } else { 0.0 };
+            ui.allocate_ui_with_layout(Vec2::new(main_w, col_h), Layout::top_down(Align::Min), |ui| {
+                ui.set_width(main_w);
+                ui.spacing_mut().item_spacing.y = 6.0;
+                let Some(l) = last else {
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(main_w, name_h), Sense::hover());
+                    widgets::col_text(ui, r, "No Pokémon", name_font.clone(), theme.secondary, Align::Min);
+                    return;
+                };
+                let p = &l.pkmn;
+                // row 1: name + level pill
+                let (r, _) = ui.allocate_exact_size(Vec2::new(main_w, name_h), Sense::hover());
+                let name_w = paint_run(ui, r.min.x, r.center().y, &[(&p.name, name_font.clone(), theme.text_strong())], 0.0);
+                let pill_rect = Rect::from_min_size(Pos2::new(r.min.x + name_w + 10.0, r.min.y), Vec2::new(main_w - name_w - 10.0, name_h));
+                let mut pill_ui = ui.new_child(egui::UiBuilder::new().max_rect(pill_rect).layout(Layout::left_to_right(Align::Center)));
+                widgets::pill(&mut pill_ui, theme, &format!("Lv {}", p.level), theme.primary, theme.pill_bg(), theme.pill_border());
+                // row 2: ability · nature · held item
+                if show_meta {
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(main_w, line_h), Sense::hover());
+                    let held = format!("Held item: {}", p.held_item.as_deref().filter(|h| !h.is_empty()).unwrap_or("none"));
+                    let nature = p.nature.display_name();
+                    let mut segs: Vec<Seg> = Vec::new();
+                    if cur_gen >= 3 {
+                        segs.push((&p.ability, body.clone(), theme.text));
+                        segs.push(("·", body.clone(), theme.secondary));
+                        segs.push((&nature, body.clone(), theme.text));
+                        segs.push(("·", body.clone(), theme.secondary));
+                    }
+                    segs.push((&held, body.clone(), theme.secondary));
+                    paint_run(ui, r.min.x, r.center().y, &segs, 8.0);
+                }
+                // row 3: exp line with the progress bar
+                let (r, _) = ui.allocate_exact_size(Vec2::new(main_w, line_h), Sense::hover());
+                let exp = fmt_thousands(l.cur_xp);
+                let left: [Seg; 2] = [("Exp", body.clone(), theme.secondary), (&exp, bold.clone(), theme.text)];
+                let left_w = paint_run(ui, r.min.x, r.center().y, &left, 4.0);
+                if has_state {
+                    let (right, fraction): (Vec<Seg>, f32) = if l.xp_to_next_level <= 0 {
+                        (vec![("Max level", body.clone(), theme.secondary)], 1.0)
+                    } else {
+                        (Vec::new(), (1.0 - l.percent_xp_to_next_level as f32 / 100.0).clamp(0.0, 1.0))
+                    };
+                    let to_next = fmt_thousands(l.xp_to_next_level);
+                    let to_lv = format!("to Lv {}", p.level + 1);
+                    let right: Vec<Seg> = if right.is_empty() { vec![(&to_next, bold.clone(), theme.text), (&to_lv, body.clone(), theme.secondary)] } else { right };
+                    let right_w = seg_width(ui, &right, 4.0);
+                    paint_run(ui, r.max.x - right_w, r.center().y, &right, 4.0);
+                    let bar = Rect::from_min_max(Pos2::new(r.min.x + left_w + 10.0, r.center().y - 3.0), Pos2::new(r.max.x - right_w - 10.0, r.center().y + 3.0));
+                    if bar.width() > 0.0 {
+                        widgets::paint_progress_bar(ui, bar, fraction, theme.primary, theme.subtle_border);
+                    }
+                }
+            });
+            // 3. "Before" block, right-aligned and vertically centred
+            let cap_h = caption.size().y;
+            let before_h = cap_h + 3.0 + row_h(ui, &bold) + if before.location.is_some() { 3.0 + row_h(ui, &body) } else { 0.0 };
+            let x1 = ui.max_rect().max.x;
+            let x0 = x1 - before_w;
+            let (region, _) = ui.allocate_exact_size(Vec2::new(ui.available_width().max(before_w), tile), Sense::hover());
+            let _ = region;
+            let cy0 = tile_rect.center().y - before_h / 2.0;
+            ui.painter().galley(Pos2::new(x1 - caption.size().x, cy0), caption.clone(), theme.secondary);
+            let mut y = cy0 + cap_h + 3.0;
+            let label = widgets::elide(ui, &before.label, &bold, before_w);
+            widgets::col_text(ui, Rect::from_min_size(Pos2::new(x0, y), Vec2::new(before_w, row_h(ui, &bold))), &label, bold.clone(), theme.header, Align::Max);
+            if let Some(loc) = &before.location {
+                y += row_h(ui, &bold) + 3.0;
+                let loc = widgets::elide(ui, loc, &body, before_w);
+                widgets::col_text(ui, Rect::from_min_size(Pos2::new(x0, y), Vec2::new(before_w, row_h(ui, &body))), &loc, body.clone(), theme.secondary, Align::Max);
+            }
+        });
     });
 }
 
-/// `PkmnViewer.set_pkmn` layout data.
-pub struct PkmnViewerArgs<'a> {
-    pub pkmn: &'a EnemyPkmn,
-    pub badges: Option<&'a BadgeList>,
-    pub speed_style: Option<&'static str>,
-    pub stats_only: bool,
-    pub font_size: Option<f32>,
+// ---------------------------------------------------------------------------
+// Stats card
+// ---------------------------------------------------------------------------
+
+struct StatRow {
+    name: &'static str,
+    now: i64,
+    boosted: bool,
+    gain: Option<i64>,
+    realized: Option<i64>,
+    total: Option<i64>,
 }
 
-/// The `PkmnViewer` (name / ability / held item tinted labels, stat and move columns).
-pub fn pkmn_viewer(ui: &mut Ui, theme: &Theme, gen: &GenData, args: &PkmnViewerArgs) {
-    let font = match args.font_size {
-        Some(s) => theme.font(s),
-        None => theme.body(),
-    };
-    let header_bg = theme.tinted_bg("Header", 0.25);
-    let header_color = theme.header;
-    let pkmn = args.pkmn;
-    ui.spacing_mut().item_spacing = Vec2::new(2.0, 2.0);
-    let tinted_label = |ui: &mut Ui, text: &str| {
-        let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font.clone(), Color32::WHITE));
-        let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width().max(galley.size().x + 8.0), galley.size().y + 4.0), Sense::hover());
-        ui.painter().rect_filled(rect, CornerRadius::same(2), header_bg);
-        ui.painter().galley(Pos2::new(rect.min.x + 4.0, rect.center().y - galley.size().y / 2.0), galley, header_color);
-    };
-    tinted_label(ui, &pkmn.name);
-    if gen.get_generation() >= 3 {
-        tinted_label(ui, &format!("{} ({})", pkmn.ability, pkmn.nature.display_name()));
+fn stat_vals(gen1: bool, sb: &StatBlock) -> Vec<i64> {
+    if gen1 {
+        vec![sb.hp, sb.attack, sb.defense, sb.special_attack, sb.speed]
+    } else {
+        vec![sb.hp, sb.attack, sb.defense, sb.special_attack, sb.special_defense, sb.speed]
     }
-    if gen.get_generation() >= 2 {
-        tinted_label(ui, &format!("Held Item: {}", pkmn.held_item.as_deref().unwrap_or("None")));
-    }
+}
 
-    let mut attack_val = pkmn.cur_stats.attack.to_string();
-    let mut defense_val = pkmn.cur_stats.defense.to_string();
-    let mut spa_val = pkmn.cur_stats.special_attack.to_string();
-    let mut spd_val = pkmn.cur_stats.special_defense.to_string();
-    let mut speed_val = pkmn.cur_stats.speed.to_string();
-    if let Some(b) = args.badges {
-        if b.is_attack_boosted() {
-            attack_val = format!("*{}", attack_val);
+/// The badge-boost markers of `pkmn.cur_stats` (including the Gen 2 Sp. Def
+/// rule: no marker when the boost is ignored for the mon's Sp. Atk).
+fn boost_flags(gen: &GenData, pkmn: &EnemyPkmn, badges: &BadgeList) -> Vec<bool> {
+    let cur_gen = gen.get_generation();
+    let spd = if badges.is_special_defense_boosted() {
+        if cur_gen == 2 {
+            let unboosted = pkmn.base_stats.calc_level_stats(pkmn.level, &pkmn.dvs, &pkmn.stat_xp, &gen.make_badge_list(), pkmn.nature, None).special_attack;
+            !xpr_data::stats::should_ignore_spd_badge_boost(unboosted)
+        } else {
+            true
         }
-        if b.is_defense_boosted() {
-            defense_val = format!("*{}", defense_val);
-        }
-        if b.is_special_attack_boosted() {
-            spa_val = format!("*{}", spa_val);
-        }
-        if b.is_special_defense_boosted() {
-            if gen.get_generation() == 2 {
-                let unboosted = pkmn
-                    .base_stats
-                    .calc_level_stats(pkmn.level, &pkmn.dvs, &pkmn.stat_xp, &gen.make_badge_list(), pkmn.nature, None)
-                    .special_attack;
-                if !xpr_data::stats::should_ignore_spd_badge_boost(unboosted) {
-                    spd_val = format!("*{}", spd_val);
-                }
-            } else {
-                spd_val = format!("*{}", spd_val);
-            }
-        }
-        if b.is_speed_boosted() {
-            speed_val = format!("*{}", speed_val);
-        }
+    } else {
+        false
+    };
+    if cur_gen == 1 {
+        vec![false, badges.is_attack_boosted(), badges.is_defense_boosted(), badges.is_special_attack_boosted(), badges.is_speed_boosted()]
+    } else {
+        vec![false, badges.is_attack_boosted(), badges.is_defense_boosted(), badges.is_special_attack_boosted(), spd, badges.is_speed_boosted()]
     }
-    let stat_rows = vec![
-        ("HP:".to_string(), pkmn.cur_stats.hp.to_string(), None),
-        ("Attack:".to_string(), attack_val, None),
-        ("Defense:".to_string(), defense_val, None),
-        ("Spc Atk:".to_string(), spa_val, None),
-        ("Spc Def:".to_string(), spd_val, None),
-        ("Speed:".to_string(), speed_val, args.speed_style),
-    ];
-    let mut moves: Vec<String> = pkmn.move_list.iter().map(|m| m.clone().unwrap_or_default()).collect();
+}
+
+fn stat_rows(gen: &GenData, last: &LastPkmn, state: Option<&RouteState>) -> Vec<StatRow> {
+    let gen1 = gen.get_generation() == 1;
+    let names: &[&'static str] = if gen1 { &["HP", "Attack", "Defense", "Special", "Speed"] } else { &["HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"] };
+    let now = stat_vals(gen1, &last.pkmn.cur_stats);
+    let boosted = boost_flags(gen, &last.pkmn, &last.badges);
+    // EV columns are unknown (`—`) without a state
+    let opt = |sb: Option<StatBlock>| -> Vec<Option<i64>> {
+        match sb {
+            Some(sb) => stat_vals(gen1, &sb).into_iter().map(Some).collect(),
+            None => vec![None; names.len()],
+        }
+    };
+    let gain = opt(state.map(|s| s.solo_pkmn.get_net_gain_from_stat_xp(&s.badges)));
+    let realized = opt(state.map(|s| s.solo_pkmn.realized_stat_xp));
+    let total = opt(state.map(|s| s.solo_pkmn.unrealized_stat_xp));
+    names
+        .iter()
+        .enumerate()
+        .map(|(i, n)| StatRow { name: n, now: now[i], boosted: boosted[i], gain: gain[i], realized: realized[i], total: total[i] })
+        .collect()
+}
+
+fn stats_inner_height(rows: usize) -> f32 {
+    CARD_TITLE_H + TITLE_GAP + rows as f32 * STAT_ROW_H + CARD_FOOTER_H
+}
+
+/// Draws the Stats card; returns true when the "EVs real / total" column was
+/// clicked this frame, so the caller can offer an EV override at this point.
+pub fn stats_card(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, last: Option<&LastPkmn>, state: Option<&RouteState>, min_inner_h: f32) -> bool {
+    let mut clicked_evs = false;
+    widgets::card(ui, theme, None, |ui| {
+        ui.set_min_height(min_inner_h);
+        ui.spacing_mut().item_spacing.y = 0.0;
+        let cur_gen = gen.map(|g| g.get_generation()).unwrap_or(3);
+        let (heads, cols): ([&str; 3], [f32; 3]) = if cur_gen >= 3 {
+            (["Now", "from EVs", "EVs real / total"], STAT_COLS_EV)
+        } else {
+            (["Now", "from StatExp", "StatExp real / total"], STAT_COLS_STATEXP)
+        };
+        let title = widgets::card_title(ui, theme, "Stats", None);
+        // column heads, right-aligned over their columns
+        let mut x = title.max.x;
+        for (head, w) in heads.iter().zip(cols.iter()).rev() {
+            let cell = Rect::from_min_max(Pos2::new(x - w, title.min.y), Pos2::new(x, title.max.y));
+            widgets::col_text(ui, cell, head, theme.caption_font(), theme.secondary, Align::Max);
+            x -= w;
+        }
+        ui.add_space(TITLE_GAP);
+        let rows: Vec<StatRow> = match (gen, last) {
+            (Some(g), Some(l)) => stat_rows(g, l, state),
+            _ => Vec::new(),
+        };
+        let now_font = theme.font_bold(10.5);
+        let body = theme.body();
+        let divider = theme.row_divider();
+        let dash = "—";
+        for row in &rows {
+            let r = widgets::table_row(ui, STAT_ROW_H, Some(divider));
+            let mut x = r.max.x;
+            // real / total
+            let cell = Rect::from_min_max(Pos2::new(x - cols[2], r.min.y), Pos2::new(x, r.max.y));
+            let rt = match (row.realized, row.total) {
+                (Some(a), Some(b)) => format!("{} / {}", fmt_thousands(a), fmt_thousands(b)),
+                _ => dash.to_string(),
+            };
+            if state.is_some() {
+                let resp = ui.interact(cell, ui.id().with(("ev_cell", row.name)), Sense::click());
+                if resp.clicked() {
+                    clicked_evs = true;
+                }
+                resp.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Override the EVs from this point on");
+            }
+            widgets::col_text(ui, cell, &rt, body.clone(), theme.secondary, Align::Max);
+            x -= cols[2];
+            // from EVs
+            let cell = Rect::from_min_max(Pos2::new(x - cols[1], r.min.y), Pos2::new(x, r.max.y));
+            let gain = match row.gain {
+                Some(g) => format!("{:+}", g),
+                None => dash.to_string(),
+            };
+            widgets::col_text(ui, cell, &gain, body.clone(), theme.secondary, Align::Max);
+            x -= cols[1];
+            // Now (+ badge-boost dot)
+            let cell = Rect::from_min_max(Pos2::new(x - cols[0], r.min.y), Pos2::new(x, r.max.y));
+            let now = row.now.to_string();
+            widgets::col_text(ui, cell, &now, now_font.clone(), theme.text_strong(), Align::Max);
+            if row.boosted {
+                let vw = widgets::text_width(ui, &now, &now_font);
+                ui.painter().circle_filled(Pos2::new(cell.max.x - vw - 5.0 - 3.0, cell.center().y), 3.0, theme.header);
+            }
+            x -= cols[0];
+            // name
+            let cell = Rect::from_min_max(Pos2::new(r.min.x, r.min.y), Pos2::new(x, r.max.y));
+            widgets::col_text(ui, cell, row.name, body.clone(), theme.text, Align::Min);
+        }
+        // footer: left text (badge-boost / no-EVs note) and the right-aligned
+        // badges list must never overlap, so the right side is elided to
+        // whatever width the left side leaves it.
+        let r = widgets::table_row(ui, CARD_FOOTER_H, Some(divider));
+        let cap = theme.caption_font();
+        let any_boost = rows.iter().any(|r| r.boosted);
+        let no_evs = state.is_some() && !rows.is_empty() && rows.iter().all(|r| r.total == Some(0));
+        let cell = Rect::from_min_max(Pos2::new(r.min.x, r.min.y + 4.0), r.max);
+        let left_w = if any_boost {
+            ui.painter().circle_filled(Pos2::new(cell.min.x + 3.0, cell.center().y), 3.0, theme.header);
+            let text_cell = Rect::from_min_max(Pos2::new(cell.min.x + 11.0, cell.min.y), cell.max);
+            widgets::col_text(ui, text_cell, "Badge boost applied", cap.clone(), theme.secondary, Align::Min);
+            11.0 + widgets::text_width(ui, "Badge boost applied", &cap)
+        } else if no_evs {
+            widgets::col_text(ui, cell, "No EVs earned yet", cap.clone(), theme.secondary, Align::Min);
+            widgets::text_width(ui, "No EVs earned yet", &cap)
+        } else {
+            0.0
+        };
+        let badges_text = match last {
+            Some(l) if l.badges.num_badges() > 0 => l.badges.to_short_string(),
+            _ => "Badges: none".to_string(),
+        };
+        let right_max_w = (cell.width() - left_w - 12.0).max(20.0);
+        let shown = widgets::elide(ui, &badges_text, &cap, right_max_w);
+        widgets::col_text(ui, cell, &shown, cap, theme.secondary, Align::Max);
+    });
+    clicked_evs
+}
+
+// ---------------------------------------------------------------------------
+// Moves card
+// ---------------------------------------------------------------------------
+
+fn moves_inner_height() -> f32 {
+    CARD_TITLE_H + TITLE_GAP + 4.0 * MOVE_ROW_H
+}
+
+/// Draws the Moves card; returns the slot (0-3) clicked this frame, if any,
+/// so the caller can offer to replace it via a Tutor event.
+pub fn moves_card(ui: &mut Ui, theme: &Theme, last: Option<&LastPkmn>, min_inner_h: f32) -> Option<i64> {
+    let mut moves: Vec<String> = last.map(|l| l.pkmn.move_list.iter().map(|m| m.clone().unwrap_or_default()).collect()).unwrap_or_default();
+    moves.truncate(4);
     while moves.len() < 4 {
         moves.push(String::new());
     }
-    let move_rows = vec![
-        ("Lv:".to_string(), pkmn.level.to_string(), None),
-        ("Exp:".to_string(), pkmn.xp.to_string(), None),
-        ("Move 1:".to_string(), moves[0].clone(), None),
-        ("Move 2:".to_string(), moves[1].clone(), None),
-        ("Move 3:".to_string(), moves[2].clone(), None),
-        ("Move 4:".to_string(), moves[3].clone(), None),
-    ];
-    ui.horizontal_top(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        let total = ui.available_width();
-        let half = if args.stats_only { total } else { (total - 2.0) / 2.0 };
-        ui.allocate_ui_with_layout(Vec2::new(half, 0.0), egui::Layout::top_down(egui::Align::Min), |ui| {
-            ui.set_width(half);
-            stat_column(
-                ui,
-                theme,
-                &StatColumnSpec { header: "", rows: stat_rows, label_width: None, val_width: Some(4.0 * 8.0), style_prefix: "Secondary", font: font.clone() },
-            );
-        });
-        if !args.stats_only {
-            ui.allocate_ui_with_layout(Vec2::new(half, 0.0), egui::Layout::top_down(egui::Align::Min), |ui| {
-                ui.set_width(half);
-                stat_column(
-                    ui,
-                    theme,
-                    &StatColumnSpec { header: "", rows: move_rows, label_width: None, val_width: Some(11.0 * 8.0), style_prefix: "Primary", font: font.clone() },
-                );
-            });
-        }
-    });
-}
-
-fn vals_from_stat_block(gen: &GenData, sb: &StatBlock) -> Vec<i64> {
-    if gen.get_generation() >= 2 {
-        vec![sb.hp, sb.attack, sb.defense, sb.special_attack, sb.special_defense, sb.speed]
-    } else {
-        vec![sb.hp, sb.attack, sb.defense, sb.special_attack, sb.speed]
-    }
-}
-
-/// `StatExpViewer`: three columns (net gain / realized / total).
-pub fn stat_exp_viewer(ui: &mut Ui, theme: &Theme, gen: &GenData, state: Option<&RouteState>) {
-    let cur_gen = gen.get_generation();
-    let labels: Vec<&str> = if cur_gen >= 2 {
-        vec!["HP:", "Attack:", "Defense:", "Spc Atk:", "Spc Def:", "Speed:"]
-    } else {
-        vec!["HP:", "Attack:", "Defense:", "Special:", "Speed:"]
-    };
-    let (gain_header, realized_header, total_header) = if cur_gen >= 3 {
-        ("Net Stats\nFrom EVs", "Realized\nEVs", "Total\nEVs")
-    } else {
-        ("Net Stats\nFrom StatExp", "Realized\nStatExp", "Total\nStatExp")
-    };
-    let (net, realized, total): (Vec<i64>, Vec<i64>, Vec<i64>) = match state {
-        Some(s) => (
-            vals_from_stat_block(gen, &s.solo_pkmn.get_net_gain_from_stat_xp(&s.badges)),
-            vals_from_stat_block(gen, &s.solo_pkmn.realized_stat_xp),
-            vals_from_stat_block(gen, &s.solo_pkmn.unrealized_stat_xp),
-        ),
-        None => (vec![0; labels.len()], vec![0; labels.len()], vec![0; labels.len()]),
-    };
-    let rows = |vals: &Vec<i64>| -> Vec<(String, String, Option<&'static str>)> {
-        labels.iter().zip(vals.iter()).map(|(l, v)| (l.to_string(), v.to_string(), None)).collect()
-    };
-    ui.horizontal_top(|ui| {
-        ui.spacing_mut().item_spacing.x = 4.0;
-        let third = (ui.available_width() - 8.0) / 3.0;
-        let specs = [
-            (gain_header, rows(&net), 3.0, "Header"),
-            (realized_header, rows(&realized), 5.0, "Secondary"),
-            (total_header, rows(&total), 5.0, "Primary"),
-        ];
-        for (header, rows, vw, prefix) in specs {
-            ui.allocate_ui_with_layout(Vec2::new(third, 0.0), egui::Layout::top_down(egui::Align::Min), |ui| {
-                ui.set_width(third);
-                stat_column(ui, theme, &StatColumnSpec { header, rows, label_width: None, val_width: Some(vw * 8.0), style_prefix: prefix, font: theme.body() });
-            });
-        }
-    });
-}
-
-/// `InventoryViewer`: money line + 20 numbered item slots in two columns.
-/// Slots are numbered from 1, matching the bag-reorder event text.
-pub fn inventory_viewer(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory>) {
-    let max_render = 20usize;
-    let split = max_render / 2;
-    let header_bg = theme.tinted_bg("Header", 0.25);
-    let money = inventory.map(|i| i.cur_money.to_string()).unwrap_or_else(|| "0".to_string());
-    let font = theme.body();
-    ui.spacing_mut().item_spacing = Vec2::new(2.0, 2.0);
-    {
-        let text = format!("Current Money: {}", money);
-        let galley = ui.fonts_mut(|f| f.layout_no_wrap(text, font.clone(), Color32::WHITE));
-        let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width().max(galley.size().x + 8.0), galley.size().y + 4.0), Sense::hover());
-        ui.painter().rect_filled(rect, CornerRadius::same(2), header_bg);
-        ui.painter().galley(Pos2::new(rect.min.x + 4.0, rect.center().y - galley.size().y / 2.0), galley, theme.header);
-    }
-    let items: Vec<String> = match inventory {
-        Some(inv) => {
-            let too_many = inv.cur_items.len() > max_render;
-            let mut out = Vec::new();
-            for idx in 0..max_render {
-                if idx < inv.cur_items.len() {
-                    if too_many && idx == max_render - 1 {
-                        out.push(format!("# {:0>2}+: More items...", idx + 1));
-                    } else {
-                        let it = &inv.cur_items[idx];
-                        out.push(format!("# {:0>2}: {}x {}", idx + 1, it.num, it.base_item.name));
-                    }
-                } else {
-                    out.push(format!("# {:0>2}:", idx + 1));
+    let n = moves.iter().filter(|m| !m.is_empty()).count();
+    let can_click = last.is_some();
+    let mut clicked_slot: Option<i64> = None;
+    widgets::card(ui, theme, None, |ui| {
+        ui.set_min_height(min_inner_h);
+        ui.spacing_mut().item_spacing.y = 0.0;
+        widgets::card_title(ui, theme, "Moves", Some(&format!("{} of 4", n)));
+        ui.add_space(TITLE_GAP);
+        let divider = theme.row_divider();
+        for (i, m) in moves.iter().enumerate() {
+            let r = widgets::table_row(ui, MOVE_ROW_H, Some(divider));
+            if can_click {
+                let resp = ui.interact(r, ui.id().with(("move_row", i)), Sense::click());
+                if resp.clicked() {
+                    clicked_slot = Some(i as i64);
                 }
+                resp.on_hover_cursor(egui::CursorIcon::PointingHand);
             }
-            out
+            let slot = Rect::from_min_max(r.min, Pos2::new(r.min.x + 14.0, r.max.y));
+            widgets::col_text(ui, slot, &(i + 1).to_string(), theme.caption_font(), theme.secondary, Align::Min);
+            let cell = Rect::from_min_max(Pos2::new(r.min.x + 24.0, r.min.y), r.max);
+            if m.is_empty() {
+                widgets::col_text(ui, cell, "—", theme.body(), theme.secondary, Align::Min);
+            } else {
+                let shown = widgets::elide(ui, m, &theme.body_bold(), cell.width());
+                widgets::col_text(ui, cell, &shown, theme.body_bold(), theme.text_strong(), Align::Min);
+            }
         }
-        None => (0..max_render).map(|i| format!("# {:0>2}:", i + 1)).collect(),
-    };
-    ui.horizontal_top(|ui| {
-        ui.spacing_mut().item_spacing.x = 8.0;
-        for col in 0..2 {
-            ui.vertical(|ui| {
-                ui.set_min_width(160.0);
-                for row in 0..split {
-                    let idx = col * split + row;
-                    ui.label(egui::RichText::new(&items[idx]).font(font.clone()).color(theme.secondary));
-                }
-            });
+    });
+    clicked_slot
+}
+
+// ---------------------------------------------------------------------------
+// Bag card
+// ---------------------------------------------------------------------------
+
+/// The rows the bag card draws: `(slot label, quantity, name)`; the overflow
+/// row has no quantity.
+fn bag_rows(inv: &Inventory) -> Vec<(String, Option<i64>, String)> {
+    let n = inv.cur_items.len();
+    let too_many = n > MAX_BAG_ROWS;
+    let mut out = Vec::new();
+    for (idx, it) in inv.cur_items.iter().enumerate().take(MAX_BAG_ROWS) {
+        if too_many && idx == MAX_BAG_ROWS - 1 {
+            out.push((format!("{:0>2}+", idx + 1), None, "More items…".to_string()));
+        } else {
+            out.push((format!("{:0>2}", idx + 1), Some(it.num), it.base_item.name.clone()));
+        }
+    }
+    out
+}
+
+fn bag_inner_height(items: usize) -> f32 {
+    let body = if items == 0 { EMPTY_BAG_H } else { items.min(MAX_BAG_ROWS) as f32 * BAG_ROW_H };
+    CARD_TITLE_H + TITLE_GAP + MONEY_ROW_H + body
+}
+
+pub fn bag_card(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory>, min_inner_h: f32) {
+    let rows = inventory.map(bag_rows).unwrap_or_default();
+    let n_items = inventory.map(|i| i.cur_items.len()).unwrap_or(0).min(MAX_BAG_ROWS);
+    let money = inventory.map(|i| i.cur_money).unwrap_or(0);
+    widgets::card(ui, theme, None, |ui| {
+        ui.set_min_height(min_inner_h);
+        ui.spacing_mut().item_spacing.y = 0.0;
+        widgets::card_title(ui, theme, "Bag", Some(&format!("{} of {} slots", n_items, MAX_BAG_ROWS)));
+        ui.add_space(TITLE_GAP);
+        let divider = theme.row_divider();
+        let r = widgets::table_row(ui, MONEY_ROW_H, Some(divider));
+        widgets::col_text(ui, r, "Money", theme.body(), theme.secondary, Align::Min);
+        widgets::col_text(ui, r, &format!("${}", fmt_thousands(money)), theme.font_bold(13.5), theme.text_strong(), Align::Max);
+        if rows.is_empty() {
+            // centred empty state filling the rest of the card
+            let h = (min_inner_h - CARD_TITLE_H - TITLE_GAP - MONEY_ROW_H).max(EMPTY_BAG_H);
+            let r = widgets::table_row(ui, h, Some(divider));
+            let text = "Bag is empty before this event";
+            let tw = row_h(ui, &theme.body());
+            let block_h = 26.0 + 6.0 + tw;
+            let top = r.center().y - block_h / 2.0;
+            let icon = Rect::from_min_size(Pos2::new(r.center().x - 13.0, top), Vec2::splat(26.0));
+            widgets::paint_bag_glyph(ui, icon, theme.icon_stroke());
+            let cell = Rect::from_min_max(Pos2::new(r.min.x, top + 26.0 + 6.0), Pos2::new(r.max.x, top + block_h));
+            widgets::col_text(ui, cell, text, theme.body(), theme.secondary, Align::Center);
+            return;
+        }
+        for (slot, qty, name) in &rows {
+            let r = widgets::table_row(ui, BAG_ROW_H, Some(divider));
+            let slot_cell = Rect::from_min_max(r.min, Pos2::new(r.min.x + 18.0, r.max.y));
+            widgets::col_text(ui, slot_cell, slot, theme.caption_font(), theme.secondary, Align::Min);
+            let qty_cell = Rect::from_min_max(Pos2::new(r.min.x + 18.0 + 10.0, r.min.y), Pos2::new(r.min.x + 18.0 + 10.0 + 26.0, r.max.y));
+            if let Some(q) = qty {
+                widgets::col_text(ui, qty_cell, &format!("{}×", q), theme.body(), theme.secondary, Align::Max);
+            }
+            let name_cell = Rect::from_min_max(Pos2::new(qty_cell.max.x + 10.0, r.min.y), r.max);
+            let shown = widgets::elide(ui, name, &theme.body(), name_cell.width());
+            let color = if qty.is_some() { theme.contrast } else { theme.secondary };
+            widgets::col_text(ui, name_cell, &shown, theme.body(), color, Align::Min);
         }
     });
 }
 
-/// `StateViewer.set_state`: the three rounded sections (Pokémon + stat EXP on
-/// the left in a 3:2 split with the inventory on the right).
-pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Option<&RouteState>, last_pkmn: &mut Option<(EnemyPkmn, BadgeList)>) {
-    let section_bg = theme.section_bg();
-    let margin = egui::Margin { left: 8, right: 8, top: 6, bottom: 6 };
-    ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-    // Python keeps the last mon shown when the state is None
+// ---------------------------------------------------------------------------
+// The whole read-only block
+// ---------------------------------------------------------------------------
+
+/// Header card + the cards row. Updates `last_pkmn` from `state` when there
+/// is one, and otherwise keeps showing the last mon (with `—` in the EV
+/// columns and an empty bag).
+/// What the Pre-Event State cards were clicked on this frame.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StateViewerClicks {
+    /// a move slot (0-3) of the Moves card
+    pub move_slot: Option<i64>,
+    /// the "EVs real / total" column of the Stats card
+    pub evs: bool,
+}
+
+pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Option<&RouteState>, last_pkmn: &mut Option<LastPkmn>, assets: &mut Assets, before: &BeforeInfo) -> StateViewerClicks {
     if let Some(s) = state {
-        *last_pkmn = Some((s.solo_pkmn.get_pkmn_obj(&s.badges, None), s.badges.clone()));
+        *last_pkmn = Some(LastPkmn {
+            pkmn: s.solo_pkmn.get_pkmn_obj(&s.badges, None),
+            badges: s.badges.clone(),
+            cur_xp: s.solo_pkmn.cur_xp,
+            xp_to_next_level: s.solo_pkmn.xp_to_next_level,
+            percent_xp_to_next_level: s.solo_pkmn.percent_xp_to_next_level,
+        });
     }
-    ui.horizontal_top(|ui| {
-        let total = ui.available_width();
-        let left_w = ((total - 6.0) * 3.0 / 5.0).max(200.0);
-        let right_w = (total - 6.0 - left_w).max(250.0);
-        ui.allocate_ui_with_layout(Vec2::new(left_w, 0.0), egui::Layout::top_down(egui::Align::Min), |ui| {
-            ui.set_width(left_w);
-            widgets::rounded_section(ui, section_bg, 6, margin, |ui| {
-                ui.set_min_height(150.0);
-                match (gen, last_pkmn.as_ref()) {
-                    (Some(g), Some((pkmn, badges))) => {
-                        pkmn_viewer(ui, theme, g, &PkmnViewerArgs { pkmn, badges: Some(badges), speed_style: None, stats_only: false, font_size: Some(12.0) });
-                    }
-                    _ => {
-                        ui.label(egui::RichText::new("").font(theme.body()));
-                    }
-                }
-            });
-            widgets::rounded_section(ui, section_bg, 6, margin, |ui| {
-                ui.set_min_height(150.0);
-                if let Some(g) = gen {
-                    stat_exp_viewer(ui, theme, g, state);
-                }
-                ui.add_space(4.0);
-                ui.label(egui::RichText::new("Stats with * are calculated with a badge boost").font(theme.body()).italics().color(theme.contrast));
-            });
+    let last = last_pkmn.as_ref();
+    identity_header(ui, theme, gen, last, state.is_some(), assets, before);
+    ui.add_space(CARD_GAP);
+
+    let n_stat_rows = if gen.map(|g| g.get_generation()).unwrap_or(3) == 1 { 5 } else { 6 };
+    let n_items = state.map(|s| s.inventory.cur_items.len()).unwrap_or(0);
+    let inventory = state.map(|s| &s.inventory);
+    let content_w = ui.available_width();
+    let two_rows = content_w - 2.0 * CARD_GAP < 360.0 + 180.0 + 240.0;
+    let column = |ui: &mut Ui, w: f32, add: &mut dyn FnMut(&mut Ui)| {
+        ui.allocate_ui_with_layout(Vec2::new(w, 0.0), Layout::top_down(Align::Min), |ui| {
+            ui.set_width(w);
+            add(ui);
         });
-        ui.allocate_ui_with_layout(Vec2::new(right_w, 0.0), egui::Layout::top_down(egui::Align::Min), |ui| {
-            ui.set_width(right_w);
-            widgets::rounded_section(ui, section_bg, 6, margin, |ui| {
-                ui.set_min_height(150.0);
-                inventory_viewer(ui, theme, state.map(|s| &s.inventory));
-            });
+    };
+    let mut clicks = StateViewerClicks::default();
+    if two_rows {
+        let avail = content_w - CARD_GAP;
+        let stats_w = (avail * 0.65).max(360.0);
+        let moves_w = (avail - stats_w).max(180.0);
+        let h = stats_inner_height(n_stat_rows).max(moves_inner_height());
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = CARD_GAP;
+            column(ui, stats_w, &mut |ui| clicks.evs = stats_card(ui, theme, gen, last, state, h));
+            column(ui, moves_w, &mut |ui| clicks.move_slot = moves_card(ui, theme, last, h));
         });
-    });
+        ui.add_space(CARD_GAP);
+        bag_card(ui, theme, inventory, bag_inner_height(n_items));
+    } else {
+        let avail = content_w - 2.0 * CARD_GAP;
+        let stats_w = (avail * 0.443).max(360.0);
+        let moves_w = (avail * 0.237).max(180.0);
+        let bag_w = (avail - stats_w - moves_w).max(240.0);
+        let h = stats_inner_height(n_stat_rows).max(moves_inner_height()).max(bag_inner_height(n_items));
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = CARD_GAP;
+            column(ui, stats_w, &mut |ui| clicks.evs = stats_card(ui, theme, gen, last, state, h));
+            column(ui, moves_w, &mut |ui| clicks.move_slot = moves_card(ui, theme, last, h));
+            column(ui, bag_w, &mut |ui| bag_card(ui, theme, inventory, h));
+        });
+    }
+    clicks
 }

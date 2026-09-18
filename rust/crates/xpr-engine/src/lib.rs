@@ -10,7 +10,7 @@ pub mod undo;
 pub mod view;
 
 pub use events::{
-    swaps_between, BagReorderEventDefinition, BagSwap, EvolutionEventDefinition, EventDefinition,
+    swaps_between, BagReorderEventDefinition, BagSwap, EvOverrideEventDefinition, EvolutionEventDefinition, EventDefinition,
     HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelUpKey, LevelVal,
     LocationEventDefinition, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition,
     WildPkmnEventDefinition,

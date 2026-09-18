@@ -738,7 +738,7 @@ impl RouteList {
             // shifted by the horizontal scroll offset so the columns line up.
             let (header_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), HEADER_HEIGHT), Sense::hover());
             let avail_h = ui.available_height();
-            let scroll = egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h).show(ui, |ui| {
+            let scroll = widgets::show_scroll(ui, egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h), |ui| {
                 ui.set_min_width(total_w);
                 // ---- body ----
                 let n = self.rows.len();

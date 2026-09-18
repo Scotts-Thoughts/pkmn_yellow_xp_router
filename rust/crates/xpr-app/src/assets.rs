@@ -140,7 +140,7 @@ mod tests {
         for version in xpr_core::consts::VERSION_LIST {
             assert!(embedded::BOX_ART.iter().any(|(v, _)| *v == version), "no box art for {}", version);
         }
-        for icon in ["trainer.png", "item.png", "misc.png", "moves.png", "wild.png", "filter icons/TASK_RARE_CANDY.png", "filter icons/ERROR_SEARCH.png", "filter icons/TASK_REORDER_BAG.png"] {
+        for icon in ["trainer.png", "item.png", "misc.png", "moves.png", "wild.png", "filter icons/TASK_RARE_CANDY.png", "filter icons/ERROR_SEARCH.png", "filter icons/TASK_REORDER_BAG.png", "filter icons/TASK_EV_OVERRIDE.png"] {
             assert!(Assets::icon_bytes(icon).is_some(), "missing {}", icon);
         }
         assert!(load_png(embedded::PKMN_ICONS[0].1, false).is_some());

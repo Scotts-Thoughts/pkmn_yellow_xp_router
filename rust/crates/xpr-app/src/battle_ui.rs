@@ -324,7 +324,7 @@ impl BattleSummaryUi {
     fn controls_bar(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, bc: &mut BattleController, ctrl: &mut MainController, assets: &mut Assets, _actions: &mut BattleUiActions) {
         let can_candies = bc.can_support_prefight_candies();
         // Horizontal scroll so a narrow window can't widen the whole panel.
-        egui::ScrollArea::horizontal().id_salt("battle_controls_scroll").auto_shrink([false, true]).show(ui, |ui| {
+        widgets::show_scroll(ui, egui::ScrollArea::horizontal().id_salt("battle_controls_scroll").auto_shrink([false, true]), |ui| {
         egui::Frame::new().inner_margin(egui::Margin { left: 6, right: 6, top: 2, bottom: 2 }).show(ui, |ui| {
             // Fixed-height row so every group is centered on the same
             // baseline (see `widgets::stepper_group`).

@@ -45,9 +45,13 @@ fn state(s: Option<&std::sync::Arc<RouteState>>) -> Value {
 }
 
 fn filter_types() -> Vec<String> {
-    // the Python reference has no bag-reorder event type, so its records
-    // carry no such filter key
-    let mut v: Vec<String> = consts::ROUTE_EVENT_TYPES.iter().filter(|s| **s != consts::TASK_REORDER_BAG).map(|s| s.to_string()).collect();
+    // the Python reference has no bag-reorder or EV-override event type, so
+    // its records carry no such filter keys
+    let mut v: Vec<String> = consts::ROUTE_EVENT_TYPES
+        .iter()
+        .filter(|s| **s != consts::TASK_REORDER_BAG && **s != consts::TASK_EV_OVERRIDE)
+        .map(|s| s.to_string())
+        .collect();
     v.extend(FILTER_TYPES_EXTRA.iter().map(|s| s.to_string()));
     v
 }

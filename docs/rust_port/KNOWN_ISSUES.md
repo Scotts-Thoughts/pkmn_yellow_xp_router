@@ -195,6 +195,36 @@ the Sell. Things to know:
   `Silver Powder` where the item DB has `Silverpowder`; stealing it reports
   an unknown item.
 
+### EV Override (all gens, Rust only; added 2026-09-18)
+
+A testing aid with no in-game equivalent: an `"EV Override"` event pins
+the solo mon's EVs (stat exp in gens 1-2) to fixed values from that point
+of the route on, so a damage range can be checked against a chosen spread
+without re-routing the yields that would produce it. Stored as an object
+keyed like a serialized stat block (`hp`, `attack`, `defense`, `speed`,
+`special_attack`, `special_defense`; a missing key is 0). Things to know:
+
+- The override replaces both the realized and the unrealized stat XP, so
+  the stats reflect it immediately (like a vitamin, unlike a battle yield
+  in gen 1-2, which waits for the next level-up). Later yields stack on top
+  of the override as usual.
+- Gens 1-2 have one Special stat exp (the engine reads `special_attack`
+  for both special stats), so the editor and the dialog show a single
+  "Special" field there and store its value in both fields; the label
+  reads "Stat Exp Override: ... Spc ...".
+- Values the game cannot hold are applied capped (65535 per stat in gens
+  1-2; 255 per stat and 510 total in gens 3-5, filled in HP, Atk, Def, Spe,
+  SpA, SpD order like the rest of the engine) and flagged as a **warning**
+  on the event, not an error.
+- A new override created from the inline creator starts at the mon's
+  values at the insertion point; the numbers are edited in the details
+  panel ("Use current" resets them). Clicking the "EVs real / total"
+  column of the Pre-Event State stats card opens a dialog prefilled with
+  those values that inserts an override right before the selected event.
+- The Python app has no such event type, so it opens one as an empty notes
+  event and drops it on re-save; the golden records carry no filter key
+  for it.
+
 ## UI divergences (egui vs. Qt)
 
 Things that are different by design of the toolkit swap, or that the Qt code
@@ -269,5 +299,5 @@ could not do either:
 | `XPR_SMOKE_SCREENSHOT=<file.png>` | Capture the window ~4 s after start and exit (unattended smoke run) |
 | `XPR_SMOKE_DELAY_MS=<ms>` | How long the smoke run waits before the capture (default 4000); raise it to drive the window by hand or with injected input first |
 | `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | With a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of honouring the auto-load preference (`rust/windows_build.py --smoke` uses the latter to prove the packaged exe runs on its own) |
-| `XPR_SMOKE_ACTION=battle\|battle_last\|last\|newroute\|summary\|inline\|candy\|record\|quickstart` | Before the smoke screenshot: open the battle tab of the first / last trainer, select the last event of the route (its editor shows in the details panel), open the new-route page, the docked run summary, or the inline creator; `candy` opens the biggest trainer fight (or the one named by `XPR_SMOKE_FIGHT=<substring>`) and clicks "+" candy six times, 700 ms apart, before an 8 s screenshot; `record` starts recording against `XPR_GAMEHOOK_URL`, stops after `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL` (a JSON endpoint) reports `"done": true`, saves the route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshots and exits; `quickstart` presses the landing page's "Start Recording" (no route loaded) and then behaves like `record` |
+| `XPR_SMOKE_ACTION=battle\|battle_last\|last\|prestate\|newroute\|summary\|inline\|candy\|record\|quickstart` | Before the smoke screenshot: open the battle tab of the first / last trainer, select the last event of the route (its editor shows in the details panel), open the new-route page, the docked run summary, or the inline creator; `candy` opens the biggest trainer fight (or the one named by `XPR_SMOKE_FIGHT=<substring>`) and clicks "+" candy six times, 700 ms apart, before an 8 s screenshot; `record` starts recording against `XPR_GAMEHOOK_URL`, stops after `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL` (a JSON endpoint) reports `"done": true`, saves the route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshots and exits; `quickstart` presses the landing page's "Start Recording" (no route loaded) and then behaves like `record`; `prestate` selects the group whose name contains `XPR_SMOKE_EVENT` (or the folder named by `XPR_SMOKE_EVENT=folder:<substring>`; default: the first trainer fight) and forces the Pre-Event State tab, with `XPR_SMOKE_NOTES=open\|closed` setting the notes footer and `XPR_SMOKE_SPLIT=<0..1>` the splitter fraction for the shot (neither is saved) |
 | `XPR_FRAME_LOG=1` | Log every frame slower than 1 ms with the route-list and event-details draw times, and every route-list rebuild |

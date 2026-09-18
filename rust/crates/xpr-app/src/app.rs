@@ -23,7 +23,7 @@ use crate::assets::Assets;
 use crate::battle_ui::ScreenshotMode;
 use crate::controller::MainController;
 use crate::dialogs::{
-    AppConfigDialog, AssignMoveDialog, BattleConfigDialog, ColorConfigDialog, CustomDvsDialog, CustomGenDialog, Dialog,
+    AppConfigDialog, AssignMoveDialog, BattleConfigDialog, ColorConfigDialog, CustomDvsDialog, CustomGenDialog, Dialog, EvOverrideDialog,
     DialogCtx, DialogOutcome, FinalTrainersDialog, HighlightColorDialog, LoadRouteDialog, MatchupExportDialog, MessageBox,
     MsgButtons, MsgChoice, MsgTag, NewFolderDialog, ShortcutsDialog, TransferDialog,
 };
@@ -119,6 +119,9 @@ pub struct XprApp {
     frame_parts: (Duration, Duration),
     /// `XPR_SMOKE_ACTION=candy`: the candy clicks still to send, and when.
     smoke_candy: Option<(u32, Instant)>,
+    /// `XPR_SMOKE_ACTION=prestate`: when to force the Pre-Event State tab
+    /// back on after the selection's auto-switch.
+    smoke_prestate: Option<Instant>,
     /// `XPR_SMOKE_ACTION=record`: (save-as name, when to stop recording at the latest)
     smoke_record: Option<(Option<String>, Instant)>,
     /// set by the `XPR_SMOKE_STOP_URL` poller once the mock reports the scenario is done
@@ -208,6 +211,7 @@ impl XprApp {
             frame_log: std::env::var_os("XPR_FRAME_LOG").is_some(),
             frame_parts: (Duration::ZERO, Duration::ZERO),
             smoke_candy: None,
+            smoke_prestate: None,
             smoke_record: None,
             smoke_stop_flag: None,
         }
@@ -387,7 +391,28 @@ impl XprApp {
         }
         if let Some(slot) = actions.battle.assign_move_slot {
             if let Some(gen) = self.ctrl.gen() {
-                self.dialog = Some(Dialog::AssignMove(AssignMoveDialog::new(&gen, slot)));
+                self.dialog = Some(Dialog::AssignMove(AssignMoveDialog::new(&gen, slot, false)));
+            }
+        }
+        if let Some(slot) = actions.pre_state_assign_move_slot {
+            let has_event = matches!(
+                self.ctrl.get_single_selected_event_id(true).map(|id| self.ctrl.router.obj_kind(id)),
+                Some(Some(ObjKind::Group)) | Some(Some(ObjKind::Item))
+            );
+            if has_event {
+                if let Some(gen) = self.ctrl.gen() {
+                    self.dialog = Some(Dialog::AssignMove(AssignMoveDialog::new(&gen, slot, true)));
+                }
+            }
+        }
+        if actions.pre_state_override_evs {
+            if let Some(id) = self.ctrl.get_single_selected_event_id(true) {
+                let is_event = matches!(self.ctrl.router.obj_kind(id), Some(ObjKind::Group) | Some(ObjKind::Item));
+                if let (true, Some(gen), Some(st)) = (is_event, self.ctrl.gen(), self.ctrl.router.init_state_of(id)) {
+                    let sx = st.solo_pkmn.unrealized_stat_xp;
+                    let current = [sx.hp, sx.attack, sx.defense, sx.special_attack, sx.special_defense, sx.speed];
+                    self.dialog = Some(Dialog::EvOverride(EvOverrideDialog::new(&gen, current)));
+                }
             }
         }
         if let Some(idx) = actions.battle.export_matchup {
@@ -567,7 +592,7 @@ impl XprApp {
             }
         }
         // filters (application-wide; the handlers check the text-field flag)
-        let filters: [(&str, &str); 17] = [
+        let filters: [(&str, &str); 18] = [
             ("filter_trainer", consts::TASK_TRAINER_BATTLE),
             ("filter_rare_candy", consts::TASK_RARE_CANDY),
             ("filter_tm_hm", consts::TASK_LEARN_MOVE_TM),
@@ -584,6 +609,7 @@ impl XprApp {
             ("filter_heal", consts::TASK_HEAL),
             ("filter_blackout", consts::TASK_BLACKOUT),
             ("filter_evolution", consts::TASK_EVOLUTION),
+            ("filter_ev_override", consts::TASK_EV_OVERRIDE),
             ("filter_notes", consts::TASK_NOTES_ONLY),
         ];
         for (aid, et) in filters {
@@ -1276,8 +1302,15 @@ impl XprApp {
             }
             DialogOutcome::RefreshBattle => self.details.refresh_after_config_change(&self.cfg, &self.ctrl),
             DialogOutcome::ApplyShortcuts => self.shortcuts = ShortcutMap::from_config(&self.cfg),
-            DialogOutcome::AssignMove { slot, mv } => {
-                self.details.bc.assign_player_move_via_tutor(&self.cfg, &mut self.ctrl, slot, &mv);
+            DialogOutcome::AssignMove { slot, mv, pre_state } => {
+                if pre_state {
+                    self.ctrl.assign_move_via_tutor_before_selected(slot, &mv);
+                } else {
+                    self.details.bc.assign_player_move_via_tutor(&self.cfg, &mut self.ctrl, slot, &mv);
+                }
+            }
+            DialogOutcome::EvOverride(values) => {
+                self.ctrl.override_evs_before_selected(values);
             }
             DialogOutcome::MatchupExport { idx, mode } => self.request_shot(ShotKind::Matchup { idx, mode }),
             DialogOutcome::RestartForUpdate => {
@@ -1853,6 +1886,27 @@ impl XprApp {
                             self.ctrl.select_new_events(vec![g]);
                         }
                     }
+                    Ok("prestate") => {
+                        // select the group named by `XPR_SMOKE_EVENT` (a substring; else
+                        // the first trainer fight) and show its Pre-Event State tab
+                        let wanted = std::env::var("XPR_SMOKE_EVENT").ok();
+                        let pick = match wanted.as_deref().and_then(|w| w.strip_prefix("folder:")) {
+                            // `folder:<substring>` selects a folder instead
+                            Some(fname) => self.ctrl.router.all_groups().into_iter().filter_map(|g| self.ctrl.router.parent_of(g)).find(|f| {
+                                self.ctrl.router.folder(*f).map(|x| x.name.contains(fname)).unwrap_or(false)
+                            }),
+                            None => self.ctrl.router.all_groups().into_iter().find(|g| {
+                                self.ctrl.router.group(*g).map(|x| match &wanted {
+                                    Some(w) => x.name.contains(w.as_str()),
+                                    None => x.event_definition.trainer_def.is_some(),
+                                }).unwrap_or(false)
+                            }),
+                        };
+                        if let Some(g) = pick {
+                            self.ctrl.select_new_events(vec![g]);
+                            self.smoke_prestate = Some(Instant::now() + Duration::from_millis(500));
+                        }
+                    }
                     Ok("candy") => {
                         // select the trainer fight named by `XPR_SMOKE_FIGHT` (else the
                         // one with the most mons), then click "+" candy a few times
@@ -1915,6 +1969,25 @@ impl XprApp {
                     }
                 }
                 ctx.request_repaint_after(Duration::from_millis(50));
+            }
+            if let Some(when) = self.smoke_prestate {
+                if Instant::now() >= when {
+                    self.smoke_prestate = None;
+                    let mut actions = DetailsActions::default();
+                    self.details.set_tab(&self.cfg, crate::event_details::PRE_STATE_TAB, &mut actions);
+                    self.apply_details_actions(ctx, actions);
+                    // `XPR_SMOKE_SPLIT=<0..1>`: the splitter fraction for the shot (not saved)
+                    if let Some(f) = std::env::var("XPR_SMOKE_SPLIT").ok().and_then(|v| v.parse::<f64>().ok()) {
+                        self.pre_state_fraction = Some(f);
+                    }
+                    // `XPR_SMOKE_NOTES=open|closed`: the notes footer state for the shot
+                    match std::env::var("XPR_SMOKE_NOTES").as_deref() {
+                        Ok("open") => self.details.notes.set_collapsed(false),
+                        Ok("closed") => self.details.notes.set_collapsed(true),
+                        _ => {}
+                    }
+                }
+                ctx.request_repaint_after(Duration::from_millis(10));
             }
             if let Some((left, when)) = self.smoke_candy {
                 if Instant::now() >= when {

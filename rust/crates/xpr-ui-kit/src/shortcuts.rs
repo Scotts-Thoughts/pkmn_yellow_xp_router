@@ -176,6 +176,14 @@ pub fn text_field_swallows(sc: &KeyboardShortcut) -> bool {
     if sc.modifiers.command || sc.modifiers.ctrl || sc.modifiers.alt {
         // the editing chords a line edit accepts itself (copy/paste/undo/select-all/word navigation)
         if (sc.modifiers.command || sc.modifiers.ctrl) && !sc.modifiers.alt {
+            // Select-all/copy/paste/cut/delete have no Shift-modified meaning in a plain
+            // line edit, so a Shift chord (e.g. "Ctrl+Shift+A") is a distinct app shortcut,
+            // not the text field's own accelerator, and must not be swallowed here.
+            // Word/line navigation and undo do have Shift variants (selection extension,
+            // redo), so those stay swallowed either way.
+            if sc.modifiers.shift {
+                return matches!(sc.logical_key, Key::Z | Key::ArrowLeft | Key::ArrowRight | Key::Home | Key::End);
+            }
             return matches!(
                 sc.logical_key,
                 Key::A | Key::C | Key::V | Key::X | Key::Z | Key::Y | Key::ArrowLeft | Key::ArrowRight | Key::Home | Key::End | Key::Backspace | Key::Delete
@@ -208,5 +216,21 @@ mod tests {
         assert!(parse_key_sequence("").is_none());
         assert_eq!(format_key_sequence(&parse_key_sequence("Ctrl+Shift+Alt+F").unwrap()), "Ctrl+Shift+Alt+F");
         assert_eq!(format_key_sequence(&parse_key_sequence("Ctrl+`").unwrap()), "Ctrl+`");
+    }
+
+    #[test]
+    fn shift_chords_are_not_mistaken_for_text_field_accelerators() {
+        // export_notes ("Ctrl+Shift+W") and app_config ("Ctrl+Shift+A") must never be
+        // swallowed just because they share a letter with Ctrl+W / Ctrl+A.
+        assert!(!text_field_swallows(&parse_key_sequence("Ctrl+Shift+W").unwrap()));
+        // close_route ("Alt+W") is an Alt chord and never a text-field accelerator
+        assert!(!text_field_swallows(&parse_key_sequence("Alt+W").unwrap()));
+        assert!(!text_field_swallows(&parse_key_sequence("Ctrl+Shift+A").unwrap()));
+        // the plain editing chords they collide with must still be swallowed
+        assert!(text_field_swallows(&parse_key_sequence("Ctrl+C").unwrap()));
+        assert!(text_field_swallows(&parse_key_sequence("Ctrl+A").unwrap()));
+        // selection-extension / redo chords keep their Shift-modified meaning
+        assert!(text_field_swallows(&parse_key_sequence("Ctrl+Shift+Left").unwrap()));
+        assert!(text_field_swallows(&parse_key_sequence("Ctrl+Shift+Z").unwrap()));
     }
 }
