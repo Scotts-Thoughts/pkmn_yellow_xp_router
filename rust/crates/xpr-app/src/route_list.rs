@@ -20,6 +20,8 @@ use crate::controller::MainController;
 use crate::inline_creator::{key_for_event_type, InlineEventCreator, INLINE_ROW_HEIGHT};
 
 pub const ROW_HEIGHT: f32 = 20.0;
+/// Height of the pinned column-header strip above the rows.
+const HEADER_HEIGHT: f32 = 22.0;
 const INDENT: f32 = 16.0;
 const CHECK_W: f32 = 16.0;
 const BRANCH_W: f32 = 16.0;
@@ -729,34 +731,19 @@ impl RouteList {
         let outer = egui::Frame::new().fill(theme.bg_lighter).stroke(Stroke::new(1.0_f32, theme.border));
         outer.show(ui, |ui| {
             ui.set_min_size(Vec2::new(ui.available_width(), ui.available_height()));
-            let avail_h = ui.available_height();
             ui.spacing_mut().item_spacing = Vec2::ZERO;
-            egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h).show(ui, |ui| {
+            // ---- header ----
+            // The header lives outside the scroll area so it stays put while
+            // the rows scroll under it; it is painted after the body (below)
+            // shifted by the horizontal scroll offset so the columns line up.
+            let (header_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), HEADER_HEIGHT), Sense::hover());
+            let avail_h = ui.available_height();
+            let scroll = egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h).show(ui, |ui| {
                 ui.set_min_width(total_w);
-                // ---- header ----
-                let (hrect, _) = ui.allocate_exact_size(Vec2::new(total_w, 22.0), Sense::hover());
-                let mut x = hrect.min.x;
-                for (i, (title, _)) in COLUMN_DEFS.iter().enumerate() {
-                    let w = widths[i];
-                    let r = Rect::from_min_size(Pos2::new(x, hrect.min.y), Vec2::new(w, 22.0));
-                    ui.painter().rect(r, CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
-                    ui.painter().text(Pos2::new(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *title, bold.clone(), theme.text);
-                    // resizable name & levels-up columns
-                    if i <= 1 {
-                        let handle = Rect::from_min_size(Pos2::new(r.max.x - 3.0, r.min.y), Vec2::new(6.0, 22.0));
-                        let resp = ui.interact(handle, ui.id().with(("col_resize", i)), Sense::drag());
-                        if resp.hovered() || resp.dragged() {
-                            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-                        }
-                        if resp.dragged() {
-                            self.col_widths[i] = (self.col_widths[i] + resp.drag_delta().x).max(40.0);
-                        }
-                    }
-                    x += w;
-                }
                 // ---- body ----
                 let n = self.rows.len();
                 let body_top = ui.cursor().min.y;
+                let left_x = ui.cursor().min.x;
                 let mut y = body_top;
                 let clip = ui.clip_rect();
                 let pointer = ui.input(|i| i.pointer.interact_pos());
@@ -782,12 +769,12 @@ impl RouteList {
                     for r in &self.rows[..row_pos] {
                         ry += if r.kind == RowKind::InlineSpacer { inline_h } else { ROW_HEIGHT };
                     }
-                    Some(Rect::from_min_size(Pos2::new(hrect.min.x + 2.0, ry + (ROW_HEIGHT - 16.0) / 2.0), Vec2::splat(16.0)))
+                    Some(Rect::from_min_size(Pos2::new(left_x + 2.0, ry + (ROW_HEIGHT - 16.0) / 2.0), Vec2::splat(16.0)))
                 });
                 for idx in 0..n {
                     let row = self.rows[idx].clone();
                     let h = if row.kind == RowKind::InlineSpacer { inline_h } else { ROW_HEIGHT };
-                    let rect = Rect::from_min_size(Pos2::new(hrect.min.x, y), Vec2::new(total_w, h));
+                    let rect = Rect::from_min_size(Pos2::new(left_x, y), Vec2::new(total_w, h));
                     y += h;
                     // scroll targets
                     match self.scroll_target {
@@ -803,7 +790,7 @@ impl RouteList {
                     }
                     let _ = ui.allocate_rect(rect, Sense::hover());
                     if row.kind == RowKind::InlineSpacer {
-                        let indent = hrect.min.x + 2.0 + row.depth as f32 * INDENT;
+                        let indent = left_x + 2.0 + row.depth as f32 * INDENT;
                         let strip = Rect::from_min_max(Pos2::new(indent, rect.min.y), Pos2::new(rect.max.x.max(indent + 200.0), rect.max.y));
                         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(strip).layout(egui::Layout::left_to_right(egui::Align::Center)));
                         if let Some(inline) = self.inline.as_mut() {
@@ -1008,7 +995,7 @@ impl RouteList {
                     for r in &self.rows[..row_pos] {
                         ry += if r.kind == RowKind::InlineSpacer { inline_h } else { ROW_HEIGHT };
                     }
-                    let prect = Rect::from_min_size(Pos2::new(hrect.min.x + 2.0, ry + (ROW_HEIGHT - 16.0) / 2.0), Vec2::splat(16.0));
+                    let prect = Rect::from_min_size(Pos2::new(left_x + 2.0, ry + (ROW_HEIGHT - 16.0) / 2.0), Vec2::splat(16.0));
                     let resp = ui.interact(prect, ui.id().with("plus_btn"), Sense::click());
                     let fill = if resp.hovered() { theme.accent_hover } else { theme.accent };
                     ui.painter().circle_filled(prect.center(), 8.0, fill);
@@ -1123,6 +1110,30 @@ impl RouteList {
                     }
                 }
             });
+            let painter = ui.painter().with_clip_rect(header_rect);
+            let mut x = header_rect.min.x - scroll.state.offset.x;
+            for (i, (title, _)) in COLUMN_DEFS.iter().enumerate() {
+                let w = widths[i];
+                let r = Rect::from_min_size(Pos2::new(x, header_rect.min.y), Vec2::new(w, HEADER_HEIGHT));
+                painter.rect(r, CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
+                painter.text(Pos2::new(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *title, bold.clone(), theme.text);
+                // resizable name & levels-up columns
+                if i <= 1 {
+                    let handle = Rect::from_min_size(Pos2::new(r.max.x - 3.0, r.min.y), Vec2::new(6.0, HEADER_HEIGHT)).intersect(header_rect);
+                    let resp = ui.interact(handle, ui.id().with(("col_resize", i)), Sense::drag());
+                    if resp.hovered() || resp.dragged() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                    }
+                    if resp.dragged() {
+                        self.col_widths[i] = (self.col_widths[i] + resp.drag_delta().x).max(40.0);
+                    }
+                }
+                x += w;
+            }
+            // header bg past the last column
+            if x < header_rect.max.x {
+                painter.rect(Rect::from_min_max(Pos2::new(x, header_rect.min.y), header_rect.max), CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
+            }
         });
         // keyboard handling (list focus + no text field)
         if key_input && self.focused {
@@ -1248,7 +1259,7 @@ impl RouteList {
     /// The top-centre of a row (for the quick-add popover anchor).
     fn row_anchor_pos(&self, ui: &Ui, id: NodeId) -> Pos2 {
         let r = ui.min_rect();
-        let mut y = r.min.y + 22.0;
+        let mut y = r.min.y + HEADER_HEIGHT;
         for row in &self.rows {
             if row.id == id {
                 break;
