@@ -521,6 +521,11 @@ pub trait GameRecorder: Send {
     fn active_flag(&self) -> ActiveFlag;
     fn startup(&mut self, store: &PropertyStore);
     fn handle_event(&mut self, store: &PropertyStore, new: &GameHookProperty, prev: &GameHookProperty);
+    /// The client finished applying a `PropertiesChanged` batch (or the hub
+    /// was quiet for a read timeout): every value in `store` is now at least
+    /// as new as the changes `handle_event` just saw, which is not true while
+    /// a batch is still being walked property by property.
+    fn on_idle(&mut self, _store: &PropertyStore) {}
     fn shutdown(&mut self);
 }
 
@@ -617,6 +622,12 @@ impl SessionEvents for Session {
 
     fn on_property_changed(&mut self, store: &PropertyStore, new: &GameHookProperty, old: &GameHookProperty) {
         self.game.handle_event(store, new, old);
+    }
+
+    fn on_idle(&mut self, store: &PropertyStore) {
+        if self.game.is_active() {
+            self.game.on_idle(store);
+        }
     }
 
     fn on_shutdown(&mut self) {

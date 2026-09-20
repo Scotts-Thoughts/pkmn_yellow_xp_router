@@ -415,6 +415,19 @@ struct BattleData {
     delayed_held_item_updater: DelayedUpdate,
     delayed_levelup: DelayedUpdate,
     delayed_initialization: DelayedUpdate,
+    /// The battle flag is up but the batch that raised it may still be
+    /// applying: run `battle_ready` from `on_idle`, once the batch is in.
+    ///
+    /// Emerald fills the enemy party, then sets `BATTLE_TYPE_IS_MASTER` (the
+    /// mapper's `battle.type.is_battle`), then clears `gBattleOutcome`
+    /// (`BattleStartClearSetData`). GameHook's poll usually catches all three
+    /// in one `PropertiesChanged` batch, which the client walks in mapper
+    /// order: the outcome (entering this state) and the flag come *before*
+    /// `battle.trainer.team.*`. Counting the team as the flag arrives reads
+    /// the previous fight's party, so a 4-mon leader after a 1-mon trainer got
+    /// `exp_split` of length 1, every switch failed the length check and the
+    /// event came out with `mon_order = [1]`.
+    init_after_batch: bool,
     loss_detected: bool,
     cached_first_mon_species: String,
     cached_first_mon_level: i64,
@@ -447,6 +460,7 @@ impl Default for BattleData {
             delayed_held_item_updater: DelayedUpdate::new(BATTLE_DELAY),
             delayed_levelup: DelayedUpdate::new(BATTLE_DELAY),
             delayed_initialization: DelayedUpdate::new(BATTLE_DELAY),
+            init_after_batch: false,
             loss_detected: false,
             cached_first_mon_species: String::new(),
             cached_first_mon_level: 0,
@@ -1014,6 +1028,9 @@ impl Gen3Machine {
         if store_i64(store, &self.keys.battle_player_mon_party_pos) == 0 {
             let held = store.value(&self.keys.mon_held_item);
             if held.is_null() {
+                // a berry eaten (or an item knocked off) mid-fight: whatever
+                // the mon holds next can only have come off an enemy
+                self.battle.init_held_item = Value::Null;
                 self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, true)));
             } else if held != self.battle.init_held_item {
                 let stolen = self.battle.init_held_item.is_null();
@@ -1082,6 +1099,7 @@ impl Gen3Machine {
             GameState::Battle => {
                 let money = store_i64(store, &self.keys.player_money);
                 let held_at_start = store.value(&self.keys.mon_held_item);
+                let flag_already_up = store.truthy(&self.keys.battle_flag);
                 let b = &mut self.battle;
                 b.defeated_trainer_mons.clear();
                 b.delayed_move_updater.reset();
@@ -1111,6 +1129,10 @@ impl Gen3Machine {
                 // read as a change
                 b.init_held_item = held_at_start;
                 b.delayed_initialization.begin_waiting(true);
+                // the flag's batch can land before the outcome's (GameHook
+                // reads the two pages at different moments): initialise once
+                // this batch is in rather than waiting out the ticks
+                b.init_after_batch = flag_already_up;
             }
             GameState::InventoryChange => {
                 self.inventory.seconds_delay = BASE_DELAY;
@@ -1423,8 +1445,10 @@ impl Gen3Machine {
                 log::error!("Solo mon gained experience, but we didn't properly cache which enemy mon was defeated... This is normal if the a different pokemon has been pulled into player's slot 1");
             }
         } else if new.path == self.keys.battle_flag {
-            if new.truthy() && !self.battle.battle_started && self.battle.delayed_initialization.trigger(false) {
-                self.battle_ready(store);
+            // not `battle_ready` right here: the enemy party in this same
+            // batch has not been applied yet (see `init_after_batch`)
+            if new.truthy() && !self.battle.battle_started {
+                self.battle.init_after_batch = true;
             }
         } else if new.path == self.keys.battle_first_enemy_hp {
             if new.eq_i64(0) {
@@ -1944,6 +1968,18 @@ impl GameRecorder for Gen3Machine {
             self.on_enter(result, store);
             self.cur_state = result;
             self.controller.set_game_state(result);
+        }
+    }
+
+    fn on_idle(&mut self, store: &PropertyStore) {
+        if self.cur_state != GameState::Battle || !self.battle.init_after_batch {
+            return;
+        }
+        self.battle.init_after_batch = false;
+        // the same once-only gate the flag change used to pass through; the
+        // tick path stays armed if the flag has dropped again meanwhile
+        if !self.battle.battle_started && store.truthy(&self.keys.battle_flag) && self.battle.delayed_initialization.trigger(false) {
+            self.battle_ready(store);
         }
     }
 

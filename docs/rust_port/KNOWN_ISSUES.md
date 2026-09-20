@@ -194,6 +194,42 @@ the Sell. Things to know:
 - Emerald's trainer data spells Bug Maniac Jeffrey (rematch 4)'s held item
   `Silver Powder` where the item DB has `Silverpowder`; stealing it reports
   an unknown item.
+- **A berry eaten mid-fight, then a Thief** (gen 3; fixed 2026-09-20): the
+  held item the steal is compared against now follows the mon's real one,
+  so the steal is recorded on the fight. Before, it was still the item held
+  as the battle began, and the steal came out as a `Hold Item` from the bag
+  ("Cannot sell/use item that you do not have"). The recorder still queues
+  the eaten berry's `Hold Item` (hold nothing) *after* the trainer event
+  (added at battle start), so the engine sees the steal while the berry is
+  still held ("already holding"): move that `Hold Item` ahead of the fight.
+
+### Gen 3 trainer battle start vs. GameHook batches (fixed 2026-09-20)
+
+Emerald (and FireRed) fill `gEnemyParty`, then set `BATTLE_TYPE_IS_MASTER`
+(the mapper's `battle.type.is_battle`, bit 2 of `gBattleTypeFlags`), then
+clear `gBattleOutcome` in `BattleStartClearSetData`. One GameHook poll
+usually catches all three, and the client applies a `PropertiesChanged`
+batch one property at a time in mapper order: `battle.outcome` (#858, enters
+the Battle state) and `battle.type.is_battle` (#861) before
+`battle.trainer.team.*` (#892+). The gen 3 recorder ran `_battle_ready` as
+the flag arrived, so its enemy-party census was the *previous* fight's:
+after a one-mon trainer, a leader got `exp_split` of length 1, every switch
+failed the `real < exp_split.len()` check, and the fight was saved with
+`mon_order = [1]` (the app then shows only the lead; the initial event also
+errs with "list index out of range"). It only came out right when the
+previous battle had at least as many mons, or when the poll split the flag
+from the outcome. The census now runs from the client's idle pass, once the
+batch is in (`GameRecorder::on_idle`, `init_after_batch`); the tick-delayed
+path stays as the fallback. `xpr-recorder/tests/gen3_mon_order.rs` replays
+the same-batch, flag-first and mock-style starts. Gens 4/5 never had the
+immediate path; gens 1/2 take the party from the trainer data.
+
+Routes recorded before the fix carry the truncated `mon_order`; opening such
+a fight in the editor and saving pads it to `[1, -1, ...]` and then
+`[1, 1, ...]`, smearing a `thief_mons` entry onto every slot. Repair: set
+`mon_order` to definition order, drop an all-ones `exp_split`, put
+`thief_mons` back on the mon the log names ("stole X from the enemy mon at
+party position N").
 
 ### EV Override (all gens, Rust only; added 2026-09-18)
 
