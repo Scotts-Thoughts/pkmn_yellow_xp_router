@@ -237,11 +237,16 @@ could not do either:
 - **Item checkbox in the route list.** The Qt `EventItem` toggle raises
   (`set_enabled_status` is missing); Rust makes it a no-op. Folders and
   groups toggle as before.
-- **Window screenshots are opaque** (Qt captured with a transparent
-  background outside the rounded corners; egui's `ViewportCommand::Screenshot`
-  returns the framebuffer). Corners are still rounded the way
-  `_round_container_corners` does it. The file names and the crop rects
-  (full / player / enemy / summary) are the same.
+- **Screenshots are rendered offscreen** (`xpr-app/src/screenshot.rs`): the
+  widget is drawn into a private egui context on a transparent canvas and
+  rasterised in software, like Qt's `widget.render(pixmap)`, so the PNGs have
+  a transparent background between the cards, anti-aliased rounded corners
+  (also on the cut edge of the player / enemy halves), the whole content
+  regardless of the scroll position, and none of the on-screen chrome (menu,
+  tooltips, hover, toolbar). The file names and crop rects (full / player /
+  enemy / matchup / summary) are the same as Qt's. Unlike Qt the export is
+  at the window's pixel scale, so on a 125 % display the PNG is 1.25× the
+  logical size.
 - **Overlays instead of windows.** The quick-add popover, the toast, the
   auto-clearing status label and every dialog are drawn inside the main
   window (egui `Modal` / `Area`). The run summary (undocked) and the setup
@@ -300,4 +305,5 @@ could not do either:
 | `XPR_SMOKE_DELAY_MS=<ms>` | How long the smoke run waits before the capture (default 4000); raise it to drive the window by hand or with injected input first |
 | `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | With a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of honouring the auto-load preference (`rust/windows_build.py --smoke` uses the latter to prove the packaged exe runs on its own) |
 | `XPR_SMOKE_ACTION=battle\|battle_last\|last\|prestate\|newroute\|summary\|inline\|candy\|record\|quickstart` | Before the smoke screenshot: open the battle tab of the first / last trainer, select the last event of the route (its editor shows in the details panel), open the new-route page, the docked run summary, or the inline creator; `candy` opens the biggest trainer fight (or the one named by `XPR_SMOKE_FIGHT=<substring>`) and clicks "+" candy six times, 700 ms apart, before an 8 s screenshot; `record` starts recording against `XPR_GAMEHOOK_URL`, stops after `XPR_SMOKE_RECORD_SECS` (default 30) or ~3 s after `XPR_SMOKE_STOP_URL` (a JSON endpoint) reports `"done": true`, saves the route as `XPR_SMOKE_SAVE_NAME` (if set), then screenshots and exits; `quickstart` presses the landing page's "Start Recording" (no route loaded) and then behaves like `record`; `prestate` selects the group whose name contains `XPR_SMOKE_EVENT` (or the folder named by `XPR_SMOKE_EVENT=folder:<substring>`; default: the first trainer fight) and forces the Pre-Event State tab, with `XPR_SMOKE_NOTES=open\|closed` setting the notes footer and `XPR_SMOKE_SPLIT=<0..1>` the splitter fraction for the shot (neither is saved) |
+| `XPR_SMOKE_EXPORT=<kind>[,<kind>...]` | Right before the smoke capture, run these exports (they land in the configured images dir): `event_list`, `battle_summary`, `player_ranges`, `enemy_ranges`, `run_summary`, `setup_summary`, `matchup:<n>[:player\|:enemy]`; combine with `XPR_SMOKE_ACTION=battle_last` / `summary` to have something to export |
 | `XPR_FRAME_LOG=1` | Log every frame slower than 1 ms with the route-list and event-details draw times, and every route-list rebuild |

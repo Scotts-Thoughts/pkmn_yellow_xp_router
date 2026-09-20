@@ -60,6 +60,7 @@ Test-hook environment variables (all optional):
 | `XPR_SMOKE_SCREENSHOT=<png>` | capture the window ~4 s after start, then exit |
 | `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | with a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of the auto-load preference |
 | `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy` | drive the UI into a state before the smoke capture; `candy` clicks "+" candy six times on the biggest fight (or `XPR_SMOKE_FIGHT=<substring>`) |
+| `XPR_SMOKE_EXPORT=<kind>[,<kind>...]` | run these exports right before the capture (`event_list`, `battle_summary`, `player_ranges`, `enemy_ranges`, `run_summary`, `setup_summary`, `matchup:<n>[:player\|:enemy]`); the PNGs land in the configured images dir |
 | `XPR_FRAME_LOG=1` | log every frame slower than 1 ms (with the route-list / details draw split) and every route-list rebuild |
 
 Python side for comparisons: `py -3.14 main.py` (the plain `python` on PATH
@@ -201,7 +202,7 @@ Other shortcuts: gym leaders 1–8, Blue 9, Elite Four/Champion Ctrl+1…Ctrl+7 
 
 - [ ] Run Summary: docked panel at the bottom (toggle Dock/Undock), undocked = secondary OS window; gradient cells per stat; Crystal/HeartGold exclusions; elite-four dedupe; held-item row for gen ≠ 1; Export writes the PNG.
 - [ ] Setup Summary: secondary window with the text `setup_summary_text` produces; compare with Python for the same route.
-- [ ] Screenshots F5–F8 and the matchup export: files named like Python (`<route>_<kind>_<n>.png` etc.) in `images/` (or the custom Image Path from the status bar); toast with "Open Folder"; rounded corners; content crops match Qt (full window / player half / enemy half / event list). Known: opaque background.
+- [ ] Screenshots F5–F8 and the matchup export: files named like Python (`<route>_<kind>_<n>.png` etc.) in `images/` (or the custom Image Path from the status bar); toast with "Open Folder"; transparent background between the cards with anti-aliased rounded corners (also on the cut edge of the player / enemy halves); the whole battle summary even when it is scrolled; no menu / tooltip / hover state in the PNG; content crops match Qt (cards only / player half / enemy half / event list at its scroll position / run summary grid without the toolbar).
 
 ## 12. Recorder
 

@@ -120,6 +120,10 @@ pub struct RouteList {
     folder_fg: Option<Color32>,
     pub focused: bool,
     last_click: Option<(NodeId, Instant)>,
+    /// The scroll position drawn last frame (`export_ui` reproduces it).
+    scroll_offset: Vec2,
+    /// Set while `export_ui` draws: the scroll position to draw at.
+    export_scroll: Option<Vec2>,
     inline_counter: u64,
 }
 
@@ -159,6 +163,8 @@ impl RouteList {
             folder_fg: None,
             focused: false,
             last_click: None,
+            scroll_offset: Vec2::ZERO,
+            export_scroll: None,
             inline_counter: 0,
         };
         rl.update_highlight_colors(cfg);
@@ -738,7 +744,11 @@ impl RouteList {
             // shifted by the horizontal scroll offset so the columns line up.
             let (header_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), HEADER_HEIGHT), Sense::hover());
             let avail_h = ui.available_height();
-            let scroll = widgets::show_scroll(ui, egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h), |ui| {
+            let mut area = egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h);
+            if let Some(offset) = self.export_scroll {
+                area = area.scroll_offset(offset);
+            }
+            let scroll = widgets::show_scroll(ui, area, |ui| {
                 ui.set_min_width(total_w);
                 // ---- body ----
                 let n = self.rows.len();
@@ -1110,6 +1120,7 @@ impl RouteList {
                     }
                 }
             });
+            self.scroll_offset = scroll.state.offset;
             let painter = ui.painter().with_clip_rect(header_rect);
             let mut x = header_rect.min.x - scroll.state.offset.x;
             for (i, (title, _)) in COLUMN_DEFS.iter().enumerate() {
@@ -1158,6 +1169,19 @@ impl RouteList {
                 self.start_add_new_event(ctrl, actions);
             }
         }
+    }
+
+    /// Draw the list for an export (`event_list.grab()`): the on-screen
+    /// scroll position, no pointer or keyboard, and without the hover "+"
+    /// button. The transient state the draw touches is put back afterwards
+    /// so the real frame that follows is unaffected.
+    pub fn export_ui(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, ctrl: &mut MainController) {
+        let saved = (self.scroll_target.take(), self.hovered_row, self.plus_visible_for.take(), self.plus_hide_deadline.take(), self.scroll_offset);
+        self.export_scroll = Some(self.scroll_offset);
+        let mut actions = ListActions::default();
+        self.ui(ui, theme, cfg, ctrl, &mut actions, false);
+        self.export_scroll = None;
+        (self.scroll_target, self.hovered_row, self.plus_visible_for, self.plus_hide_deadline, self.scroll_offset) = saved;
     }
 
     fn select_row_click(&mut self, ctrl: &mut MainController, id: NodeId, modifiers: egui::Modifiers) {

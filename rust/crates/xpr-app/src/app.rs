@@ -34,7 +34,8 @@ use crate::quick_add::QuickAddPopover;
 use crate::recorder_glue::{gamehook_url, Recorder};
 use crate::route_index::RouteIndex;
 use crate::route_list::{ListActions, RouteList};
-use crate::screenshot::{save_cropped, PendingShot, ShotKind};
+use crate::battle_ui::BattleUiActions;
+use crate::screenshot::{rect_to_pixels, save_cropped, Offscreen, ShotKind, CARD_RADIUS};
 use crate::summaries::{setup_summary_text, RunSummary};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,8 +103,13 @@ pub struct XprApp {
     splitter_save_deadline: Option<Instant>,
     splitter_dragging: bool,
     initial_splitter_applied: bool,
-    pending_shot: Option<PendingShot>,
-    shot_counter: u64,
+    /// Exports requested this frame; drawn offscreen and saved at the start
+    /// of the next one (`perform_pending_shots`).
+    pending_shots: Vec<ShotKind>,
+    /// Where the route list body was drawn last frame (its export size).
+    event_list_rect: Option<Rect>,
+    /// The setup summary window's content rect last frame (its export size).
+    setup_summary_rect: Option<Rect>,
     invalid_cycle_ids: Vec<NodeId>,
     invalid_cycle_index: i64,
     exit: SharedExit,
@@ -195,8 +201,9 @@ impl XprApp {
             splitter_save_deadline: None,
             splitter_dragging: false,
             initial_splitter_applied: false,
-            pending_shot: None,
-            shot_counter: 0,
+            pending_shots: Vec::new(),
+            event_list_rect: None,
+            setup_summary_rect: None,
             invalid_cycle_ids: Vec::new(),
             invalid_cycle_index: -1,
             exit,
@@ -1049,32 +1056,40 @@ impl XprApp {
 
     // ---- screenshots -------------------------------------------------------------------------
 
+    /// Queue an export. It is drawn offscreen at the start of the next frame
+    /// (`perform_pending_shots`), so the live window never shows the export
+    /// layout and whatever is open right now (the menu that was just clicked,
+    /// a tooltip) is not part of the PNG.
     fn request_shot(&mut self, kind: ShotKind) {
         if self.ctrl.is_empty() && kind != ShotKind::SetupSummary && kind != ShotKind::RunSummary {
             return;
         }
-        match kind {
-            ShotKind::BattleSummary | ShotKind::PlayerRanges | ShotKind::EnemyRanges => {
-                if !self.details.is_battle_tab() {
-                    return;
-                }
-            }
-            _ => {}
+        if kind.battle_mode().is_some() && !self.details.is_battle_tab() {
+            return;
         }
-        let route = self.ctrl.get_current_route_name().to_string();
-        let image_name = match &kind {
-            ShotKind::EventList => "event_list".to_string(),
-            ShotKind::BattleSummary => "battle_summary".to_string(),
-            ShotKind::PlayerRanges => "player_ranges".to_string(),
-            ShotKind::EnemyRanges => "enemy_ranges".to_string(),
-            ShotKind::Matchup { idx, mode } => match mode {
-                ScreenshotMode::Full => format!("matchup_{}", idx + 1),
-                ScreenshotMode::Player => format!("matchup_{}_player_ranges", idx + 1),
-                ScreenshotMode::Enemy => format!("matchup_{}_enemy_ranges", idx + 1),
-            },
-            ShotKind::RunSummary => "run_summary".to_string(),
-            ShotKind::SetupSummary => "setup_summary".to_string(),
-        };
+        if !self.pending_shots.contains(&kind) {
+            self.pending_shots.push(kind);
+        }
+    }
+
+    /// Before drawing: export every queued shot from the layout of the last
+    /// frame (panel widths, the list's scroll position).
+    fn perform_pending_shots(&mut self, ctx: &egui::Context) {
+        if self.pending_shots.is_empty() {
+            return;
+        }
+        let kinds = std::mem::take(&mut self.pending_shots);
+        for kind in kinds {
+            match self.export_shot(ctx, &kind) {
+                Ok(path) => self.ctrl.send_message(format!("Saved screenshot to: {}", path.display())),
+                Err(e) => self.ctrl.trigger_exception(format!("Couldn't save screenshot due to exception! {}", e)),
+            }
+        }
+    }
+
+    /// `take_screenshot`'s output path for `kind`: the custom image path
+    /// (event list only) or the images dir, `<timestamp>-<route>_<kind>.png`.
+    fn shot_path(&self, kind: &ShotKind) -> PathBuf {
         let custom = if matches!(kind, ShotKind::EventList) { Some(self.image_path_text.clone()) } else { None };
         let dir = match custom {
             Some(p) if !p.trim().is_empty() => {
@@ -1088,112 +1103,105 @@ impl XprApp {
             }
             _ => self.cfg.get_images_dir(),
         };
-        let _ = route;
-        let out_path = self.ctrl.screenshot_path(&dir, &image_name);
-        let viewport = match &kind {
-            ShotKind::RunSummary if self.run_summary.as_ref().map(|r| !r.docked).unwrap_or(false) => egui::ViewportId::from_hash_of("run_summary"),
-            ShotKind::SetupSummary => egui::ViewportId::from_hash_of("setup_summary"),
-            _ => egui::ViewportId::ROOT,
-        };
-        match &kind {
-            ShotKind::BattleSummary => self.details.battle_ui.screenshot_mode = Some(ScreenshotMode::Full),
-            ShotKind::PlayerRanges => self.details.battle_ui.screenshot_mode = Some(ScreenshotMode::Player),
-            ShotKind::EnemyRanges => self.details.battle_ui.screenshot_mode = Some(ScreenshotMode::Enemy),
-            ShotKind::Matchup { mode, .. } => self.details.battle_ui.screenshot_mode = Some(*mode),
-            _ => {}
-        }
-        self.pending_shot = Some(PendingShot { kind, viewport, rect: None, out_path, requested: false });
+        self.ctrl.screenshot_path(&dir, &kind.image_name())
     }
 
-    /// After drawing: resolve the capture rectangle and request the screenshot.
-    fn resolve_shot(&mut self, ctx: &egui::Context, event_list_rect: Option<Rect>, run_summary_rect: Option<Rect>, setup_summary_rect: Option<Rect>) {
-        let Some(shot) = self.pending_shot.as_mut() else { return };
-        if shot.requested {
-            return;
-        }
-        let geo = self.details.battle_ui.geometry.clone();
-        let rect = match &shot.kind {
-            ShotKind::EventList => event_list_rect,
-            ShotKind::RunSummary => run_summary_rect,
-            ShotKind::SetupSummary => setup_summary_rect,
-            ShotKind::BattleSummary => {
-                let (Some(base), false) = (geo.base_rect, geo.mon_pair_rects.is_empty()) else { return };
-                let top = geo.mon_pair_rects.iter().map(|r| r.min.y).fold(f32::MAX, f32::min);
-                let bottom = geo.mon_pair_rects.iter().map(|r| r.max.y).fold(f32::MIN, f32::max);
-                Some(Rect::from_min_max(Pos2::new(base.min.x, top), Pos2::new(base.max.x, bottom)))
-            }
-            ShotKind::PlayerRanges => {
-                let (Some(base), false) = (geo.base_rect, geo.mon_pair_rects.is_empty()) else { return };
-                let top = geo.mon_pair_rects.iter().map(|r| r.min.y).fold(f32::MAX, f32::min);
-                let bottom = geo.mon_pair_rects.iter().map(|r| r.max.y).fold(f32::MIN, f32::max);
-                let split = geo.divider_x.map(|d| d.0).unwrap_or(base.center().x);
-                Some(Rect::from_min_max(Pos2::new(base.min.x, top), Pos2::new(split, bottom)))
-            }
-            ShotKind::EnemyRanges => {
-                let (Some(base), false) = (geo.base_rect, geo.mon_pair_rects.is_empty()) else { return };
-                let top = geo.mon_pair_rects.iter().map(|r| r.min.y).fold(f32::MAX, f32::min);
-                let bottom = geo.mon_pair_rects.iter().map(|r| r.max.y).fold(f32::MIN, f32::max);
-                let split = geo.divider_x.map(|d| d.1).unwrap_or(base.center().x);
-                Some(Rect::from_min_max(Pos2::new(split, top), Pos2::new(base.max.x, bottom)))
-            }
-            ShotKind::Matchup { idx, mode } => {
-                // the visible matchups are in display order
-                let visible: Vec<usize> = (0..6).filter(|i| self.details.bc.get_pkmn_info(*i, true).is_some() || self.details.bc.get_pkmn_info(*i, false).is_some()).collect();
-                let pos = visible.iter().position(|i| i == idx);
-                let Some(r) = pos.and_then(|p| geo.mon_pair_rects.get(p).copied()) else { return };
-                match mode {
-                    ScreenshotMode::Full => Some(r),
-                    ScreenshotMode::Player => {
-                        let split = geo.divider_x.map(|d| d.0).unwrap_or(r.center().x);
-                        Some(Rect::from_min_max(r.min, Pos2::new(split, r.max.y)))
-                    }
-                    ScreenshotMode::Enemy => {
-                        let split = geo.divider_x.map(|d| d.1).unwrap_or(r.center().x);
-                        Some(Rect::from_min_max(Pos2::new(split, r.min.y), r.max))
-                    }
-                }
-            }
-        };
-        let Some(r) = rect else {
-            self.pending_shot = None;
-            self.details.battle_ui.screenshot_mode = None;
-            return;
-        };
-        shot.rect = Some(r);
-        shot.requested = true;
-        self.shot_counter += 1;
-        let tag = crate::screenshot::ShotTag(self.shot_counter);
-        ctx.send_viewport_cmd_to(shot.viewport, egui::ViewportCommand::Screenshot(egui::UserData::new(tag)));
-        ctx.request_repaint();
-    }
-
-    fn handle_screenshot_events(&mut self, ctx: &egui::Context) {
-        let Some(shot) = self.pending_shot.clone() else { return };
-        if !shot.requested {
-            return;
-        }
-        let image = ctx.input(|i| {
-            i.events.iter().find_map(|e| match e {
-                egui::Event::Screenshot { viewport_id, image, .. } if *viewport_id == shot.viewport => Some(image.clone()),
-                _ => None,
-            })
-        });
-        let Some(image) = image else { return };
+    /// Draw `kind` into its own transparent canvas and save it (Qt's
+    /// `widget.render(pixmap)` onto a transparent pixmap). Returns the path.
+    fn export_shot(&mut self, ctx: &egui::Context, kind: &ShotKind) -> Result<PathBuf, String> {
+        let out_path = self.shot_path(kind);
         let ppp = ctx.pixels_per_point();
-        let corners = match &shot.kind {
-            ShotKind::PlayerRanges | ShotKind::EnemyRanges | ShotKind::BattleSummary | ShotKind::Matchup { .. } => {
-                let geo = self.details.battle_ui.geometry.clone();
-                let r = shot.rect.unwrap_or(Rect::NOTHING);
-                Some(geo.mon_pair_rects.iter().map(|m| m.intersect(r)).filter(|m| m.is_positive()).collect::<Vec<Rect>>())
+        let max_texture_side = ctx.input(|i| i.max_texture_side);
+        let mut off = Offscreen::new(&self.theme, ppp, max_texture_side);
+        let theme = self.theme.clone();
+        let canvas = match kind {
+            ShotKind::EventList => {
+                // the list body at its on-screen size and scroll position
+                let size = self.event_list_rect.ok_or("no event list on screen")?.size();
+                let route_list = &mut self.route_list;
+                let (cfg, ctrl) = (&self.cfg, &mut self.ctrl);
+                let prims = off.render(size, 3, |c| {
+                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(c, |ui| {
+                        ui.spacing_mut().item_spacing = Vec2::new(2.0, 2.0);
+                        route_list.export_ui(ui, &theme, cfg, ctrl);
+                    });
+                });
+                off.rasterize(&prims, Rect::from_min_size(Pos2::ZERO, size))?
             }
-            _ => None,
+            ShotKind::BattleSummary | ShotKind::PlayerRanges | ShotKind::EnemyRanges | ShotKind::Matchup { .. } => {
+                // The matchup cards at the panel's on-screen width, on a canvas
+                // tall enough that nothing is cut off by the scroll viewport;
+                // `screenshot_mode` hides the controls bar, the per-matchup
+                // Export buttons, default dropdowns and unchecked toggles, and
+                // swaps the header icons.
+                let base = self.details.battle_ui.geometry.base_rect.ok_or("no battle summary on screen")?;
+                let mode = kind.battle_mode().unwrap_or(ScreenshotMode::Full);
+                let size = Vec2::new(base.width(), 16_000.0);
+                let details = &mut self.details;
+                let (cfg, ctrl) = (&mut self.cfg, &mut self.ctrl);
+                details.battle_ui.screenshot_mode = Some(mode);
+                let mut assets = Assets::new();
+                let prims = off.render(size, 2, |c| {
+                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(c, |ui| {
+                        let mut actions = BattleUiActions::default();
+                        details.battle_ui.ui(ui, &theme, cfg, &mut details.bc, ctrl, &mut assets, &mut actions);
+                    });
+                });
+                details.battle_ui.screenshot_mode = None;
+                let geo = details.battle_ui.geometry.clone();
+                let (Some(base), false) = (geo.base_rect, geo.mon_pair_rects.is_empty()) else {
+                    return Err("no matchups to export".to_string());
+                };
+                // `_get_mon_pairs_rect` / `_get_divider_x_in_base_frame`: the
+                // crop is the cards' vertical extent, split at the divider for
+                // the player / enemy halves.
+                let top = geo.mon_pair_rects.iter().map(|r| r.min.y).fold(f32::MAX, f32::min);
+                let bottom = geo.mon_pair_rects.iter().map(|r| r.max.y).fold(f32::MIN, f32::max);
+                let (mut x0, mut x1) = (base.min.x, base.max.x);
+                let (mut y0, mut y1) = (top, bottom);
+                if let ShotKind::Matchup { idx, .. } = kind {
+                    // the visible matchups are in display order
+                    let visible: Vec<usize> = (0..6).filter(|i| details.bc.get_pkmn_info(*i, true).is_some() || details.bc.get_pkmn_info(*i, false).is_some()).collect();
+                    let r = visible.iter().position(|i| i == idx).and_then(|p| geo.mon_pair_rects.get(p).copied()).ok_or("matchup is not shown")?;
+                    (x0, x1, y0, y1) = (r.min.x, r.max.x, r.min.y, r.max.y);
+                }
+                match mode {
+                    ScreenshotMode::Full => {}
+                    ScreenshotMode::Player => x1 = geo.divider_x.map(|d| d.0).unwrap_or((x0 + x1) / 2.0),
+                    ScreenshotMode::Enemy => x0 = geo.divider_x.map(|d| d.1).unwrap_or((x0 + x1) / 2.0),
+                }
+                let crop = Rect::from_min_max(Pos2::new(x0, y0), Pos2::new(x1, y1));
+                let mut canvas = off.rasterize(&prims, crop)?;
+                // `_round_container_corners` on every card the crop cuts through
+                let containers: Vec<[i64; 4]> = geo.mon_pair_rects.iter().map(|m| m.intersect(crop)).filter(|m| m.is_positive()).map(|m| rect_to_pixels(m, ppp, crop)).collect();
+                canvas.round_corners(&containers, CARD_RADIUS * ppp);
+                canvas
+            }
+            ShotKind::RunSummary => {
+                // the gradient grid alone (no toolbar), whatever its size
+                let rs = self.run_summary.as_ref().ok_or("no run summary open")?;
+                let mut grid_rect = Rect::NOTHING;
+                let prims = off.render(Vec2::new(8_000.0, 8_000.0), 2, |c| {
+                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(c, |ui| {
+                        grid_rect = rs.grid(ui, &theme);
+                    });
+                });
+                off.rasterize(&prims, grid_rect)?
+            }
+            ShotKind::SetupSummary => {
+                // the window's text at its on-screen size, on the window background
+                let size = self.setup_summary_rect.map(|r| r.size()).unwrap_or(Vec2::new(420.0, 300.0));
+                let text = setup_summary_text(&self.ctrl);
+                let prims = off.render(size, 2, |c| {
+                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg).inner_margin(egui::Margin::same(15))).show(c, |ui| {
+                        ui.add(egui::Label::new(egui::RichText::new(&text).font(theme.body()).color(theme.text)).wrap());
+                    });
+                });
+                off.rasterize(&prims, Rect::from_min_size(Pos2::ZERO, size))?
+            }
         };
-        match save_cropped(&image, ppp, shot.rect.unwrap_or(Rect::NOTHING), &shot.out_path, corners) {
-            Ok(_) => self.ctrl.send_message(format!("Saved screenshot to: {}", shot.out_path.display())),
-            Err(e) => self.ctrl.trigger_exception(format!("Couldn't save screenshot due to exception! {}", e)),
-        }
-        self.pending_shot = None;
-        self.details.battle_ui.screenshot_mode = None;
+        canvas.save(&out_path)?;
+        Ok(out_path)
     }
 
     // ---- dialogs -------------------------------------------------------------------------
@@ -1731,7 +1739,7 @@ impl XprApp {
                         self.frame_parts.0 = t.elapsed();
                     }
                 });
-                event_list_rect = Some(inner.response.rect);
+                event_list_rect = Some(inner.response.rect.shrink(4.0));
             });
         }
         // splitter handle
@@ -2002,6 +2010,17 @@ impl XprApp {
                 ctx.request_repaint_after(Duration::from_millis(10));
             }
             if Instant::now() >= at {
+                // `XPR_SMOKE_EXPORT=<kind>[,<kind>...]`: run these exports (they
+                // land in the images dir) right before the capture; kinds are
+                // `event_list`, `battle_summary`, `player_ranges`,
+                // `enemy_ranges`, `run_summary`, `setup_summary` and
+                // `matchup:<n>[:player|:enemy]`
+                if let Ok(list) = std::env::var("XPR_SMOKE_EXPORT") {
+                    for kind in list.split(',').filter_map(smoke_export_kind) {
+                        log::info!("smoke: export {:?}", kind);
+                        self.request_shot(kind);
+                    }
+                }
                 self.smoke = Some((path, at, true));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new("smoke")));
             }
@@ -2015,7 +2034,7 @@ impl XprApp {
         });
         if let Some(img) = image {
             let full = Rect::from_min_size(Pos2::ZERO, egui::Vec2::new(img.size[0] as f32, img.size[1] as f32));
-            if let Err(e) = save_cropped(&img, 1.0, full, &path, None) {
+            if let Err(e) = save_cropped(&img, 1.0, full, &path) {
                 log::error!("smoke screenshot failed: {}", e);
             } else {
                 log::info!("smoke screenshot saved to {}", path.display());
@@ -2100,7 +2119,7 @@ impl XprApp {
         self.tick_timers(ctx);
         self.dispatch_signals(ctx);
         self.handle_shortcuts(ctx);
-        self.handle_screenshot_events(ctx);
+        self.perform_pending_shots(ctx);
         self.dispatch_signals(ctx);
 
         let theme = self.theme.clone();
@@ -2123,7 +2142,6 @@ impl XprApp {
             self.status_bar(ui);
         });
         // docked run summary above the status bar
-        let mut run_summary_rect: Option<Rect> = None;
         if self.run_summary.as_ref().map(|r| r.docked).unwrap_or(false) && self.page == Page::Editor {
             let mut toggled = false;
             let mut closed = false;
@@ -2135,7 +2153,6 @@ impl XprApp {
                     closed = c;
                     export = e;
                 }
-                run_summary_rect = Some(ui.min_rect());
             });
             if toggled {
                 self.toggle_summary_dock();
@@ -2256,7 +2273,6 @@ impl XprApp {
                         toggled = t;
                         closed = c;
                         export = e;
-                        run_summary_rect = Some(ui.min_rect());
                     });
                     if ctx.input(|i| i.viewport().close_requested()) {
                         closed = true;
@@ -2276,9 +2292,33 @@ impl XprApp {
                 self.request_shot(ShotKind::RunSummary);
             }
         }
-        self.resolve_shot(ctx, event_list_rect, run_summary_rect, setup_summary_rect);
+        self.event_list_rect = event_list_rect;
+        self.setup_summary_rect = setup_summary_rect;
         self.dispatch_signals(ctx);
         self.smoke_tick(ctx);
+    }
+}
+
+/// One `XPR_SMOKE_EXPORT` entry.
+fn smoke_export_kind(name: &str) -> Option<ShotKind> {
+    let mut parts = name.trim().split(':');
+    match parts.next()? {
+        "event_list" => Some(ShotKind::EventList),
+        "battle_summary" => Some(ShotKind::BattleSummary),
+        "player_ranges" => Some(ShotKind::PlayerRanges),
+        "enemy_ranges" => Some(ShotKind::EnemyRanges),
+        "run_summary" => Some(ShotKind::RunSummary),
+        "setup_summary" => Some(ShotKind::SetupSummary),
+        "matchup" => {
+            let idx = parts.next()?.parse::<usize>().ok()?.checked_sub(1)?;
+            let mode = match parts.next() {
+                Some("player") => ScreenshotMode::Player,
+                Some("enemy") => ScreenshotMode::Enemy,
+                _ => ScreenshotMode::Full,
+            };
+            Some(ShotKind::Matchup { idx, mode })
+        }
+        _ => None,
     }
 }
 
