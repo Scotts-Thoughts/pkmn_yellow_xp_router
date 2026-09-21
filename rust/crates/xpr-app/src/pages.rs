@@ -35,6 +35,9 @@ pub struct LandingActions {
     /// game (version from the mapper, solo mon from the first Pokémon).
     pub start_recording: bool,
     pub load_route: Option<PathBuf>,
+    /// "Compare Routes": `Some(Some(path))` seeds slot A with the selected
+    /// route, `Some(None)` opens the page empty.
+    pub compare_routes: Option<Option<PathBuf>>,
     pub auto_load_toggled: bool,
 }
 
@@ -129,6 +132,12 @@ impl LandingPage {
                 if let Some(r) = &self.selected_route {
                     actions.load_route = Some(io_utils::get_existing_route_path(paths, r));
                 }
+            }
+            ui.add_space(10.0);
+            let compare = StyledButton::new(theme, egui::RichText::new("Compare Routes").font(theme.font_bold(11.0))).min_size(Vec2::new(350.0, 32.0)).show(ui);
+            if compare.on_hover_text("See how two routes differ. The selected route, if any, becomes route A.").clicked() {
+                let selected = self.selected_route.as_ref().filter(|_| can_load).map(|r| io_utils::get_existing_route_path(paths, r));
+                actions.compare_routes = Some(selected);
             }
             ui.add_space(10.0);
             let mut auto = self.auto_load;

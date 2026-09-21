@@ -1740,16 +1740,172 @@ pub const CARD_TITLE_H: f32 = 22.0;
 /// muted caption right. Returns the row rect so callers can place column
 /// heads over it.
 pub fn card_title(ui: &mut Ui, theme: &Theme, title: &str, right: Option<&str>) -> Rect {
+    card_title_colored(ui, theme, title, right, theme.header)
+}
+
+/// [`card_title`] with an explicit title colour. The compare page draws its
+/// titles in `text_strong` because the header colour means "route B" there.
+pub fn card_title_colored(ui: &mut Ui, theme: &Theme, title: &str, right: Option<&str>, color: Color32) -> Rect {
     let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), CARD_TITLE_H), Sense::hover());
     if ui.is_rect_visible(rect) {
-        let g = caption_galley(ui, title, theme.caption_font_bold(), theme.header);
-        ui.painter().galley(Pos2::new(rect.min.x, rect.center().y - g.size().y / 2.0), g, theme.header);
+        let g = caption_galley(ui, title, theme.caption_font_bold(), color);
+        ui.painter().galley(Pos2::new(rect.min.x, rect.center().y - g.size().y / 2.0), g, color);
         if let Some(r) = right {
             let g = ui.fonts_mut(|f| f.layout_no_wrap(r.to_string(), theme.caption_font(), theme.secondary));
             ui.painter().galley(Pos2::new(rect.max.x - g.size().x, rect.center().y - g.size().y / 2.0), g, theme.secondary);
         }
     }
     rect
+}
+
+// ---------------------------------------------------------------------------
+// Route compare (docs/rust_port/design/route_compare/SPEC.md §3)
+// ---------------------------------------------------------------------------
+
+/// Which of the two compared routes a value belongs to. Blue means A, amber
+/// means B, everywhere on the compare page.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Side {
+    A,
+    B,
+}
+
+impl Side {
+    pub fn letter(self) -> &'static str {
+        match self {
+            Side::A => "A",
+            Side::B => "B",
+        }
+    }
+
+    /// The route's accent: `theme.primary` for A, `theme.header` for B.
+    pub fn color(self, theme: &Theme) -> Color32 {
+        match self {
+            Side::A => theme.primary,
+            Side::B => theme.header,
+        }
+    }
+
+    pub fn bg(self, theme: &Theme) -> Color32 {
+        match self {
+            Side::A => theme.pill_bg(),
+            Side::B => theme.chip_bg(),
+        }
+    }
+
+    pub fn border(self, theme: &Theme) -> Color32 {
+        match self {
+            Side::A => theme.pill_border(),
+            Side::B => theme.chip_border(),
+        }
+    }
+}
+
+/// Two opposing horizontal arrows (the "swap A and B" button). Painted
+/// rather than typed: `\u{21c4}` is missing from several system fonts.
+pub fn paint_swap_icon(ui: &Ui, rect: Rect, color: Color32) {
+    let stroke = Stroke::new(1.3_f32, color);
+    let c = rect.center();
+    let half = (rect.width() * 0.32).min(7.0);
+    let gap = 3.0;
+    for (dy, pointing_right) in [(-gap, true), (gap, false)] {
+        let y = c.y + dy;
+        let (x0, x1) = (c.x - half, c.x + half);
+        ui.painter().line_segment([Pos2::new(x0, y), Pos2::new(x1, y)], stroke);
+        let tip = if pointing_right { x1 } else { x0 };
+        let back = if pointing_right { tip - 3.0 } else { tip + 3.0 };
+        ui.painter().line_segment([Pos2::new(back, y - 2.5), Pos2::new(tip, y)], stroke);
+        ui.painter().line_segment([Pos2::new(back, y + 2.5), Pos2::new(tip, y)], stroke);
+    }
+}
+
+/// The "these are the same fight" mark in the event diff's gutter: two short
+/// horizontal rules (`\u{2550}` is likewise not always available).
+pub fn paint_equals_mark(ui: &Ui, rect: Rect, color: Color32) {
+    let c = rect.center();
+    let half = (rect.width() * 0.3).min(8.0);
+    for dy in [-2.0_f32, 2.0] {
+        ui.painter()
+            .line_segment([Pos2::new(c.x - half, c.y + dy), Pos2::new(c.x + half, c.y + dy)], Stroke::new(1.0_f32, color));
+    }
+}
+
+/// A small up/down arrow marking a fight that happens in a different order.
+pub fn paint_moved_mark(ui: &Ui, rect: Rect, color: Color32) {
+    let stroke = Stroke::new(1.2_f32, color);
+    let c = rect.center();
+    let h = (rect.height() * 0.32).min(5.0);
+    ui.painter().line_segment([Pos2::new(c.x, c.y - h), Pos2::new(c.x, c.y + h)], stroke);
+    for (y, dir) in [(c.y - h, 1.0_f32), (c.y + h, -1.0)] {
+        ui.painter().line_segment([Pos2::new(c.x - 2.5, y + 2.5 * dir), Pos2::new(c.x, y)], stroke);
+        ui.painter().line_segment([Pos2::new(c.x + 2.5, y + 2.5 * dir), Pos2::new(c.x, y)], stroke);
+    }
+}
+
+/// Side of the route badge, and the height of one bar pair.
+pub const ROUTE_BADGE: f32 = 20.0;
+
+/// The 20 x 20 "A" / "B" badge that labels every compared value.
+pub fn route_badge(ui: &mut Ui, theme: &Theme, side: Side) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(ROUTE_BADGE), Sense::hover());
+    paint_route_badge(ui, theme, rect, side);
+    resp
+}
+
+/// [`route_badge`] into an already-allocated rect.
+pub fn paint_route_badge(ui: &Ui, theme: &Theme, rect: Rect, side: Side) {
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+    let fg = side.color(theme);
+    ui.painter().rect(rect, CornerRadius::same(4), side.bg(theme), Stroke::new(1.0_f32, side.border(theme)), egui::StrokeKind::Inside);
+    let g = ui.fonts_mut(|f| f.layout_no_wrap(side.letter().to_string(), theme.caption_font_bold(), fg));
+    ui.painter().galley(rect.center() - g.size() / 2.0, g, fg);
+}
+
+/// Two 4 px bars (A above B) sharing a track, filled to `a_frac` / `b_frac`
+/// of `rect`'s width. Fractions are clamped to 0..1.
+pub fn paired_bars(ui: &Ui, theme: &Theme, rect: Rect, a_frac: f32, b_frac: f32) {
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+    let track = theme.subtle_border;
+    for (i, (frac, side)) in [(a_frac, Side::A), (b_frac, Side::B)].into_iter().enumerate() {
+        let y = rect.center().y - 5.0 + i as f32 * 6.0;
+        let bar = Rect::from_min_size(Pos2::new(rect.min.x, y), Vec2::new(rect.width(), 4.0));
+        ui.painter().rect_filled(bar, CornerRadius::same(2), track);
+        let w = rect.width() * frac.clamp(0.0, 1.0);
+        if w > 0.5 {
+            let fill = Rect::from_min_size(bar.min, Vec2::new(w, 4.0));
+            ui.painter().rect_filled(fill, CornerRadius::same(2), side.color(theme));
+        }
+    }
+}
+
+/// A single horizontal bar split into `segments` of `(fraction, colour)`.
+/// Fractions that do not reach 1.0 leave the track showing.
+pub fn stacked_bar(ui: &Ui, theme: &Theme, rect: Rect, segments: &[(f32, Color32)]) {
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+    ui.painter().rect_filled(rect, CornerRadius::same(3), theme.subtle_border);
+    let mut x = rect.min.x;
+    for (frac, color) in segments {
+        let w = rect.width() * frac.clamp(0.0, 1.0);
+        if w <= 0.5 {
+            continue;
+        }
+        let seg = Rect::from_min_size(Pos2::new(x, rect.min.y), Vec2::new(w.min(rect.max.x - x), rect.height()));
+        // Only the outer edges are rounded, so the segments read as one bar.
+        let radius = CornerRadius {
+            nw: if x <= rect.min.x + 0.5 { 3 } else { 0 },
+            sw: if x <= rect.min.x + 0.5 { 3 } else { 0 },
+            ne: if seg.max.x >= rect.max.x - 0.5 { 3 } else { 0 },
+            se: if seg.max.x >= rect.max.x - 0.5 { 3 } else { 0 },
+        };
+        ui.painter().rect_filled(seg, radius, *color);
+        x = seg.max.x;
+    }
 }
 
 /// Rounded pill ("Lv 5"): 12 px bold text, padding 2 x 8, radius 999.

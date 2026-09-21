@@ -26,6 +26,8 @@ pub enum ShotKind {
     Matchup { idx: usize, mode: ScreenshotMode },
     RunSummary,
     SetupSummary,
+    /// The active tab of the route-compare page.
+    Compare,
 }
 
 impl ShotKind {
@@ -43,6 +45,7 @@ impl ShotKind {
             },
             ShotKind::RunSummary => "run_summary".to_string(),
             ShotKind::SetupSummary => "setup_summary".to_string(),
+            ShotKind::Compare => "compare".to_string(),
         }
     }
 

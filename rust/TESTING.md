@@ -59,8 +59,9 @@ Test-hook environment variables (all optional):
 | `XPR_GAMEHOOK_URL` | recorder base URL (default `http://localhost:8085`) |
 | `XPR_SMOKE_SCREENSHOT=<png>` | capture the window ~4 s after start, then exit |
 | `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | with a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of the auto-load preference |
-| `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy` | drive the UI into a state before the smoke capture; `candy` clicks "+" candy six times on the biggest fight (or `XPR_SMOKE_FIGHT=<substring>`) |
-| `XPR_SMOKE_EXPORT=<kind>[,<kind>...]` | run these exports right before the capture (`event_list`, `battle_summary`, `player_ranges`, `enemy_ranges`, `run_summary`, `setup_summary`, `matchup:<n>[:player\|:enemy]`); the PNGs land in the configured images dir |
+| `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy\|compare` | drive the UI into a state before the smoke capture; `candy` clicks "+" candy six times on the biggest fight (or `XPR_SMOKE_FIGHT=<substring>`) |
+| `XPR_SMOKE_COMPARE_A` / `_B=<route path>`, `XPR_SMOKE_COMPARE_TAB=overview\|checkpoints\|diff`, `XPR_SMOKE_COMPARE_EXPAND=<n>` | with `XPR_SMOKE_ACTION=compare`: the two routes to compare, which tab to show and which checkpoint row to expand |
+| `XPR_SMOKE_EXPORT=<kind>[,<kind>...]` | run these exports right before the capture (`event_list`, `battle_summary`, `player_ranges`, `enemy_ranges`, `run_summary`, `setup_summary`, `compare`, `matchup:<n>[:player\|:enemy]`); the PNGs land in the configured images dir |
 | `XPR_FRAME_LOG=1` | log every frame slower than 1 ms (with the route-list / details draw split) and every route-list rebuild |
 
 Python side for comparisons: `py -3.14 main.py` (the plain `python` on PATH
@@ -235,6 +236,58 @@ handling, or the route list's folder handling.
 - [ ] Unsaved route → close window → prompt (Save / Don't save / Cancel); Cancel keeps the app open.
 - [ ] Route saved from Rust → opened in Python (and vice-versa) without error; `git diff`-style comparison of both saves of the same edits is empty.
 
+## 14b. Route compare
+
+Design and acceptance list: `docs/rust_port/design/route_compare/SPEC.md`
+(§9.3 is the full checklist; the highlights are repeated here). Reference
+pair: two Emerald Houndoom routes, `e-houndoom-1-13454` (A) and
+`e-ike-houndoom` (B). `cargo run -p xpr-engine --example compare_dump -- A.json
+B.json` prints every number the Overview shows, for checking by hand.
+
+- [ ] File → Compare Routes… (Ctrl+Shift+C) and the landing page's Compare
+      Routes button both open the page (the landing page's selected route
+      becomes A); Back and Esc return where you came from.
+- [ ] With a route open in the editor, on the compare page: Ctrl+Z, Delete,
+      Ctrl+B, Ctrl+E/D, Shift+1..9 and F3/F4 do **nothing**; go Back and the
+      route is exactly as it was. F5-F8 export nothing.
+- [ ] Route picker: opens and stays open; typing filters; the game filter
+      starts on the other route's game and choosing a game does not close the
+      popup; a click on the page or Esc closes it (Esc does not also leave the
+      page); clicking its button again closes it.
+      (`cargo test -p xpr-app --test compare_page` covers these.)
+- [ ] Reference pair, Overview: IV totals 184 / 183, Hidden Power Water 70 vs
+      Grass 70, trainers 160 / 152, wild 68 / 41 (+ 8 / 2 trainer-owned),
+      candies 16 / 15, vitamins 0 / 8, moves learned 10 / 15, blackout loss
+      −$96,015 / −$2,583, final money $78,071 / $90,047, final time 1:34:54.3
+      vs 1:20:36.7 with "14:17.6 faster than A" under B.
+- [ ] Trainers card reads 115 / 14 / 29 / 23 / 2; expanding a set lists names;
+      clicking a name jumps to that fight in the event diff.
+- [ ] `Rival Brendan 1 Mudkip` and `Rival May 1 Mudkip` share one anchor row
+      (likewise 3, 4, 5); rival 2 stays one-sided — the teams genuinely differ.
+- [ ] Checkpoints: "A vs B" is red where A arrived later, green where earlier;
+      a row expands to stats + both movesets; the ↕ marker appears on fights
+      fought in a different order.
+- [ ] Event diff: one-sided items carry a route-coloured marker, shared items
+      are grey, quantity differences read `×10 vs ×7`; filters hide kinds; a
+      300-trainer Crystal route still scrolls smoothly.
+- [ ] Swap flips every sign and colour without reloading; picking a route
+      loads in the background (the page stays responsive).
+- [ ] Open from the editor with unsaved edits: A reflects them; going Back
+      leaves the editor's selection, undo stack and scroll position untouched.
+- [ ] A route whose custom gen is missing, or any unloadable file: red failure
+      banner for that slot only, the other slot stays loaded.
+- [ ] Gen 1 pair: `DVs`, `Special`, `StatExp`; no Hidden Power / nature /
+      ability / held item. Gen 2: `DVs`, `StatExp`, Hidden Power and held item
+      shown, no nature/ability. Different generations: setup and stats cards
+      hidden, banner shown.
+- [ ] A pair with no recorded times: no time columns, `—` on the identity
+      cards.
+- [ ] Export screenshot on each tab (lands in the images dir as
+      `compare_<a>_vs_<b>_<tab>.png`, full height, nothing clipped); Copy
+      summary puts the plain-text table on the clipboard.
+- [ ] Custom background/text/header/primary colours recolour A and B
+      consistently.
+
 ## 15. Cross-testing with the Python app (side by side)
 
 1. Same route, same edits in both apps (add a trainer, a candy, a vitamin, a TM, move an event, change DVs, split/rename a folder, toggle a highlight, disable a group) → save both → diff the JSON (expected: identical apart from nothing).
@@ -246,4 +299,6 @@ handling, or the route list's folder handling.
 
 ## 16. Already smoke-checked during development (screenshots only, isolated config)
 
-Landing page (routes table + sort toggles); editor page (tree colours, quantities, highlights, state viewer, inventory, notes footer, status bar chips); battle summary (8 damage columns with ranges/kill %/recoil/best-move flags, custom-data & stat-stage dropdowns, intimidate, export); new-route page (box-art table, DV frame); docked run summary (gradient cells); inline creator (type dropdown, trainer editor cards). `cargo test --workspace` and the golden verify (204/204 with battles) are green.
+Route compare (all three tabs on the reference Emerald pair, an expanded
+checkpoint row, a cross-generation pair with its three banners, and the
+full-page PNG export). Landing page (routes table + sort toggles); editor page (tree colours, quantities, highlights, state viewer, inventory, notes footer, status bar chips); battle summary (8 damage columns with ranges/kill %/recoil/best-move flags, custom-data & stat-stage dropdowns, intimidate, export); new-route page (box-art table, DV frame); docked run summary (gradient cells); inline creator (type dropdown, trainer editor cards). `cargo test --workspace` and the golden verify (204/204 with battles) are green.

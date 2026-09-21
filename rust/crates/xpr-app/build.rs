@@ -80,10 +80,23 @@ fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let ico_path = out_dir.join("app_icon.ico");
         write_ico(&icons.join("app_icon.png"), &ico_path);
-        winresource::WindowsResource::new().set_icon(ico_path.to_str().unwrap()).compile().unwrap_or_else(|e| {
-            println!("cargo:warning=failed to embed exe icon: {}", e);
-        });
+        embed_exe_icon(&ico_path);
     }
+}
+
+/// `winresource` is a Windows-only build dependency, so the call has to be
+/// compiled out on every other host (cross-building to Windows from macOS
+/// still writes the `.ico`, it just cannot embed it).
+#[cfg(windows)]
+fn embed_exe_icon(ico_path: &std::path::Path) {
+    winresource::WindowsResource::new().set_icon(ico_path.to_str().unwrap()).compile().unwrap_or_else(|e| {
+        println!("cargo:warning=failed to embed exe icon: {}", e);
+    });
+}
+
+#[cfg(not(windows))]
+fn embed_exe_icon(_ico_path: &std::path::Path) {
+    println!("cargo:warning=not building on Windows: the exe icon is not embedded");
 }
 
 /// Build a multi-resolution `.ico` from the (small, pixel-art) source PNG:

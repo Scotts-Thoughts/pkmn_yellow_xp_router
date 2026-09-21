@@ -1,0 +1,376 @@
+<title>Route Compare Mockup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+/* Single-theme on purpose: this page depicts the XP Router's own dark theme.
+   1 CSS px = 1 egui logical px at 100 % scale. Every colour is a Theme token (SPEC §3). */
+:root{
+  --bg:#1e1e1e; --card:#272727; --card-border:#343434; --row-div:#313131; --pane-div:#333333;
+  --strip:#2c2c2c; --ctl-border:#505050; --text:#d4d4d4; --strong:#f2f2f2; --muted:#999999;
+  --disabled:#616161; --track:#393939;
+  --a:#7cb8e0; --a-bg:#293035; --a-border:#36454f;      /* Route A = theme.primary */
+  --b:#e8a850; --b-bg:#362e24; --b-border:#54432b;      /* Route B = theme.header  */
+  --accent:#0078d4; --success:#4ec97a; --warning:#e8b730; --failure:#e05555;
+  --warn-bg:#36301f; --warn-border:#5e4f23;
+  --page:#141414;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--text);font:12px/1.35 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{padding-inline:16px;padding-block:20px 40px;max-width:1312px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.note{color:var(--muted);font-size:12px;max-width:78ch;line-height:1.5}
+.note b{color:var(--strong);font-weight:600}
+.note .ka,.note .kb{font-weight:700}.note .ka{color:var(--a)}.note .kb{color:var(--b)}
+.scroller{overflow-x:auto;border:1px solid #2a2a2a;border-radius:8px}
+.win{width:1280px;background:var(--bg);display:flex;flex-direction:column}
+
+/* menu bar + header strip + tab strip */
+.menubar{height:24px;display:flex;gap:14px;align-items:center;padding:0 10px;background:#252525;border-bottom:1px solid var(--pane-div);color:var(--text)}
+.hdr{height:56px;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--strip);border-bottom:1px solid var(--pane-div)}
+.btn{height:28px;padding:0 12px;border:1px solid var(--ctl-border);border-radius:4px;background:var(--card);color:var(--text);font:inherit;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.btn:hover{background:var(--card-border)}
+.btn:focus-visible,.tab:focus-visible,.seg button:focus-visible,.picker:focus-visible,tr.cp:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.hdr h1{font-size:11px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 4px 0 0}
+.picker{height:36px;width:330px;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--bg);border:1px solid var(--ctl-border);border-radius:4px;cursor:pointer}
+.picker .nm{color:var(--strong);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker .sub{color:var(--muted);font-size:11px;white-space:nowrap}
+.picker .col{display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.2}
+.picker .chev{color:var(--muted)}
+.badge{width:20px;height:20px;border-radius:4px;display:inline-grid;place-items:center;font-weight:700;font-size:11px;flex:none}
+.badge.a{background:var(--a-bg);border:1px solid var(--a-border);color:var(--a)}
+.badge.b{background:var(--b-bg);border:1px solid var(--b-border);color:var(--b)}
+.swap{width:28px;padding:0;justify-content:center}
+.grow{flex:1}
+.tabs{height:40px;display:flex;align-items:stretch;padding:0 16px;border-bottom:1px solid var(--pane-div);gap:0}
+.tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:inherit;padding:0 12px;cursor:pointer}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--strong);font-weight:700;border-bottom-color:var(--accent)}
+.tabs .right{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--muted)}
+.check{width:14px;height:14px;border:1px solid var(--ctl-border);border-radius:3px;background:var(--bg);display:inline-grid;place-items:center;color:var(--accent);font-size:11px;font-weight:700}
+
+.body{padding:16px;display:flex;flex-direction:column;gap:12px;min-height:640px}
+.banner{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:6px;background:var(--warn-bg);border:1px solid var(--warn-border);color:var(--warning)}
+.banner b{font-weight:700}
+.row{display:flex;gap:12px;align-items:stretch}
+.colstack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.colstack>.card{flex:0 0 auto}
+.colstack>.card.fill{flex:1 0 auto}
+.card{background:var(--card);border:1px solid var(--card-border);border-radius:8px;padding:12px 14px 10px;flex:1;min-width:0}
+.ct{height:22px;display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+/* Card titles are text-strong here, NOT theme.header: on this page amber must only ever mean "Route B". */
+.ct .t{font-size:11px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--strong)}
+.cap{font-size:11px;color:var(--muted)}
+.capu{font-size:11px;color:var(--muted);letter-spacing:.9px;text-transform:uppercase}
+
+/* identity cards */
+.idc{display:flex;gap:14px;align-items:center;padding:14px 16px}
+.tile{width:68px;height:68px;border-radius:12px;background:var(--bg);border:1px solid var(--card-border);display:grid;place-items:center;color:var(--disabled);font-size:10px;flex:none}
+.idc .main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.idc .l1{display:flex;align-items:center;gap:10px}
+.idc .name{font-size:22px;font-weight:700;color:var(--strong);line-height:1.1}
+/* neutral on this page (NOT the primary-tinted pill): blue is reserved for Route A */
+.pill{padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;background:var(--bg);border:1px solid var(--ctl-border);color:var(--strong)}
+/* neutral on this page (NOT the header-tinted chip): amber is reserved for Route B */
+.chip{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;background:var(--bg);border:1px solid var(--card-border);color:var(--muted)}
+.meta{color:var(--muted)} .meta span{color:var(--text)}
+.idc .side{text-align:right;display:flex;flex-direction:column;gap:3px;flex:none}
+.idc .side .v{font-size:18px;font-weight:700;color:var(--strong)}
+
+/* tables */
+table{border-collapse:collapse;width:100%;font:inherit;color:inherit}
+th{font-size:11px;font-weight:400;color:var(--muted);text-align:right;padding:0 0 4px 0;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{height:27px;border-top:1px solid var(--row-div);text-align:right;padding:0 0 0 10px;white-space:nowrap}
+td:first-child{padding-left:0;color:var(--text)}
+th.a{color:var(--a);font-weight:700} th.b{color:var(--b);font-weight:700}
+.v{color:var(--strong);font-weight:700;font-size:14px}
+.n{color:var(--text)}
+.same{color:var(--muted)}
+.d{color:var(--muted);width:64px}
+.d.diff{color:var(--strong);font-weight:700}
+.d.good{color:var(--success);font-weight:700}.d.bad{color:var(--failure);font-weight:700}
+tr.grp td{height:30px;border-top:1px solid var(--pane-div);font-size:11px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);text-align:left}
+tr.total td{border-top:1px solid var(--pane-div)}
+.bars{width:120px;padding-left:14px}
+.bar{height:4px;border-radius:2px;background:var(--track);margin:2px 0;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:2px}
+.bar.a i{background:var(--a)}.bar.b i{background:var(--b)}
+.type{display:inline-block;padding:1px 8px;border-radius:3px;font-weight:700;font-size:11px;color:#1e1e1e}
+
+/* stacked source bars */
+.stack{display:flex;height:16px;border-radius:3px;overflow:hidden;background:var(--track)}
+.stack i{display:block;height:100%}
+.srow{display:grid;grid-template-columns:24px 1fr 86px;gap:10px;align-items:center;height:30px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;color:var(--muted);font-size:11px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+
+/* moves */
+.moves{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mv{display:flex;align-items:center;gap:8px;height:30px;border-top:1px solid var(--row-div)}
+.mv .s{width:14px;color:var(--muted);font-size:11px}
+.mv .m{color:var(--strong);font-weight:700}
+.mv.shared .m{color:var(--text);font-weight:400}
+.tag{font-size:11px;color:var(--muted)}
+.names{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.nchip{padding:2px 7px;border-radius:4px;background:var(--bg);border:1px solid var(--card-border);color:var(--text);font-size:11px}
+.setrow{display:flex;gap:8px;align-items:center;height:30px;border-top:1px solid var(--row-div)}
+.setrow .k{flex:1}.setrow .c{font-weight:700;color:var(--strong);font-size:14px;width:40px;text-align:right}
+.dis{color:var(--muted);width:12px}
+
+/* checkpoints */
+.seg{display:inline-flex;border:1px solid var(--ctl-border);border-radius:4px;overflow:hidden}
+.seg button{height:26px;padding:0 10px;background:var(--bg);border:0;border-right:1px solid var(--ctl-border);color:var(--muted);font:inherit;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--card-border);color:var(--strong);font-weight:700}
+.toolbar{display:flex;align-items:center;gap:12px}
+tr.cp{cursor:pointer}
+tr.cp:hover td{background:#2d2d2d}
+tr.cp td.f{color:var(--strong);font-weight:700}
+.cat{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;vertical-align:1px}
+tr.detail td{background:var(--bg);height:auto;padding:12px 14px;text-align:left;white-space:normal}
+.dgrid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:20px}
+.mini th,.mini td{font-size:12px}.mini td{height:24px}
+.mdiff{color:var(--strong)} .msame{color:var(--muted)}
+
+/* event diff */
+.lanes{border:1px solid var(--card-border);border-radius:8px;overflow:hidden;background:var(--card)}
+.lhead,.anchor,.block{display:grid;grid-template-columns:1fr 44px 1fr}
+.lhead{height:30px;align-items:center;background:var(--strip);border-bottom:1px solid var(--pane-div)}
+.lhead>div{padding:0 12px;display:flex;gap:8px;align-items:center}
+.anchor{min-height:30px;align-items:center;border-top:1px solid var(--pane-div);background:#2a2a2a}
+.anchor .cell{padding:0 12px;display:flex;gap:8px;align-items:center;min-width:0}
+.anchor .nm{color:var(--strong);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anchor .loc{color:var(--muted);white-space:nowrap}
+.anchor .r{margin-left:auto;display:flex;gap:10px;color:var(--muted);white-space:nowrap}
+.anchor .r b{color:var(--a)} .anchor .cell.bb .r b{color:var(--b)}
+.gut{display:grid;place-items:center;color:var(--muted);align-self:stretch;border-left:1px solid var(--row-div);border-right:1px solid var(--row-div);font-size:11px}
+.block{border-top:1px solid var(--row-div)}
+.lane{padding:3px 12px;display:flex;flex-direction:column}
+.ev{height:24px;display:flex;align-items:center;gap:8px;color:var(--muted)}
+.ev .k{width:52px;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--disabled);flex:none}
+.ev .q{margin-left:auto;font-size:11px}
+.ev.only{color:var(--strong)}
+.ev.only.ea .k{color:var(--a)} .ev.only.eb .k{color:var(--b)}
+.ev.only.ea::before,.ev.only.eb::before{content:"";width:3px;height:12px;border-radius:1px;flex:none;margin-left:-8px;margin-right:-3px}
+.ev.only.ea::before{background:var(--a)} .ev.only.eb::before{background:var(--b)}
+.ev.tr .t{font-weight:700}
+.ev .mvd{font-size:11px;color:var(--muted);font-weight:400}
+.empty{color:var(--disabled);height:24px;display:flex;align-items:center}
+.dt{font-size:11px}
+.dt.bad{color:var(--failure)}.dt.good{color:var(--success)}
+.key{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:11px;align-items:center}
+.key .sw{display:inline-block;width:3px;height:12px;border-radius:1px;vertical-align:-2px;margin-right:6px}
+</style>
+
+<div class="wrap">
+  <p class="note"><b>Route Compare — design mockup.</b> Every number is real output of <code>xpr-engine</code>&rsquo;s compare module on two Emerald Houndoom routes:
+  <span class="ka">A</span> = <code>e-houndoom-1-13454</code>, <span class="kb">B</span> = <code>e-ike-houndoom</code>.
+  1 CSS px = 1 egui px. The three tabs switch; on Checkpoints, click <b>Leader Winona</b> to see an expanded row. Blue and amber only ever mean “which route”; green and red appear only on time differences.</p>
+
+  <div class="scroller"><div class="win">
+    <div class="menubar"><span>File</span><span>Events</span><span>Highlight</span><span>Folders</span><span>Recording</span><span>Battle Summary</span><span>Update</span></div>
+
+    <div class="hdr">
+      <button class="btn" id="back">‹ Back</button>
+      <h1>Compare routes</h1>
+      <div class="picker" tabindex="0" id="pickA"><span class="badge a">A</span><div class="col"><span class="nm">e-houndoom-1-13454</span><span class="sub">Emerald · Houndoom · current route</span></div><span class="chev">▾</span></div>
+      <button class="btn swap" id="swap" title="Swap A and B">⇄</button>
+      <div class="picker" tabindex="0" id="pickB"><span class="badge b">B</span><div class="col"><span class="nm">e-ike-houndoom</span><span class="sub">Emerald · Houndoom · saved 2026-09-14</span></div><span class="chev">▾</span></div>
+      <span class="grow"></span>
+      <button class="btn" id="copy">Copy summary</button>
+      <button class="btn" id="shot">Export screenshot</button>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-t="overview" id="tab-overview">Overview</button>
+      <button class="tab" role="tab" aria-selected="false" data-t="checkpoints" id="tab-checkpoints">Checkpoints</button>
+      <button class="tab" role="tab" aria-selected="false" data-t="diff" id="tab-diff">Event diff</button>
+      <div class="right"><span class="check">✓</span> Highlight differences</div>
+    </div>
+
+    <!-- ============ OVERVIEW ============ -->
+    <div class="body" id="overview">
+      <div class="banner"><span>⚠</span><span><b>Route errors:</b> A has 2 events with errors and B has 1. Totals after the first error may be off.</span></div>
+
+      <div class="row">
+        <div class="card idc"><div class="tile">icon</div>
+          <div class="main"><div class="l1"><span class="badge a">A</span><span class="name">Houndoom</span><span class="pill">Lv 71</span><span class="chip">Emerald</span></div>
+          <div class="meta"><span>Early Bird</span> · <span>Rash</span> · Held item: <span>Charcoal</span></div>
+          <div class="meta">519 events in 205 folders · 0 disabled</div></div>
+          <div class="side"><span class="capu">Final time</span><span class="v">1:34:54.3</span></div></div>
+        <div class="card idc"><div class="tile">icon</div>
+          <div class="main"><div class="l1"><span class="badge b">B</span><span class="name">Houndoom</span><span class="pill">Lv 71</span><span class="chip">Emerald</span></div>
+          <div class="meta"><span>Flash Fire</span> · <span>Quiet</span> · Held item: <span>Leftovers</span></div>
+          <div class="meta">433 events in 172 folders · 0 disabled</div></div>
+          <div class="side"><span class="capu">Final time</span><span class="v">1:20:36.7</span><span class="dt good">14:17.6 faster than A</span></div></div>
+      </div>
+
+      <div class="row">
+        <div class="card" style="flex:0 0 440px"><div class="ct"><span class="t">Pokémon setup</span><span class="cap">IVs · nature · ability</span></div>
+          <table id="t-setup"></table></div>
+        <div class="colstack" style="flex:1">
+          <div class="card"><div class="ct"><span class="t">Final stats and EVs</span><span class="cap">at the end of each route</span></div>
+            <table id="t-stats"></table></div>
+          <div class="card fill"><div class="ct"><span class="t">Where the exp came from</span><span class="cap">447,779 exp gained in each route</span></div>
+            <div id="xp"></div>
+            <div class="legend"><span><i style="background:#8a8a8a"></i>Trainers</span><span><i style="background:#5f5f5f"></i>Wild</span><span><i style="background:#c9a227"></i>Rare Candy</span></div></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="card"><div class="ct"><span class="t">Route totals</span><span class="cap">enabled events only</span></div>
+          <table id="t-totals"></table></div>
+        <div class="colstack" style="flex:0 0 440px">
+          <div class="card"><div class="ct"><span class="t">Money</span><span class="cap">start $3,000</span></div>
+            <table id="t-money"></table></div>
+          <div class="card"><div class="ct"><span class="t">Final moves</span><span class="cap">bold = not in the other route</span></div>
+            <div class="moves" id="fm"></div></div>
+          <div class="card fill"><div class="ct"><span class="t">Trainers</span><span class="cap">160 vs 152</span></div>
+            <div id="sets"></div></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="card"><div class="ct"><span class="t">Moves learned</span><span class="cap">level when learned</span></div>
+          <table id="t-moves"></table></div>
+      </div>
+    </div>
+
+    <!-- ============ CHECKPOINTS ============ -->
+    <div class="body" id="checkpoints" hidden>
+      <div class="toolbar">
+        <div class="seg"><button aria-pressed="true" id="cp-major">Major fights</button><button aria-pressed="false" id="cp-all">All shared trainers (130)</button></div>
+        <span class="cap">State <b style="color:var(--text)">before</b> each fight both routes have. Click a row for stats and moves.</span>
+      </div>
+      <div class="card" style="padding-top:10px"><table id="t-cp"></table></div>
+    </div>
+
+    <!-- ============ EVENT DIFF ============ -->
+    <div class="body" id="diff" hidden>
+      <div class="toolbar">
+        <div class="seg" id="filters"><button aria-pressed="true">Trainers</button><button aria-pressed="true">Wild</button><button aria-pressed="true">Items</button><button aria-pressed="true">Moves</button><button aria-pressed="true">Candy &amp; vitamins</button><button aria-pressed="false">Heals &amp; saves</button></div>
+        <span class="grow"></span>
+        <span class="key"><span><span class="sw" style="background:var(--a)"></span>only in A</span><span><span class="sw" style="background:var(--b)"></span>only in B</span><span>grey = in both</span><span>═ same fight · ↕ fought in a different order</span></span>
+      </div>
+      <div class="lanes" id="lanes"></div>
+      <span class="cap">Showing the first 9 of 118 shared fights. Trainers are the fixed points; everything between two shared fights is grouped and compared as a set.</span>
+    </div>
+  </div></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), f=n=>n.toLocaleString("en-US");
+const dcell=(a,b,opt={})=>{const d=b-a;if(d===0)return `<td class="d">—</td>`;const s=(d>0?"+":"−")+f(Math.abs(d));return `<td class="d diff">${s}</td>`};
+const pair=(a,b)=>a===b?[`<td class="same">${a}</td>`,`<td class="same">${b}</td>`]:[`<td class="n">${a}</td>`,`<td class="n">${b}</td>`];
+
+// ---- Pokémon setup
+const iv=[["HP",31,30],["Attack",31,30],["Defense",31,31],["Sp. Atk",30,30],["Sp. Def",31,31],["Speed",30,31]];
+$("#t-setup").innerHTML=`<tr><th>IVs</th><th class="a">A</th><th class="b">B</th><th>B − A</th></tr>`+
+ iv.map(([n,a,b])=>`<tr><td>${n}</td><td class="${a===b?'same':'v'}">${a}</td><td class="${a===b?'same':'v'}">${b}</td>${dcell(a,b)}</tr>`).join("")+
+ `<tr class="total"><td>Total</td><td class="v">184</td><td class="v">183</td>${dcell(184,183)}</tr>
+  <tr class="grp"><td colspan="4">Traits</td></tr>
+  <tr><td>Hidden Power</td><td><span class="type" style="background:#6890f0">Water</span> 70</td><td><span class="type" style="background:#78c850">Grass</span> 70</td><td class="d diff">differs</td></tr>
+  <tr><td>Nature</td><td class="n">Rash <span class="cap">+SpA −SpD</span></td><td class="n">Quiet <span class="cap">+SpA −Spe</span></td><td class="d diff">differs</td></tr>
+  <tr><td>Ability</td><td class="n">Early Bird</td><td class="n">Flash Fire</td><td class="d diff">differs</td></tr>`;
+
+// ---- Final stats + EVs
+const st=[["HP",223,222,81,76],["Attack",193,191,127,119],["Defense",117,116,58,51],["Sp. Atk",238,248,89,138],["Sp. Def",147,161,50,36],["Speed",196,174,105,90]];
+$("#t-stats").innerHTML=`<tr><th>Stat</th><th class="a">Stat A</th><th class="b">Stat B</th><th>B − A</th><th class="bars"></th><th class="a">EVs A</th><th class="b">EVs B</th><th>B − A</th></tr>`+
+ st.map(([n,a,b,ea,eb])=>`<tr><td>${n}</td><td class="v">${a}</td><td class="v">${b}</td>${dcell(a,b)}
+   <td class="bars"><div class="bar a"><i style="width:${a/2.6}%"></i></div><div class="bar b"><i style="width:${b/2.6}%"></i></div></td>
+   <td class="n">${ea}</td><td class="n">${eb}</td>${dcell(ea,eb)}</tr>`).join("")+
+ `<tr class="total"><td>Total EVs</td><td></td><td></td><td></td><td></td><td class="same">510</td><td class="same">510</td><td class="d">—</td></tr>`;
+
+// ---- Totals
+const T=[["Battles"],["Trainers fought",160,152],["  of which major fights",29,27],["Trainer Pokémon defeated",323,318],["Wild Pokémon fought",68,41],["  different species",16,11],["  trainer-owned singles",8,2],
+ ["Levelling"],["Final level",71,71],["Rare Candies used",16,15],["Vitamins used",0,8,"B: Calcium ×6, Protein ×2"],
+ ["Moves"],["Moves learned",10,15],["  by level-up",3,4],["  by TM / HM",6,9],["  by tutor or deleter",1,2],
+ ["Items"],["Items picked up",99,88],["Purchases",12,8],["Sales",12,5],["Items used or dropped",79,68],["Held item changes",20,22],
+ ["Other"],["Pokémon Center heals",23,18],["Saves",22,10],["Blackouts",6,1],["Events with errors",2,1]];
+$("#t-totals").innerHTML=`<tr><th>Metric</th><th class="a">A</th><th class="b">B</th><th>B − A</th><th class="bars"></th><th style="text-align:left;padding-left:14px">Detail</th></tr>`+
+ T.map(r=>{if(r.length===1)return `<tr class="grp"><td colspan="6">${r[0]}</td></tr>`;const [n,a,b,note]=r,m=Math.max(a,b,1),sub=n.startsWith("  ");
+  return `<tr><td style="${sub?'padding-left:14px;color:var(--muted)':''}">${n.trim()}</td><td class="${a===b?'same':'v'}">${f(a)}</td><td class="${a===b?'same':'v'}">${f(b)}</td>${dcell(a,b)}
+   <td class="bars"><div class="bar a"><i style="width:${a/m*100}%"></i></div><div class="bar b"><i style="width:${b/m*100}%"></i></div></td>
+   <td class="cap" style="text-align:left;padding-left:14px">${note||""}</td></tr>`}).join("");
+
+// ---- Exp sources
+const xp=[["a",247449,9762,190568],["b",255293,4796,187690]],tot=447779;
+$("#xp").innerHTML=xp.map(([k,t,w,c])=>`<div class="srow"><span class="badge ${k}">${k.toUpperCase()}</span>
+  <div class="stack"><i style="width:${t/tot*100}%;background:#8a8a8a"></i><i style="width:${w/tot*100}%;background:#5f5f5f"></i><i style="width:${c/tot*100}%;background:#c9a227"></i></div>
+  <span class="cap" style="text-align:right">${Math.round(t/tot*100)} · ${Math.round(w/tot*100)} · ${Math.round(c/tot*100)} %</span></div>`).join("");
+
+// ---- Money
+const M=[["Won from trainers",193936,186780],["Sales",52350,36200],["Purchases",-75200,-133350],["Lost to blackouts",-96015,-2583]];
+const mf=n=>(n<0?"−$":"$")+f(Math.abs(n));
+$("#t-money").innerHTML=`<tr><th></th><th class="a">A</th><th class="b">B</th><th>B − A</th></tr>`+
+ M.map(([n,a,b])=>`<tr><td>${n}</td><td class="n">${mf(a)}</td><td class="n">${mf(b)}</td><td class="d diff">${(b-a>0?"+":"−")+"$"+f(Math.abs(b-a))}</td></tr>`).join("")+
+ `<tr class="total"><td>Final money</td><td class="v">$78,071</td><td class="v">$90,047</td><td class="d diff">+$11,976</td></tr>`;
+
+// ---- Trainer sets
+$("#sets").innerHTML=[["Fought in both, same order",115,""],["Fought in both, different order",14,""],["Only in A  (expanded)",29,"a"],["Only in B",23,"b"],["Fought twice in A",2,"a"]]
+ .map(([k,c,w],i)=>`<div class="setrow"><span class="dis">${i===2?"▾":i>2?"▸":""}</span>${w?`<span class="badge ${w}">${w.toUpperCase()}</span>`:""}<span class="k">${k}</span><span class="c">${c}</span></div>`).join("")+
+ `<div class="names"><span class="nchip">Rival Brendan 2 Mudkip</span><span class="nchip">Tuber F Lola</span><span class="nchip">Tuber M Ricky</span><span class="nchip">Sailor Edmond</span><span class="nchip">Tuber F Hailey</span><span class="nchip">Sailor Huey</span><span class="nchip">Lady Sarah</span><span class="nchip">Rich Boy Dawson</span><span class="nchip">Pokefan Miguel</span><span class="nchip">Guitarist Joseph</span><span class="nchip">Guitarist Dalton</span><span class="nchip">Youngster Ben</span><span class="nchip">Aroma Lady Shayla</span><span class="nchip" style="color:var(--muted)">+16 more</span></div>`;
+
+// ---- Final moves
+const fa=["Fire Blast","Sunny Day","Substitute","Crunch"],fb=["Substitute","Attract","Flamethrower","Sunny Day"];
+const col=(k,l,o)=>`<div><div style="display:flex;gap:8px;align-items:center;height:24px"><span class="badge ${k}">${k.toUpperCase()}</span></div>`+
+ l.map((m,i)=>`<div class="mv ${o.includes(m)?'shared':''}"><span class="s">${i+1}</span><span class="m">${m}</span></div>`).join("")+`</div>`;
+$("#fm").innerHTML=col("a",fa,fb)+col("b",fb,fa);
+
+// ---- Moves learned
+const L=[["Smog","Level-up","13","13"],["Thief","TM46","20","18"],["Bite","Level-up","27","27"],["Secret Power","TM43","29","29"],["Flamethrower","TM35 / Level-up","30 · TM35","51 · level-up, 69 · tutor"],
+ ["Hidden Power","TM10","30","34, 48"],["Overheat","TM50","—","32"],["Substitute","Tutor","40","37"],["Fire Blast","TM38","53","37"],["Return","TM27","—","37"],["Crunch","Level-up","59","59"],["Attract","TM45","—","67"],["Sunny Day","TM11","68","70"]];
+$("#t-moves").innerHTML=`<tr><th>Move</th><th style="text-align:left;padding-left:10px">Source</th><th class="a" style="width:220px">A · Lv</th><th class="b" style="width:220px">B · Lv</th></tr>`+
+ L.map(([m,s,a,b])=>{const same=a===b;return `<tr><td style="${same?'':'color:var(--strong);font-weight:700'}">${m}</td><td class="cap" style="text-align:left">${s}</td><td class="${same?'same':'n'}">${a}</td><td class="${same?'same':'n'}">${b}</td></tr>`}).join("");
+
+// ---- Checkpoints
+const C=[["Leader Roxanne","#0d0d0d",18,16,"14:03.4","11:04.8","+2:58.6",604,2583,100,69,0],
+ ["Leader Wattson","#0d0d0d",28,27,"33:15.8","23:57.9","+9:17.9",24875,22123,195,149,0],
+ ["Magma Admin Tabitha 2","#702060",31,30,"40:21.8","29:38.1","+10:43.8",81417,10679,222,195,3],
+ ["Leader Flannery","#0d0d0d",31,31,"41:48.8","31:20.0","+10:28.9",84297,15215,228,206,3],
+ ["Leader Norman","#0d0d0d",33,33,"44:38.4","34:39.4","+9:59.0",92841,21859,244,233,3],
+ ["Leader Winona","#0d0d0d",38,38,"55:33.7","44:40.1","+10:53.6",55479,2791,305,342,3],
+ ["Leader Tate & Liza","#0d0d0d",53,48,"1:10:17.7","55:46.4","+14:31.3",67203,40019,397,437,2],
+ ["Leader Juan","#0d0d0d",54,50,"1:18:19.6","1:02:22.0","+15:57.6",89283,60139,440,475,2],
+ ["Elite Four Sidney","#38084d",66,66,"1:25:25.8","1:07:44.3","+17:41.4",40991,52967,499,510,2],
+ ["Champion Wallace","#054d3f",68,68,"1:29:50.5","1:14:53.5","+14:57.0",61791,73767,510,510,3],
+ ["Rival Steven","#12196b",70,70,"1:34:54.3","1:20:36.7","+14:17.6",73391,85367,510,510,3]];
+const detail=`<tr class="detail" id="cpd" hidden><td colspan="12"><div class="dgrid">
+ <table class="mini"><tr><th>Before Leader Winona</th><th class="a">Stat A</th><th class="b">Stat B</th><th>B − A</th><th class="a">EVs A</th><th class="b">EVs B</th></tr>
+ ${[["HP",122,122,65,63],["Attack",99,99,61,68],["Defense",63,63,41,38],["Sp. Atk",114,119,49,101],["Sp. Def",71,79,21,22],["Speed",103,91,68,50]].map(([n,a,b,ea,eb])=>`<tr><td>${n}</td><td class="${a===b?'same':'n'}">${a}</td><td class="${a===b?'same':'n'}">${b}</td>${dcell(a,b)}<td class="n">${ea}</td><td class="n">${eb}</td></tr>`).join("")}</table>
+ <div><div class="cap" style="margin-bottom:4px"><span class="badge a">A</span>&nbsp; Held: Charcoal</div>${["Hidden Power","Flamethrower","Howl","Bite"].map((m,i)=>`<div class="mv ${m==="Bite"?'shared':''}"><span class="s">${i+1}</span><span class="m">${m}</span></div>`).join("")}</div>
+ <div><div class="cap" style="margin-bottom:4px"><span class="badge b">B</span>&nbsp; Held: Black Glasses</div>${["Substitute","Fire Blast","Return","Bite"].map((m,i)=>`<div class="mv ${m==="Bite"?'shared':''}"><span class="s">${i+1}</span><span class="m">${m}</span></div>`).join("")}</div>
+ </div></td></tr>`;
+$("#t-cp").innerHTML=`<tr><th>Fight</th><th class="a">Lv A</th><th class="b">Lv B</th><th>B − A</th><th class="a">Time A</th><th class="b">Time B</th><th>A vs B</th><th class="a">Money A</th><th class="b">Money B</th><th class="a">EVs A</th><th class="b">EVs B</th><th>Moves</th></tr>`+
+ C.map(([n,c,la,lb,ta,tb,dt,ma,mb,ea,eb,md])=>`<tr class="cp" tabindex="0" data-n="${n}"><td class="f"><span class="cat" style="background:${c};outline:1px solid #555"></span>${n}</td>
+  <td class="${la===lb?'same':'v'}">${la}</td><td class="${la===lb?'same':'v'}">${lb}</td>${dcell(la,lb)}
+  <td class="n">${ta}</td><td class="n">${tb}</td><td class="d bad" style="width:80px">${dt}</td>
+  <td class="n">$${f(ma)}</td><td class="n">$${f(mb)}</td><td class="${ea===eb?'same':'n'}">${ea}</td><td class="${ea===eb?'same':'n'}">${eb}</td>
+  <td class="${md?'mdiff':'msame'}">${md?md+" differ":"same"}</td></tr>${n==="Leader Winona"?detail:""}`).join("");
+document.querySelectorAll("tr.cp").forEach(r=>{const go=()=>{if(r.dataset.n==="Leader Winona"){const d=$("#cpd");d.hidden=!d.hidden}};r.addEventListener("click",go);r.addEventListener("keydown",e=>{if(e.key==="Enter")go()})});
+
+// ---- Event diff lanes.  ev = [kind, text, qty, status]  status: c = in both, o = only here
+const E=(side,[k,t,q,s,extra])=>`<div class="ev ${s==="o"?"only e"+side:""} ${k==="Trainer"?"tr":""}"><span class="k">${k}</span><span class="t">${t}</span>${extra?`<span class="mvd">${extra}</span>`:""}${q?`<span class="q">${q}</span>`:""}</div>`;
+const block=(a,b)=>`<div class="block"><div class="lane">${a.length?a.map(e=>E("a",e)).join(""):'<div class="empty">—</div>'}</div><div class="gut"></div><div class="lane">${b.length?b.map(e=>E("b",e)).join(""):'<div class="empty">—</div>'}</div></div>`;
+const anchor=(n,loc,la,ta,lb,tb,dt,cls,g="═")=>`<div class="anchor"><div class="cell"><span class="nm">${n}</span><span class="loc">${loc}</span><span class="r">Lv <b>${la}</b><span>${ta}</span></span></div><div class="gut">${g}</div><div class="cell bb"><span class="nm">${n}</span><span class="r"><span class="dt ${cls}">${dt}</span>Lv <b>${lb}</b><span>${tb}</span></span></div></div>`;
+$("#lanes").innerHTML=`<div class="lhead"><div><span class="badge a">A</span><b style="color:var(--strong)">e-houndoom-1-13454</b></div><div class="gut" style="border:0"></div><div><span class="badge b">B</span><b style="color:var(--strong)">e-ike-houndoom</b></div></div>`+
+ anchor("Rival Brendan 1 / May 1 Mudkip","Route 103",5,"1:21.3",5,"1:16.8","−0:04.5","good")+
+ block([["Wild","Poochyena L3","×2","o"],["Wild","Zigzagoon L2","","o"],["Wild","Wurmple L3","","o"],["Item","Poké Ball","×5","c"],["Heal","Oldale Town","","o"]],[["Item","Poké Ball","×5","c"]])+
+ anchor("Youngster Calvin","Route 102",6,"2:09.6",5,"1:48.6","−0:21.0","good")+
+ anchor("Bug Catcher Rick","Route 102",6,"2:20.0",6,"1:58.4","−0:21.6","good")+
+ block([["Wild","Wurmple L3","","o"]],[])+
+ anchor("Youngster Allen","Route 102",7,"2:35.3",6,"2:09.8","−0:25.5","good")+
+ block([["Item","Oran Berry","×2","c"]],[["Item","Pecha Berry","×2","o"],["Item","Oran Berry","×2","c"]])+
+ anchor("Lass Tiana","Route 102",7,"2:47.6",7,"2:25.4","−0:22.2","good")+
+ block([["Buy","Repel","×10 vs ×7","c"]],[["Buy","Escape Rope","×2","o"],["Buy","Repel","×7 vs ×10","c"],["Heal","Petalburg City","","o"]])+
+ anchor("Youngster Billy","Route 104",8,"3:38.9",7,"3:23.2","−0:15.7","good")+
+ block([["Item","Oran Berry","×2","c"],["Wild","Cascoon L5","","o"]],[["Trainer","Lady Cindy","","c","↕ A fights them after Team Aqua Grunt 15"],["Item","Heart Scale","","o"],["Item","Oran Berry","×2","c"],["Wild","Shroomish L5","","o"]])+
+ anchor("Bug Catcher Lyle","Petalburg Woods",8,"4:05.8",8,"3:59.0","−0:06.8","good")+
+ block([["Item","Parlyz Heal","","c"],["Wild","Wurmple L5","×2","o"]],[["Wild","Poochyena L5–6","×2","o"],["Item","Parlyz Heal","","c"],["Wild","Slakoth L6","","o"]])+
+ anchor("Team Aqua Grunt 8","Petalburg Woods",9,"4:28.5",9,"4:25.9","−0:02.6","good")+
+ block([["Item","Great Ball","","c"],["Wild","Poochyena L5","×2","o"],["Item","Ether","","o"],["Use","Ether","","o"]],[["Item","Great Ball","","c"]])+
+ anchor("Bug Catcher James","Petalburg Woods",10,"4:58.4",10,"4:39.8","−0:18.6","good");
+
+// ---- tabs + toggles
+const tabs=[...document.querySelectorAll(".tab")];
+tabs.forEach(t=>t.addEventListener("click",()=>{tabs.forEach(x=>{const on=x===t;x.setAttribute("aria-selected",on);$("#"+x.dataset.t).hidden=!on})}));
+document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{if(b.parentElement.id==="filters")b.setAttribute("aria-pressed",b.getAttribute("aria-pressed")!=="true");else[...b.parentElement.children].forEach(x=>x.setAttribute("aria-pressed",x===b))}));
+</script>

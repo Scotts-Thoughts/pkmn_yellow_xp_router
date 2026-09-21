@@ -4,6 +4,7 @@
 pub mod app;
 pub mod assets;
 pub mod battle;
+pub mod compare;
 pub mod battle_ui;
 pub mod controller;
 pub mod custom_dvs;

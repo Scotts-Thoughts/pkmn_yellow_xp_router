@@ -21,6 +21,7 @@ use xpr_ui_kit::{AutoClearingLabel, Geometry, ShortcutMap, ToastHost};
 
 use crate::assets::Assets;
 use crate::battle_ui::ScreenshotMode;
+use crate::compare::{CompareEnv, CompareView, RouteSource};
 use crate::controller::MainController;
 use crate::dialogs::{
     AppConfigDialog, AssignMoveDialog, BattleConfigDialog, ColorConfigDialog, CustomDvsDialog, CustomGenDialog, Dialog, EvOverrideDialog,
@@ -43,6 +44,7 @@ pub enum Page {
     Landing,
     NewRoute,
     Editor,
+    Compare,
 }
 
 /// What `main` needs to know after the window closes.
@@ -87,6 +89,13 @@ pub struct XprApp {
     index_rx: Option<Receiver<RouteIndex>>,
     run_summary: Option<RunSummary>,
     setup_summary_open: bool,
+    compare: CompareView,
+    /// The compare page's on-screen width, for exports.
+    compare_width: Option<f32>,
+    /// `XPR_SMOKE_COMPARE_EXPAND`: the checkpoint row to open once loaded.
+    smoke_compare_expand: Option<usize>,
+    /// The page Compare was opened from, returned to by Back / Esc.
+    compare_return: Page,
     recorder: Recorder,
     /// the landing page's "Start Recording": the GameHook session that
     /// detects the game and the first Pokémon before a route exists
@@ -187,6 +196,10 @@ impl XprApp {
             index_rx: Some(rx),
             run_summary: None,
             setup_summary_open: false,
+            compare: CompareView::new(),
+            compare_width: None,
+            smoke_compare_expand: None,
+            compare_return: Page::Landing,
             recorder,
             quick_start: None,
             route_name_text: String::new(),
@@ -432,6 +445,70 @@ impl XprApp {
 
     // ---- shortcuts --------------------------------------------------------------------------
 
+    /// Draw the compare page and report what it wants done.
+    fn compare_page(&mut self, ui: &mut egui::Ui) -> crate::compare::CompareActions {
+        self.compare.poll(ui.ctx());
+        if let Some(n) = self.smoke_compare_expand {
+            if self.compare.has_comparison() {
+                self.compare.expand_checkpoint_for_smoke(n);
+                self.smoke_compare_expand = None;
+            }
+        }
+        let theme = self.theme.clone();
+        let env = CompareEnv {
+            registry: self.registry.clone(),
+            paths: &self.paths,
+            index: &self.index,
+            current_route_name: self.current_route_name(),
+        };
+        let mut actions = self.compare.ui(ui, &theme, &self.cfg, &mut self.assets, &env);
+        if let Some(is_a) = actions.use_current_route {
+            // serialized once, on request (a big route takes milliseconds)
+            if let Some(src) = self.current_route_source() {
+                self.compare.set_source(is_a, src, &env);
+            }
+        }
+        // An open picker consumes Esc itself, so this only sees the key when
+        // it means "leave the page".
+        if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape)) {
+            actions.back = true;
+        }
+        actions
+    }
+
+    /// Open the compare page, seeding route A with the open route (D9).
+    fn open_compare_page(&mut self) {
+        let current = self.current_route_source();
+        self.open_compare_with(current);
+    }
+
+    /// Open the compare page with `a` (if any) in slot A.
+    fn open_compare_with(&mut self, a: Option<RouteSource>) {
+        if self.page != Page::Compare {
+            self.compare_return = self.page;
+        }
+        let env = CompareEnv {
+            registry: self.registry.clone(),
+            paths: &self.paths,
+            index: &self.index,
+            current_route_name: self.current_route_name(),
+        };
+        self.compare.open(a, &env);
+        self.page = Page::Compare;
+    }
+
+    /// The name of the route open in the editor, if one is.
+    fn current_route_name(&self) -> Option<String> {
+        let name = self.ctrl.get_current_route_name();
+        (!name.is_empty() && self.ctrl.gen().is_some()).then(|| name.to_string())
+    }
+
+    /// The route open in the editor, serialized from memory.
+    fn current_route_source(&self) -> Option<RouteSource> {
+        let name = self.current_route_name()?;
+        self.ctrl.router.serialize().ok().map(|json| RouteSource::Value { label: name, json })
+    }
+
     fn handle_shortcuts(&mut self, ctx: &egui::Context) {
         if self.dialog.is_some() || self.message.is_some() {
             return;
@@ -456,6 +533,9 @@ impl XprApp {
         }
         if fire("load_route") {
             self.dialog = Some(Dialog::LoadRoute(LoadRouteDialog::new(&self.paths)));
+        }
+        if fire("compare_routes") {
+            self.open_compare_page();
         }
         if fire("save_route") {
             self.save_route();
@@ -500,6 +580,12 @@ impl XprApp {
             self.dialog = Some(Dialog::Shortcuts(ShortcutsDialog::new(&self.cfg)));
         }
         // Events
+        // Everything below edits or drives the route editor. The compare page
+        // keeps the editor's route loaded underneath it, so none of it may
+        // fire there: Ctrl+Z or Delete would change a route nobody can see.
+        if self.page == Page::Compare {
+            return;
+        }
         if fire("undo") && !text_focus && self.ctrl.can_undo() {
             self.ctrl.undo();
         }
@@ -1061,7 +1147,12 @@ impl XprApp {
     /// layout and whatever is open right now (the menu that was just clicked,
     /// a tooltip) is not part of the PNG.
     fn request_shot(&mut self, kind: ShotKind) {
-        if self.ctrl.is_empty() && kind != ShotKind::SetupSummary && kind != ShotKind::RunSummary {
+        // F5-F8 on the compare page would export the editor as it was last
+        // drawn; only the page's own export makes sense there.
+        if self.page == Page::Compare && kind != ShotKind::Compare {
+            return;
+        }
+        if self.ctrl.is_empty() && kind != ShotKind::SetupSummary && kind != ShotKind::RunSummary && kind != ShotKind::Compare {
             return;
         }
         if kind.battle_mode().is_some() && !self.details.is_battle_tab() {
@@ -1090,6 +1181,18 @@ impl XprApp {
     /// `take_screenshot`'s output path for `kind`: the custom image path
     /// (event list only) or the images dir, `<timestamp>-<route>_<kind>.png`.
     fn shot_path(&self, kind: &ShotKind) -> PathBuf {
+        if matches!(kind, ShotKind::Compare) {
+            if let Some(cmp) = self.compare.comparison() {
+                let tab = match self.compare.tab {
+                    crate::compare::TAB_CHECKPOINTS => "checkpoints",
+                    crate::compare::TAB_DIFF => "event_diff",
+                    _ => "overview",
+                };
+                let name = format!("compare_{}_vs_{}_{}", io_utils::get_path_safe_string(&cmp.a.label), io_utils::get_path_safe_string(&cmp.b.label), tab);
+                let date = chrono::Local::now().format("%Y%m%d%H%M%S").to_string();
+                return io_utils::get_safe_path_no_collision(&self.cfg.get_images_dir(), &format!("{}-{}", date, name), ".png");
+            }
+        }
         let custom = if matches!(kind, ShotKind::EventList) { Some(self.image_path_text.clone()) } else { None };
         let dir = match custom {
             Some(p) if !p.trim().is_empty() => {
@@ -1198,6 +1301,22 @@ impl XprApp {
                     });
                 });
                 off.rasterize(&prims, Rect::from_min_size(Pos2::ZERO, size))?
+            }
+            ShotKind::Compare => {
+                // The active tab's content at the page's on-screen width, on a
+                // canvas tall enough that the scroll viewport cuts nothing off.
+                let width = self.compare_width.unwrap_or(1280.0);
+                let size = Vec2::new(width, 16_000.0);
+                let compare = &mut self.compare;
+                let cfg = &self.cfg;
+                let mut assets = Assets::new();
+                let mut content = Rect::NOTHING;
+                let prims = off.render(size, 2, |c| {
+                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(c, |ui| {
+                        content = compare.export_ui(ui, &theme, cfg, &mut assets);
+                    });
+                });
+                off.rasterize(&prims, content)?
             }
         };
         canvas.save(&out_path)?;
@@ -1390,6 +1509,9 @@ impl XprApp {
                 }
                 if widgets::menu_item(ui, &theme, "Load Route", &label("load_route"), true) {
                     self.dialog = Some(Dialog::LoadRoute(LoadRouteDialog::new(&self.paths)));
+                }
+                if widgets::menu_item(ui, &theme, "Compare Routes\u{2026}", &label("compare_routes"), true) {
+                    self.open_compare_page();
                 }
                 if widgets::menu_item(ui, &theme, "Save Route", &label("save_route"), true) {
                     self.save_route();
@@ -1871,6 +1993,36 @@ impl XprApp {
                 self.begin_quick_start(ctx);
                 self.smoke_arm_record_stop(&path);
             }
+            // `XPR_SMOKE_ACTION=compare`: open the compare page on
+            // `XPR_SMOKE_COMPARE_A` / `_B`, wait for both to load, then show
+            // `XPR_SMOKE_COMPARE_TAB` (overview | checkpoints | diff).
+            if !self.smoke_action_done && std::env::var("XPR_SMOKE_ACTION").as_deref() == Ok("compare") && self.deferred_post_init.is_none() {
+                self.smoke_action_done = true;
+                let pick = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty()).map(|v| RouteSource::Path(PathBuf::from(v)));
+                let env = CompareEnv {
+                    registry: self.registry.clone(),
+                    paths: &self.paths,
+                    index: &self.index,
+                    current_route_name: None,
+                };
+                if let Some(a) = pick("XPR_SMOKE_COMPARE_A") {
+                    self.compare.set_source(true, a, &env);
+                }
+                if let Some(b) = pick("XPR_SMOKE_COMPARE_B") {
+                    self.compare.set_source(false, b, &env);
+                }
+                self.compare.tab = match std::env::var("XPR_SMOKE_COMPARE_TAB").as_deref() {
+                    Ok("checkpoints") => crate::compare::TAB_CHECKPOINTS,
+                    Ok("diff") => crate::compare::TAB_DIFF,
+                    _ => crate::compare::TAB_OVERVIEW,
+                };
+                self.compare_return = Page::Landing;
+                self.page = Page::Compare;
+                if let Ok(n) = std::env::var("XPR_SMOKE_COMPARE_EXPAND") {
+                    self.smoke_compare_expand = n.parse().ok();
+                }
+                log::info!("smoke: compare page");
+            }
             // `XPR_SMOKE_ACTION` drives the window into a state before the capture.
             if !self.smoke_action_done && Instant::now() >= at - Duration::from_millis(1500) && self.page == Page::Editor {
                 self.smoke_action_done = true;
@@ -2013,7 +2165,7 @@ impl XprApp {
                 // `XPR_SMOKE_EXPORT=<kind>[,<kind>...]`: run these exports (they
                 // land in the images dir) right before the capture; kinds are
                 // `event_list`, `battle_summary`, `player_ranges`,
-                // `enemy_ranges`, `run_summary`, `setup_summary` and
+                // `enemy_ranges`, `run_summary`, `setup_summary`, `compare` and
                 // `matchup:<n>[:player|:enemy]`
                 if let Ok(list) = std::env::var("XPR_SMOKE_EXPORT") {
                     for kind in list.split(',').filter_map(smoke_export_kind) {
@@ -2165,6 +2317,7 @@ impl XprApp {
             }
         }
         let mut event_list_rect: Option<Rect> = None;
+        let mut compare_actions: Option<crate::compare::CompareActions> = None;
         egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(ctx, |ui| match self.page {
             Page::Landing => {
                 if let Some(qs) = &self.quick_start {
@@ -2192,6 +2345,9 @@ impl XprApp {
                         self.ctrl.load_route(&p);
                         self.show_route_controls();
                     }
+                    if let Some(a) = actions.compare_routes {
+                        self.open_compare_with(a.map(RouteSource::Path));
+                    }
                 }
             }
             Page::NewRoute => {
@@ -2215,7 +2371,23 @@ impl XprApp {
             Page::Editor => {
                 event_list_rect = self.editor_page(ui, ctx);
             }
+            Page::Compare => {
+                self.compare_width = Some(ui.available_width());
+                compare_actions = Some(self.compare_page(ui));
+            }
         });
+        if let Some(actions) = compare_actions {
+            if actions.back {
+                self.page = self.compare_return;
+            }
+            if actions.export {
+                self.request_shot(ShotKind::Compare);
+            }
+            if let Some(text) = actions.copy_summary {
+                ctx.copy_text(text);
+                self.toast.show("Summary copied", 3000, None);
+            }
+        }
         // popover / dialogs / toast
         if let Some(trainer) = self.quick_add.ui(ctx, &theme, &mut self.ctrl, &mut self.assets) {
             self.ctrl.set_preview_trainer(&trainer);
@@ -2304,6 +2476,7 @@ fn smoke_export_kind(name: &str) -> Option<ShotKind> {
     let mut parts = name.trim().split(':');
     match parts.next()? {
         "event_list" => Some(ShotKind::EventList),
+        "compare" => Some(ShotKind::Compare),
         "battle_summary" => Some(ShotKind::BattleSummary),
         "player_ranges" => Some(ShotKind::PlayerRanges),
         "enemy_ranges" => Some(ShotKind::EnemyRanges),
