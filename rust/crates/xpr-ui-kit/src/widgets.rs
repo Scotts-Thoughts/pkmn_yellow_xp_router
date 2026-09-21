@@ -283,7 +283,7 @@ pub fn amount_button(ui: &mut Ui, theme: &Theme, text: &str, enabled: bool) -> R
 /// `QPushButton[class="seg-toggle"]`: square, bold, red left bar when checked.
 pub fn seg_toggle(ui: &mut Ui, theme: &Theme, text: &str, checked: bool) -> Response {
     let font = theme.body_bold();
-    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font, Color32::WHITE));
+    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font, Color32::PLACEHOLDER));
     let desired = Vec2::new(galley.size().x + 28.0, (galley.size().y + 8.0).max(24.0));
     let (rect, response) = ui.allocate_exact_size(desired, Sense::click());
     if ui.is_rect_visible(rect) {
@@ -1109,7 +1109,7 @@ pub fn checkbox(ui: &mut Ui, theme: &Theme, checked: &mut bool, text: &str, enab
     let galley = if text.is_empty() {
         None
     } else {
-        Some(ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font, Color32::WHITE)))
+        Some(ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font, Color32::PLACEHOLDER)))
     };
     let text_w = galley.as_ref().map(|g| g.size().x + 4.0).unwrap_or(0.0);
     let desired = Vec2::new(16.0 + text_w, 20.0);
@@ -1194,7 +1194,7 @@ pub fn disclosure_triangle(ui: &mut Ui, expanded: bool, size: f32, color: Color3
 /// sitting on the top border.
 pub fn group_box<R>(ui: &mut Ui, theme: &Theme, title: &str, add_contents: impl FnOnce(&mut Ui) -> R) -> R {
     let font = theme.body_bold();
-    let galley = ui.fonts_mut(|f| f.layout_no_wrap(title.to_string(), font, Color32::WHITE));
+    let galley = ui.fonts_mut(|f| f.layout_no_wrap(title.to_string(), font, Color32::PLACEHOLDER));
     let title_h = galley.size().y;
     ui.add_space(title_h / 2.0);
     let frame = egui::Frame::new()
@@ -1248,7 +1248,7 @@ pub fn tab_bar(ui: &mut Ui, theme: &Theme, tabs: &[&str], current: &mut usize, t
     for (i, t) in tabs.iter().enumerate() {
         let selected = i == *current;
         let font = if selected { theme.body_bold() } else { theme.body() };
-        let galley = ui.fonts_mut(|f| f.layout_no_wrap(t.to_string(), font, Color32::WHITE));
+        let galley = ui.fonts_mut(|f| f.layout_no_wrap(t.to_string(), font, Color32::PLACEHOLDER));
         let w = galley.size().x + 24.0;
         let rect = Rect::from_min_size(Pos2::new(x, strip.min.y), Vec2::new(w, strip.height()));
         let resp = ui.interact(rect, ui.id().with(("tab", i)), Sense::click());
@@ -1302,11 +1302,11 @@ pub fn menu_check_item(ui: &mut Ui, theme: &Theme, text: &str, shortcut: &str, c
 
 fn menu_row(ui: &mut Ui, theme: &Theme, text: &str, shortcut: &str, checked: Option<bool>, enabled: bool) -> bool {
     let font = theme.body();
-    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font.clone(), Color32::WHITE));
+    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font.clone(), Color32::PLACEHOLDER));
     let sc_galley = if shortcut.is_empty() {
         None
     } else {
-        Some(ui.fonts_mut(|f| f.layout_no_wrap(shortcut.to_string(), font.clone(), Color32::WHITE)))
+        Some(ui.fonts_mut(|f| f.layout_no_wrap(shortcut.to_string(), font.clone(), Color32::PLACEHOLDER)))
     };
     let indicator_w = if checked.is_some() { 20.0 } else { 0.0 };
     let min_w = ui.available_width().max(galley.size().x + sc_galley.as_ref().map(|g| g.size().x + 32.0).unwrap_or(0.0) + 40.0 + indicator_w);
@@ -1655,7 +1655,9 @@ mod tests {
 /// Chip-style label (status bar version / run status).
 pub fn chip(ui: &mut Ui, theme: &Theme, text: &str, bg: Color32, fg: Color32, padding: Vec2, clickable: bool) -> Response {
     let font = theme.body();
-    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font, Color32::WHITE));
+    // PLACEHOLDER so `fg` applies: a colour baked into the galley wins over
+    // the one given to `painter.galley`
+    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font, Color32::PLACEHOLDER));
     let desired = galley.size() + 2.0 * padding;
     let (rect, resp) = ui.allocate_exact_size(desired, if clickable { Sense::click() } else { Sense::hover() });
     if ui.is_rect_visible(rect) {

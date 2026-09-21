@@ -862,6 +862,12 @@ impl MainController {
 
     pub fn load_all_custom_versions(&mut self) {
         let r = self.router.registry().reload_all_custom_gens();
+        self.on_custom_versions_loaded(r);
+    }
+
+    /// The outcome of a `reload_all_custom_gens` run elsewhere (the start-up
+    /// background load).
+    pub fn on_custom_versions_loaded(&mut self, r: Result<(), String>) {
         self.report(r, "load_all_custom_versions");
     }
 

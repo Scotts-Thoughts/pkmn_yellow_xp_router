@@ -385,7 +385,7 @@ impl BattleSummaryUi {
                     self.held_item_apply_in_flight = false;
                 }
                 let chip = |ui: &mut Ui, text: String, tip: &str| {
-                    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text, theme.body(), Color32::WHITE));
+                    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text, theme.body(), Color32::PLACEHOLDER));
                     let (r, resp) = ui.allocate_exact_size(galley.size() + Vec2::new(8.0, 4.0), Sense::hover());
                     ui.painter().rect_stroke(r, CornerRadius::same(3), Stroke::new(1.0_f32, theme::rgba(255, 255, 255, 0.15)), egui::StrokeKind::Inside);
                     ui.painter().galley(Pos2::new(r.min.x + 4.0, r.center().y - galley.size().y / 2.0), galley, theme.text);

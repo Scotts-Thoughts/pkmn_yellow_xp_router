@@ -112,11 +112,6 @@ impl LandingPage {
             ui.add_space(50.0);
             ui.label(egui::RichText::new("Pokemon Solo Challenge Router").font(theme.font_bold(24.0)).color(theme.text));
             ui.add_space(20.0);
-            let create = StyledButton::new(theme, egui::RichText::new("Create New Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
-            if create.clicked() {
-                actions.create_route = true;
-            }
-            ui.add_space(10.0);
             let record = StyledButton::new(theme, egui::RichText::new("● Start Recording").font(theme.font_bold(14.0)).color(Color32::from_rgb(0xe7, 0x4c, 0x3c)))
                 .min_size(Vec2::new(350.0, 50.0))
                 .text_color(Color32::from_rgb(0xe7, 0x4c, 0x3c))
@@ -124,6 +119,11 @@ impl LandingPage {
                 .on_hover_text("Connect to GameHook now: the game comes from the loaded mapper and the route is set up from your first Pokémon (species, DVs/IVs, nature, ability) the moment you receive it.");
             if record.clicked() {
                 actions.start_recording = true;
+            }
+            ui.add_space(10.0);
+            let create = StyledButton::new(theme, egui::RichText::new("Create New Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
+            if create.clicked() {
+                actions.create_route = true;
             }
             ui.add_space(10.0);
             let can_load = self.selected_route.as_ref().map(|r| r != NO_ROUTES).unwrap_or(false);
@@ -134,7 +134,7 @@ impl LandingPage {
                 }
             }
             ui.add_space(10.0);
-            let compare = StyledButton::new(theme, egui::RichText::new("Compare Routes").font(theme.font_bold(11.0))).min_size(Vec2::new(350.0, 32.0)).show(ui);
+            let compare = StyledButton::new(theme, egui::RichText::new("Compare Routes").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
             if compare.on_hover_text("See how two routes differ. The selected route, if any, becomes route A.").clicked() {
                 let selected = self.selected_route.as_ref().filter(|_| can_load).map(|r| io_utils::get_existing_route_path(paths, r));
                 actions.compare_routes = Some(selected);
@@ -427,7 +427,9 @@ pub struct NewRoutePage {
     min_battles_cache: Vec<String>,
     min_battles_selector: OptionMenu,
     pub dvs: CustomDvsFrame,
-    route_cache_per_game: HashMap<String, Vec<String>>,
+    /// false while the base-route list was built before the background
+    /// route index finished loading (rebuilt once it has)
+    base_routes_from_index: bool,
     pkmn_list_cache: HashMap<(String, String), Vec<String>>,
     pending_game_load: bool,
 }
@@ -445,7 +447,7 @@ impl NewRoutePage {
             min_battles_cache: vec![consts::EMPTY_ROUTE_NAME.to_string()],
             min_battles_selector: OptionMenu::new(vec![consts::EMPTY_ROUTE_NAME.to_string()], None),
             dvs: CustomDvsFrame::new(),
-            route_cache_per_game: HashMap::new(),
+            base_routes_from_index: true,
             pkmn_list_cache: HashMap::new(),
             pending_game_load: false,
         }
@@ -501,7 +503,7 @@ impl NewRoutePage {
     }
 
     /// `refresh_game_list`
-    pub fn refresh_game_list(&mut self, registry: &Registry, paths: &Paths) {
+    pub fn refresh_game_list(&mut self, registry: &Registry, index: &RouteIndex) {
         if let Err(e) = registry.reload_all_custom_gens() {
             log::warn!("Could not reload some custom gens: {}", e);
         }
@@ -511,14 +513,14 @@ impl NewRoutePage {
             Some(c) if self.games.iter().any(|g| g.name == c) => {}
             _ => {
                 if let Some(first) = self.games.first().map(|g| g.name.clone()) {
-                    self.select_game(&first, registry, paths);
+                    self.select_game(&first, registry, index);
                 }
             }
         }
     }
 
     /// `reset_form`
-    pub fn reset_form(&mut self, registry: &Registry, paths: &Paths) {
+    pub fn reset_form(&mut self, registry: &Registry, index: &RouteIndex) {
         self.pkmn_filter.clear();
         self.min_battles_filter.clear();
         self.populate_game_table(registry);
@@ -527,7 +529,7 @@ impl NewRoutePage {
         self.current_gen_num = None;
         self.pkmn_list_cache.clear();
         if let Some(first) = self.games.first().map(|g| g.name.clone()) {
-            self.select_game(&first, registry, paths);
+            self.select_game(&first, registry, index);
         } else {
             self.solo_selector.new_values(vec![consts::NO_POKEMON.to_string()], None);
             self.min_battles_selector.new_values(vec![consts::EMPTY_ROUTE_NAME.to_string()], None);
@@ -535,7 +537,7 @@ impl NewRoutePage {
     }
 
     /// `_on_game_selection_changed` + `_pkmn_version_callback`
-    fn select_game(&mut self, new_game: &str, registry: &Registry, paths: &Paths) -> Option<String> {
+    fn select_game(&mut self, new_game: &str, registry: &Registry, index: &RouteIndex) -> Option<String> {
         if self.selected_game.as_deref() == Some(new_game) {
             return None;
         }
@@ -556,33 +558,30 @@ impl NewRoutePage {
         self.current_gen_num = Some(new_gen_num);
         self.selected_gen = Some(gen.clone());
         self.update_pokemon_list();
-        // routes for this game
-        let game = new_game.to_string();
-        if !self.route_cache_per_game.contains_key(&game) {
-            let mut all_routes = vec![consts::EMPTY_ROUTE_NAME.to_string()];
-            for preset in &gen.min_battles_db().data {
-                all_routes.push(format!("{}{}", consts::PRESET_ROUTE_PREFIX, preset));
-            }
-            for name in io_utils::get_existing_route_names(paths, "", false) {
-                let p = io_utils::get_existing_route_path(paths, &name);
-                if let Ok(bytes) = std::fs::read(&p) {
-                    if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                        if v.get(consts::PKMN_VERSION_KEY).and_then(|x| x.as_str()) == Some(game.as_str()) {
-                            all_routes.push(name);
-                        }
-                    }
-                }
-            }
-            self.route_cache_per_game.insert(game.clone(), all_routes);
-        }
-        self.min_battles_cache = self.route_cache_per_game[&game].clone();
-        self.base_route_filter_callback();
+        self.rebuild_base_routes(index);
         if gen_changed {
             let selected = self.solo_selector.get().to_string();
             let mon = if !selected.is_empty() && selected != consts::NO_POKEMON { gen.pkmn_db().get_pkmn(&selected).cloned() } else { None };
             self.dvs.config_for_target_game_and_mon(&gen, mon.as_deref(), None, None, None);
         }
         None
+    }
+
+    /// The "Base Route" choices for the selected game: the empty route, the
+    /// gen's presets, then the saved routes of that version. The version
+    /// comes from the route index, not from parsing every route file.
+    fn rebuild_base_routes(&mut self, index: &RouteIndex) {
+        let (Some(game), Some(gen)) = (self.selected_game.as_deref(), self.selected_gen.as_ref()) else { return };
+        let mut all_routes = vec![consts::EMPTY_ROUTE_NAME.to_string()];
+        for preset in &gen.min_battles_db().data {
+            all_routes.push(format!("{}{}", consts::PRESET_ROUTE_PREFIX, preset));
+        }
+        let mut saved: Vec<String> = index.entries.values().filter(|e| e.version == game).map(|e| e.name.clone()).collect();
+        saved.sort_by_key(|s| s.to_lowercase());
+        all_routes.extend(saved);
+        self.min_battles_cache = all_routes;
+        self.base_routes_from_index = index.loaded;
+        self.base_route_filter_callback();
     }
 
     fn update_pokemon_list(&mut self) {
@@ -634,14 +633,17 @@ impl NewRoutePage {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, registry: &Registry, paths: &Paths, assets: &mut Assets, actions: &mut NewRouteActions) {
+    pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, registry: &Registry, paths: &Paths, index: &RouteIndex, assets: &mut Assets, actions: &mut NewRouteActions) {
         if self.games.is_empty() {
             self.populate_game_table(registry);
             if let Some(first) = self.games.first().map(|g| g.name.clone()) {
-                if let Some(e) = self.select_game(&first, registry, paths) {
+                if let Some(e) = self.select_game(&first, registry, index) {
                     actions.error = Some(e);
                 }
             }
+        }
+        if !self.base_routes_from_index && index.loaded {
+            self.rebuild_base_routes(index);
         }
         let _ = self.pending_game_load;
         let (enter, escape) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape)));
@@ -716,7 +718,7 @@ impl NewRoutePage {
                         }
                     });
                     if let Some(name) = clicked {
-                        if let Some(e) = self.select_game(&name, registry, paths) {
+                        if let Some(e) = self.select_game(&name, registry, index) {
                             actions.error = Some(e);
                         }
                     }

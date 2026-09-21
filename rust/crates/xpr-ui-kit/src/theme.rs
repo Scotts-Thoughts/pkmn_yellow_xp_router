@@ -28,6 +28,17 @@ pub fn parse_hex(hex: &str) -> Color32 {
     Color32::from_rgb(r, g, b)
 }
 
+/// Black or white, whichever has the higher WCAG contrast ratio on `bg`
+/// (the two are equal at a relative luminance of ~0.179).
+pub fn text_on(bg: Color32) -> Color32 {
+    let lin = |c: u8| {
+        let v = c as f64 / 255.0;
+        if v <= 0.03928 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+    };
+    let lum = 0.2126 * lin(bg.r()) + 0.7152 * lin(bg.g()) + 0.0722 * lin(bg.b());
+    if lum > 0.179 { Color32::BLACK } else { Color32::WHITE }
+}
+
 /// `_rgb_to_hex` (Python `int()` truncation, clamped like the battle summary helper).
 pub fn rgb_to_hex(r: f64, g: f64, b: f64) -> String {
     let clamp = |v: f64| (v.max(0.0).min(255.0)) as i64;

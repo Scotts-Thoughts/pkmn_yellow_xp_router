@@ -44,7 +44,9 @@ impl RouteIndex {
         paths.global_config_dir.join(INDEX_FILE_NAME)
     }
 
-    /// Load the persisted index (missing or corrupt -> empty).
+    /// Load the persisted index (missing or corrupt -> empty, not loaded).
+    /// A persisted index is `loaded`: it is shown right away and `refresh`
+    /// corrects it afterwards.
     pub fn load(paths: &Paths) -> RouteIndex {
         let mut idx = RouteIndex::default();
         let p = RouteIndex::index_path(paths);
@@ -56,6 +58,7 @@ impl RouteIndex {
                     let mtime = v.get("mtime").and_then(|x| x.as_f64()).unwrap_or(0.0);
                     idx.entries.insert(name.clone(), IndexEntry { name, version, species, mtime });
                 }
+                idx.loaded = true;
             }
         }
         idx
@@ -88,8 +91,11 @@ impl RouteIndex {
             let path = io_utils::get_existing_route_path(paths, &name);
             let mtime = mtime_of(&path);
             seen.insert(name.clone());
+            // a tolerance, not equality: the index stores mtimes as JSON
+            // floats and a parse can be off by 1 ulp, which re-read (and
+            // re-saved) dozens of untouched routes on every start
             let needs_read = match self.entries.get(&name) {
-                Some(e) => e.mtime != mtime,
+                Some(e) => (e.mtime - mtime).abs() > 1e-3,
                 None => true,
             };
             if !needs_read {

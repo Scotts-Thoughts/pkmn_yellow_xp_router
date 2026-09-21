@@ -86,7 +86,9 @@ pub struct XprApp {
     toast: ToastHost,
     message_label: AutoClearingLabel,
     index: RouteIndex,
-    index_rx: Option<Receiver<RouteIndex>>,
+    /// start-up index scan: the persisted index first (shown at once), then
+    /// the refreshed one with `true`
+    index_rx: Option<Receiver<(RouteIndex, bool)>>,
     run_summary: Option<RunSummary>,
     setup_summary_open: bool,
     compare: CompareView,
@@ -105,6 +107,9 @@ pub struct XprApp {
     route_loaded_before_new_route: bool,
     auto_load_checked: bool,
     deferred_post_init: Option<Instant>,
+    /// the start-up custom-gen load, off the UI thread: the data dir may
+    /// live in a cloud-synced folder whose reads can stall for many seconds
+    custom_gens_rx: Option<Receiver<Result<(), String>>>,
     first_frame: bool,
     update: UpdateState,
     pre_state_fraction: Option<f64>,
@@ -155,9 +160,23 @@ impl XprApp {
         let (tx, rx) = channel();
         let scan_paths = paths.clone();
         std::thread::spawn(move || {
+            let t0 = Instant::now();
             let mut idx = RouteIndex::load(&scan_paths);
-            idx.refresh(&scan_paths);
-            let _ = tx.send(idx);
+            let t_load = t0.elapsed();
+            if idx.loaded {
+                let _ = tx.send((idx.clone(), false));
+            }
+            let changed = idx.refresh(&scan_paths);
+            log::info!("route index: {} routes; load {:.0} ms, refresh {:.0} ms{}", idx.entries.len(), t_load.as_secs_f64() * 1000.0, (t0.elapsed() - t_load).as_secs_f64() * 1000.0, if changed { " (changed, re-saved)" } else { "" });
+            let _ = tx.send((idx, true));
+        });
+        let (ctx_tx, ctx_rx) = channel();
+        let scan_registry = registry.clone();
+        std::thread::spawn(move || {
+            let t0 = Instant::now();
+            let r = scan_registry.reload_all_custom_gens();
+            log::info!("custom gens loaded in {:.0} ms", t0.elapsed().as_secs_f64() * 1000.0);
+            let _ = ctx_tx.send(r);
         });
         let (utx, urx) = channel();
         std::thread::spawn(move || {
@@ -207,6 +226,7 @@ impl XprApp {
             route_loaded_before_new_route: false,
             auto_load_checked: false,
             deferred_post_init: None,
+            custom_gens_rx: Some(ctx_rx),
             first_frame: true,
             update: UpdateState { rx: Some(urx), startup_check: true, deferred_version: None, deferred_url: None, requested: false, check_button_enabled: true },
             pre_state_fraction,
@@ -260,7 +280,9 @@ impl XprApp {
 
     fn show_new_route_page(&mut self) {
         self.page = Page::NewRoute;
-        self.new_route.refresh_game_list(&self.registry, &self.paths);
+        // pick up routes saved since the last scan (mtime check only)
+        self.refresh_index_now();
+        self.new_route.refresh_game_list(&self.registry, &self.index);
     }
 
     fn show_route_controls(&mut self) {
@@ -276,9 +298,9 @@ impl XprApp {
 
     // ---- startup --------------------------------------------------------------------------------
 
-    /// `_deferred_post_init`: custom gens, then the auto-load.
+    /// `_deferred_post_init`: the auto-load, once the background custom-gen
+    /// load has finished (a route may be for a custom gen).
     fn deferred_post_init(&mut self) {
-        self.ctrl.load_all_custom_versions();
         // `XPR_SMOKE_ROUTE=<route name>` (smoke test only): load that route
         // instead of honouring the auto-load preference.
         let smoke_route = if self.smoke.is_some() { std::env::var("XPR_SMOKE_ROUTE").ok().map(|n| io_utils::get_existing_route_path(&self.paths, &n)) } else { None };
@@ -1765,13 +1787,13 @@ impl XprApp {
                 Some(v) => (format!("{} Version", v), XprApp::version_color(v)),
                 None => ("Version".to_string(), Color32::WHITE),
             };
-            widgets::chip(ui, &theme, &vtext, vcolor, Color32::BLACK, Vec2::new(10.0, 6.0), false);
+            widgets::chip(ui, &theme, &vtext, vcolor, theme::text_on(vcolor), Vec2::new(10.0, 6.0), false);
             let (rtext, rcolor) = if self.ctrl.has_errors() {
                 ("Run Status: Invalid", theme::parse_hex(consts::ERROR_COLOR))
             } else {
                 ("Run Status: Valid", theme::parse_hex(consts::VALID_COLOR))
             };
-            if widgets::chip(ui, &theme, rtext, rcolor, Color32::BLACK, Vec2::new(10.0, 6.0), true).clicked() {
+            if widgets::chip(ui, &theme, rtext, rcolor, theme::text_on(rcolor), Vec2::new(10.0, 6.0), true).clicked() {
                 self.cycle_invalid_events();
             }
             widgets::label_colored(ui, &theme, "Route Name:", theme.secondary);
@@ -2246,20 +2268,36 @@ impl XprApp {
             let _ = self.fonts_installed;
         }
         if let Some(t) = self.deferred_post_init {
-            if Instant::now() >= t {
+            if Instant::now() < t {
+                ctx.request_repaint_after(t - Instant::now());
+            } else if let Some(rx) = &self.custom_gens_rx {
+                // the landing page stays live while the custom gens load
+                match rx.try_recv() {
+                    Ok(r) => {
+                        self.custom_gens_rx = None;
+                        self.ctrl.on_custom_versions_loaded(r);
+                    }
+                    Err(_) => ctx.request_repaint_after(Duration::from_millis(50)),
+                }
+            } else if self.index_rx.is_some() {
+                // the auto-load's "most recent" needs the refreshed index
+                ctx.request_repaint_after(Duration::from_millis(50));
+            } else {
                 self.deferred_post_init = None;
                 self.deferred_post_init();
-            } else {
-                ctx.request_repaint_after(t - Instant::now());
             }
         }
         // background results
         if let Some(rx) = &self.index_rx {
-            if let Ok(idx) = rx.try_recv() {
+            let mut done = false;
+            while let Ok((idx, is_final)) = rx.try_recv() {
                 self.index = idx;
+                done = is_final;
+            }
+            if done {
                 self.index_rx = None;
             } else {
-                ctx.request_repaint_after(Duration::from_millis(200));
+                ctx.request_repaint_after(Duration::from_millis(100));
             }
         }
         self.poll_update_check(ctx);
@@ -2334,7 +2372,14 @@ impl XprApp {
                     }
                 } else {
                     let mut actions = LandingActions::default();
+                    let t0 = Instant::now();
                     self.landing.ui(ui, &theme, &mut self.cfg, &self.paths, &self.registry, &self.index, &mut actions);
+                    if self.frame_log {
+                        let dt = t0.elapsed();
+                        if dt > Duration::from_millis(1) {
+                            log::info!("landing page {:.2} ms ({} routes indexed)", dt.as_secs_f64() * 1000.0, self.index.entries.len());
+                        }
+                    }
                     if actions.create_route {
                         self.open_new_route_window();
                     }
@@ -2352,7 +2397,7 @@ impl XprApp {
             }
             Page::NewRoute => {
                 let mut actions = NewRouteActions::default();
-                self.new_route.ui(ui, &theme, &self.registry, &self.paths, &mut self.assets, &mut actions);
+                self.new_route.ui(ui, &theme, &self.registry, &self.paths, &self.index, &mut self.assets, &mut actions);
                 if let Some(e) = actions.error {
                     self.show_message("Error", &e, MsgButtons::Ok, MsgTag::NewRouteError);
                 }

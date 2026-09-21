@@ -83,7 +83,7 @@ impl ToastHost {
                             );
                             if t.folder_path.is_some() {
                                 let font = theme.body();
-                                let galley = ui.fonts_mut(|f| f.layout_no_wrap("Open Folder".to_string(), font, Color32::WHITE));
+                                let galley = ui.fonts_mut(|f| f.layout_no_wrap("Open Folder".to_string(), font, Color32::PLACEHOLDER));
                                 let (rect, resp) = ui.allocate_exact_size(galley.size() + Vec2::new(20.0, 8.0), Sense::click());
                                 let fill = if resp.hovered() { Color32::from_rgb(0x81, 0xc7, 0x84) } else { Color32::from_rgb(0x66, 0xbb, 0x6a) };
                                 ui.painter().rect(rect, CornerRadius::same(3), alpha(fill), Stroke::new(1.0_f32, alpha(Color32::from_rgb(0x81, 0xc7, 0x84))), egui::StrokeKind::Inside);

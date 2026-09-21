@@ -284,13 +284,14 @@ impl RouteList {
         self.dirty = true;
     }
 
-    /// `refresh()`: rebuild the visible rows.
-    pub fn refresh(&mut self, ctrl: &MainController) {
+    /// `refresh()`: rebuild the visible rows. Returns true when the inline
+    /// creator was dropped because its anchor row is gone.
+    pub fn refresh(&mut self, ctrl: &MainController) -> bool {
         self.quantity_editor = None;
         self.dirty = false;
         let Some(gen) = ctrl.gen() else {
             self.rows.clear();
-            return;
+            return false;
         };
         // snapshot expand state keyed by name path
         let mut saved: HashMap<String, bool> = std::mem::take(&mut self.persistent_expand_state);
@@ -313,8 +314,10 @@ impl RouteList {
             self.push_children(ctrl, &gen, &children, 0, None, search.as_deref(), cur_filter.as_deref(), &mut rows, "");
         }
         self.rows = rows;
+        let had_inline = self.inline.is_some();
         self.insert_inline_row();
         self.selection.retain(|id| ctrl.router.contains_id(*id));
+        had_inline && self.inline.is_none()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -681,7 +684,13 @@ impl RouteList {
         let t_rebuild_total = Instant::now();
         let t_rebuild = Instant::now();
         if self.dirty {
-            self.refresh(ctrl);
+            if self.refresh(ctrl) {
+                // the creator's anchor row vanished (its event was deleted or
+                // filtered out): close it the same way a discard would, so the
+                // details panel stops forcing the Pre-Event State tab
+                self.restore_editing_state(ctrl, actions);
+                self.remove_inline_creator(actions);
+            }
             actions.refreshed = true;
             rebuilt = true;
         }
