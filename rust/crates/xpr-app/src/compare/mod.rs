@@ -165,6 +165,9 @@ pub struct CompareView {
     pub tab: usize,
     pub highlight_differences: bool,
     state: TabState,
+    /// The UI context (known from the first `poll`): a finished loader
+    /// wakes the page instead of waiting for the next poll timer.
+    wake_ctx: Option<egui::Context>,
 }
 
 impl Default for CompareView {
@@ -177,6 +180,7 @@ impl Default for CompareView {
             tab: TAB_OVERVIEW,
             highlight_differences: true,
             state: TabState::default(),
+            wake_ctx: None,
         }
     }
 }
@@ -252,8 +256,12 @@ impl CompareView {
         };
         let registry = env.registry.clone();
         let (tx, rx) = channel();
+        let wake_ctx = self.wake_ctx.clone();
         std::thread::spawn(move || {
             let _ = tx.send(load_digest(registry, src, origin));
+            if let Some(ctx) = wake_ctx {
+                ctx.request_repaint();
+            }
         });
         let slot = if is_a { &mut self.a } else { &mut self.b };
         slot.rx = Some(rx);
@@ -275,6 +283,9 @@ impl CompareView {
 
     /// Drain the loader channels; call once per frame while the page is up.
     pub fn poll(&mut self, ctx: &egui::Context) {
+        if self.wake_ctx.is_none() {
+            self.wake_ctx = Some(ctx.clone());
+        }
         let mut changed = false;
         for slot in [&mut self.a, &mut self.b] {
             let Some(rx) = &slot.rx else { continue };

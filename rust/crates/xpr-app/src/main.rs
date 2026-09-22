@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use xpr_app::app::{initial_viewport, ExitState, XprApp};
+use xpr_app::app::{initial_viewport, ExitState, StartupWork, XprApp};
 use xpr_core::{Config, Paths};
 use xpr_data::Registry;
 
@@ -30,6 +30,7 @@ fn main() {
     }
     paths.config_user_data_dir(&data_dir);
     let registry = Arc::new(Registry::new(paths.pokemon_raw_data.clone(), paths.custom_gens_dir.clone()));
+    let background = StartupWork::spawn(&paths, &registry);
     let exit = Arc::new(std::sync::Mutex::new(ExitState::default()));
     let exit_for_app = exit.clone();
     let options = eframe::NativeOptions {
@@ -40,7 +41,7 @@ fn main() {
     let result = eframe::run_native(
         "Pokemon Solo Challenge Router",
         options,
-        Box::new(move |cc| Ok(Box::new(XprApp::new(cc, cfg, paths, registry, exit_for_app)))),
+        Box::new(move |cc| Ok(Box::new(XprApp::new(cc, cfg, paths, registry, exit_for_app, background)))),
     );
     if let Err(e) = result {
         log::error!("eframe error: {}", e);

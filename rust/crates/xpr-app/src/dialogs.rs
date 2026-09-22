@@ -1175,7 +1175,7 @@ impl ShortcutsDialog {
                             let default_seq = xpr_core::config::default_shortcut(id).to_string();
                             let cur = self.seq_of(id);
                             let is_custom = cur != default_seq;
-                            let color = if is_custom { Color32::from_rgb(0x00, 0xff, 0xff) } else { theme.text };
+                            let color = if is_custom { theme.primary } else { theme.text };
                             widgets::label_colored(ui, theme, format!("    {}", label), color);
                             let capturing = self.capturing.as_deref() == Some(id);
                             let shown = if capturing { "...".to_string() } else { cur.clone() };

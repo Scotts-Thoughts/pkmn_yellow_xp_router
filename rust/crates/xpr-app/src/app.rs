@@ -57,6 +57,69 @@ pub struct ExitState {
 
 pub type SharedExit = Arc<std::sync::Mutex<ExitState>>;
 
+/// The start-up work that needs no window: the route index scan, the custom
+/// gens and the update check. `main` spawns it before the window exists, so
+/// it runs while the OS creates the window and the GL context.
+pub struct StartupWork {
+    index_rx: Receiver<(RouteIndex, bool)>,
+    custom_gens_rx: Receiver<Result<(), String>>,
+    update_rx: Receiver<xpr_update::ReleaseInfo>,
+    /// the UI context once there is one: a finished thread requests a
+    /// repaint so its result is not left waiting on a poll timer
+    waker: Arc<std::sync::OnceLock<egui::Context>>,
+}
+
+impl StartupWork {
+    pub fn spawn(paths: &Paths, registry: &Arc<Registry>) -> StartupWork {
+        let waker: Arc<std::sync::OnceLock<egui::Context>> = Arc::new(std::sync::OnceLock::new());
+        let wake_with = |waker: &Arc<std::sync::OnceLock<egui::Context>>| {
+            let waker = waker.clone();
+            move || {
+                if let Some(ctx) = waker.get() {
+                    ctx.request_repaint();
+                }
+            }
+        };
+        let (tx, index_rx) = channel();
+        let scan_paths = paths.clone();
+        let wake = wake_with(&waker);
+        std::thread::spawn(move || {
+            let t0 = Instant::now();
+            let mut idx = RouteIndex::load(&scan_paths);
+            let t_load = t0.elapsed();
+            if idx.loaded {
+                let _ = tx.send((idx.clone(), false));
+                wake();
+            }
+            let changed = idx.refresh(&scan_paths);
+            log::info!("route index: {} routes; load {:.0} ms, refresh {:.0} ms{}", idx.entries.len(), t_load.as_secs_f64() * 1000.0, (t0.elapsed() - t_load).as_secs_f64() * 1000.0, if changed { " (changed, re-saved)" } else { "" });
+            let _ = tx.send((idx, true));
+            wake();
+        });
+        let (ctx_tx, custom_gens_rx) = channel();
+        let scan_registry = registry.clone();
+        let wake = wake_with(&waker);
+        std::thread::spawn(move || {
+            let t0 = Instant::now();
+            let r = scan_registry.reload_all_custom_gens();
+            log::info!("custom gens loaded in {:.0} ms", t0.elapsed().as_secs_f64() * 1000.0);
+            let _ = ctx_tx.send(r);
+            wake();
+        });
+        let (utx, update_rx) = channel();
+        let wake = wake_with(&waker);
+        std::thread::spawn(move || {
+            // `XPR_DISABLE_AUTO_UPDATE`: no request to GitHub at start
+            // (isolated / offline test runs), so the check just reports "no
+            // release information" and nothing is prompted.
+            let info = if std::env::var_os("XPR_DISABLE_AUTO_UPDATE").is_some() { xpr_update::ReleaseInfo::default() } else { xpr_update::get_new_version_info() };
+            let _ = utx.send(info);
+            wake();
+        });
+        StartupWork { index_rx, custom_gens_rx, update_rx, waker }
+    }
+}
+
 struct UpdateState {
     rx: Option<Receiver<xpr_update::ReleaseInfo>>,
     startup_check: bool,
@@ -149,43 +212,16 @@ pub struct XprApp {
 }
 
 impl XprApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, cfg: Config, paths: Paths, registry: Arc<Registry>, exit: SharedExit) -> XprApp {
+    pub fn new(cc: &eframe::CreationContext<'_>, cfg: Config, paths: Paths, registry: Arc<Registry>, exit: SharedExit, background: StartupWork) -> XprApp {
         let mut theme = Theme::from_config(&cfg);
         theme.install_fonts(&cc.egui_ctx);
         theme.apply(&cc.egui_ctx);
         let ctrl = MainController::new(registry.clone(), paths.clone());
         let assets = Assets::new();
         let recorder = Recorder::new(cc.egui_ctx.clone());
-        // background: route index scan and the start-up update check
-        let (tx, rx) = channel();
-        let scan_paths = paths.clone();
-        std::thread::spawn(move || {
-            let t0 = Instant::now();
-            let mut idx = RouteIndex::load(&scan_paths);
-            let t_load = t0.elapsed();
-            if idx.loaded {
-                let _ = tx.send((idx.clone(), false));
-            }
-            let changed = idx.refresh(&scan_paths);
-            log::info!("route index: {} routes; load {:.0} ms, refresh {:.0} ms{}", idx.entries.len(), t_load.as_secs_f64() * 1000.0, (t0.elapsed() - t_load).as_secs_f64() * 1000.0, if changed { " (changed, re-saved)" } else { "" });
-            let _ = tx.send((idx, true));
-        });
-        let (ctx_tx, ctx_rx) = channel();
-        let scan_registry = registry.clone();
-        std::thread::spawn(move || {
-            let t0 = Instant::now();
-            let r = scan_registry.reload_all_custom_gens();
-            log::info!("custom gens loaded in {:.0} ms", t0.elapsed().as_secs_f64() * 1000.0);
-            let _ = ctx_tx.send(r);
-        });
-        let (utx, urx) = channel();
-        std::thread::spawn(move || {
-            // `XPR_DISABLE_AUTO_UPDATE`: no request to GitHub at start
-            // (isolated / offline test runs), so the check just reports "no
-            // release information" and nothing is prompted.
-            let info = if std::env::var_os("XPR_DISABLE_AUTO_UPDATE").is_some() { xpr_update::ReleaseInfo::default() } else { xpr_update::get_new_version_info() };
-            let _ = utx.send(info);
-        });
+        // from here on the background results wake the UI themselves
+        let _ = background.waker.set(cc.egui_ctx.clone());
+        let StartupWork { index_rx: rx, custom_gens_rx: ctx_rx, update_rx: urx, .. } = background;
         let shortcuts = ShortcutMap::from_config(&cfg);
         let landing = LandingPage::new(&cfg);
         let route_list = RouteList::new(&cfg);
@@ -323,14 +359,17 @@ impl XprApp {
                 return;
             }
         }
-        self.refresh_index_now();
+        // a scan still running in the background delivers its own result
+        if self.index_rx.is_none() {
+            self.refresh_index_now();
+        }
     }
 
     fn find_most_recent_route(&self) -> Option<PathBuf> {
-        if self.index.loaded {
+        if self.index.loaded && self.index_rx.is_none() {
             return self.index.most_recent(&self.paths);
         }
-        // index not ready yet: scan mtimes directly
+        // index not refreshed yet (the persisted copy may be stale): scan mtimes directly
         let mut best: Option<(f64, PathBuf)> = None;
         for name in io_utils::get_existing_route_names(&self.paths, "", false) {
             let p = io_utils::get_existing_route_path(&self.paths, &name);
@@ -1782,28 +1821,24 @@ impl XprApp {
         let theme = self.theme.clone();
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
-            let version = self.ctrl.get_version().map(|s| s.to_string());
-            let (vtext, vcolor) = match &version {
-                Some(v) => (format!("{} Version", v), XprApp::version_color(v)),
-                None => ("Version".to_string(), Color32::WHITE),
-            };
-            widgets::chip(ui, &theme, &vtext, vcolor, theme::text_on(vcolor), Vec2::new(10.0, 6.0), false);
-            let (rtext, rcolor) = if self.ctrl.has_errors() {
-                ("Run Status: Invalid", theme::parse_hex(consts::ERROR_COLOR))
-            } else {
-                ("Run Status: Valid", theme::parse_hex(consts::VALID_COLOR))
-            };
-            if widgets::chip(ui, &theme, rtext, rcolor, theme::text_on(rcolor), Vec2::new(10.0, 6.0), true).clicked() {
+            // everything in the bar shares one control height
+            let h = 24.0;
+            if let Some(v) = self.ctrl.get_version().map(|s| s.to_string()) {
+                widgets::status_chip(ui, &theme, &format!("{} Version", v), XprApp::version_color(&v), h, false);
+            }
+            let (rtext, rcolor) = if self.ctrl.has_errors() { ("Run Status: Invalid", theme.failure) } else { ("Run Status: Valid", theme.success) };
+            if widgets::status_chip(ui, &theme, rtext, rcolor, h, true).clicked() {
                 self.cycle_invalid_events();
             }
+            ui.add_space(6.0);
             widgets::label_colored(ui, &theme, "Route Name:", theme.secondary);
-            let r = Entry::new(&theme, &mut self.route_name_text).width(200.0).id(ui.id().with("route_name")).show(ui);
+            let r = Entry::new(&theme, &mut self.route_name_text).width(200.0).min_height(h).corner_radius(3).id(ui.id().with("route_name")).show(ui);
             if r.changed && self.route_name_text != self.ctrl.get_current_route_name() {
                 let n = self.route_name_text.clone();
                 self.ctrl.set_current_route_name(&n);
             }
             widgets::label_colored(ui, &theme, "Image Path:", theme.secondary);
-            let r = Entry::new(&theme, &mut self.image_path_text).width(200.0).id(ui.id().with("image_path")).show(ui);
+            let r = Entry::new(&theme, &mut self.image_path_text).width(200.0).min_height(h).corner_radius(3).id(ui.id().with("image_path")).show(ui);
             if r.changed {
                 let p = self.image_path_text.clone();
                 self.ctrl.set_custom_image_path(&p);
@@ -1811,15 +1846,13 @@ impl XprApp {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let active = self.ctrl.is_record_mode_active();
                 let enabled = self.ctrl.get_version().is_some();
-                let color = if active { Color32::from_rgb(0xe7, 0x4c, 0x3c) } else if enabled { Color32::from_rgb(0x88, 0x88, 0x88) } else { Color32::from_rgb(0x55, 0x55, 0x55) };
-                let hover = if active { Color32::from_rgb(0xff, 0x6b, 0x5b) } else { Color32::from_rgb(0xaa, 0xaa, 0xaa) };
-                let btn = widgets::StyledButton::new(&theme, egui::RichText::new("● Record").font(theme.font(10.5)).color(color)).enabled(enabled).text_color(color).hover_fill(theme.bg_lighter).show(ui);
-                let _ = hover;
+                let dot = if active { Color32::from_rgb(0xe7, 0x4c, 0x3c) } else { Color32::from_rgb(0x88, 0x88, 0x88) };
+                let btn = widgets::StyledButton::new(&theme, "Record").dot(dot).min_size(Vec2::new(0.0, h)).padding(Vec2::new(10.0, 2.0)).enabled(enabled).show(ui);
                 if btn.clicked() {
                     self.record_button_clicked();
                 }
                 if active {
-                    if widgets::StyledButton::new(&theme, "↻").min_size(Vec2::new(24.0, 24.0)).padding(Vec2::ZERO).enabled(self.recorder.reconnect_enabled).show(ui).clicked() {
+                    if widgets::StyledButton::new(&theme, "↻").min_size(Vec2::new(h, h)).padding(Vec2::ZERO).enabled(self.recorder.reconnect_enabled).show(ui).clicked() {
                         self.recorder.reconnect();
                     }
                     widgets::label_colored(ui, &theme, self.recorder.client_status.clone(), theme.secondary);
@@ -1888,8 +1921,12 @@ impl XprApp {
         }
         // splitter handle
         let resp = ui.interact(handle_rect, ui.id().with("splitter"), Sense::drag());
-        let handle_color = if resp.hovered() || resp.dragged() { theme.accent } else { theme.border };
-        ui.painter().rect_filled(handle_rect, CornerRadius::ZERO, handle_color);
+        // a hairline at rest, the full accent grip while hovered / dragged
+        if resp.hovered() || resp.dragged() {
+            ui.painter().rect_filled(handle_rect, CornerRadius::ZERO, theme.accent);
+        } else {
+            ui.painter().vline(handle_rect.center().x, handle_rect.y_range(), Stroke::new(1.0_f32, theme.border));
+        }
         if resp.hovered() || resp.dragged() {
             ctx.set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
         }
@@ -2261,33 +2298,7 @@ impl eframe::App for XprApp {
 
 impl XprApp {
     fn update_inner(&mut self, ctx: &egui::Context) {
-        if self.first_frame {
-            self.first_frame = false;
-            self.deferred_post_init = Some(Instant::now() + Duration::from_millis(200));
-            ctx.request_repaint_after(Duration::from_millis(200));
-            let _ = self.fonts_installed;
-        }
-        if let Some(t) = self.deferred_post_init {
-            if Instant::now() < t {
-                ctx.request_repaint_after(t - Instant::now());
-            } else if let Some(rx) = &self.custom_gens_rx {
-                // the landing page stays live while the custom gens load
-                match rx.try_recv() {
-                    Ok(r) => {
-                        self.custom_gens_rx = None;
-                        self.ctrl.on_custom_versions_loaded(r);
-                    }
-                    Err(_) => ctx.request_repaint_after(Duration::from_millis(50)),
-                }
-            } else if self.index_rx.is_some() {
-                // the auto-load's "most recent" needs the refreshed index
-                ctx.request_repaint_after(Duration::from_millis(50));
-            } else {
-                self.deferred_post_init = None;
-                self.deferred_post_init();
-            }
-        }
-        // background results
+        // background results (their threads wake the UI; the timers are a fallback)
         if let Some(rx) = &self.index_rx {
             let mut done = false;
             while let Ok((idx, is_final)) = rx.try_recv() {
@@ -2298,6 +2309,28 @@ impl XprApp {
                 self.index_rx = None;
             } else {
                 ctx.request_repaint_after(Duration::from_millis(100));
+            }
+        }
+        if self.first_frame {
+            self.first_frame = false;
+            self.deferred_post_init = Some(Instant::now());
+            let _ = self.fonts_installed;
+        }
+        // usually on the very first frame: the custom gens load while the OS
+        // creates the window, so it opens straight onto the auto-loaded route
+        if self.deferred_post_init.is_some() {
+            // the landing page stays live while the custom gens load
+            if let Some(r) = self.custom_gens_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
+                self.custom_gens_rx = None;
+                self.ctrl.on_custom_versions_loaded(r);
+            }
+            if self.custom_gens_rx.is_some() {
+                ctx.request_repaint_after(Duration::from_millis(50));
+            } else {
+                // not held up by the index scan: until that is final the
+                // auto-load finds the most recent route by mtime itself
+                self.deferred_post_init = None;
+                self.deferred_post_init();
             }
         }
         self.poll_update_check(ctx);

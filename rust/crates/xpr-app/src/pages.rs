@@ -112,7 +112,8 @@ impl LandingPage {
             ui.add_space(50.0);
             ui.label(egui::RichText::new("Pokemon Solo Challenge Router").font(theme.font_bold(24.0)).color(theme.text));
             ui.add_space(20.0);
-            let record = StyledButton::new(theme, egui::RichText::new("● Start Recording").font(theme.font_bold(14.0)).color(Color32::from_rgb(0xe7, 0x4c, 0x3c)))
+            let record = StyledButton::new(theme, egui::RichText::new("Start Recording").font(theme.font_bold(14.0)).color(Color32::from_rgb(0xe7, 0x4c, 0x3c)))
+                .dot(Color32::from_rgb(0xe7, 0x4c, 0x3c))
                 .min_size(Vec2::new(350.0, 50.0))
                 .text_color(Color32::from_rgb(0xe7, 0x4c, 0x3c))
                 .show(ui)
@@ -213,7 +214,6 @@ impl LandingPage {
             SORT_ALPHABETICAL => entries.sort_by_key(|e| e.0.to_lowercase()),
             _ => entries.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap_or(std::cmp::Ordering::Equal)),
         }
-        let bold = theme.body_bold();
         let font = theme.body();
         let total_w = ui.available_width();
         let widths = [80.0, 90.0, (total_w - 80.0 - 90.0 - 130.0).max(120.0), 130.0];
@@ -226,8 +226,7 @@ impl LandingPage {
             let mut x = hrect.min.x;
             for (i, h) in headers.iter().enumerate() {
                 let r = Rect::from_min_size(Pos2::new(x, hrect.min.y), Vec2::new(widths[i], 22.0));
-                ui.painter().rect(r, CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
-                ui.painter().text(Pos2::new(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *h, bold.clone(), theme.text);
+                widgets::paint_table_header_cell(ui.painter(), theme, r, h, i == 0);
                 x += widths[i];
             }
             widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("landing_routes").auto_shrink([false, false]).max_height(ui.available_height().max(300.0)), |ui| {
@@ -310,7 +309,10 @@ pub fn quick_start_ui(ui: &mut Ui, theme: &Theme, phase: &QuickStartPhase, url: 
                     if busy {
                         ui.add(egui::Spinner::new().size(18.0).color(red));
                     }
-                    ui.label(egui::RichText::new("● Start Recording").font(theme.font_bold(18.0)).color(red));
+                    // painted, not "●": the configured font may lack the glyph
+                    let (dot, _) = ui.allocate_exact_size(Vec2::new(14.0, 24.0), Sense::hover());
+                    ui.painter().circle_filled(dot.center(), 6.0, red);
+                    ui.label(egui::RichText::new("Start Recording").font(theme.font_bold(18.0)).color(red));
                 });
                 ui.add_space(14.0);
                 // game line
@@ -650,7 +652,7 @@ impl NewRoutePage {
         if escape {
             actions.cancel = true;
         }
-        let lbl_font = theme.font(12.0);
+        let lbl_font = theme.font(11.0);
         let entry_font = theme.font(11.0);
         ui.vertical_centered(|ui| {
             ui.add_space(30.0);
@@ -664,10 +666,12 @@ impl NewRoutePage {
             let page_w = ui.available_width();
             ui.horizontal_top(|ui| {
                 ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                    ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Pokemon Version:").font(lbl_font.clone()).color(theme.text));
                 });
                 let table_h = (ui.available_height() * 0.45).max(100.0);
-                let total_w = (page_w - label_w - 10.0).max(400.0);
+                // the scroll bar sits outside `total_w`; keep the table flush with the fields below
+                let total_w = (page_w - label_w - 10.0).max(400.0) - 12.0;
                 let widths = [84.0, 120.0, 120.0, 100.0, (total_w - 84.0 - 120.0 - 120.0 - 100.0).max(80.0)];
                 let headers = ["Box Art", "Game", "Generation", "Platform", "Recorder"];
                 egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border)).show(ui, |ui| {
@@ -679,8 +683,7 @@ impl NewRoutePage {
                     let mut x = hrect.min.x;
                     for (i, h) in headers.iter().enumerate() {
                         let r = Rect::from_min_size(Pos2::new(x, hrect.min.y), Vec2::new(widths[i], 22.0));
-                        ui.painter().rect(r, CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
-                        ui.painter().text(Pos2::new(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *h, theme.body_bold(), theme.text);
+                        widgets::paint_table_header_cell(ui.painter(), theme, r, h, i == 0);
                         x += widths[i];
                     }
                     let mut clicked: Option<String> = None;
@@ -728,9 +731,10 @@ impl NewRoutePage {
             // ---- solo filter / selector ----
             ui.horizontal(|ui| {
                 ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Solo Pokemon Filter:").font(lbl_font.clone()).color(theme.text));
                 });
-                let r = Entry::new(theme, &mut self.pkmn_filter).width((page_w - label_w - 10.0).max(300.0)).font(entry_font.clone()).id(ui.id().with("pkmn_filter")).show(ui);
+                let r = Entry::new(theme, &mut self.pkmn_filter).width((page_w - label_w - 10.0).max(400.0)).font(entry_font.clone()).id(ui.id().with("pkmn_filter")).show(ui);
                 if r.changed {
                     self.update_pokemon_list();
                     self.pkmn_selector_callback();
@@ -738,26 +742,29 @@ impl NewRoutePage {
             });
             ui.horizontal(|ui| {
                 ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Solo Pokemon:").font(lbl_font.clone()).color(theme.text));
                 });
-                if self.solo_selector.ui(ui, theme, ui.id().with("solo"), Some((page_w - label_w - 10.0).max(250.0)), true) {
+                if self.solo_selector.ui(ui, theme, ui.id().with("solo"), Some((page_w - label_w - 10.0).max(400.0)), true) {
                     self.pkmn_selector_callback();
                 }
             });
             ui.horizontal(|ui| {
                 ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Base Route Filter:").font(lbl_font.clone()).color(theme.text));
                 });
-                let r = Entry::new(theme, &mut self.min_battles_filter).width((page_w - label_w - 10.0).max(300.0)).font(entry_font.clone()).id(ui.id().with("base_filter")).show(ui);
+                let r = Entry::new(theme, &mut self.min_battles_filter).width((page_w - label_w - 10.0).max(400.0)).font(entry_font.clone()).id(ui.id().with("base_filter")).show(ui);
                 if r.changed {
                     self.base_route_filter_callback();
                 }
             });
             ui.horizontal(|ui| {
                 ui.allocate_ui_with_layout(Vec2::new(label_w, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Base Route:").font(lbl_font.clone()).color(theme.text));
                 });
-                self.min_battles_selector.ui(ui, theme, ui.id().with("base_route"), Some((page_w - label_w - 10.0).max(250.0)), true);
+                self.min_battles_selector.ui(ui, theme, ui.id().with("base_route"), Some((page_w - label_w - 10.0).max(400.0)), true);
             });
             ui.horizontal_top(|ui| {
                 let est = if self.selected_gen.as_ref().map(|g| g.get_generation() > 2).unwrap_or(false) { 760.0 } else { 300.0 };
@@ -765,9 +772,12 @@ impl NewRoutePage {
                 self.dvs.ui(ui, theme);
             });
             ui.vertical_centered(|ui| {
-                ui.label(egui::RichText::new("WARNING: Any unsaved changes in your current route\nwill be lost when creating a new route!").font(theme.font(10.0)).color(Color32::RED));
+                ui.label(egui::RichText::new("WARNING: Any unsaved changes in your current route\nwill be lost when creating a new route!").font(theme.font(10.0)).color(theme.failure));
             });
+            ui.add_space(6.0);
             ui.horizontal(|ui| {
+                // centred under the form, like the DV block and the warning above
+                ui.add_space(((page_w - 370.0) / 2.0).max(0.0));
                 if StyledButton::new(theme, "Create Route").fixed_width(180.0).show(ui).clicked() || enter {
                     if let Some(req) = self.create_request(paths) {
                         actions.create = Some(req);

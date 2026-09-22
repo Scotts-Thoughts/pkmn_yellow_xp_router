@@ -893,7 +893,14 @@ impl RouteList {
                     x += CHECK_W + 4.0;
                     // text with optional quantity suffix
                     let raw_name = values.name.clone();
-                    let text = if row.kind == RowKind::LevelUpSibling { format!("  └ {}", raw_name) } else { raw_name.clone() };
+                    let text = raw_name.clone();
+                    if row.kind == RowKind::LevelUpSibling {
+                        // the "└" elbow, painted: the configured font may lack the glyph
+                        let c = Pos2::new(x + 10.5, rect.center().y + 0.5);
+                        ui.painter().line_segment([Pos2::new(c.x, c.y - 6.0), c], Stroke::new(1.0_f32, fg));
+                        ui.painter().line_segment([c, Pos2::new(c.x + 7.0, c.y)], Stroke::new(1.0_f32, fg));
+                        x += 24.0;
+                    }
                     let quantity = if row.kind == RowKind::Group { RouteList::quantity_of(ctrl, row.id) } else { None };
                     let suffix = quantity.map(|q| format!("x{}", q)).filter(|s| text.ends_with(s.as_str()));
                     let max_text_w = (name_cell_right - x - 4.0).max(10.0);
@@ -1135,8 +1142,7 @@ impl RouteList {
             for (i, (title, _)) in COLUMN_DEFS.iter().enumerate() {
                 let w = widths[i];
                 let r = Rect::from_min_size(Pos2::new(x, header_rect.min.y), Vec2::new(w, HEADER_HEIGHT));
-                painter.rect(r, CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
-                painter.text(Pos2::new(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *title, bold.clone(), theme.text);
+                widgets::paint_table_header_cell(&painter, theme, r, title, i == 0);
                 // resizable name & levels-up columns
                 if i <= 1 {
                     let handle = Rect::from_min_size(Pos2::new(r.max.x - 3.0, r.min.y), Vec2::new(6.0, HEADER_HEIGHT)).intersect(header_rect);
@@ -1152,7 +1158,7 @@ impl RouteList {
             }
             // header bg past the last column
             if x < header_rect.max.x {
-                painter.rect(Rect::from_min_max(Pos2::new(x, header_rect.min.y), header_rect.max), CornerRadius::ZERO, theme.bg_darker, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
+                widgets::paint_table_header_cell(&painter, theme, Rect::from_min_max(Pos2::new(x, header_rect.min.y), header_rect.max), "", false);
             }
         });
         // keyboard handling (list focus + no text field)

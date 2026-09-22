@@ -128,6 +128,7 @@ pub struct StyledButton<'a> {
     hover_fill: Option<Color32>,
     corner_radius: CornerRadius,
     stroke: Option<Stroke>,
+    dot: Option<Color32>,
 }
 
 impl<'a> StyledButton<'a> {
@@ -145,7 +146,15 @@ impl<'a> StyledButton<'a> {
             hover_fill: None,
             corner_radius: CornerRadius::same(3),
             stroke: None,
+            dot: None,
         }
+    }
+
+    /// A painted leading dot (the record indicator). Drawn rather than typed
+    /// as "●" so it does not depend on the font having the glyph.
+    pub fn dot(mut self, c: Color32) -> Self {
+        self.dot = Some(c);
+        self
     }
 
     pub fn enabled(mut self, v: bool) -> Self {
@@ -214,8 +223,11 @@ impl<'a> StyledButton<'a> {
         let theme = self.theme;
         let font = self.font.clone().unwrap_or_else(|| theme.body());
         let galley = self.text.into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, font);
+        // dot diameter + gap, scaled with the text
+        let dot_d = (galley.size().y * 0.5).round();
+        let dot_w = if self.dot.is_some() { dot_d + (dot_d * 0.75).round() } else { 0.0 };
         let desired = Vec2::new(
-            (galley.size().x + 2.0 * self.padding.x).max(self.min_size.x),
+            (galley.size().x + dot_w + 2.0 * self.padding.x).max(self.min_size.x),
             (galley.size().y + 2.0 * self.padding.y).max(self.min_size.y),
         );
         let sense = if self.enabled { Sense::click() } else { Sense::hover() };
@@ -251,10 +263,12 @@ impl<'a> StyledButton<'a> {
             };
             let painter = ui.painter();
             painter.rect(rect, self.corner_radius, fill, stroke, egui::StrokeKind::Inside);
-            let text_pos = Pos2::new(
-                rect.center().x - galley.size().x / 2.0,
-                rect.center().y - galley.size().y / 2.0,
-            );
+            let content_x = rect.center().x - (galley.size().x + dot_w) / 2.0;
+            if let Some(c) = self.dot {
+                let c = if self.enabled { c } else { theme.disabled_text };
+                painter.circle_filled(Pos2::new(content_x + dot_d / 2.0, rect.center().y), dot_d / 2.0, c);
+            }
+            let text_pos = Pos2::new(content_x + dot_w, rect.center().y - galley.size().y / 2.0);
             painter.galley(text_pos, galley, text_color);
         }
         response
@@ -289,7 +303,7 @@ pub fn seg_toggle(ui: &mut Ui, theme: &Theme, text: &str, checked: bool) -> Resp
     if ui.is_rect_visible(rect) {
         let hovered = response.hovered();
         let (fill, text_color) = if checked {
-            (if hovered { theme.hover_bg } else { theme.bg_lighter }, Color32::WHITE)
+            (if hovered { theme.hover_bg } else { theme.bg_lighter }, theme.text_strong())
         } else if hovered {
             (theme.hover_bg, theme.text)
         } else {
@@ -298,8 +312,9 @@ pub fn seg_toggle(ui: &mut Ui, theme: &Theme, text: &str, checked: bool) -> Resp
         let painter = ui.painter();
         painter.rect(rect, CornerRadius::ZERO, fill, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
         if checked {
-            let bar = Rect::from_min_size(rect.min, Vec2::new(3.0, rect.height()));
-            painter.rect_filled(bar, CornerRadius::ZERO, theme.failure);
+            // same selection mark as `tab_bar`
+            let bar = Rect::from_min_max(Pos2::new(rect.min.x + 1.0, rect.max.y - 3.0), Pos2::new(rect.max.x - 1.0, rect.max.y - 1.0));
+            painter.rect_filled(bar, CornerRadius::ZERO, theme.accent);
         }
         let text_pos = Pos2::new(rect.center().x - galley.size().x / 2.0, rect.center().y - galley.size().y / 2.0);
         painter.galley(text_pos, galley, text_color);
@@ -1652,17 +1667,36 @@ mod tests {
 // Misc helpers
 // ---------------------------------------------------------------------------
 
-/// Chip-style label (status bar version / run status).
-pub fn chip(ui: &mut Ui, theme: &Theme, text: &str, bg: Color32, fg: Color32, padding: Vec2, clickable: bool) -> Response {
-    let font = theme.body();
-    // PLACEHOLDER so `fg` applies: a colour baked into the galley wins over
-    // the one given to `painter.galley`
-    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), font, Color32::PLACEHOLDER));
-    let desired = galley.size() + 2.0 * padding;
+/// One cell of a flat table header strip: strip fill, a hairline underneath
+/// and a short inset separator before every column but the first. `rect`
+/// may extend past the last column to fill the rest of the strip (empty `title`).
+pub fn paint_table_header_cell(painter: &egui::Painter, theme: &Theme, rect: Rect, title: &str, first: bool) {
+    painter.rect_filled(rect, CornerRadius::ZERO, theme.strip_bg());
+    painter.hline(rect.x_range(), rect.max.y - 0.5, Stroke::new(1.0_f32, theme.border));
+    if !first {
+        painter.vline(rect.min.x + 0.5, (rect.min.y + 5.0)..=(rect.max.y - 5.0), Stroke::new(1.0_f32, theme.border));
+    }
+    if !title.is_empty() {
+        painter.text(Pos2::new(rect.min.x + 4.0, rect.center().y), egui::Align2::LEFT_CENTER, title, theme.body_bold(), theme.text);
+    }
+}
+
+/// Status-bar indicator (version / run status): a coloured dot and neutral
+/// text on a faint tint of that colour, the same language as [`pill`] and
+/// [`chip_outlined`]. `height` lines it up with the buttons beside it.
+pub fn status_chip(ui: &mut Ui, theme: &Theme, text: &str, color: Color32, height: f32, clickable: bool) -> Response {
+    let galley = ui.fonts_mut(|f| f.layout_no_wrap(text.to_string(), theme.body(), Color32::PLACEHOLDER));
+    let (dot_d, gap, pad) = (7.0, 6.0, 9.0);
+    let desired = Vec2::new(galley.size().x + dot_d + gap + 2.0 * pad, height.max(galley.size().y + 4.0));
     let (rect, resp) = ui.allocate_exact_size(desired, if clickable { Sense::click() } else { Sense::hover() });
     if ui.is_rect_visible(rect) {
-        ui.painter().rect_filled(rect, CornerRadius::same(3), bg);
-        ui.painter().galley(Pos2::new(rect.min.x + padding.x, rect.center().y - galley.size().y / 2.0), galley, fg);
+        let hovered = clickable && resp.hovered();
+        let fill = crate::theme::tint(color, theme.bg, if hovered { 0.22 } else { 0.12 });
+        let border = crate::theme::tint(color, theme.bg, if hovered { 0.55 } else { 0.32 });
+        let painter = ui.painter();
+        painter.rect(rect, CornerRadius::same(3), fill, Stroke::new(1.0_f32, border), egui::StrokeKind::Inside);
+        painter.circle_filled(Pos2::new(rect.min.x + pad + dot_d / 2.0, rect.center().y), dot_d / 2.0, color);
+        painter.galley(Pos2::new(rect.min.x + pad + dot_d + gap, rect.center().y - galley.size().y / 2.0), galley, theme.text_strong());
     }
     if clickable {
         resp.on_hover_cursor(egui::CursorIcon::PointingHand)
