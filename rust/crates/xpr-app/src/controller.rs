@@ -821,6 +821,14 @@ impl MainController {
         }
     }
 
+    /// Enable / disable several events as a single undo step.
+    pub fn set_events_enabled(&mut self, event_ids: &[NodeId], enabled: bool) {
+        let ids = event_ids.to_vec();
+        if self.undoable("set_events_enabled", |r| r.set_events_enabled(&ids, enabled)) {
+            self.on_event_change();
+        }
+    }
+
     pub fn set_record_mode(&mut self, new_record_mode: bool) {
         self.record_mode_active = new_record_mode;
         self.on_record_mode_change();

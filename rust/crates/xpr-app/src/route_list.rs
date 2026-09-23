@@ -1076,7 +1076,20 @@ impl RouteList {
                 } else if let Some(idx) = right_clicked_row {
                     let row = self.rows[idx].clone();
                     self.close_quantity_editor(ctrl);
-                    self.toggle_enabled(ctrl, row.id);
+                    // right-clicking a row of a multi-selection gives every
+                    // selected row the clicked row's toggled state
+                    let own_enabled = match row.kind {
+                        RowKind::Folder => ctrl.router.folder(row.id).map(|f| f.enabled.unwrap_or(false)),
+                        RowKind::Group => ctrl.router.group(row.id).map(|g| g.enabled.unwrap_or(false)),
+                        _ => None,
+                    };
+                    match own_enabled {
+                        Some(cur) if self.selection.len() > 1 && self.selection.contains(&row.id) => {
+                            let ids = self.selection.clone();
+                            ctrl.set_events_enabled(&ids, !cur);
+                        }
+                        _ => self.toggle_enabled(ctrl, row.id),
+                    }
                 }
                 if let Some(pid) = plus_clicked {
                     self.restore_editing_state(ctrl, actions);

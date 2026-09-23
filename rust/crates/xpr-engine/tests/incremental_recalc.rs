@@ -186,6 +186,22 @@ fn incremental_recalc_matches_full_recalc() {
             fdef.notes = format!("{} probe", fdef.notes);
             router.replace_event_group(folder, fdef).expect("folder notes");
             check(&mut router, &format!("{}: folder notes", label));
+            // the route list's multi-select enable toggle: unchanged ids are
+            // skipped, so a single changed id takes the incremental path
+            router.set_events_enabled(&[gid, candy, vit], false).expect("batch disable");
+            assert!(!router.is_enabled(gid) && !router.is_enabled(candy) && !router.is_enabled(vit), "{}: batch disable", label);
+            check(&mut router, &format!("{}: batch disable", label));
+            router.set_events_enabled(&[gid, candy, vit], true).expect("batch enable");
+            assert!(router.is_enabled(gid) && router.is_enabled(candy) && router.is_enabled(vit), "{}: batch enable", label);
+            check(&mut router, &format!("{}: batch enable", label));
+            router.set_events_enabled(&[folder, gid], false).expect("disable folder");
+            assert!(!router.is_enabled(gid) && !router.group(gid).unwrap().enabled.unwrap(), "{}: disable folder", label);
+            check(&mut router, &format!("{}: disable folder", label));
+            router.set_events_enabled(&[folder], true).expect("enable folder");
+            check(&mut router, &format!("{}: enable folder", label));
+            router.set_events_enabled(&[folder, gid, candy], true).expect("enable fight");
+            assert!(router.is_enabled(gid), "{}: enable fight in folder", label);
+            check(&mut router, &format!("{}: enable fight in folder", label));
             // removals (a single id takes the incremental path)
             router.batch_remove_events(&[vit]).expect("remove vitamin");
             check(&mut router, &format!("{}: remove vitamin", label));

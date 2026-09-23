@@ -712,6 +712,38 @@ impl Router {
         }
     }
 
+    /// Set the enabled flag of several groups / folders in one pass (event
+    /// items have no flag of their own and are skipped), then recalc once.
+    pub fn set_events_enabled(&mut self, ids: &[NodeId], enabled: bool) -> Result<(), String> {
+        let mut changed = Vec::new();
+        for id in ids {
+            match self.nodes.get_mut(id) {
+                Some(Node::Group(g)) => {
+                    if g.enabled.unwrap_or(false) != enabled {
+                        g.set_enabled_status(enabled);
+                        changed.push(*id);
+                    }
+                }
+                Some(Node::Folder(f)) => {
+                    if f.enabled.unwrap_or(false) != enabled {
+                        f.set_enabled_status(enabled);
+                        changed.push(*id);
+                    }
+                }
+                None => {
+                    if !self.items.contains_key(id) {
+                        return Err(format!("Failed to find event object with id: {}", id));
+                    }
+                }
+            }
+        }
+        match changed.as_slice() {
+            [] => Ok(()),
+            [single] => self.recalc_from_node(*single),
+            _ => self.recalc(),
+        }
+    }
+
     /// `move_event_to_adjacent_folder`
     pub fn move_event_to_adjacent_folder(&mut self, event_id: NodeId, move_up: bool) -> Result<(), String> {
         if !self.nodes.contains_key(&event_id) {
