@@ -46,6 +46,14 @@ pub fn get_move_accuracy(pkmn: &EnemyPkmn, mv: &Move, custom: &str, defending: &
     if pkmn.ability == gc::NO_GUARD || defending.ability == gc::NO_GUARD {
         return None;
     }
+    if gc::OHKO_MOVE_NAMES.contains(&mv.name.as_str()) {
+        // OHKO moves skip the usual accuracy modifiers: base accuracy plus the
+        // level difference, out of 100; fails outright against a higher level.
+        if pkmn.level < defending.level {
+            return Some(0.0);
+        }
+        return Some((mv.accuracy.unwrap_or(0) + (pkmn.level - defending.level)).min(100) as f64);
+    }
     let mut result: Option<i64> = mv.accuracy;
     if mv.name == gc::BLIZZARD_MOVE && weather == consts::WEATHER_HAIL {
         return None;
@@ -470,7 +478,10 @@ pub fn calculate_damage(gen: &GenData, a: &DamageArgs) -> Option<DamageRange> {
     }
 
     if gc::OHKO_MOVE_NAMES.contains(&mv.name.as_str()) {
-        if atk.speed < def.speed {
+        if defending_ability == gc::STURDY {
+            return None;
+        }
+        if attacking_pkmn.level < defending_pkmn.level {
             return None;
         }
         return Some(DamageRange::single(defending_pkmn.cur_stats.hp));

@@ -33407,7 +33407,18 @@
    "attacking_battle_stats": null,
    "defending_battle_stats": null,
    "attacker_is_enemy": false,
-   "result": null
+   "result": {
+    "min_damage": 99,
+    "max_damage": 99,
+    "size": 1,
+    "num_attacks": 1,
+    "damage_vals": [
+     [
+      99,
+      1
+     ]
+    ]
+   }
   },
   {
    "kind": "calculate_damage",

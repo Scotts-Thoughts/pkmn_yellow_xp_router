@@ -30,6 +30,15 @@ pub fn get_crit_rate(pkmn: &EnemyPkmn, mv: &Move, custom_move_data: &str) -> f64
     (b.min(255) as f64) / 256.0
 }
 
+/// `get_move_accuracy`: the listed accuracy, except for OHKO moves, which
+/// report their exact hit chance (30% is stored as 76/256).
+pub fn get_move_accuracy(mv: &Move) -> Option<f64> {
+    if mv.has_flavor(gc::FLAVOR_ONE_HIT_KO) {
+        return mv.accuracy.map(|a| ((a * 255 / 100) as f64) / 256.0 * 100.0);
+    }
+    mv.accuracy.map(|a| a as f64)
+}
+
 /// `calculate_gen_one_damage`
 pub fn calculate_damage(gen: &GenData, a: &DamageArgs) -> Option<DamageRange> {
     let mv = a.mv;
@@ -74,7 +83,17 @@ pub fn calculate_damage(gen: &GenData, a: &DamageArgs) -> Option<DamageRange> {
         if is_immune {
             return None;
         }
-        if attacking_battle_stats.speed < defending_battle_stats.speed {
+        // OHKO moves can't crit: the speed check always uses the real battle
+        // speeds, not the crit stats (which drop stages and badge boosts).
+        let (attacking_speed, defending_speed) = if a.is_crit {
+            (
+                a.attacking_battle_stats.map(|s| s.speed).unwrap_or_else(|| attacking_pkmn.get_battle_stats(attacking_stages, false, None).speed),
+                a.defending_battle_stats.map(|s| s.speed).unwrap_or_else(|| defending_pkmn.get_battle_stats(defending_stages, false, None).speed),
+            )
+        } else {
+            (attacking_battle_stats.speed, defending_battle_stats.speed)
+        };
+        if attacking_speed < defending_speed {
             return None;
         }
         return Some(DamageRange::single(defending_pkmn.cur_stats.hp));

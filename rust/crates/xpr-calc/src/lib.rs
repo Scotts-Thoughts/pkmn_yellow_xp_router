@@ -82,7 +82,7 @@ pub fn get_crit_rate(gen: &GenData, pkmn: &EnemyPkmn, mv: &Move, custom_move_dat
 pub fn get_move_accuracy(gen: &GenData, pkmn: &EnemyPkmn, mv: &Move, custom_move_data: Option<&str>, defending: &EnemyPkmn, weather: &str) -> Option<f64> {
     let custom = custom_move_data.unwrap_or("");
     match gen.gen {
-        Gen::One => mv.accuracy.map(|a| a as f64),
+        Gen::One => gen1::get_move_accuracy(mv),
         Gen::Two => gen2::get_move_accuracy(pkmn, mv, defending, weather),
         Gen::Three => gen3::get_move_accuracy(gen, pkmn, mv, custom, defending, weather),
         Gen::Four => gen4::get_move_accuracy(pkmn, mv, custom, defending, weather),

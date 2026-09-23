@@ -969,13 +969,15 @@ impl BattleSummaryUi {
                 if m.min_damage != -1 {
                     let hp = m.defending_mon_hp.max(1) as f64;
                     let pct = |v: i64| py_round(v as f64 / hp * 100.0);
+                    // A fixed amount (OHKO, Seismic Toss, ...) shows once, not as "X - X".
+                    let span = |lo: i64, hi: i64, suffix: &str| if lo == hi { format!("{}{}", lo, suffix) } else { format!("{} - {}{}", lo, hi, suffix) };
                     let font = theme.body();
                     let row1_y = rrect.min.y + 8.5;
                     let row2_y = rrect.min.y + 25.5;
-                    ui.painter().text(Pos2::new(rrect.min.x + 4.0, row1_y), Align2::LEFT_CENTER, format!("{} - {}", m.min_damage, m.max_damage), font.clone(), range_fg);
-                    ui.painter().text(Pos2::new(rrect.max.x - 4.0, row1_y), Align2::RIGHT_CENTER, format!("{} - {}%", pct(m.min_damage), pct(m.max_damage)), font.clone(), range_fg);
-                    ui.painter().text(Pos2::new(rrect.min.x + 4.0, row2_y), Align2::LEFT_CENTER, format!("{} - {}", m.crit_min_damage, m.crit_max_damage), font.clone(), range_fg);
-                    ui.painter().text(Pos2::new(rrect.max.x - 4.0, row2_y), Align2::RIGHT_CENTER, format!("{} - {}%", pct(m.crit_min_damage), pct(m.crit_max_damage)), font, range_fg);
+                    ui.painter().text(Pos2::new(rrect.min.x + 4.0, row1_y), Align2::LEFT_CENTER, span(m.min_damage, m.max_damage, ""), font.clone(), range_fg);
+                    ui.painter().text(Pos2::new(rrect.max.x - 4.0, row1_y), Align2::RIGHT_CENTER, span(pct(m.min_damage), pct(m.max_damage), "%"), font.clone(), range_fg);
+                    ui.painter().text(Pos2::new(rrect.min.x + 4.0, row2_y), Align2::LEFT_CENTER, span(m.crit_min_damage, m.crit_max_damage, ""), font.clone(), range_fg);
+                    ui.painter().text(Pos2::new(rrect.max.x - 4.0, row2_y), Align2::RIGHT_CENTER, span(pct(m.crit_min_damage), pct(m.crit_max_damage), "%"), font, range_fg);
                 }
             }
             // ---- kill frame (>= 52 px; `kill_h` is shared by the whole row) ----

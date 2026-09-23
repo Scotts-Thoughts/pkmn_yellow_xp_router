@@ -44,7 +44,8 @@ pub fn get_move_accuracy(gen: &GenData, pkmn: &EnemyPkmn, mv: &Move, custom: &st
         if pkmn.level < defending.level {
             return Some(0.0);
         }
-        return Some(((mv.accuracy.unwrap_or(0) + (pkmn.level - defending.level) - 1).max(0)) as f64);
+        // hits when `Random() % 100 + 1 < accuracy + level difference`
+        return Some(((mv.accuracy.unwrap_or(0) + (pkmn.level - defending.level) - 1).clamp(0, 100)) as f64);
     }
     let mut result: Option<i64> = if mv.name == gc::NATURE_POWER_MOVE {
         Some(if custom.contains(gc::TALL_GRASS_TERRAIN) {

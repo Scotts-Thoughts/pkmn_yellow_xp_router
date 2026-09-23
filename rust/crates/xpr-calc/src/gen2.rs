@@ -36,7 +36,12 @@ pub fn get_move_accuracy(pkmn: &EnemyPkmn, mv: &Move, defending: &EnemyPkmn, wea
         if pkmn.level < defending.level {
             return Some(0.0);
         }
-        let v = (76 + 2 * (pkmn.level - defending.level)).min(255);
+        // Accuracy is stored out of 255 (30% -> 76) and gains 2 per level the
+        // user is above the target, capped at 255, which always hits.
+        let v = (mv.accuracy.unwrap_or(0) * 255 / 100 + 2 * (pkmn.level - defending.level)).min(255);
+        if v == 255 {
+            return None;
+        }
         return Some((v as f64) / 256.0 * 100.0);
     }
     mv.accuracy.map(|a| a as f64)
