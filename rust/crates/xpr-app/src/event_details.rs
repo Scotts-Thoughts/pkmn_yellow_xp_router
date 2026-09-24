@@ -621,7 +621,24 @@ impl EventDetails {
     /// `_handle_matchup_reorder`
     pub fn handle_matchup_reorder(&mut self, cfg: &Config, ctrl: &mut MainController, from_idx: usize, to_idx: usize) {
         self.force_and_clear_event_update(cfg, ctrl);
-        self.bc.reorder_matchup(cfg, ctrl, from_idx, to_idx);
+        if self.bc.reorder_matchup(cfg, ctrl, from_idx, to_idx) {
+            self.reload_trainer_editor(cfg, ctrl);
+        }
+    }
+
+    /// Resync the trainer editor with the saved definition after the battle
+    /// summary rewrote it. Every later save (stage modifiers, notes, ...)
+    /// takes `mon_order` from the editor's order menus, so a stale editor
+    /// would write the old order back over the reorder.
+    fn reload_trainer_editor(&mut self, cfg: &Config, ctrl: &MainController) {
+        if self.current_event_type.as_deref() != Some(consts::TASK_TRAINER_BATTLE) {
+            return;
+        }
+        let Some(id) = ctrl.get_single_selected_event_id(true) else { return };
+        let (Some(def), Some(gen)) = (ctrl.router.group(id).map(|g| g.event_definition.clone()), ctrl.gen()) else { return };
+        let init = self.current_init_state.clone();
+        let ctx = EditorCtx { theme: &Theme::from_config(cfg), gen: &gen, cfg, cur_state: init.as_deref(), event_type: consts::TASK_TRAINER_BATTLE, enabled: self.allow_updates };
+        self.editors.load(&ctx, &def);
     }
 
     pub fn refresh_after_config_change(&mut self, cfg: &Config, ctrl: &MainController) {
