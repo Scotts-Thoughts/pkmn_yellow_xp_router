@@ -189,7 +189,7 @@ impl LandingPage {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 6.0;
                     widgets::label(ui, theme, "Search:");
-                    let r = Entry::new(theme, &mut self.search_text).width(ui.available_width()).hint("Filter routes...").id(ui.id().with("landing_search")).show(ui);
+                    let r = Entry::new(theme, &mut self.search_text).width(ui.available_width()).hint("Filter routes...").id(ui.id().with("landing_search")).clearable().show(ui);
                     if r.changed {
                         self.search_deadline = Some(Instant::now() + Duration::from_millis(300));
                     }

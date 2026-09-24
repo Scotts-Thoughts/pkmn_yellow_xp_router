@@ -13,7 +13,7 @@ use xpr_data::model::{EnemyPkmn, FieldStatus, Gen, Move, StageModifiers, StatBlo
 use xpr_data::GenData;
 
 pub use battle_summary::{BattleSummary, MoveRenderInfo, PkmnRenderInfo};
-pub use damage::{find_kill, DamageRange, KillRange};
+pub use damage::{find_kill, find_kill_hits, DamageRange, HitModel, KillRange};
 
 /// Arguments of `CurrentGen.calculate_damage`.
 #[derive(Clone, Copy)]
@@ -33,6 +33,9 @@ pub struct DamageArgs<'a> {
     pub attacking_battle_stats: Option<&'a StatBlock>,
     pub defending_battle_stats: Option<&'a StatBlock>,
     pub attacker_is_enemy: bool,
+    /// Wild encounter (Ruby/Sapphire only apply the Atk/Def/SpA/SpD badge
+    /// boosts in trainer battles).
+    pub is_wild_battle: bool,
 }
 
 impl<'a> DamageArgs<'a> {
@@ -52,6 +55,7 @@ impl<'a> DamageArgs<'a> {
             attacking_battle_stats: None,
             defending_battle_stats: None,
             attacker_is_enemy: false,
+            is_wild_battle: false,
         }
     }
 }
@@ -67,25 +71,40 @@ pub fn calculate_damage(gen: &GenData, args: &DamageArgs) -> Option<DamageRange>
     }
 }
 
-/// `CurrentGen.get_crit_rate`
-pub fn get_crit_rate(gen: &GenData, pkmn: &EnemyPkmn, mv: &Move, custom_move_data: Option<&str>) -> f64 {
+/// The per-hit ranges of a multi-hit use (gens 2-5), or `None` when the
+/// use is a single hit (or gen 1, whose hits share one roll).
+pub fn hit_model(gen: &GenData, args: &DamageArgs) -> Option<HitModel> {
     match gen.gen {
-        Gen::One => gen1::get_crit_rate(pkmn, mv, custom_move_data.unwrap_or("")),
-        Gen::Two => gen2::get_crit_rate(pkmn, mv),
-        Gen::Three => gen3::get_crit_rate(pkmn, mv, custom_move_data),
-        Gen::Four => gen4::get_crit_rate(pkmn, mv, custom_move_data),
-        Gen::Five => gen5::get_crit_rate(pkmn, mv, custom_move_data),
+        Gen::One => None,
+        Gen::Two => gen2::hit_model(gen, args),
+        Gen::Three => gen3::hit_model(gen, args),
+        Gen::Four => gen4::hit_model(gen, args),
+        Gen::Five => gen5::hit_model(gen, args),
     }
 }
 
-/// `CurrentGen.get_move_accuracy`: `None` means the move always hits.
-pub fn get_move_accuracy(gen: &GenData, pkmn: &EnemyPkmn, mv: &Move, custom_move_data: Option<&str>, defending: &EnemyPkmn, weather: &str) -> Option<f64> {
-    let custom = custom_move_data.unwrap_or("");
+/// `CurrentGen.get_crit_rate`: the chance that one hit of `args.mv` by
+/// `args.attacking` against `args.defending` is a critical hit.
+pub fn get_crit_rate(gen: &GenData, args: &DamageArgs) -> f64 {
+    let custom = args.custom_move_data;
     match gen.gen {
-        Gen::One => gen1::get_move_accuracy(mv),
-        Gen::Two => gen2::get_move_accuracy(pkmn, mv, defending, weather),
-        Gen::Three => gen3::get_move_accuracy(gen, pkmn, mv, custom, defending, weather),
-        Gen::Four => gen4::get_move_accuracy(pkmn, mv, custom, defending, weather),
-        Gen::Five => gen5::get_move_accuracy(pkmn, mv, custom, defending, weather),
+        Gen::One => gen1::get_crit_rate(args.attacking, args.mv, custom),
+        Gen::Two => gen2::get_crit_rate(args.attacking, args.mv),
+        Gen::Three => gen3::get_crit_rate(args.attacking, args.mv, Some(custom), args.defending),
+        Gen::Four => gen4::get_crit_rate(args, Some(custom)),
+        Gen::Five => gen5::get_crit_rate(args.attacking, args.mv, Some(custom)),
+    }
+}
+
+/// `CurrentGen.get_move_accuracy`: the hit chance in percent; `None` means
+/// the move always hits.
+pub fn get_move_accuracy(gen: &GenData, args: &DamageArgs) -> Option<f64> {
+    let custom = args.custom_move_data;
+    match gen.gen {
+        Gen::One => gen1::get_move_accuracy(args),
+        Gen::Two => gen2::get_move_accuracy(args),
+        Gen::Three => gen3::get_move_accuracy(gen, args, custom),
+        Gen::Four => gen4::get_move_accuracy(args, custom),
+        Gen::Five => gen5::get_move_accuracy(args.attacking, args.mv, custom, args.defending, args.weather),
     }
 }

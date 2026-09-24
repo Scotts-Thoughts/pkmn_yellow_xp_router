@@ -1007,7 +1007,7 @@
             "name": "SonicBoom",
             "accuracy": 90,
             "pp": 20,
-            "base_power": 1,
+            "base_power": 20,
             "priority": 0,
             "type": "Normal",
             "target": "target_single_enemy",
@@ -1182,7 +1182,9 @@
             "type": "Water",
             "target": "target_both_enemies",
             "effects": [],
-            "attack_flavor": [],
+            "attack_flavor": [
+                "bonus_dive_damage"
+            ],
             "contact": false,
             "affected_by_protect": true,
             "affected_by_mirror_move": true,
@@ -3470,15 +3472,15 @@
             "effects": [
                 {
                     "status": "Freeze",
-                    "chance": 6.3
+                    "chance": 6.67
                 },
                 {
                     "status": "Paralysis",
-                    "chance": 6.3
+                    "chance": 6.67
                 },
                 {
                     "status": "Burn",
-                    "chance": 6.3
+                    "chance": 6.67
                 }
             ],
             "attack_flavor": [
@@ -5398,7 +5400,8 @@
             "target": "target_single_enemy",
             "effects": [],
             "attack_flavor": [
-                "trap"
+                "trap",
+                "bonus_dive_damage"
             ],
             "contact": false,
             "affected_by_protect": true,
@@ -7386,7 +7389,7 @@
             "effects": [
                 {
                     "chance": 30,
-                    "flinch": true
+                    "status": "Paralysis"
                 }
             ],
             "attack_flavor": [

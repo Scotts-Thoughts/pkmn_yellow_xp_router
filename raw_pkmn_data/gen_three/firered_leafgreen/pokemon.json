@@ -112,7 +112,8 @@
                 "Magical Leaf",
                 "Grass Whistle",
                 "Curse"
-            ]
+            ],
+            "weight": 6.9
         },
         {
             "name": "Ivysaur",
@@ -225,7 +226,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 13.0
         },
         {
             "name": "Venusaur",
@@ -345,7 +347,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 100.0
         },
         {
             "name": "Charmander",
@@ -464,7 +467,8 @@
                 "Beat Up",
                 "Swords Dance",
                 "Dragon Dance"
-            ]
+            ],
+            "weight": 8.5
         },
         {
             "name": "Charmeleon",
@@ -578,7 +582,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 19.0
         },
         {
             "name": "Charizard",
@@ -709,7 +714,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 90.5
         },
         {
             "name": "Squirtle",
@@ -831,7 +837,8 @@
                 "Refresh",
                 "Mud Sport",
                 "Yawn"
-            ]
+            ],
+            "weight": 9.0
         },
         {
             "name": "Wartortle",
@@ -952,7 +959,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 22.5
         },
         {
             "name": "Blastoise",
@@ -1080,7 +1088,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 85.5
         },
         {
             "name": "Caterpie",
@@ -1123,7 +1132,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 2.9
         },
         {
             "name": "Metapod",
@@ -1166,7 +1176,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 9.9
         },
         {
             "name": "Butterfree",
@@ -1273,7 +1284,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.0
         },
         {
             "name": "Weedle",
@@ -1316,7 +1328,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 3.2
         },
         {
             "name": "Kakuna",
@@ -1359,7 +1372,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 10.0
         },
         {
             "name": "Beedrill",
@@ -1456,7 +1470,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 29.5
         },
         {
             "name": "Pidgey",
@@ -1554,7 +1569,8 @@
                 "Foresight",
                 "Steel Wing",
                 "Air Cutter"
-            ]
+            ],
+            "weight": 1.8
         },
         {
             "name": "Pidgeotto",
@@ -1654,7 +1670,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 30.0
         },
         {
             "name": "Pidgeot",
@@ -1759,7 +1776,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 39.5
         },
         {
             "name": "Rattata",
@@ -1868,7 +1886,8 @@
                 "Reversal",
                 "Uproar",
                 "Swagger"
-            ]
+            ],
+            "weight": 3.5
         },
         {
             "name": "Raticate",
@@ -1975,7 +1994,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 18.5
         },
         {
             "name": "Spearow",
@@ -2075,7 +2095,8 @@
                 "Tri Attack",
                 "Astonish",
                 "Sky Attack"
-            ]
+            ],
+            "weight": 2.0
         },
         {
             "name": "Fearow",
@@ -2172,7 +2193,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 38.0
         },
         {
             "name": "Ekans",
@@ -2286,7 +2308,8 @@
                 "Spite",
                 "Beat Up",
                 "Poison Fang"
-            ]
+            ],
+            "weight": 6.9
         },
         {
             "name": "Arbok",
@@ -2403,7 +2426,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 65.0
         },
         {
             "name": "Pikachu",
@@ -2515,7 +2539,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 6.0
         },
         {
             "name": "Raichu",
@@ -2601,7 +2626,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 30.0
         },
         {
             "name": "Sandshrew",
@@ -2714,7 +2740,8 @@
                 "Metal Claw",
                 "Swords Dance",
                 "Crush Claw"
-            ]
+            ],
+            "weight": 12.0
         },
         {
             "name": "Sandslash",
@@ -2827,7 +2854,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 29.5
         },
         {
             "name": "NidoranF",
@@ -2943,7 +2971,8 @@
                 "Charm",
                 "Counter",
                 "Beat Up"
-            ]
+            ],
+            "weight": 7.0
         },
         {
             "name": "Nidorina",
@@ -3051,7 +3080,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 20.0
         },
         {
             "name": "Nidoqueen",
@@ -3160,7 +3190,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.0
         },
         {
             "name": "NidoranM",
@@ -3275,7 +3306,8 @@
                 "Amnesia",
                 "Confusion",
                 "Beat Up"
-            ]
+            ],
+            "weight": 9.0
         },
         {
             "name": "Nidorino",
@@ -3382,7 +3414,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 19.5
         },
         {
             "name": "Nidoking",
@@ -3490,7 +3523,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 62.0
         },
         {
             "name": "Clefairy",
@@ -3625,7 +3659,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 7.5
         },
         {
             "name": "Clefable",
@@ -3725,7 +3760,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 40.0
         },
         {
             "name": "Vulpix",
@@ -3837,7 +3873,8 @@
                 "Howl",
                 "Psych Up",
                 "Heat Wave"
-            ]
+            ],
+            "weight": 9.9
         },
         {
             "name": "Ninetales",
@@ -3917,7 +3954,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 19.9
         },
         {
             "name": "Jigglypuff",
@@ -4040,7 +4078,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 5.5
         },
         {
             "name": "Wigglytuff",
@@ -4136,7 +4175,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 12.0
         },
         {
             "name": "Zubat",
@@ -4244,7 +4284,8 @@
                 "Gust",
                 "Whirlwind",
                 "Curse"
-            ]
+            ],
+            "weight": 7.5
         },
         {
             "name": "Golbat",
@@ -4358,7 +4399,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 55.0
         },
         {
             "name": "Oddish",
@@ -4455,7 +4497,8 @@
                 "Synthesis",
                 "Charm",
                 "Ingrain"
-            ]
+            ],
+            "weight": 5.4
         },
         {
             "name": "Gloom",
@@ -4553,7 +4596,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 8.6
         },
         {
             "name": "Vileplume",
@@ -4633,7 +4677,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 18.6
         },
         {
             "name": "Paras",
@@ -4742,7 +4787,8 @@
                 "Sweet Scent",
                 "Light Screen",
                 "Pursuit"
-            ]
+            ],
+            "weight": 5.4
         },
         {
             "name": "Parasect",
@@ -4851,7 +4897,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 29.5
         },
         {
             "name": "Venonat",
@@ -4958,7 +5005,8 @@
                 "Screech",
                 "Giga Drain",
                 "Signal Beam"
-            ]
+            ],
+            "weight": 30.0
         },
         {
             "name": "Venomoth",
@@ -5074,7 +5122,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 12.5
         },
         {
             "name": "Diglett",
@@ -5184,7 +5233,8 @@
                 "Beat Up",
                 "Uproar",
                 "Rock Slide"
-            ]
+            ],
+            "weight": 0.8
         },
         {
             "name": "Dugtrio",
@@ -5307,7 +5357,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 33.3
         },
         {
             "name": "Meowth",
@@ -5422,7 +5473,8 @@
                 "Amnesia",
                 "Psych Up",
                 "Assist"
-            ]
+            ],
+            "weight": 4.2
         },
         {
             "name": "Persian",
@@ -5536,7 +5588,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.0
         },
         {
             "name": "Psyduck",
@@ -5654,7 +5707,8 @@
                 "Psychic",
                 "Cross Chop",
                 "Refresh"
-            ]
+            ],
+            "weight": 19.6
         },
         {
             "name": "Golduck",
@@ -5772,7 +5826,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 76.6
         },
         {
             "name": "Mankey",
@@ -5899,7 +5954,8 @@
                 "Beat Up",
                 "Revenge",
                 "Smelling Salt"
-            ]
+            ],
+            "weight": 28.0
         },
         {
             "name": "Primeape",
@@ -6030,7 +6086,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.0
         },
         {
             "name": "Growlithe",
@@ -6141,7 +6198,8 @@
                 "Fire Spin",
                 "Howl",
                 "Heat Wave"
-            ]
+            ],
+            "weight": 19.0
         },
         {
             "name": "Arcanine",
@@ -6225,7 +6283,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 155.0
         },
         {
             "name": "Poliwag",
@@ -6328,7 +6387,8 @@
                 "Mind Reader",
                 "Water Sport",
                 "Ice Ball"
-            ]
+            ],
+            "weight": 12.4
         },
         {
             "name": "Poliwhirl",
@@ -6441,7 +6501,8 @@
                 "Metronome",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 20.0
         },
         {
             "name": "Poliwrath",
@@ -6541,7 +6602,8 @@
                 "Metronome",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 54.0
         },
         {
             "name": "Abra",
@@ -6628,7 +6690,8 @@
                 "Fire Punch",
                 "Thunder Punch",
                 "Ice Punch"
-            ]
+            ],
+            "weight": 19.5
         },
         {
             "name": "Kadabra",
@@ -6752,7 +6815,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 56.5
         },
         {
             "name": "Alakazam",
@@ -6877,7 +6941,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 48.0
         },
         {
             "name": "Machop",
@@ -7003,7 +7068,8 @@
                 "Smelling Salt",
                 "Counter",
                 "Rock Slide"
-            ]
+            ],
+            "weight": 19.5
         },
         {
             "name": "Machoke",
@@ -7125,7 +7191,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 70.5
         },
         {
             "name": "Machamp",
@@ -7248,7 +7315,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 130.0
         },
         {
             "name": "Bellsprout",
@@ -7355,7 +7423,8 @@
                 "Leech Life",
                 "Ingrain",
                 "Magical Leaf"
-            ]
+            ],
+            "weight": 4.0
         },
         {
             "name": "Weepinbell",
@@ -7462,7 +7531,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 6.4
         },
         {
             "name": "Victreebel",
@@ -7551,7 +7621,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 15.5
         },
         {
             "name": "Tentacool",
@@ -7658,7 +7729,8 @@
                 "Haze",
                 "Safeguard",
                 "Confuse Ray"
-            ]
+            ],
+            "weight": 45.5
         },
         {
             "name": "Tentacruel",
@@ -7767,7 +7839,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 55.0
         },
         {
             "name": "Geodude",
@@ -7884,7 +7957,8 @@
                 "Mega Punch",
                 "Rock Slide",
                 "Block"
-            ]
+            ],
+            "weight": 20.0
         },
         {
             "name": "Graveler",
@@ -8005,7 +8079,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 105.0
         },
         {
             "name": "Golem",
@@ -8129,7 +8204,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 300.0
         },
         {
             "name": "Ponyta",
@@ -8235,7 +8311,8 @@
                 "Hypnosis",
                 "Charm",
                 "Double Edge"
-            ]
+            ],
+            "weight": 30.0
         },
         {
             "name": "Rapidash",
@@ -8351,7 +8428,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 95.0
         },
         {
             "name": "Slowpoke",
@@ -8477,7 +8555,8 @@
                 "Mud Sport",
                 "Sleep Talk",
                 "Snore"
-            ]
+            ],
+            "weight": 36.0
         },
         {
             "name": "Slowbro",
@@ -8611,7 +8690,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 78.5
         },
         {
             "name": "Magnemite",
@@ -8713,7 +8793,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 6.0
         },
         {
             "name": "Magneton",
@@ -8824,7 +8905,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.0
         },
         {
             "name": "Farfetchd",
@@ -8933,7 +9015,8 @@
                 "Flail",
                 "Feather Dance",
                 "Curse"
-            ]
+            ],
+            "weight": 15.0
         },
         {
             "name": "Doduo",
@@ -9033,7 +9116,8 @@
                 "Faint Attack",
                 "Flail",
                 "Endeavor"
-            ]
+            ],
+            "weight": 39.2
         },
         {
             "name": "Dodrio",
@@ -9137,7 +9221,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 85.2
         },
         {
             "name": "Seel",
@@ -9239,7 +9324,8 @@
                 "Encore",
                 "Fake Out",
                 "Icicle Spear"
-            ]
+            ],
+            "weight": 90.0
         },
         {
             "name": "Dewgong",
@@ -9353,7 +9439,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 120.0
         },
         {
             "name": "Grimer",
@@ -9467,7 +9554,8 @@
                 "Curse",
                 "Shadow Punch",
                 "Explosion"
-            ]
+            ],
+            "weight": 30.0
         },
         {
             "name": "Muk",
@@ -9582,7 +9670,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 30.0
         },
         {
             "name": "Shellder",
@@ -9683,7 +9772,8 @@
                 "Rapid Spin",
                 "Screech",
                 "Icicle Spear"
-            ]
+            ],
+            "weight": 4.0
         },
         {
             "name": "Cloyster",
@@ -9767,7 +9857,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 132.5
         },
         {
             "name": "Gastly",
@@ -9882,7 +9973,8 @@
                 "Will O Wisp",
                 "Grudge",
                 "Explosion"
-            ]
+            ],
+            "weight": 0.1
         },
         {
             "name": "Haunter",
@@ -9997,7 +10089,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 0.1
         },
         {
             "name": "Gengar",
@@ -10125,7 +10218,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 40.5
         },
         {
             "name": "Onix",
@@ -10243,7 +10337,8 @@
                 "Flail",
                 "Explosion",
                 "Block"
-            ]
+            ],
+            "weight": 210.0
         },
         {
             "name": "Drowzee",
@@ -10368,7 +10463,8 @@
                 "Fire Punch",
                 "Thunder Punch",
                 "Ice Punch"
-            ]
+            ],
+            "weight": 32.4
         },
         {
             "name": "Hypno",
@@ -10499,7 +10595,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 75.6
         },
         {
             "name": "Krabby",
@@ -10613,7 +10710,8 @@
                 "Slam",
                 "Knock Off",
                 "Swords Dance"
-            ]
+            ],
+            "weight": 6.5
         },
         {
             "name": "Kingler",
@@ -10736,7 +10834,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.0
         },
         {
             "name": "Voltorb",
@@ -10840,7 +10939,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 10.4
         },
         {
             "name": "Electrode",
@@ -10953,7 +11053,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 66.6
         },
         {
             "name": "Exeggcute",
@@ -11065,7 +11166,8 @@
                 "Psych Up",
                 "Ingrain",
                 "Curse"
-            ]
+            ],
+            "weight": 2.5
         },
         {
             "name": "Exeggutor",
@@ -11150,7 +11252,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 120.0
         },
         {
             "name": "Cubone",
@@ -11280,7 +11383,8 @@
                 "Skull Bash",
                 "Perish Song",
                 "Swords Dance"
-            ]
+            ],
+            "weight": 6.5
         },
         {
             "name": "Marowak",
@@ -11415,7 +11519,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 45.0
         },
         {
             "name": "Hitmonlee",
@@ -11534,7 +11639,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 49.8
         },
         {
             "name": "Hitmonchan",
@@ -11649,7 +11755,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 50.2
         },
         {
             "name": "Lickitung",
@@ -11782,7 +11889,8 @@
                 "Sleep Talk",
                 "Snore",
                 "Substitute"
-            ]
+            ],
+            "weight": 65.5
         },
         {
             "name": "Koffing",
@@ -11892,7 +12000,8 @@
                 "Destiny Bond",
                 "Pain Split",
                 "Will O Wisp"
-            ]
+            ],
+            "weight": 1.0
         },
         {
             "name": "Weezing",
@@ -12004,7 +12113,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 9.5
         },
         {
             "name": "Rhyhorn",
@@ -12126,7 +12236,8 @@
                 "Swords Dance",
                 "Curse",
                 "Crush Claw"
-            ]
+            ],
+            "weight": 115.0
         },
         {
             "name": "Rhydon",
@@ -12255,7 +12366,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 120.0
         },
         {
             "name": "Chansey",
@@ -12398,7 +12510,8 @@
                 "Heal Bell",
                 "Aromatherapy",
                 "Substitute"
-            ]
+            ],
+            "weight": 34.6
         },
         {
             "name": "Tangela",
@@ -12516,7 +12629,8 @@
                 "Amnesia",
                 "Leech Seed",
                 "Nature Power"
-            ]
+            ],
+            "weight": 35.0
         },
         {
             "name": "Kangaskhan",
@@ -12649,7 +12763,8 @@
                 "Counter",
                 "Crush Claw",
                 "Substitute"
-            ]
+            ],
+            "weight": 80.0
         },
         {
             "name": "Horsea",
@@ -12747,7 +12862,8 @@
                 "Splash",
                 "Dragon Rage",
                 "Dragon Breath"
-            ]
+            ],
+            "weight": 8.0
         },
         {
             "name": "Seadra",
@@ -12850,7 +12966,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 25.0
         },
         {
             "name": "Goldeen",
@@ -12959,7 +13076,8 @@
                 "Hydro Pump",
                 "Sleep Talk",
                 "Mud Sport"
-            ]
+            ],
+            "weight": 15.0
         },
         {
             "name": "Seaking",
@@ -13067,7 +13185,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 39.0
         },
         {
             "name": "Staryu",
@@ -13180,7 +13299,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 34.5
         },
         {
             "name": "Starmie",
@@ -13268,7 +13388,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 80.0
         },
         {
             "name": "MrMime",
@@ -13418,7 +13539,8 @@
                 "Psych Up",
                 "Fake Out",
                 "Trick"
-            ]
+            ],
+            "weight": 54.5
         },
         {
             "name": "Scyther",
@@ -13531,7 +13653,8 @@
                 "Light Screen",
                 "Endure",
                 "Silver Wind"
-            ]
+            ],
+            "weight": 56.0
         },
         {
             "name": "Jynx",
@@ -13658,7 +13781,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 40.6
         },
         {
             "name": "Electabuzz",
@@ -13764,7 +13888,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 30.0
         },
         {
             "name": "Magmar",
@@ -13878,7 +14003,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 44.5
         },
         {
             "name": "Pinsir",
@@ -13990,7 +14116,8 @@
                 "Flail",
                 "False Swipe",
                 "Faint Attack"
-            ]
+            ],
+            "weight": 55.0
         },
         {
             "name": "Tauros",
@@ -14100,7 +14227,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 88.4
         },
         {
             "name": "Magikarp",
@@ -14147,7 +14275,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 10.0
         },
         {
             "name": "Gyarados",
@@ -14255,7 +14384,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 235.0
         },
         {
             "name": "Lapras",
@@ -14383,7 +14513,8 @@
                 "Curse",
                 "Sleep Talk",
                 "Horn Drill"
-            ]
+            ],
+            "weight": 220.0
         },
         {
             "name": "Ditto",
@@ -14422,7 +14553,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 4.0
         },
         {
             "name": "Eevee",
@@ -14521,7 +14653,8 @@
                 "Curse",
                 "Tickle",
                 "Wish"
-            ]
+            ],
+            "weight": 6.5
         },
         {
             "name": "Vaporeon",
@@ -14630,7 +14763,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 29.0
         },
         {
             "name": "Jolteon",
@@ -14737,7 +14871,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 24.5
         },
         {
             "name": "Flareon",
@@ -14842,7 +14977,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 25.0
         },
         {
             "name": "Porygon",
@@ -14952,7 +15088,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 36.5
         },
         {
             "name": "Omanyte",
@@ -15065,7 +15202,8 @@
                 "Haze",
                 "Rock Slide",
                 "Spikes"
-            ]
+            ],
+            "weight": 7.5
         },
         {
             "name": "Omastar",
@@ -15184,7 +15322,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 35.0
         },
         {
             "name": "Kabuto",
@@ -15299,7 +15438,8 @@
                 "Flail",
                 "Knock Off",
                 "Confuse Ray"
-            ]
+            ],
+            "weight": 11.5
         },
         {
             "name": "Kabutops",
@@ -15429,7 +15569,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 40.5
         },
         {
             "name": "Aerodactyl",
@@ -15539,7 +15680,8 @@
                 "Steel Wing",
                 "Dragon Breath",
                 "Curse"
-            ]
+            ],
+            "weight": 59.0
         },
         {
             "name": "Snorlax",
@@ -15681,7 +15823,8 @@
                 "Curse",
                 "Fissure",
                 "Substitute"
-            ]
+            ],
+            "weight": 460.0
         },
         {
             "name": "Articuno",
@@ -15780,7 +15923,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 55.4
         },
         {
             "name": "Zapdos",
@@ -15880,7 +16024,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 52.6
         },
         {
             "name": "Moltres",
@@ -15978,7 +16123,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.0
         },
         {
             "name": "Dratini",
@@ -16093,7 +16239,8 @@
                 "Supersonic",
                 "Dragon Breath",
                 "Dragon Dance"
-            ]
+            ],
+            "weight": 3.3
         },
         {
             "name": "Dragonair",
@@ -16209,7 +16356,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 16.5
         },
         {
             "name": "Dragonite",
@@ -16343,7 +16491,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 210.0
         },
         {
             "name": "Mewtwo",
@@ -16478,7 +16627,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 122.0
         },
         {
             "name": "Mew",
@@ -16612,7 +16762,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 4.0
         },
         {
             "name": "Chikorita",
@@ -16724,7 +16875,8 @@
                 "Nature Power",
                 "Ingrain",
                 "Grass Whistle"
-            ]
+            ],
+            "weight": 6.4
         },
         {
             "name": "Bayleef",
@@ -16837,7 +16989,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 15.8
         },
         {
             "name": "Meganium",
@@ -16952,7 +17105,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 100.5
         },
         {
             "name": "Cyndaquil",
@@ -17051,7 +17205,8 @@
                 "Covet",
                 "Howl",
                 "Crush Claw"
-            ]
+            ],
+            "weight": 7.9
         },
         {
             "name": "Quilava",
@@ -17150,7 +17305,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 19.0
         },
         {
             "name": "Typhlosion",
@@ -17260,7 +17416,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 79.5
         },
         {
             "name": "Totodile",
@@ -17376,7 +17533,8 @@
                 "Mud Sport",
                 "Water Sport",
                 "Dragon Claw"
-            ]
+            ],
+            "weight": 9.5
         },
         {
             "name": "Croconaw",
@@ -17490,7 +17648,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 25.0
         },
         {
             "name": "Feraligatr",
@@ -17611,7 +17770,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 88.8
         },
         {
             "name": "Sentret",
@@ -17724,7 +17884,8 @@
                 "Substitute",
                 "Trick",
                 "Assist"
-            ]
+            ],
+            "weight": 6.0
         },
         {
             "name": "Furret",
@@ -17841,7 +18002,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.5
         },
         {
             "name": "Hoothoot",
@@ -17947,7 +18109,8 @@
                 "Whirlwind",
                 "Sky Attack",
                 "Feather Dance"
-            ]
+            ],
+            "weight": 21.2
         },
         {
             "name": "Noctowl",
@@ -18054,7 +18217,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 40.8
         },
         {
             "name": "Ledyba",
@@ -18163,7 +18327,8 @@
                 "Psybeam",
                 "Bide",
                 "Silver Wind"
-            ]
+            ],
+            "weight": 10.8
         },
         {
             "name": "Ledian",
@@ -18273,7 +18438,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 35.6
         },
         {
             "name": "Spinarak",
@@ -18380,7 +18546,8 @@
                 "Baton Pass",
                 "Pursuit",
                 "Signal Beam"
-            ]
+            ],
+            "weight": 8.5
         },
         {
             "name": "Ariados",
@@ -18489,7 +18656,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 33.5
         },
         {
             "name": "Crobat",
@@ -18604,7 +18772,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 75.0
         },
         {
             "name": "Chinchou",
@@ -18712,7 +18881,8 @@
                 "Flail",
                 "Screech",
                 "Amnesia"
-            ]
+            ],
+            "weight": 12.0
         },
         {
             "name": "Lanturn",
@@ -18821,7 +18991,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 22.5
         },
         {
             "name": "Pichu",
@@ -18912,7 +19083,8 @@
                 "Double Slap",
                 "Wish",
                 "Charge"
-            ]
+            ],
+            "weight": 2.0
         },
         {
             "name": "Cleffa",
@@ -19019,7 +19191,8 @@
                 "Mimic",
                 "Wish",
                 "Substitute"
-            ]
+            ],
+            "weight": 3.0
         },
         {
             "name": "Igglybuff",
@@ -19116,7 +19289,8 @@
                 "Faint Attack",
                 "Wish",
                 "Fake Tears"
-            ]
+            ],
+            "weight": 1.0
         },
         {
             "name": "Togepi",
@@ -19246,7 +19420,8 @@
                 "Future Sight",
                 "Substitute",
                 "Psych Up"
-            ]
+            ],
+            "weight": 1.5
         },
         {
             "name": "Togetic",
@@ -19386,7 +19561,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 3.2
         },
         {
             "name": "Natu",
@@ -19494,7 +19670,8 @@
                 "Psych Up",
                 "Feather Dance",
                 "Refresh"
-            ]
+            ],
+            "weight": 2.0
         },
         {
             "name": "Xatu",
@@ -19595,7 +19772,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 15.0
         },
         {
             "name": "Mareep",
@@ -19690,7 +19868,8 @@
                 "Reflect",
                 "Odor Sleuth",
                 "Charge"
-            ]
+            ],
+            "weight": 7.8
         },
         {
             "name": "Flaaffy",
@@ -19789,7 +19968,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 13.3
         },
         {
             "name": "Ampharos",
@@ -19897,7 +20077,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 61.5
         },
         {
             "name": "Bellossom",
@@ -19981,7 +20162,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 5.8
         },
         {
             "name": "Marill",
@@ -20095,7 +20277,8 @@
                 "Perish Song",
                 "Supersonic",
                 "Substitute"
-            ]
+            ],
+            "weight": 8.5
         },
         {
             "name": "Azumarill",
@@ -20213,7 +20396,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 28.5
         },
         {
             "name": "Sudowoodo",
@@ -20321,7 +20505,8 @@
             ],
             "egg_moves": [
                 "Self Destruct"
-            ]
+            ],
+            "weight": 38.0
         },
         {
             "name": "Politoed",
@@ -20419,7 +20604,8 @@
                 "Metronome",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 33.9
         },
         {
             "name": "Hoppip",
@@ -20524,7 +20710,8 @@
                 "Amnesia",
                 "Helping Hand",
                 "Psych Up"
-            ]
+            ],
+            "weight": 0.5
         },
         {
             "name": "Skiploom",
@@ -20633,7 +20820,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 1.0
         },
         {
             "name": "Jumpluff",
@@ -20743,7 +20931,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 3.0
         },
         {
             "name": "Aipom",
@@ -20870,7 +21059,8 @@
                 "Slam",
                 "Double Slap",
                 "Beat Up"
-            ]
+            ],
+            "weight": 11.5
         },
         {
             "name": "Sunkern",
@@ -20969,7 +21159,8 @@
                 "Nature Power",
                 "Curse",
                 "Helping Hand"
-            ]
+            ],
+            "weight": 1.8
         },
         {
             "name": "Sunflora",
@@ -21066,7 +21257,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 8.5
         },
         {
             "name": "Yanma",
@@ -21177,7 +21369,8 @@
                 "Leech Life",
                 "Signal Beam",
                 "Silver Wind"
-            ]
+            ],
+            "weight": 38.0
         },
         {
             "name": "Wooper",
@@ -21293,7 +21486,8 @@
                 "Stockpile",
                 "Swallow",
                 "Spit Up"
-            ]
+            ],
+            "weight": 8.5
         },
         {
             "name": "Quagsire",
@@ -21409,7 +21603,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 75.0
         },
         {
             "name": "Espeon",
@@ -21518,7 +21713,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 26.5
         },
         {
             "name": "Umbreon",
@@ -21626,7 +21822,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 27.0
         },
         {
             "name": "Murkrow",
@@ -21730,7 +21927,8 @@
                 "Confuse Ray",
                 "Feather Dance",
                 "Perish Song"
-            ]
+            ],
+            "weight": 2.1
         },
         {
             "name": "Slowking",
@@ -21856,7 +22054,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 79.5
         },
         {
             "name": "Misdreavus",
@@ -21968,7 +22167,8 @@
                 "Destiny Bond",
                 "Psych Up",
                 "Imprison"
-            ]
+            ],
+            "weight": 1.0
         },
         {
             "name": "Unown",
@@ -22007,7 +22207,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 5.0
         },
         {
             "name": "Wobbuffet",
@@ -22058,7 +22259,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 28.5
         },
         {
             "name": "Girafarig",
@@ -22178,7 +22380,8 @@
                 "Psych Up",
                 "Wish",
                 "Magic Coat"
-            ]
+            ],
+            "weight": 41.5
         },
         {
             "name": "Pineco",
@@ -22285,7 +22488,8 @@
                 "Swift",
                 "Counter",
                 "Sand Tomb"
-            ]
+            ],
+            "weight": 7.2
         },
         {
             "name": "Forretress",
@@ -22394,7 +22598,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 125.8
         },
         {
             "name": "Dunsparce",
@@ -22522,7 +22727,8 @@
                 "Headbutt",
                 "Astonish",
                 "Curse"
-            ]
+            ],
+            "weight": 14.0
         },
         {
             "name": "Gligar",
@@ -22629,7 +22835,8 @@
                 "Razor Wind",
                 "Counter",
                 "Sand Tomb"
-            ]
+            ],
+            "weight": 64.8
         },
         {
             "name": "Steelix",
@@ -22744,7 +22951,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 400.0
         },
         {
             "name": "Snubbull",
@@ -22874,7 +23082,8 @@
                 "Heal Bell",
                 "Snore",
                 "Smelling Salt"
-            ]
+            ],
+            "weight": 7.8
         },
         {
             "name": "Granbull",
@@ -22999,7 +23208,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 48.7
         },
         {
             "name": "Qwilfish",
@@ -23113,7 +23323,8 @@
                 "Bubble Beam",
                 "Supersonic",
                 "Astonish"
-            ]
+            ],
+            "weight": 3.9
         },
         {
             "name": "Scizor",
@@ -23219,7 +23430,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 118.0
         },
         {
             "name": "Shuckle",
@@ -23311,7 +23523,8 @@
             ],
             "egg_moves": [
                 "Sweet Scent"
-            ]
+            ],
+            "weight": 20.5
         },
         {
             "name": "Heracross",
@@ -23425,7 +23638,8 @@
                 "Bide",
                 "Flail",
                 "False Swipe"
-            ]
+            ],
+            "weight": 54.0
         },
         {
             "name": "Sneasel",
@@ -23555,7 +23769,8 @@
                 "Bite",
                 "Crush Claw",
                 "Fake Out"
-            ]
+            ],
+            "weight": 28.0
         },
         {
             "name": "Teddiursa",
@@ -23676,7 +23891,8 @@
                 "Fake Tears",
                 "Yawn",
                 "Sleep Talk"
-            ]
+            ],
+            "weight": 8.8
         },
         {
             "name": "Ursaring",
@@ -23799,7 +24015,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 125.8
         },
         {
             "name": "Slugma",
@@ -23898,7 +24115,8 @@
             "egg_moves": [
                 "Acid Armor",
                 "Heat Wave"
-            ]
+            ],
+            "weight": 35.0
         },
         {
             "name": "Magcargo",
@@ -24007,7 +24225,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 55.0
         },
         {
             "name": "Swinub",
@@ -24113,7 +24332,8 @@
                 "Mud Shot",
                 "Icicle Spear",
                 "Double Edge"
-            ]
+            ],
+            "weight": 6.5
         },
         {
             "name": "Piloswine",
@@ -24223,7 +24443,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 55.8
         },
         {
             "name": "Corsola",
@@ -24345,7 +24566,8 @@
                 "Ingrain",
                 "Confuse Ray",
                 "Icicle Spear"
-            ]
+            ],
+            "weight": 5.0
         },
         {
             "name": "Remoraid",
@@ -24449,7 +24671,8 @@
                 "Screech",
                 "Thunder Wave",
                 "Rock Blast"
-            ]
+            ],
+            "weight": 12.0
         },
         {
             "name": "Octillery",
@@ -24552,7 +24775,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 28.5
         },
         {
             "name": "Delibird",
@@ -24628,7 +24852,8 @@
                 "Splash",
                 "Rapid Spin",
                 "Ice Ball"
-            ]
+            ],
+            "weight": 16.0
         },
         {
             "name": "Mantine",
@@ -24733,7 +24958,8 @@
                 "Slam",
                 "Mud Sport",
                 "Rock Slide"
-            ]
+            ],
+            "weight": 220.0
         },
         {
             "name": "Skarmory",
@@ -24843,7 +25069,8 @@
                 "Whirlwind",
                 "Sky Attack",
                 "Curse"
-            ]
+            ],
+            "weight": 50.5
         },
         {
             "name": "Houndour",
@@ -24960,7 +25187,8 @@
                 "Reversal",
                 "Beat Up",
                 "Will O Wisp"
-            ]
+            ],
+            "weight": 10.8
         },
         {
             "name": "Houndoom",
@@ -25074,7 +25302,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 35.0
         },
         {
             "name": "Kingdra",
@@ -25178,7 +25407,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 152.0
         },
         {
             "name": "Phanpy",
@@ -25281,7 +25511,8 @@
                 "Snore",
                 "Counter",
                 "Fissure"
-            ]
+            ],
+            "weight": 33.5
         },
         {
             "name": "Donphan",
@@ -25379,7 +25610,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 120.0
         },
         {
             "name": "Porygon2",
@@ -25489,7 +25721,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.5
         },
         {
             "name": "Stantler",
@@ -25606,7 +25839,8 @@
                 "Swagger",
                 "Psych Up",
                 "Extrasensory"
-            ]
+            ],
+            "weight": 71.2
         },
         {
             "name": "Smeargle",
@@ -25681,7 +25915,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 58.0
         },
         {
             "name": "Tyrogue",
@@ -25754,7 +25989,8 @@
                 "Mach Punch",
                 "Mind Reader",
                 "Helping Hand"
-            ]
+            ],
+            "weight": 21.0
         },
         {
             "name": "Hitmontop",
@@ -25863,7 +26099,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 48.0
         },
         {
             "name": "Smoochum",
@@ -25983,7 +26220,8 @@
                 "Fake Out",
                 "Wish",
                 "Ice Punch"
-            ]
+            ],
+            "weight": 6.0
         },
         {
             "name": "Elekid",
@@ -26090,7 +26328,8 @@
                 "Cross Chop",
                 "Fire Punch",
                 "Ice Punch"
-            ]
+            ],
+            "weight": 23.5
         },
         {
             "name": "Magby",
@@ -26197,7 +26436,8 @@
                 "Screech",
                 "Cross Chop",
                 "Thunder Punch"
-            ]
+            ],
+            "weight": 21.4
         },
         {
             "name": "Miltank",
@@ -26320,7 +26560,8 @@
                 "Curse",
                 "Helping Hand",
                 "Sleep Talk"
-            ]
+            ],
+            "weight": 75.5
         },
         {
             "name": "Blissey",
@@ -26457,7 +26698,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 46.8
         },
         {
             "name": "Raikou",
@@ -26564,7 +26806,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 178.0
         },
         {
             "name": "Entei",
@@ -26670,7 +26913,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 198.0
         },
         {
             "name": "Suicune",
@@ -26778,7 +27022,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 187.0
         },
         {
             "name": "Larvitar",
@@ -26888,7 +27133,8 @@
                 "Ancient Power",
                 "Dragon Dance",
                 "Curse"
-            ]
+            ],
+            "weight": 72.0
         },
         {
             "name": "Pupitar",
@@ -26998,7 +27244,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 152.0
         },
         {
             "name": "Tyranitar",
@@ -27130,7 +27377,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 202.0
         },
         {
             "name": "Lugia",
@@ -27252,7 +27500,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 216.0
         },
         {
             "name": "HoOh",
@@ -27369,7 +27618,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 199.0
         },
         {
             "name": "Celebi",
@@ -27475,7 +27725,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 5.0
         },
         {
             "name": "Treecko",
@@ -27597,7 +27848,8 @@
                 "Leech Seed",
                 "Dragon Breath",
                 "Crush Claw"
-            ]
+            ],
+            "weight": 5.0
         },
         {
             "name": "Grovyle",
@@ -27724,7 +27976,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 21.6
         },
         {
             "name": "Sceptile",
@@ -27855,7 +28108,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 52.2
         },
         {
             "name": "Torchic",
@@ -27973,7 +28227,8 @@
                 "Swagger",
                 "Rock Slide",
                 "Smelling Salt"
-            ]
+            ],
+            "weight": 2.5
         },
         {
             "name": "Combusken",
@@ -28099,7 +28354,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 19.5
         },
         {
             "name": "Blaziken",
@@ -28236,7 +28492,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 52.0
         },
         {
             "name": "Mudkip",
@@ -28355,7 +28612,8 @@
                 "Stomp",
                 "Ice Ball",
                 "Mirror Coat"
-            ]
+            ],
+            "weight": 7.6
         },
         {
             "name": "Marshtomp",
@@ -28485,7 +28743,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 28.0
         },
         {
             "name": "Swampert",
@@ -28619,7 +28878,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 81.9
         },
         {
             "name": "Poochyena",
@@ -28736,7 +28996,8 @@
                 "Covet",
                 "Leer",
                 "Yawn"
-            ]
+            ],
+            "weight": 13.6
         },
         {
             "name": "Mightyena",
@@ -28861,7 +29122,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 37.0
         },
         {
             "name": "Zigzagoon",
@@ -28982,7 +29244,8 @@
                 "Substitute",
                 "Tickle",
                 "Trick"
-            ]
+            ],
+            "weight": 17.5
         },
         {
             "name": "Linoone",
@@ -29108,7 +29371,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.5
         },
         {
             "name": "Wurmple",
@@ -29155,7 +29419,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 3.6
         },
         {
             "name": "Silcoon",
@@ -29198,7 +29463,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 10.0
         },
         {
             "name": "Beautifly",
@@ -29298,7 +29564,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 28.4
         },
         {
             "name": "Cascoon",
@@ -29341,7 +29608,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 11.5
         },
         {
             "name": "Dustox",
@@ -29442,7 +29710,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 31.6
         },
         {
             "name": "Lotad",
@@ -29542,7 +29811,8 @@
                 "Leech Seed",
                 "Flail",
                 "Water Gun"
-            ]
+            ],
+            "weight": 2.6
         },
         {
             "name": "Lombre",
@@ -29652,7 +29922,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.5
         },
         {
             "name": "Ludicolo",
@@ -29745,7 +30016,8 @@
                 "Metronome",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 55.0
         },
         {
             "name": "Seedot",
@@ -29842,7 +30114,8 @@
                 "Razor Wind",
                 "Take Down",
                 "False Swipe"
-            ]
+            ],
+            "weight": 4.0
         },
         {
             "name": "Nuzleaf",
@@ -29952,7 +30225,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 28.0
         },
         {
             "name": "Shiftry",
@@ -30039,7 +30313,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 59.6
         },
         {
             "name": "Nincada",
@@ -30142,7 +30417,8 @@
                 "Faint Attack",
                 "Gust",
                 "Silver Wind"
-            ]
+            ],
+            "weight": 5.5
         },
         {
             "name": "Ninjask",
@@ -30264,7 +30540,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 12.0
         },
         {
             "name": "Shedinja",
@@ -30365,7 +30642,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 1.2
         },
         {
             "name": "Taillow",
@@ -30465,7 +30743,8 @@
                 "Mirror Move",
                 "Rage",
                 "Sky Attack"
-            ]
+            ],
+            "weight": 2.3
         },
         {
             "name": "Swellow",
@@ -30567,7 +30846,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 19.8
         },
         {
             "name": "Shroomish",
@@ -30673,7 +30953,8 @@
                 "Charm",
                 "False Swipe",
                 "Helping Hand"
-            ]
+            ],
+            "weight": 4.5
         },
         {
             "name": "Breloom",
@@ -30801,7 +31082,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 39.2
         },
         {
             "name": "Spinda",
@@ -30930,7 +31212,8 @@
                 "Wish",
                 "Trick",
                 "Smelling Salt"
-            ]
+            ],
+            "weight": 5.0
         },
         {
             "name": "Wingull",
@@ -31028,7 +31311,8 @@
                 "Agility",
                 "Gust",
                 "Water Sport"
-            ]
+            ],
+            "weight": 9.5
         },
         {
             "name": "Pelipper",
@@ -31142,7 +31426,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 28.0
         },
         {
             "name": "Surskit",
@@ -31240,7 +31525,8 @@
                 "Psybeam",
                 "Hydro Pump",
                 "Mind Reader"
-            ]
+            ],
+            "weight": 1.7
         },
         {
             "name": "Masquerain",
@@ -31350,7 +31636,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 3.6
         },
         {
             "name": "Wailmer",
@@ -31472,7 +31759,8 @@
                 "Curse",
                 "Fissure",
                 "Tickle"
-            ]
+            ],
+            "weight": 130.0
         },
         {
             "name": "Wailord",
@@ -31598,7 +31886,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 398.0
         },
         {
             "name": "Skitty",
@@ -31723,7 +32012,8 @@
                 "Baton Pass",
                 "Substitute",
                 "Tickle"
-            ]
+            ],
+            "weight": 11.0
         },
         {
             "name": "Delcatty",
@@ -31810,7 +32100,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.6
         },
         {
             "name": "Kecleon",
@@ -31949,7 +32240,8 @@
                 "Disable",
                 "Magic Coat",
                 "Trick"
-            ]
+            ],
+            "weight": 22.0
         },
         {
             "name": "Baltoy",
@@ -32059,7 +32351,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 21.5
         },
         {
             "name": "Claydol",
@@ -32188,7 +32481,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 108.0
         },
         {
             "name": "Nosepass",
@@ -32298,7 +32592,8 @@
                 "Magnitude",
                 "Rollout",
                 "Explosion"
-            ]
+            ],
+            "weight": 97.0
         },
         {
             "name": "Torkoal",
@@ -32412,7 +32707,8 @@
                 "Endure",
                 "Sleep Talk",
                 "Yawn"
-            ]
+            ],
+            "weight": 80.4
         },
         {
             "name": "Sableye",
@@ -32544,7 +32840,8 @@
                 "Psych Up",
                 "Recover",
                 "Moonlight"
-            ]
+            ],
+            "weight": 11.0
         },
         {
             "name": "Barboach",
@@ -32653,7 +32950,8 @@
                 "Thrash",
                 "Whirlpool",
                 "Spark"
-            ]
+            ],
+            "weight": 1.9
         },
         {
             "name": "Whiscash",
@@ -32774,7 +33072,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 23.6
         },
         {
             "name": "Luvdisc",
@@ -32874,7 +33173,8 @@
                 "Supersonic",
                 "Water Sport",
                 "Mud Sport"
-            ]
+            ],
+            "weight": 8.7
         },
         {
             "name": "Corphish",
@@ -32997,7 +33297,8 @@
                 "Endeavor",
                 "Body Slam",
                 "Ancient Power"
-            ]
+            ],
+            "weight": 11.5
         },
         {
             "name": "Crawdaunt",
@@ -33129,7 +33430,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 32.8
         },
         {
             "name": "Feebas",
@@ -33206,7 +33508,8 @@
                 "Hypnosis",
                 "Light Screen",
                 "Confuse Ray"
-            ]
+            ],
+            "weight": 7.4
         },
         {
             "name": "Milotic",
@@ -33312,7 +33615,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 162.0
         },
         {
             "name": "Carvanha",
@@ -33417,7 +33721,8 @@
                 "Hydro Pump",
                 "Double Edge",
                 "Thrash"
-            ]
+            ],
+            "weight": 20.8
         },
         {
             "name": "Sharpedo",
@@ -33540,7 +33845,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 88.8
         },
         {
             "name": "Trapinch",
@@ -33639,7 +33945,8 @@
                 "Focus Energy",
                 "Quick Attack",
                 "Gust"
-            ]
+            ],
+            "weight": 15.0
         },
         {
             "name": "Vibrava",
@@ -33752,7 +34059,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 15.3
         },
         {
             "name": "Flygon",
@@ -33869,7 +34177,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 82.0
         },
         {
             "name": "Makuhita",
@@ -33999,7 +34308,8 @@
                 "Revenge",
                 "Dynamic Punch",
                 "Counter"
-            ]
+            ],
+            "weight": 86.4
         },
         {
             "name": "Hariyama",
@@ -34129,7 +34439,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 253.8
         },
         {
             "name": "Electrike",
@@ -34241,7 +34552,8 @@
                 "Uproar",
                 "Curse",
                 "Swift"
-            ]
+            ],
+            "weight": 15.2
         },
         {
             "name": "Manectric",
@@ -34360,7 +34672,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 40.2
         },
         {
             "name": "Numel",
@@ -34469,7 +34782,8 @@
                 "Rollout",
                 "Defense Curl",
                 "Stomp"
-            ]
+            ],
+            "weight": 24.0
         },
         {
             "name": "Camerupt",
@@ -34586,7 +34900,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 220.0
         },
         {
             "name": "Spheal",
@@ -34712,7 +35027,8 @@
                 "Rock Slide",
                 "Curse",
                 "Fissure"
-            ]
+            ],
+            "weight": 39.5
         },
         {
             "name": "Sealeo",
@@ -34830,7 +35146,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 87.6
         },
         {
             "name": "Walrein",
@@ -34949,7 +35266,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 150.6
         },
         {
             "name": "Cacnea",
@@ -35074,7 +35392,8 @@
                 "Teeter Dance",
                 "Dynamic Punch",
                 "Counter"
-            ]
+            ],
+            "weight": 51.3
         },
         {
             "name": "Cacturne",
@@ -35208,7 +35527,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 77.4
         },
         {
             "name": "Snorunt",
@@ -35315,7 +35635,8 @@
             "egg_moves": [
                 "Block",
                 "Spikes"
-            ]
+            ],
+            "weight": 16.8
         },
         {
             "name": "Glalie",
@@ -35436,7 +35757,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 256.5
         },
         {
             "name": "Lunatone",
@@ -35543,7 +35865,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 168.0
         },
         {
             "name": "Solrock",
@@ -35653,7 +35976,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 154.0
         },
         {
             "name": "Azurill",
@@ -35743,7 +36067,8 @@
                 "Refresh",
                 "Slam",
                 "Tickle"
-            ]
+            ],
+            "weight": 2.0
         },
         {
             "name": "Spoink",
@@ -35860,7 +36185,8 @@
                 "Extrasensory",
                 "Substitute",
                 "Trick"
-            ]
+            ],
+            "weight": 30.6
         },
         {
             "name": "Grumpig",
@@ -35990,7 +36316,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 71.5
         },
         {
             "name": "Plusle",
@@ -36101,7 +36428,8 @@
             "egg_moves": [
                 "Substitute",
                 "Wish"
-            ]
+            ],
+            "weight": 4.2
         },
         {
             "name": "Minun",
@@ -36212,7 +36540,8 @@
             "egg_moves": [
                 "Substitute",
                 "Wish"
-            ]
+            ],
+            "weight": 4.2
         },
         {
             "name": "Mawile",
@@ -36341,7 +36670,8 @@
                 "Psych Up",
                 "Ancient Power",
                 "Tickle"
-            ]
+            ],
+            "weight": 11.5
         },
         {
             "name": "Meditite",
@@ -36468,7 +36798,8 @@
                 "Fake Out",
                 "Baton Pass",
                 "Dynamic Punch"
-            ]
+            ],
+            "weight": 11.2
         },
         {
             "name": "Medicham",
@@ -36613,7 +36944,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 31.5
         },
         {
             "name": "Swablu",
@@ -36723,7 +37055,8 @@
                 "Haze",
                 "Pursuit",
                 "Rage"
-            ]
+            ],
+            "weight": 1.2
         },
         {
             "name": "Altaria",
@@ -36852,7 +37185,8 @@
                 "Dream Eater",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 20.6
         },
         {
             "name": "Wynaut",
@@ -36915,7 +37249,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 14.0
         },
         {
             "name": "Duskull",
@@ -37031,7 +37366,8 @@
                 "Grudge",
                 "Memento",
                 "Faint Attack"
-            ]
+            ],
+            "weight": 15.0
         },
         {
             "name": "Dusclops",
@@ -37164,7 +37500,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 30.6
         },
         {
             "name": "Roselia",
@@ -37290,7 +37627,8 @@
                 "Synthesis",
                 "Pin Missile",
                 "Cotton Spore"
-            ]
+            ],
+            "weight": 2.0
         },
         {
             "name": "Slakoth",
@@ -37409,7 +37747,8 @@
                 "Crush Claw",
                 "Curse",
                 "Sleep Talk"
-            ]
+            ],
+            "weight": 24.0
         },
         {
             "name": "Vigoroth",
@@ -37535,7 +37874,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 46.5
         },
         {
             "name": "Slaking",
@@ -37662,7 +38002,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 130.5
         },
         {
             "name": "Gulpin",
@@ -37779,7 +38120,8 @@
                 "Acid Armor",
                 "Smog",
                 "Pain Split"
-            ]
+            ],
+            "weight": 10.3
         },
         {
             "name": "Swalot",
@@ -37908,7 +38250,8 @@
                 "Explosion",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 80.0
         },
         {
             "name": "Tropius",
@@ -38025,7 +38368,8 @@
                 "Razor Wind",
                 "Leech Seed",
                 "Nature Power"
-            ]
+            ],
+            "weight": 100.0
         },
         {
             "name": "Whismur",
@@ -38141,7 +38485,8 @@
                 "Swagger",
                 "Extrasensory",
                 "Smelling Salt"
-            ]
+            ],
+            "weight": 16.3
         },
         {
             "name": "Loudred",
@@ -38271,7 +38616,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 40.5
         },
         {
             "name": "Exploud",
@@ -38406,7 +38752,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 84.0
         },
         {
             "name": "Clamperl",
@@ -38488,7 +38835,8 @@
                 "Supersonic",
                 "Barrier",
                 "Confuse Ray"
-            ]
+            ],
+            "weight": 52.5
         },
         {
             "name": "Huntail",
@@ -38582,7 +38930,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 27.0
         },
         {
             "name": "Gorebyss",
@@ -38677,7 +39026,8 @@
                 "Mimic",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 22.6
         },
         {
             "name": "Absol",
@@ -38809,7 +39159,8 @@
                 "Magic Coat",
                 "Curse",
                 "Substitute"
-            ]
+            ],
+            "weight": 47.0
         },
         {
             "name": "Shuppet",
@@ -38922,7 +39273,8 @@
                 "Foresight",
                 "Astonish",
                 "Imprison"
-            ]
+            ],
+            "weight": 2.3
         },
         {
             "name": "Banette",
@@ -39043,7 +39395,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 12.5
         },
         {
             "name": "Seviper",
@@ -39152,7 +39505,8 @@
                 "Swallow",
                 "Spit Up",
                 "Body Slam"
-            ]
+            ],
+            "weight": 52.5
         },
         {
             "name": "Zangoose",
@@ -39284,7 +39638,8 @@
                 "Counter",
                 "Roar",
                 "Curse"
-            ]
+            ],
+            "weight": 40.3
         },
         {
             "name": "Relicanth",
@@ -39403,7 +39758,8 @@
                 "Amnesia",
                 "Sleep Talk",
                 "Rock Slide"
-            ]
+            ],
+            "weight": 23.4
         },
         {
             "name": "Aron",
@@ -39523,7 +39879,8 @@
                 "Body Slam",
                 "Stomp",
                 "Smelling Salt"
-            ]
+            ],
+            "weight": 60.0
         },
         {
             "name": "Lairon",
@@ -39650,7 +40007,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 120.0
         },
         {
             "name": "Aggron",
@@ -39795,7 +40153,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 360.0
         },
         {
             "name": "Castform",
@@ -39898,7 +40257,8 @@
             "egg_moves": [
                 "Future Sight",
                 "Psych Up"
-            ]
+            ],
+            "weight": 0.8
         },
         {
             "name": "Volbeat",
@@ -40015,7 +40375,8 @@
                 "Baton Pass",
                 "Silver Wind",
                 "Trick"
-            ]
+            ],
+            "weight": 17.7
         },
         {
             "name": "Illumise",
@@ -40131,7 +40492,8 @@
                 "Baton Pass",
                 "Silver Wind",
                 "Growth"
-            ]
+            ],
+            "weight": 17.7
         },
         {
             "name": "Lileep",
@@ -40234,7 +40596,8 @@
                 "Recover",
                 "Mirror Coat",
                 "Rock Slide"
-            ]
+            ],
+            "weight": 23.8
         },
         {
             "name": "Cradily",
@@ -40349,7 +40712,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.4
         },
         {
             "name": "Anorith",
@@ -40456,7 +40820,8 @@
                 "Knock Off",
                 "Swords Dance",
                 "Rock Slide"
-            ]
+            ],
+            "weight": 12.5
         },
         {
             "name": "Armaldo",
@@ -40575,7 +40940,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 68.2
         },
         {
             "name": "Ralts",
@@ -40691,7 +41057,8 @@
                 "Mean Look",
                 "Memento",
                 "Destiny Bond"
-            ]
+            ],
+            "weight": 6.6
         },
         {
             "name": "Kirlia",
@@ -40817,7 +41184,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 20.2
         },
         {
             "name": "Gardevoir",
@@ -40940,7 +41308,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 48.4
         },
         {
             "name": "Bagon",
@@ -41054,7 +41423,8 @@
                 "Dragon Rage",
                 "Twister",
                 "Dragon Dance"
-            ]
+            ],
+            "weight": 42.1
         },
         {
             "name": "Shelgon",
@@ -41178,7 +41548,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 110.5
         },
         {
             "name": "Salamence",
@@ -41311,7 +41682,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 102.6
         },
         {
             "name": "Beldum",
@@ -41350,7 +41722,8 @@
             ],
             "tm_hm_learnset": [],
             "tutor_learnset": [],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 95.2
         },
         {
             "name": "Metang",
@@ -41459,7 +41832,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 202.5
         },
         {
             "name": "Metagross",
@@ -41580,7 +41954,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 550.0
         },
         {
             "name": "Regirock",
@@ -41687,7 +42062,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 230.0
         },
         {
             "name": "Regice",
@@ -41794,7 +42170,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 175.0
         },
         {
             "name": "Registeel",
@@ -41906,7 +42283,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 205.0
         },
         {
             "name": "Kyogre",
@@ -42022,7 +42400,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 352.0
         },
         {
             "name": "Groudon",
@@ -42146,7 +42525,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 950.0
         },
         {
             "name": "Rayquaza",
@@ -42269,7 +42649,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 206.5
         },
         {
             "name": "Latias",
@@ -42393,7 +42774,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 40.0
         },
         {
             "name": "Latios",
@@ -42517,7 +42899,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.0
         },
         {
             "name": "Jirachi",
@@ -42635,7 +43018,8 @@
                 "Thunder Wave",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 1.1
         },
         {
             "name": "Deoxys",
@@ -42767,7 +43151,8 @@
                 "Nightmare",
                 "Swagger"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.8
         },
         {
             "name": "Deoxys (S)",
@@ -42911,7 +43296,8 @@
                 "Thunder Punch",
                 "Fire Punch"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.8
         },
         {
             "name": "Deoxys (D)",
@@ -43051,7 +43437,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.8
         },
         {
             "name": "Deoxys (A)",
@@ -43183,7 +43570,8 @@
                 "Rock Slide",
                 "Substitute"
             ],
-            "egg_moves": []
+            "egg_moves": [],
+            "weight": 60.8
         },
         {
             "name": "Chimecho",
@@ -43301,7 +43689,8 @@
                 "Curse",
                 "Hypnosis",
                 "Dream Eater"
-            ]
+            ],
+            "weight": 1.0
         }
     ]
 }

@@ -190,6 +190,7 @@ fn replay_python_damage_cases() {
                     attacking_battle_stats: a_stats.as_ref(),
                     defending_battle_stats: d_stats.as_ref(),
                     attacker_is_enemy: case["attacker_is_enemy"].as_bool().unwrap_or(false),
+                    is_wild_battle: false,
                 };
                 let ours = calculate_damage(&gen, &args);
                 let expected = &case["result"];
@@ -226,7 +227,11 @@ fn replay_python_damage_cases() {
             }
             "get_crit_rate" => {
                 n_crit += 1;
-                let ours = get_crit_rate(&gen, &attacking, &m, custom.as_deref());
+                let defending = case.get("defending").filter(|d| d.is_object()).map(|d| mon(&gen, d)).unwrap_or_else(|| attacking.clone());
+                let custom_str = custom.clone().unwrap_or_default();
+                let mut args = DamageArgs::new(&attacking, &m, &defending);
+                args.custom_move_data = &custom_str;
+                let ours = get_crit_rate(&gen, &args);
                 let expected = case["result"].as_f64().unwrap_or(f64::NAN);
                 if (ours - expected).abs() > 1e-12 {
                     failures.push(format!("{}: rust {} python {}", describe(case), ours, expected));
@@ -236,7 +241,11 @@ fn replay_python_damage_cases() {
                 n_acc += 1;
                 let defending = mon(&gen, &case["defending"]);
                 let weather = case["weather"].as_str().unwrap_or(xpr_core::consts::WEATHER_NONE);
-                let ours = get_move_accuracy(&gen, &attacking, &m, custom.as_deref(), &defending, weather);
+                let custom_str = custom.clone().unwrap_or_default();
+                let mut args = DamageArgs::new(&attacking, &m, &defending);
+                args.custom_move_data = &custom_str;
+                args.weather = weather;
+                let ours = get_move_accuracy(&gen, &args);
                 let expected = case["result"].as_f64();
                 let same = match (ours, expected) {
                     (None, None) => true,
@@ -251,6 +260,85 @@ fn replay_python_damage_cases() {
         }
     }
     eprintln!("replayed {} damage, {} crit-rate, {} accuracy cases", n_damage, n_crit, n_acc);
+    // `XPR_DAMAGE_CASES_REWRITE=<path>` writes a copy of the corpus whose
+    // expected results are replaced by the current ones for every differing
+    // case (for deliberate behaviour changes; review the printed list, then
+    // copy the file over the corpus). The test still fails so a rewrite is
+    // never silent.
+    if let Ok(out) = std::env::var("XPR_DAMAGE_CASES_REWRITE") {
+        let mut rewritten = corpus.clone();
+        let mut n_changed = 0;
+        if let Some(arr) = rewritten["cases"].as_array_mut() {
+            for case in arr.iter_mut() {
+                let version = case["version"].as_str().unwrap_or("").to_string();
+                let gen = reg.get_version(&version).unwrap();
+                let attacking = mon(&gen, &case["attacking"]);
+                let m = mv(&gen, &case["move"]);
+                let custom = case["custom_move_data"].as_str().map(|s| s.to_string()).unwrap_or_default();
+                let weather = case["weather"].as_str().unwrap_or(xpr_core::consts::WEATHER_NONE).to_string();
+                let defending = case.get("defending").filter(|d| d.is_object()).map(|d| mon(&gen, d)).unwrap_or_else(|| attacking.clone());
+                let new_result: Value = match case["kind"].as_str().unwrap_or("") {
+                    "calculate_damage" => {
+                        let a_stages = stages(case.get("attacking_stages"));
+                        let d_stages = stages(case.get("defending_stages"));
+                        let a_field = field(case.get("attacking_field"));
+                        let d_field = field(case.get("defending_field"));
+                        let a_stats = opt_stat_block(gen.gen, case.get("attacking_battle_stats"));
+                        let d_stats = opt_stat_block(gen.gen, case.get("defending_battle_stats"));
+                        let args = DamageArgs {
+                            attacking: &attacking,
+                            mv: &m,
+                            defending: &defending,
+                            attacking_stages: a_stages.as_ref(),
+                            defending_stages: d_stages.as_ref(),
+                            attacking_field: a_field.as_ref(),
+                            defending_field: d_field.as_ref(),
+                            is_crit: case["is_crit"].as_bool().unwrap_or(false),
+                            custom_move_data: &custom,
+                            weather: &weather,
+                            is_double_battle: case["is_double_battle"].as_bool().unwrap_or(false),
+                            attacking_battle_stats: a_stats.as_ref(),
+                            defending_battle_stats: d_stats.as_ref(),
+                            attacker_is_enemy: case["attacker_is_enemy"].as_bool().unwrap_or(false),
+                            is_wild_battle: false,
+                        };
+                        match calculate_damage(&gen, &args) {
+                            None => Value::Null,
+                            Some(r) => serde_json::json!({
+                                "damage_vals": r.damage_vals.iter().map(|(k, v)| serde_json::json!([k, v])).collect::<Vec<_>>(),
+                                "min_damage": r.min_damage,
+                                "max_damage": r.max_damage,
+                                "size": r.size,
+                                "num_attacks": r.num_attacks,
+                            }),
+                        }
+                    }
+                    "get_crit_rate" => {
+                        let mut args = DamageArgs::new(&attacking, &m, &defending);
+                        args.custom_move_data = &custom;
+                        serde_json::json!(get_crit_rate(&gen, &args))
+                    }
+                    "get_move_accuracy" => {
+                        let mut args = DamageArgs::new(&attacking, &m, &defending);
+                        args.custom_move_data = &custom;
+                        args.weather = &weather;
+                        match get_move_accuracy(&gen, &args) {
+                            None => Value::Null,
+                            Some(v) => serde_json::json!(v),
+                        }
+                    }
+                    _ => continue,
+                };
+                if new_result != case["result"] {
+                    eprintln!("REWRITE {}: {} -> {}", describe(case), case["result"], new_result);
+                    case["result"] = new_result;
+                    n_changed += 1;
+                }
+            }
+        }
+        std::fs::write(&out, serde_json::to_string_pretty(&rewritten).unwrap()).expect("write rewrite");
+        eprintln!("wrote {} with {} rewritten cases", out, n_changed);
+    }
     if !failures.is_empty() {
         for f in failures.iter().take(60) {
             eprintln!("MISMATCH {}", f);

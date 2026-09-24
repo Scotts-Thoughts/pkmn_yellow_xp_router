@@ -368,6 +368,124 @@ pub fn find_kill(
     result
 }
 
+/// The per-hit structure of one use of a move whose hits roll damage (and,
+/// from gen 2 on, critical hits) independently: multi-hit moves, two-hit
+/// moves, Beat Up and Triple Kick. Gen 1 rolls once for every hit, so it
+/// never produces one of these.
+#[derive(Clone, Debug, PartialEq)]
+pub struct HitModel {
+    /// `(non-crit range, crit range)` of every hit slot, in order.
+    pub hits: Vec<(DamageRange, DamageRange)>,
+    /// Accuracy is rolled before every hit and a miss ends the sequence
+    /// (gen 3/4 Triple Kick); otherwise one roll covers the whole use.
+    pub accuracy_per_hit: bool,
+}
+
+impl HitModel {
+    /// Sum of the smallest non-crit values of every hit.
+    pub fn min_damage(&self) -> i64 {
+        self.hits.iter().map(|(n, _)| n.min_damage).sum()
+    }
+}
+
+/// Dense probability mass of a `DamageRange` over `0..=cap`, with every
+/// value of `cap` or more collapsed into the `cap` bucket.
+fn capped_pmf(range: &DamageRange, cap: usize) -> Vec<f64> {
+    let mut out = vec![0.0f64; cap + 1];
+    let total = range.size as f64;
+    for (dmg, count) in &range.damage_vals {
+        let idx = (*dmg).clamp(0, cap as i64) as usize;
+        out[idx] += (*count as f64) / total;
+    }
+    out
+}
+
+/// `a ⊛ b` with every sum of `cap` or more collapsed into the `cap` bucket.
+fn capped_convolve(a: &[f64], b: &[f64], cap: usize) -> Vec<f64> {
+    let mut out = vec![0.0f64; cap + 1];
+    for (i, pa) in a.iter().enumerate() {
+        if *pa == 0.0 {
+            continue;
+        }
+        for (j, pb) in b.iter().enumerate() {
+            if *pb == 0.0 {
+                continue;
+            }
+            let k = (i + j).min(cap);
+            out[k] += pa * pb;
+        }
+    }
+    out
+}
+
+/// `find_kill` for a move whose hits roll crits and damage independently
+/// (see [`HitModel`]): every hit crits with `crit_chance` on its own, and
+/// the damage of one use is the convolution of its hits. The result has the
+/// same shape and semantics as [`find_kill`] (per-use kill percentages, the
+/// `-1.0` guaranteed-kill entry).
+pub fn find_kill_hits(
+    model: &HitModel,
+    crit_chance: f64,
+    accuracy: f64,
+    target_hp: i64,
+    attack_depth: i64,
+    percent_cutoff: f64,
+) -> Vec<KillRange> {
+    let mut result: Vec<KillRange> = Vec::new();
+    if target_hp <= 0 || model.hits.is_empty() {
+        return result;
+    }
+    let cap = target_hp as usize;
+    let mut delta0 = vec![0.0f64; cap + 1];
+    delta0[0] = 1.0;
+
+    // one use
+    let mut landed = delta0.clone();
+    let mut ended = vec![0.0f64; cap + 1];
+    for (normal, crit) in &model.hits {
+        let pn = capped_pmf(normal, cap);
+        let pc = capped_pmf(crit, cap);
+        let mix: Vec<f64> = pn.iter().zip(pc.iter()).map(|(n, c)| n * (1.0 - crit_chance) + c * crit_chance).collect();
+        if model.accuracy_per_hit {
+            for (e, l) in ended.iter_mut().zip(landed.iter()) {
+                *e += l * (1.0 - accuracy);
+            }
+            let hitting: Vec<f64> = landed.iter().map(|l| l * accuracy).collect();
+            landed = capped_convolve(&hitting, &mix, cap);
+        } else {
+            landed = capped_convolve(&landed, &mix, cap);
+        }
+    }
+    let use_dist: Vec<f64> = if model.accuracy_per_hit {
+        ended.iter().zip(landed.iter()).map(|(e, l)| e + l).collect()
+    } else {
+        let mut d: Vec<f64> = landed.iter().map(|l| l * accuracy).collect();
+        d[0] += 1.0 - accuracy;
+        d
+    };
+
+    let mut total = delta0;
+    let mut highest_found_kill_pct = 0.0f64;
+    for cur_num_attacks in 1..=attack_depth.max(0) {
+        total = capped_convolve(&total, &use_dist, cap);
+        let pct = 100.0 * total[cap];
+        highest_found_kill_pct = pct;
+        if pct > percent_cutoff {
+            result.push((cur_num_attacks, pct));
+        }
+        if pct > 99.0 {
+            break;
+        }
+    }
+    let rounded_acc = (accuracy * 100.0).round_ties_even();
+    let min_damage = model.min_damage();
+    if highest_found_kill_pct < 99.0 && highest_found_kill_pct < rounded_acc && min_damage != 0 {
+        let guaranteed = ((target_hp as f64) / (min_damage as f64)).ceil() as i64;
+        result.push((guaranteed, -1.0));
+    }
+    result
+}
+
 /// `get_special_damage_override`: Dragon Rage / Sonic Boom / Seismic Toss /
 /// Night Shade. `defender_types` enables the gen 2+ immunity check.
 pub fn get_special_damage_override(
@@ -467,6 +585,31 @@ mod tests {
         assert!(!kills.is_empty());
         assert_eq!(kills[0].0, 2);
         assert!(kills.last().unwrap().1 > 99.0 || kills.last().unwrap().1 == -1.0);
+    }
+
+    #[test]
+    fn hit_model_matches_single_hit_search() {
+        // one hit per use with no crit: identical to find_kill on the same range
+        let r = DamageRange::from_rolls(20, 217, 255);
+        let model = HitModel { hits: vec![(r.clone(), r.clone())], accuracy_per_hit: false };
+        let a = find_kill(&r, &r, 0.0, 0.9, 50, 20, 0.1, true);
+        let b = find_kill_hits(&model, 0.0, 0.9, 50, 20, 0.1);
+        assert_eq!(a.len(), b.len());
+        for (x, y) in a.iter().zip(b.iter()) {
+            assert_eq!(x.0, y.0);
+            assert!((x.1 - y.1).abs() < 1e-9, "{:?} vs {:?}", x, y);
+        }
+    }
+
+    #[test]
+    fn hit_model_two_hits_crit_independently() {
+        // two hits of exactly 10 (crit 20) vs 30 HP: a kill needs at least one crit
+        let n = DamageRange::single(10);
+        let c = DamageRange::single(20);
+        let model = HitModel { hits: vec![(n.clone(), c.clone()), (n, c)], accuracy_per_hit: false };
+        let kills = find_kill_hits(&model, 0.25, 1.0, 30, 5, 0.0);
+        assert_eq!(kills[0].0, 1);
+        assert!((kills[0].1 - 43.75).abs() < 1e-9, "{:?}", kills);
     }
 
     #[test]

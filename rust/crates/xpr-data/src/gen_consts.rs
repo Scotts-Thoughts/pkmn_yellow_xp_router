@@ -153,6 +153,7 @@ pub const PRESENT_HEAL: &str = "Heal";
 pub const COUNTER_MOVE: &str = "Counter";
 pub const MIRROR_COAT_MOVE: &str = "Mirror Coat";
 pub const BIDE_MOVE: &str = "Bide";
+pub const METAL_BURST_MOVE: &str = "Metal Burst";
 pub const SPIT_UP_MOVE: &str = "Spit Up";
 pub const BLIZZARD_MOVE: &str = "Blizzard";
 pub const SURF_MOVE: &str = "Surf";
@@ -328,7 +329,8 @@ pub fn plate_type(item: Option<&str>) -> Option<&'static str> {
     PLATE_TYPE_LOOKUP.iter().find(|(i, _)| *i == item).map(|(_, t)| *t)
 }
 
-/// Gen 4 Nature Power terrain -> (base_power, type, accuracy)
+/// Gen 4 Nature Power terrain -> (base_power, type, accuracy); the called
+/// move's category and targeting are in `gen4_nature_power_move`.
 pub const NATURE_POWER_PLAIN_SAND: &str = "Plain/Sand";
 pub const NATURE_POWER_GRASS_PUDDLE: &str = "Grass/Puddle";
 pub const NATURE_POWER_MOUNTAIN_CAVE: &str = "Mountain/Cave";
@@ -360,6 +362,24 @@ pub fn gen4_nature_power(terrain: &str) -> Option<(i64, &'static str, i64)> {
 
 pub const GEN4_NATURE_POWER_PHYSICAL_TERRAINS: [&str; 3] =
     [NATURE_POWER_PLAIN_SAND, NATURE_POWER_GRASS_PUDDLE, NATURE_POWER_MOUNTAIN_CAVE];
+
+/// Gen 4 Nature Power terrain -> (called move, category, targeting)
+/// (`include/data/terrain/to_move.h`: Earthquake, Seed Bomb, Rock Slide,
+/// Blizzard, Hydro Pump, Ice Beam, Tri Attack, Mud Bomb, Air Slash).
+pub fn gen4_nature_power_move(terrain: &str) -> Option<(&'static str, &'static str, &'static str)> {
+    Some(match terrain {
+        NATURE_POWER_PLAIN_SAND => ("Earthquake", consts::CATEGORY_PHYSICAL, GEN4_TARGETING_OTHERS),
+        NATURE_POWER_GRASS_PUDDLE => ("Seed Bomb", consts::CATEGORY_PHYSICAL, "Foe Or Ally"),
+        NATURE_POWER_MOUNTAIN_CAVE => ("Rock Slide", consts::CATEGORY_PHYSICAL, GEN4_TARGETING_ALL_FOES),
+        NATURE_POWER_SNOW => ("Blizzard", consts::CATEGORY_SPECIAL, GEN4_TARGETING_ALL_FOES),
+        NATURE_POWER_WATER => ("Hydro Pump", consts::CATEGORY_SPECIAL, "Foe Or Ally"),
+        NATURE_POWER_ICE => ("Ice Beam", consts::CATEGORY_SPECIAL, "Foe Or Ally"),
+        NATURE_POWER_BUILDING => ("Tri Attack", consts::CATEGORY_SPECIAL, "Foe Or Ally"),
+        NATURE_POWER_GREAT_MARSH => ("Mud Bomb", consts::CATEGORY_SPECIAL, "Foe Or Ally"),
+        NATURE_POWER_BRIDGE => ("Air Slash", consts::CATEGORY_SPECIAL, "Foe Or Ally"),
+        _ => return None,
+    })
+}
 
 /// (berry, gen-4 power, gen-5 power, type). Gen 5 raised every power by 20
 /// except the resistance berries (Occa..Chilan), which the Python table
@@ -452,8 +472,7 @@ pub static GEN4_FLING_POWER: Lazy<IndexMap<&'static str, i64>> = Lazy::new(|| {
         ("Iron Ball", 130),
         ("Hard Stone", 100), ("Rare Bone", 100),
         ("Helix Fossil", 100), ("Dome Fossil", 100), ("Old Amber", 100), ("Root Fossil", 100),
-        ("Claw Fossil", 100), ("Armor Fossil", 100), ("Skull Fossil", 100), ("Cover Fossil", 100),
-        ("Plume Fossil", 100),
+        ("Claw Fossil", 100), ("Armor Fossil", 100), ("Skull Fossil", 100),
         ("Draco Plate", 90), ("Dread Plate", 90), ("Earth Plate", 90), ("Fist Plate", 90),
         ("Flame Plate", 90), ("Icicle Plate", 90), ("Insect Plate", 90), ("Iron Plate", 90),
         ("Meadow Plate", 90), ("Mind Plate", 90), ("Sky Plate", 90), ("Splash Plate", 90),
@@ -590,6 +609,11 @@ pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<S
         m.insert(RETURN_MOVE, range_strings(102, 0, -1));
         m.insert(FRUSTRATION_MOVE, range_strings(102, 0, -1));
         m.insert(PRESENT_MOVE, vec![s("40"), s("80"), s("120"), s(PRESENT_HEAL)]);
+        let cb: Vec<String> = COUNTER_BIDE_CUSTOM_DATA.iter().map(|x| s(x)).collect();
+        m.insert(COUNTER_MOVE, cb.clone());
+        m.insert(MIRROR_COAT_MOVE, cb.clone());
+        m.insert(BIDE_MOVE, cb);
+        m.insert(BEAT_UP_MOVE, range_strings(1, 7, 1));
         m
     });
     static GEN3: Lazy<IndexMap<&'static str, Vec<String>>> = Lazy::new(|| {
@@ -623,6 +647,10 @@ pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<S
         m.insert(SPIT_UP_MOVE, range_strings(1, 4, 1));
         m.insert(PRESENT_MOVE, vec![s(PRESENT_40), s(PRESENT_80), s(PRESENT_120)]);
         m.insert(BEAT_UP_MOVE, range_strings(1, 7, 1));
+        let cb: Vec<String> = COUNTER_BIDE_CUSTOM_DATA.iter().map(|x| s(x)).collect();
+        m.insert(COUNTER_MOVE, cb.clone());
+        m.insert(MIRROR_COAT_MOVE, cb.clone());
+        m.insert(BIDE_MOVE, cb);
         m
     });
     static GEN4: Lazy<IndexMap<&'static str, Vec<String>>> = Lazy::new(|| {
@@ -659,6 +687,12 @@ pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<S
         m.insert(WAKE_UP_SLAP_MOVE, two(NO_BONUS, SLEEPING_BONUS));
         m.insert(CRUSH_GRIP_MOVE, range_strings(100, 0, -1));
         m.insert(WRING_OUT_MOVE, range_strings(100, 0, -1));
+        let cb: Vec<String> = COUNTER_BIDE_CUSTOM_DATA.iter().map(|x| s(x)).collect();
+        m.insert(COUNTER_MOVE, cb.clone());
+        m.insert(MIRROR_COAT_MOVE, cb.clone());
+        m.insert(METAL_BURST_MOVE, cb.clone());
+        m.insert(BIDE_MOVE, cb);
+        m.insert(BEAT_UP_MOVE, range_strings(1, 7, 1));
         m
     });
     static GEN5: Lazy<IndexMap<&'static str, Vec<String>>> = Lazy::new(|| {
@@ -735,6 +769,19 @@ pub fn present_type_id(t: &str) -> Option<i64> {
         _ => return None,
     })
 }
+
+/// Gen 1 `StatModifierRatios` (used for accuracy / evasion stages): -6..=+6
+pub const GEN1_STAGE_RATIOS: [(i64, i64); 13] = [
+    (25, 100), (28, 100), (33, 100), (40, 100), (50, 100), (66, 100), (1, 1),
+    (15, 10), (2, 1), (25, 10), (3, 1), (35, 10), (4, 1),
+];
+
+/// Gen 2 `AccuracyLevelMultipliers`, gen 3 `sAccuracyStageRatios` and gen 4
+/// `HitRateByStage` (identical tables): -6..=+6
+pub const ACCURACY_STAGE_RATIOS: [(i64, i64); 13] = [
+    (33, 100), (36, 100), (43, 100), (50, 100), (60, 100), (75, 100), (1, 1),
+    (133, 100), (166, 100), (2, 1), (233, 100), (133, 50), (3, 1),
+];
 
 pub fn bag_limit(gen: Gen) -> Option<usize> {
     match gen {

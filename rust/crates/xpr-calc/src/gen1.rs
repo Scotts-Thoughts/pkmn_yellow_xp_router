@@ -30,13 +30,23 @@ pub fn get_crit_rate(pkmn: &EnemyPkmn, mv: &Move, custom_move_data: &str) -> f64
     (b.min(255) as f64) / 256.0
 }
 
-/// `get_move_accuracy`: the listed accuracy, except for OHKO moves, which
-/// report their exact hit chance (30% is stored as 76/256).
-pub fn get_move_accuracy(mv: &Move) -> Option<f64> {
-    if mv.has_flavor(gc::FLAVOR_ONE_HIT_KO) {
-        return mv.accuracy.map(|a| ((a * 255 / 100) as f64) / 256.0 * 100.0);
-    }
-    mv.accuracy.map(|a| a as f64)
+/// `MoveHitTest` / `CalcHitChance`: the accuracy byte is `acc * 255 / 100`,
+/// scaled by the user's accuracy stage and the target's evasion stage
+/// (`StatModifierRatios`, min 1 per step, cap 255); the move hits when
+/// `BattleRandom < byte`, so even a 100% move misses 1/256 of the time.
+/// Swift (`SWIFT_EFFECT`) never misses.
+pub fn get_move_accuracy(a: &DamageArgs) -> Option<f64> {
+    let mv = a.mv;
+    let mut byte = mv.accuracy? * 255 / 100;
+    let default_stages = StageModifiers::default();
+    let acc_stage = a.attacking_stages.unwrap_or(&default_stages).accuracy_stage.clamp(-6, 6);
+    let eva_stage = a.defending_stages.unwrap_or(&default_stages).evasion_stage.clamp(-6, 6);
+    let (n1, d1) = gc::GEN1_STAGE_RATIOS[(acc_stage + 6) as usize];
+    byte = floor_div(byte * n1, d1).max(1);
+    let (n2, d2) = gc::GEN1_STAGE_RATIOS[(6 - eva_stage) as usize];
+    byte = floor_div(byte * n2, d2).max(1);
+    byte = byte.min(255);
+    Some((byte as f64) / 256.0 * 100.0)
 }
 
 /// `calculate_gen_one_damage`

@@ -1,5 +1,11 @@
 # Damage calculation review — every move, every game (gens 1–5)
 
+> **2026-09-23 update:** the Rust port was re-verified against the decompilations
+> after these findings were fixed; see
+> [2026-09-23_rust_verification.md](2026-09-23_rust_verification.md) for the
+> current state (fixes applied, remaining gaps, how to re-run the sweep). The
+> per-gen files below describe the Python app as it was on 2026-09-10.
+
 Review date: 2026-09-10. Branch `ui` at commit `591dc60` (working tree with uncommitted UI changes; none of them
 touch the calc).
 

@@ -76,8 +76,8 @@
             "type": "Fire",
             "effects": [
                 {
-                    "percent": 10,
-                    "status": "Burn"
+                    "status": "Burn",
+                    "chance": 10
                 }
             ],
             "attack_flavor": [],
@@ -91,8 +91,8 @@
             "type": "Ice",
             "effects": [
                 {
-                    "percent": 10,
-                    "status": "Freeze"
+                    "status": "Freeze",
+                    "chance": 10
                 }
             ],
             "attack_flavor": [],
@@ -106,8 +106,8 @@
             "type": "Electric",
             "effects": [
                 {
-                    "percent": 10,
-                    "status": "Paralysis"
+                    "status": "Paralysis",
+                    "chance": 10
                 }
             ],
             "attack_flavor": [],
@@ -160,7 +160,7 @@
         {
             "name": "Swords Dance",
             "accuracy": null,
-            "pp": 20,
+            "pp": 30,
             "base_power": null,
             "type": "Normal",
             "effects": [
@@ -300,7 +300,7 @@
         {
             "name": "Jump Kick",
             "accuracy": 95,
-            "pp": 10,
+            "pp": 25,
             "base_power": 70,
             "type": "Fighting",
             "effects": [],
@@ -408,8 +408,8 @@
             "type": "Normal",
             "effects": [
                 {
-                    "percent": 30,
-                    "status": "Paralysis"
+                    "status": "Paralysis",
+                    "chance": 30
                 }
             ],
             "attack_flavor": [],
@@ -845,7 +845,7 @@
         {
             "name": "Submission",
             "accuracy": 80,
-            "pp": 20,
+            "pp": 25,
             "base_power": 80,
             "type": "Fighting",
             "effects": [],
@@ -945,7 +945,7 @@
         {
             "name": "Growth",
             "accuracy": null,
-            "pp": 20,
+            "pp": 40,
             "base_power": null,
             "type": "Normal",
             "effects": [
@@ -1037,7 +1037,7 @@
         {
             "name": "Petal Dance",
             "accuracy": 100,
-            "pp": 10,
+            "pp": 20,
             "base_power": 70,
             "type": "Grass",
             "effects": [],
@@ -1230,13 +1230,13 @@
             "type": "Psychic",
             "effects": [
                 {
-                    "chance": 33,
+                    "chance": 33.2,
                     "modifier": -1,
                     "stat": "spa",
                     "target": "enemy"
                 },
                 {
-                    "chance": 33,
+                    "chance": 33.2,
                     "modifier": -1,
                     "stat": "spd",
                     "target": "enemy"
@@ -2207,8 +2207,8 @@
         },
         {
             "name": "Struggle",
-            "accuracy": null,
-            "pp": 1,
+            "accuracy": 100,
+            "pp": 10,
             "base_power": 50,
             "type": "Normal",
             "effects": [],

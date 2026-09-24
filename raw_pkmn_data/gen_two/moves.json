@@ -226,7 +226,7 @@
             "base_power": 70,
             "type": "Flying",
             "attack_flavor": [
-                "two_turn_semi_invulrnerable"
+                "two_turn_semi_invulnerable"
             ],
             "effects": [],
             "rom_id": 19
@@ -1189,7 +1189,7 @@
             "base_power": 60,
             "type": "Ground",
             "attack_flavor": [
-                "two_turn_semi_invlunerable"
+                "two_turn_semi_invulnerable"
             ],
             "effects": [],
             "rom_id": 91
@@ -2177,16 +2177,16 @@
             ],
             "effects": [
                 {
-                    "chance": 6.3,
+                    "chance": 6.64,
                     "status": "Freeze",
                     "Note": "technically, 20% of causing a status effect, which is one of these 3. Just using approximate rounding for the chances for now"
                 },
                 {
-                    "chance": 6.3,
+                    "chance": 6.64,
                     "status": "Paralysis"
                 },
                 {
-                    "chance": 6.3,
+                    "chance": 6.64,
                     "status": "Burn"
                 }
             ],
@@ -2321,7 +2321,12 @@
             "attack_flavor": [
                 "self_thaw"
             ],
-            "effects": [],
+            "effects": [
+                {
+                    "chance": 10,
+                    "status": "Burn"
+                }
+            ],
             "rom_id": 172
         },
         {
@@ -2333,7 +2338,12 @@
             "attack_flavor": [
                 "snore"
             ],
-            "effects": [],
+            "effects": [
+                {
+                    "chance": 30,
+                    "flinch": true
+                }
+            ],
             "rom_id": 173
         },
         {
@@ -2602,7 +2612,7 @@
             "attack_flavor": [],
             "effects": [
                 {
-                    "chance": 30,
+                    "chance": 100,
                     "status": "Spikes"
                 }
             ],
@@ -2817,7 +2827,7 @@
                 },
                 {
                     "chance": 100,
-                    "status": "Confuse"
+                    "status": "Confusion"
                 }
             ],
             "rom_id": 207
@@ -3206,7 +3216,7 @@
             "name": "Hidden Power",
             "accuracy": 100,
             "pp": 15,
-            "base_power": 0,
+            "base_power": 1,
             "type": "Normal",
             "attack_flavor": [
                 "hidden_power"
@@ -3235,7 +3245,12 @@
             "attack_flavor": [
                 "bonus_fly_damage"
             ],
-            "effects": [],
+            "effects": [
+                {
+                    "chance": 20,
+                    "flinch": true
+                }
+            ],
             "rom_id": 239
         },
         {
@@ -3324,7 +3339,7 @@
             "attack_flavor": [],
             "effects": [
                 {
-                    "chance": 20,
+                    "chance": 10,
                     "modifier": 1,
                     "stat": "omni",
                     "target": "self"

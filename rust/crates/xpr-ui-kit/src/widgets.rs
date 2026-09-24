@@ -339,7 +339,11 @@ pub struct Entry<'a> {
     margin: egui::Margin,
     radius: u8,
     min_height: Option<f32>,
+    clearable: bool,
 }
+
+/// Width reserved at the right of a clearable entry for its × button.
+const CLEAR_BUTTON_W: f32 = 16.0;
 
 /// What an entry reported this frame.
 #[derive(Clone, Debug, Default)]
@@ -352,11 +356,20 @@ pub struct EntryResponse {
     pub escape_pressed: bool,
     pub lost_focus: bool,
     pub has_focus: bool,
+    /// The × button emptied the text (`changed` is set too).
+    pub cleared: bool,
 }
 
 impl<'a> Entry<'a> {
     pub fn new(theme: &'a Theme, text: &'a mut String) -> Self {
-        Entry { text, theme, width: None, enabled: true, hint: None, id: None, center: false, font: None, margin: egui::Margin::symmetric(4, 2), radius: 2, min_height: None }
+        Entry { text, theme, width: None, enabled: true, hint: None, id: None, center: false, font: None, margin: egui::Margin::symmetric(4, 2), radius: 2, min_height: None, clearable: false }
+    }
+
+    /// Show a × button at the right edge while there is text; clicking it
+    /// empties the entry and keeps the focus in it.
+    pub fn clearable(mut self) -> Self {
+        self.clearable = true;
+        self
     }
 
     /// Inner padding (default 4 × 2).
@@ -411,17 +424,22 @@ impl<'a> Entry<'a> {
         let theme = self.theme;
         let id = self.id.unwrap_or_else(|| ui.next_auto_id());
         let focused_before = ui.memory(|m| m.has_focus(id));
-        let mut edit = TextEdit::singleline(self.text)
+        let mut margin = self.margin;
+        if self.clearable {
+            // keep the text clear of the × button
+            margin.right += CLEAR_BUTTON_W as i8;
+        }
+        let mut edit = TextEdit::singleline(&mut *self.text)
             .id(id)
             .font(self.font.clone().unwrap_or_else(|| theme.body()))
             .text_color(if self.enabled { theme.text } else { theme.disabled_text })
             .background_color(if self.enabled { theme.bg_input } else { theme.bg_darker })
-            .margin(self.margin)
+            .margin(margin)
             .interactive(self.enabled)
             .frame(false)
             .lock_focus(true)
             .vertical_align(Align::Center);
-        let pad_x = (self.margin.left + self.margin.right) as f32;
+        let pad_x = (margin.left + margin.right) as f32;
         if let Some(w) = self.width {
             edit = edit.desired_width(w - pad_x);
         }
@@ -451,6 +469,24 @@ impl<'a> Entry<'a> {
             lost_focus: response.lost_focus() || (focused_before && !has_focus),
             ..Default::default()
         };
+        if self.clearable && self.enabled && !self.text.is_empty() {
+            let rect = response.rect;
+            let btn = Rect::from_min_max(Pos2::new(rect.max.x - CLEAR_BUTTON_W - 2.0, rect.min.y), Pos2::new(rect.max.x - 2.0, rect.max.y));
+            // registered after the text edit, so it wins the click
+            let clear = ui.interact(btn, id.with("clear"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+            let color = if clear.hovered() { theme.text } else { theme.secondary };
+            let c = btn.center();
+            let h = 3.5;
+            let x_stroke = Stroke::new(1.5_f32, color);
+            ui.painter().line_segment([Pos2::new(c.x - h, c.y - h), Pos2::new(c.x + h, c.y + h)], x_stroke);
+            ui.painter().line_segment([Pos2::new(c.x - h, c.y + h), Pos2::new(c.x + h, c.y - h)], x_stroke);
+            if clear.clicked() {
+                self.text.clear();
+                r.changed = true;
+                r.cleared = true;
+                ui.memory_mut(|m| m.request_focus(id));
+            }
+        }
         if has_focus || focused_before {
             ui.input_mut(|i| {
                 if i.consume_key(Modifiers::NONE, Key::Enter) {

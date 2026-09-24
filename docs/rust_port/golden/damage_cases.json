@@ -11999,7 +11999,27 @@
    "attacking_battle_stats": null,
    "defending_battle_stats": null,
    "attacker_is_enemy": false,
-   "result": null
+   "result": {
+    "damage_vals": [
+     [
+      6,
+      7
+     ],
+     [
+      7,
+      31
+     ],
+     [
+      8,
+      1
+     ]
+    ],
+    "min_damage": 6,
+    "max_damage": 8,
+    "size": 39,
+    "num_attacks": 1
+   },
+   "note": "2026-09-23: gen 2 Beat Up implemented (per-party-member hits with the user's base Attack); Python returned None"
   },
   {
    "kind": "calculate_damage",

@@ -29,7 +29,7 @@ fn mon(gen: &GenData, name: &str, level: i64) -> EnemyPkmn {
 
 fn accuracy(gen: &GenData, attacker: &EnemyPkmn, move_name: &str, defender: &EnemyPkmn) -> Option<f64> {
     let mv = gen.move_db().get_move(move_name).unwrap();
-    get_move_accuracy(gen, attacker, mv, None, defender, consts::WEATHER_NONE)
+    get_move_accuracy(gen, &DamageArgs::new(attacker, mv, defender))
 }
 
 fn damage(gen: &GenData, attacker: &EnemyPkmn, move_name: &str, defender: &EnemyPkmn, stages: Option<&StageModifiers>, is_crit: bool) -> Option<DamageRange> {

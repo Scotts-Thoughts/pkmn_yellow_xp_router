@@ -35,6 +35,18 @@ Test plan: `TESTING.md`. Divergences: `docs/rust_port/KNOWN_ISSUES.md`.
 | `xpr-ui-kit` | done | egui theme (Python colour math, system font lookup), widget kit (styled buttons, entries, option menus, searchable dropdowns, amount entries, checkbox labels, group boxes, tab bar, menus, steppers, chips), Qt key-sequence ↔ egui shortcuts, tkinter geometry strings, toast + auto-clearing label |
 | `xpr-app` | done | the egui/eframe application: landing + new-route pages, editor (virtualised route list with drag/drop, inline creator, filter bar, quick-add popover), event details (state viewer, per-type editors, notes), battle summary UI, run/setup summaries (docked panel or secondary viewports), route compare page (Overview / Checkpoints / Event diff), all menus/shortcuts/dialogs, screenshots, recorder glue, update flow, config persistence; `build.rs` embeds `icons/**` and the prescaled box art / Pokémon icons |
 
+## Damage-calc verification (2026-09-23)
+
+Gens 1–4 damage, crit-rate and accuracy formulas were re-verified line by line
+against the pokered/pokeyellow, pokegold/pokecrystal, pokeruby/pokeemerald/
+pokefirered and pokediamond/pokeplatinum/pokeheartgold decompilations with a
+sweep harness (`crates/xpr-calc/examples/sweep.rs` + the Python transcriptions
+in `docs/damage_calc_review/reference_2026_09_23/`): 37,802 damage
+distributions over 5 versions match the game code exactly. Fixes, data
+corrections and the remaining gaps are in
+`docs/damage_calc_review/2026-09-23_rust_verification.md`; the 62-case
+regression test is `crates/xpr-calc/tests/game_formulas.rs`.
+
 ## Verified so far
 
 - `cargo test --workspace`: green (unit tests + 4 route regression tests incl. KI-1 + 437 recorded damage-calc cases + ui-kit tests + the incremental-recalc / undo-snapshot / kill-search / pre-fight-candy tests of the performance pass).

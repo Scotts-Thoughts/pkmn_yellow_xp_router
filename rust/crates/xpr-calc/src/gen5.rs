@@ -7,7 +7,7 @@ use xpr_data::model::{EnemyPkmn, FieldStatus, Move, StageModifiers};
 use xpr_data::stats;
 use xpr_data::GenData;
 
-use crate::damage::{self, py_int, DamageRange};
+use crate::damage::{self, py_int, DamageRange, HitModel};
 use crate::DamageArgs;
 
 const MIN_RANGE: i64 = 85;
@@ -108,8 +108,49 @@ fn wonder_guard_blocks(gen: &GenData, move_type: &str, d1: &str, d2: &str) -> bo
     e1 != Some(consts::SUPER_EFFECTIVE) && e2 != Some(consts::SUPER_EFFECTIVE)
 }
 
-/// `calculate_gen_five_damage`
+fn multi_hit_count(a: &DamageArgs) -> i64 {
+    let mv = a.mv;
+    let custom = a.custom_move_data;
+    if mv.has_flavor(consts::DOUBLE_HIT_FLAVOR) {
+        2
+    } else if mv.has_flavor(consts::FLAVOR_MULTI_HIT) {
+        if custom.contains(consts::MULTI_HIT_2) {
+            2
+        } else if custom.contains(consts::MULTI_HIT_3) {
+            3
+        } else if custom.contains(consts::MULTI_HIT_4) {
+            4
+        } else if custom.contains(consts::MULTI_HIT_5) {
+            5
+        } else {
+            1
+        }
+    } else {
+        1
+    }
+}
+
+/// The per-hit ranges of a multi-hit / two-hit use; `None` for single hits.
+pub fn hit_model(gen: &GenData, a: &DamageArgs) -> Option<HitModel> {
+    let n = multi_hit_count(a);
+    if n < 2 {
+        return None;
+    }
+    let mut normal_args = *a;
+    normal_args.is_crit = false;
+    let mut crit_args = *a;
+    crit_args.is_crit = true;
+    let normal = calculate_damage_impl(gen, &normal_args, true)?;
+    let crit = calculate_damage_impl(gen, &crit_args, true)?;
+    Some(HitModel { hits: vec![(normal, crit); n as usize], accuracy_per_hit: false })
+}
+
+/// `calculate_gen_five_damage`: the whole use (every hit of a multi-hit move).
 pub fn calculate_damage(gen: &GenData, a: &DamageArgs) -> Option<DamageRange> {
+    calculate_damage_impl(gen, a, false)
+}
+
+fn calculate_damage_impl(gen: &GenData, a: &DamageArgs, single_hit: bool) -> Option<DamageRange> {
     let mv = a.mv;
     let attacking_pkmn = a.attacking;
     let defending_pkmn = a.defending;
@@ -727,20 +768,7 @@ pub fn calculate_damage(gen: &GenData, a: &DamageArgs) -> Option<DamageRange> {
         temp = 1;
     }
 
-    let mut multi_hit = 1;
-    if mv.has_flavor(consts::DOUBLE_HIT_FLAVOR) {
-        multi_hit = 2;
-    } else if mv.has_flavor(consts::FLAVOR_MULTI_HIT) {
-        if custom.contains(consts::MULTI_HIT_2) {
-            multi_hit = 2;
-        } else if custom.contains(consts::MULTI_HIT_3) {
-            multi_hit = 3;
-        } else if custom.contains(consts::MULTI_HIT_4) {
-            multi_hit = 4;
-        } else if custom.contains(consts::MULTI_HIT_5) {
-            multi_hit = 5;
-        }
-    }
+    let multi_hit = if single_hit { 1 } else { multi_hit_count(a) };
 
     if mv.name == consts::SPIT_UP_MOVE_NAME {
         return Some(DamageRange::single(temp));
@@ -765,8 +793,9 @@ pub fn calculate_damage(gen: &GenData, a: &DamageArgs) -> Option<DamageRange> {
                 attacking_battle_stats: None,
                 defending_battle_stats: None,
                 attacker_is_enemy: false,
+                is_wild_battle: a.is_wild_battle,
             };
-            calculate_damage(gen, &sub)?
+            calculate_damage_impl(gen, &sub, true)?
         } else {
             result.clone()
         };

@@ -15,6 +15,9 @@ use xpr_ui_kit::ShortcutMap;
 use crate::assets::Assets;
 use crate::controller::MainController;
 
+/// Side of the square filter toggles; "Clear Filters" matches its height.
+const TOGGLE_SIZE: f32 = 26.0;
+
 const TOGGLE_ORDER: [&str; 19] = [
     consts::MAJOR_BATTLE_FILTER,
     consts::TASK_TRAINER_BATTLE,
@@ -198,7 +201,7 @@ impl FilterBar {
                         }
                     }
                     let icon = icon_file(et).and_then(|f| assets.filter_icon(ui.ctx(), f));
-                    let size = Vec2::new(26.0, 26.0);
+                    let size = Vec2::splat(TOGGLE_SIZE);
                     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
                     let hovered = resp.hovered();
                     let (fill, stroke) = if checked {
@@ -223,11 +226,15 @@ impl FilterBar {
                         FilterBar::toggle_filter_type(ctrl, et);
                     }
                 }
-                if widgets::StyledButton::new(theme, egui::RichText::new("Clear Filters").font(theme.font(8.25))).padding(Vec2::new(4.0, 2.0)).show(ui).clicked() {
+                if widgets::StyledButton::new(theme, egui::RichText::new("Clear Filters").font(theme.font(8.25))).padding(Vec2::new(4.0, 2.0)).min_size(Vec2::new(0.0, TOGGLE_SIZE)).show(ui).clicked() {
                     ctrl.set_route_filter_types(Vec::new());
                 }
-                let r = Entry::new(theme, &mut self.search_text).width(200.0).hint("Search events...").id(ui.id().with("route_search")).show(ui);
-                if r.changed {
+                let r = Entry::new(theme, &mut self.search_text).width(200.0).hint("Search events...").id(ui.id().with("route_search")).clearable().show(ui);
+                if r.cleared {
+                    // no debounce: clearing should show the full list at once
+                    self.search_deadline = None;
+                    ctrl.set_route_search("");
+                } else if r.changed {
                     self.search_deadline = Some(Instant::now() + Duration::from_millis(300));
                 }
             });

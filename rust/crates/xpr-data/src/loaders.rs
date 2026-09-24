@@ -281,7 +281,11 @@ fn load_pkmn_db(gen: Gen, raw: &Value) -> Result<Vec<PokemonSpecies>, String> {
                     false,
                 ),
                 abilities: str_list(req(cur, consts::ABILITY_LIST_KEY)?),
-                weight: None,
+                // kg (optional; used by Low Kick)
+                weight: pyjson::get(cur, consts::WEIGHT_KEY).and_then(|v| match v {
+                    Value::Null => None,
+                    other => pyjson::value_as_f64(other),
+                }),
             },
             Gen::Four | Gen::Five => {
                 let bs = req(cur, consts::BASE_STATS_KEY)?;

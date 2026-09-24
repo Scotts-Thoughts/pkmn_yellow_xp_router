@@ -16,8 +16,8 @@ use xpr_data::model::{CustomMoveData, EnemyPkmn, FieldStatus, Gen, StageModifier
 use xpr_data::GenData;
 use xpr_engine::{EventDefinition, NodeId, RouteState, Router, TrainerEventDefinition};
 
-use crate::damage::{self, find_kill, DamageRange, KillRange};
-use crate::{calculate_damage, get_crit_rate, get_move_accuracy, DamageArgs};
+use crate::damage::{self, find_kill, find_kill_hits, DamageRange, KillRange};
+use crate::{calculate_damage, get_crit_rate, get_move_accuracy, hit_model, DamageArgs};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MoveRenderInfo {
@@ -811,6 +811,7 @@ impl BattleSummary {
         let custom_str = custom_data_selection.clone().unwrap_or_default();
 
         let (normal_ranges, crit_ranges): (Option<DamageRange>, Option<DamageRange>);
+        let mut hits: Option<crate::HitModel> = None;
         if self.is_wild_battle && mon_idx < self.wild_min_dv_mons.len() {
             let wild_min = &self.wild_min_dv_mons[mon_idx];
             let wild_max = &self.wild_max_dv_mons[mon_idx];
@@ -824,6 +825,7 @@ impl BattleSummary {
                 custom: &custom_str,
                 weather: &current_weather,
                 is_double_battle: self.double_battle_flag,
+                is_wild_battle: self.is_wild_battle,
             };
             if is_player {
                 let tanky = common.calc(&attacking_mon, wild_max, false, attacking_mon_stats.as_ref(), None);
@@ -860,8 +862,12 @@ impl BattleSummary {
                 defending_battle_stats: defending_mon_stats.as_ref(),
                 // Python's summary never passes attacker_is_enemy (always False)
                 attacker_is_enemy: false,
+                is_wild_battle: self.is_wild_battle,
             };
             normal_ranges = calculate_damage(gen, &args);
+            // multi-hit moves (gens 2+): every hit rolls its own crit and
+            // damage, so the kill search works per hit
+            hits = hit_model(gen, &args);
             args.attacking = &crit_mon;
             args.is_crit = true;
             args.attacking_battle_stats = crit_mon_stats.as_ref();
@@ -869,24 +875,45 @@ impl BattleSummary {
         }
         let _ = &crit_mon;
 
+        let kill_args = DamageArgs {
+            attacking: &attacking_mon,
+            mv: &mv,
+            defending: &defending_mon,
+            attacking_stages: Some(&attacking_stages),
+            defending_stages: Some(&defending_stages),
+            attacking_field: Some(&attacking_field),
+            defending_field: Some(&defending_field),
+            is_crit: false,
+            custom_move_data: &custom_str,
+            weather: &current_weather,
+            is_double_battle: self.double_battle_flag,
+            attacking_battle_stats: attacking_mon_stats.as_ref(),
+            defending_battle_stats: defending_mon_stats.as_ref(),
+            attacker_is_enemy: false,
+            is_wild_battle: self.is_wild_battle,
+        };
         let kill_ranges: Vec<KillRange> = match (&normal_ranges, &crit_ranges) {
             (Some(n), Some(c)) => {
                 let accuracy = if cfg.calc.ignore_accuracy {
                     100.0
                 } else {
-                    get_move_accuracy(gen, &attacking_mon, &mv, custom_data_selection.as_deref(), &defending_mon, &current_weather).unwrap_or(100.0)
+                    get_move_accuracy(gen, &kill_args).unwrap_or(100.0)
                 };
                 let accuracy = accuracy / 100.0;
-                find_kill(
-                    n,
-                    c,
-                    get_crit_rate(gen, &attacking_mon, &mv, custom_data_selection.as_deref()),
-                    accuracy,
-                    defending_mon.cur_stats.hp,
-                    cfg.calc.damage_search_depth,
-                    0.1,
-                    cfg.calc.force_full_search,
-                )
+                let crit_rate = get_crit_rate(gen, &kill_args);
+                match &hits {
+                    Some(model) => find_kill_hits(model, crit_rate, accuracy, defending_mon.cur_stats.hp, cfg.calc.damage_search_depth, 0.1),
+                    None => find_kill(
+                        n,
+                        c,
+                        crit_rate,
+                        accuracy,
+                        defending_mon.cur_stats.hp,
+                        cfg.calc.damage_search_depth,
+                        0.1,
+                        cfg.calc.force_full_search,
+                    ),
+                }
             }
             _ => Vec::new(),
         };
@@ -1692,6 +1719,7 @@ struct CommonArgs<'a> {
     custom: &'a str,
     weather: &'a str,
     is_double_battle: bool,
+    is_wild_battle: bool,
 }
 
 impl<'a> CommonArgs<'a> {
@@ -1711,6 +1739,7 @@ impl<'a> CommonArgs<'a> {
             attacking_battle_stats: a_stats,
             defending_battle_stats: d_stats,
             attacker_is_enemy: false,
+            is_wild_battle: self.is_wild_battle,
         };
         calculate_damage(self.gen, &args)
     }

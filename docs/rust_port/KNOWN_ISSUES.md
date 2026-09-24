@@ -34,7 +34,7 @@ being fixed on both sides.
 | 14 | Gen 5's damage calc mutates caller-supplied battle stats in place where gens 2–4 copy them | **Not reproduced.** Rust never mutates the caller's stats. In Python the mutation can leak between successive calls with the same stat block; a difference would show up in gen 5 battle summaries with stat stages / setup moves. The golden corpus run (see `rust/PORT_STATUS.md`) did not hit a case where it changed an output, but it is the first place to look if a gen 5 battle diverges |
 | 15 | Every config setter rewrites the whole config file | Config writes are atomic (write-temp-then-rename). Only the splitter fractions are debounced (500 ms); other setters still write immediately, so `config.json` on disk always matches the last change |
 | 16 | PyInstaller bundle includes `.claude` / `.harness` JSON | Moot (Cargo build) |
-| 17 | Documented damage-calc divergences from the games | Out of scope; the port reproduces the current Python results, including the documented divergences |
+| 17 | Documented damage-calc divergences from the games | Addressed on 2026-09-23: gens 1–4 re-verified against the decompilations with a sweep harness and fixed (see `docs/damage_calc_review/2026-09-23_rust_verification.md`); the golden corpus entry for gen 2 Beat Up was re-recorded (the move is now implemented) |
 
 ## Engine / data / calc divergences (all recorded in source comments)
 

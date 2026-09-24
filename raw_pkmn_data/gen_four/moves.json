@@ -17,7 +17,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user hurls up its stomach acids on the foe. The fluid eliminates the effect of the foe\u2019s ability.",
+        "description": "The user hurls up its stomach acids on the foe. The fluid eliminates the effect of the foe’s ability.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": true
@@ -176,7 +176,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user ensnares the foe with a thin, gooey silk so it can\u2019t flee from battle. ",
+        "description": "The user ensnares the foe with a thin, gooey silk so it can’t flee from battle. ",
         "attack_flavor": [
             "mean_look"
         ],
@@ -274,7 +274,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user draws power from nature and fires it at the foe. It may also lower the target\u2019s Sp. Def.",
+        "description": "The user draws power from nature and fires it at the foe. It may also lower the target’s Sp. Def.",
         "attack_flavor": [],
         "effects": [
             {
@@ -354,7 +354,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user blows up to inflict damage on all Pok\u00e9mon in battle. The user faints upon using this move.",
+        "description": "The user blows up to inflict damage on all Pokémon in battle. The user faints upon using this move.",
         "attack_flavor": [
             "self_destruct_explosion"
         ],
@@ -453,7 +453,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user looses a blast of aura power from deep within its body. This move is certain to hit.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "always_hit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -523,7 +525,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is hit by a strong telekinetic force. It may also reduce the foe\u2019s Sp. Def stat.",
+        "description": "The foe is hit by a strong telekinetic force. It may also reduce the foe’s Sp. Def stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -661,7 +663,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user creates a bizarre area in which slower Pok\u00e9mon get to move first for five turns.",
+        "description": "The user creates a bizarre area in which slower Pokémon get to move first for five turns.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": true
@@ -707,7 +709,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "Flattery is used to confuse the foe. However, it also raises the target\u2019s Sp. Atk stat.",
+        "description": "Flattery is used to confuse the foe. However, it also raises the target’s Sp. Atk stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -742,9 +744,7 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
         "description": "The user attacks with an odd, unseeable power. It may also make the foe flinch.",
-        "attack_flavor": [
-            "bonus_minimize_damage"
-        ],
+        "attack_flavor": [],
         "effects": [
             {
                 "chance": 10,
@@ -794,7 +794,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "An attack that makes use of nature\u2019s power. Its effects vary depending on the user\u2019s environment.",
+        "description": "An attack that makes use of nature’s power. Its effects vary depending on the user’s environment.",
         "attack_flavor": [
             "nature_power"
         ],
@@ -847,7 +847,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user adds its HP to the foe\u2019s HP, then equally shares the combined HP with the foe.",
+        "description": "The user adds its HP to the foe’s HP, then equally shares the combined HP with the foe.",
         "attack_flavor": [
             "pain_split"
         ],
@@ -897,7 +897,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user attacks with a gust of chilled air. It also lowers the target\u2019s Speed stat. ",
+        "description": "The user attacks with a gust of chilled air. It also lowers the target’s Speed stat. ",
         "attack_flavor": [],
         "effects": [
             {
@@ -927,7 +927,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user enrages the foe into confusion. However, it also sharply raises the foe\u2019s Attack stat.",
+        "description": "The user enrages the foe into confusion. However, it also sharply raises the foe’s Attack stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -961,7 +961,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user makes a soothing bell chime to heal the status problems of all the party Pok\u00e9mon.",
+        "description": "The user makes a soothing bell chime to heal the status problems of all the party Pokémon.",
         "attack_flavor": [
             "heal_bell"
         ],
@@ -1034,7 +1034,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user makes the foe see a mirage. It inflicts damage matching the user\u2019s level.",
+        "description": "The user makes the foe see a mirage. It inflicts damage matching the user’s level.",
         "attack_flavor": [
             "level_damage"
         ],
@@ -1059,7 +1059,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is attacked with long, creeping tentacles or vines. It may also lower the target\u2019s Speed.",
+        "description": "The foe is attacked with long, creeping tentacles or vines. It may also lower the target’s Speed.",
         "attack_flavor": [],
         "effects": [
             {
@@ -1090,9 +1090,7 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
         "description": "The user attacks by wildly swinging its thorny arms. It may also make the target flinch.",
-        "attack_flavor": [
-            "bonus_minimize_damage"
-        ],
+        "attack_flavor": [],
         "effects": [
             {
                 "chance": 30,
@@ -1175,7 +1173,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user creates a gust of repulsive wind. It may also raise all the user\u2019s stats at once.",
+        "description": "The user creates a gust of repulsive wind. It may also raise all the user’s stats at once.",
         "attack_flavor": [],
         "effects": [
             {
@@ -1235,7 +1233,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user attacks by shooting out muddy water. It may also lower the foe\u2019s accuracy.",
+        "description": "The user attacks by shooting out muddy water. It may also lower the foe’s accuracy.",
         "attack_flavor": [],
         "effects": [
             {
@@ -1290,7 +1288,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user spouts water to damage the foe. The lower the user\u2019s HP, the less powerful it becomes.",
+        "description": "The user spouts water to damage the foe. The lower the user’s HP, the less powerful it becomes.",
         "attack_flavor": [
             "eruption"
         ],
@@ -1315,7 +1313,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user attacks the foe at full power. The attack\u2019s recoil sharply reduces the user\u2019s Sp. Atk stat.",
+        "description": "The user attacks the foe at full power. The attack’s recoil sharply reduces the user’s Sp. Atk stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -1345,7 +1343,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user swings and hits with its strong and heavy fist. It lowers the user\u2019s Speed, however.",
+        "description": "The user swings and hits with its strong and heavy fist. It lowers the user’s Speed, however.",
         "attack_flavor": [],
         "effects": [
             {
@@ -1427,7 +1425,12 @@
         "attack_flavor": [
             "third_recoil"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "status": "Paralysis"
+            }
+        ],
         "has_field_effect": false
     },
     "Softboiled": {
@@ -1448,7 +1451,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user restores its own HP by up to half of its maximum HP. It may also be used to heal an ally\u2019s HP.",
+        "description": "The user restores its own HP by up to half of its maximum HP. It may also be used to heal an ally’s HP.",
         "attack_flavor": [
             "recover"
         ],
@@ -1597,7 +1600,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user slaps down the foe\u2019s held item, preventing the item from being used during the battle.",
+        "description": "The user slaps down the foe’s held item, preventing the item from being used during the battle.",
         "attack_flavor": [
             "knock_off"
         ],
@@ -1876,7 +1879,7 @@
         "accuracy": 100,
         "priority": 1,
         "effect": "fake_out",
-        "effect_chance": null,
+        "effect_chance": 100,
         "target": "Foe Or Ally",
         "makes_contact": true,
         "affected_by_protect": true,
@@ -1888,7 +1891,12 @@
         "attack_flavor": [
             "fake_out"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Iron Tail": {
@@ -1909,7 +1917,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is slammed with a steel-hard tail. It may also lower the target\u2019s Defense stat.",
+        "description": "The foe is slammed with a steel-hard tail. It may also lower the target’s Defense stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -1962,7 +1970,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user charmingly stares at the foe, making it less wary. The target\u2019s Attack is sharply lowered.",
+        "description": "The user charmingly stares at the foe, making it less wary. The target’s Attack is sharply lowered.",
         "attack_flavor": [],
         "effects": [
             {
@@ -1992,7 +2000,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user lays a trap of spikes at the foe\u2019s feet. The trap hurts foes that switch into battle.",
+        "description": "The user lays a trap of spikes at the foe’s feet. The trap hurts foes that switch into battle.",
         "attack_flavor": [
             "spikes"
         ],
@@ -2042,7 +2050,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user switches places with a party Pok\u00e9mon in waiting, passing along any stat changes.",
+        "description": "The user switches places with a party Pokémon in waiting, passing along any stat changes.",
         "attack_flavor": [
             "baton_pass"
         ],
@@ -2178,7 +2186,12 @@
         "affected_by_kings_rock": true,
         "description": "The user focuses its willpower to its head and rams the foe. It may also make the target flinch.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 20,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Brick Break": {
@@ -2282,7 +2295,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user chomps hard on the foe with its sharp front fangs. It cuts the target\u2019s HP to half.",
+        "description": "The user chomps hard on the foe with its sharp front fangs. It cuts the target’s HP to half.",
         "attack_flavor": [
             "super_fang"
         ],
@@ -2335,7 +2348,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user vibrates its wings to generate a damaging sound wave. It may also lower the foe\u2019s Sp. Def stat.",
+        "description": "The user vibrates its wings to generate a damaging sound wave. It may also lower the foe’s Sp. Def stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -2491,7 +2504,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "This attack inflicts double damage on a paralyzed foe. It also cures the foe\u2019s paralysis, however.",
+        "description": "This attack inflicts double damage on a paralyzed foe. It also cures the foe’s paralysis, however.",
         "attack_flavor": [
             "smelling_salt"
         ],
@@ -2516,7 +2529,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is raked with steel claws. It may also raise the user\u2019s Attack stat. ",
+        "description": "The foe is raked with steel claws. It may also raise the user’s Attack stat. ",
         "attack_flavor": [],
         "effects": [
             {
@@ -2548,7 +2561,12 @@
         "affected_by_kings_rock": true,
         "description": "The user shoots filthy garbage at the foe to attack. It may also poison the target.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "status": "Poison"
+            }
+        ],
         "has_field_effect": false
     },
     "Gyro Ball": {
@@ -2732,7 +2750,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user wags its tail cutely, making the foe less wary. The target\u2019s Defense stat is lowered.",
+        "description": "The user wags its tail cutely, making the foe less wary. The target’s Defense stat is lowered.",
         "attack_flavor": [],
         "effects": [
             {
@@ -2865,7 +2883,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The foe is hit with a hard punch fired like a meteor. It may also raise the user\u2019s Attack.",
+        "description": "The foe is hit with a hard punch fired like a meteor. It may also raise the user’s Attack.",
         "attack_flavor": [],
         "effects": [
             {
@@ -2968,7 +2986,8 @@
         "affected_by_kings_rock": true,
         "description": "The user traps the foe inside a fast, vicious whirlpool that lasts for two to five turns.",
         "attack_flavor": [
-            "trap"
+            "trap",
+            "bonus_dive_damage"
         ],
         "effects": [],
         "has_field_effect": false
@@ -3073,7 +3092,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user faints. In return, the Pok\u00e9mon taking its place will have its HP restored and status cured.",
+        "description": "The user faints. In return, the Pokémon taking its place will have its HP restored and status cured.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -3096,7 +3115,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user makes a copy of itself using some of its HP. The copy serves as the user\u2019s decoy.",
+        "description": "The user makes a copy of itself using some of its HP. The copy serves as the user’s decoy.",
         "attack_flavor": [
             "substitute"
         ],
@@ -3144,7 +3163,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "Comets are summoned down from the sky. The attack\u2019s recoil sharply reduces the user\u2019s Sp. Atk stat.",
+        "description": "Comets are summoned down from the sky. The attack’s recoil sharply reduces the user’s Sp. Atk stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -3176,7 +3195,14 @@
         "affected_by_kings_rock": false,
         "description": "If it is the opposite gender of the user, the foe is charmed into sharply lowering its Sp. Atk stat.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": -2,
+                "stat": "spa",
+                "target": "enemy"
+            }
+        ],
         "has_field_effect": false
     },
     "Heart Swap": {
@@ -3304,7 +3330,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user blocks the foe\u2019s way with arms spread wide to prevent escape. ",
+        "description": "The user blocks the foe’s way with arms spread wide to prevent escape. ",
         "attack_flavor": [
             "mean_look"
         ],
@@ -3380,7 +3406,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user heightens its mental focus and unleashes its power. It may also lower the target\u2019s Sp. Def.",
+        "description": "The user heightens its mental focus and unleashes its power. It may also lower the target’s Sp. Def.",
         "attack_flavor": [],
         "effects": [
             {
@@ -3521,7 +3547,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user crunches up the foe with sharp fangs. It may also lower the target\u2019s Defense stat.",
+        "description": "The user crunches up the foe with sharp fangs. It may also lower the target’s Defense stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -3679,7 +3705,12 @@
         "affected_by_kings_rock": true,
         "description": "The user attacks with a blade of air that slices even the sky. It may also make the target flinch.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Power Swap": {
@@ -3874,7 +3905,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user hurriedly and randomly uses a move among those known by other Pok\u00e9mon in the party.",
+        "description": "The user hurriedly and randomly uses a move among those known by other Pokémon in the party.",
         "attack_flavor": [
             "assist"
         ],
@@ -3899,7 +3930,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A cloud of poison gas is sprayed in the foe\u2019s face. It may poison the target.",
+        "description": "A cloud of poison gas is sprayed in the foe’s face. It may poison the target.",
         "attack_flavor": [],
         "effects": [
             {
@@ -3974,7 +4005,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user disappears, then strikes the foe on the second turn. It hits even if the foe used Protect.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "two_turn_semi_invulnerable"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -4095,7 +4128,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The foe is thrown using the power of gravity. It inflicts damage equal to the user\u2019s level.",
+        "description": "The foe is thrown using the power of gravity. It inflicts damage equal to the user’s level.",
         "attack_flavor": [
             "level_damage"
         ],
@@ -4200,8 +4233,10 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "An energy-draining punch. The user\u2019s HP is restored by half the damage taken by the target.",
-        "attack_flavor": [],
+        "description": "An energy-draining punch. The user’s HP is restored by half the damage taken by the target.",
+        "attack_flavor": [
+            "drain_hp"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -4248,7 +4283,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A mistlike flurry of down envelops and damages the foe. It may also lower the target\u2019s Sp. Atk.",
+        "description": "A mistlike flurry of down envelops and damages the foe. It may also lower the target’s Sp. Atk.",
         "attack_flavor": [],
         "effects": [
             {
@@ -4303,7 +4338,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user fights the foe in close without guarding itself. It also cuts the user\u2019s Defense and Sp. Def.",
+        "description": "The user fights the foe in close without guarding itself. It also cuts the user’s Defense and Sp. Def.",
         "attack_flavor": [],
         "effects": [
             {
@@ -4364,7 +4399,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The foe is clamped and squeezed by the user\u2019s very thick and sturdy shell for two to five turns.",
+        "description": "The foe is clamped and squeezed by the user’s very thick and sturdy shell for two to five turns.",
         "attack_flavor": [
             "trap"
         ],
@@ -4544,7 +4579,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "If the foe\u2019s HP is down to about half, this attack will hit with double the power.",
+        "description": "If the foe’s HP is down to about half, this attack will hit with double the power.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -4567,7 +4602,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "Sand is hurled in the foe\u2019s face, reducing its accuracy.  ",
+        "description": "Sand is hurled in the foe’s face, reducing its accuracy.  ",
         "attack_flavor": [],
         "effects": [
             {
@@ -4732,7 +4767,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user blasts the foe with power that distorts even time. The user must rest on the next turn.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "recharge"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -4754,9 +4791,14 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "A flare of electricity is loosed to strike all Pok\u00e9mon in battle. It may also cause paralysis.",
+        "description": "A flare of electricity is loosed to strike all Pokémon in battle. It may also cause paralysis.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "status": "Paralysis"
+            }
+        ],
         "has_field_effect": false
     },
     "Dark Void": {
@@ -4800,7 +4842,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "Boulders are hurled at the foe. It also lowers the foe\u2019s Speed by preventing its movement.",
+        "description": "Boulders are hurled at the foe. It also lowers the foe’s Speed by preventing its movement.",
         "attack_flavor": [],
         "effects": [
             {
@@ -4830,7 +4872,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A blood-draining attack. The user\u2019s HP is restored by half the damage taken by the target.",
+        "description": "A blood-draining attack. The user’s HP is restored by half the damage taken by the target.",
         "attack_flavor": [
             "drain_hp"
         ],
@@ -4878,13 +4920,13 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is attacked with a spray of harsh acid. It may also lower the target\u2019s Sp. Def stat.",
+        "description": "The foe is attacked with a spray of harsh acid. It may also lower the target’s Sp. Def stat.",
         "attack_flavor": [],
         "effects": [
             {
                 "chance": 10,
                 "modifier": -1,
-                "stat": "def",
+                "stat": "spd",
                 "target": "enemy"
             }
         ],
@@ -5013,7 +5055,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "Obstacles are moved, reducing the foe\u2019s evasion stat. It can also be used to clear deep fog, etc.",
+        "description": "Obstacles are moved, reducing the foe’s evasion stat. It can also be used to clear deep fog, etc.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -5063,7 +5105,12 @@
         "attack_flavor": [
             "self_thaw"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "status": "Burn"
+            }
+        ],
         "has_field_effect": false
     },
     "Psybeam": {
@@ -5112,7 +5159,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user summons a hailstorm lasting five turns. It damages all Pok\u00e9mon except the Ice type.",
+        "description": "The user summons a hailstorm lasting five turns. It damages all Pokémon except the Ice type.",
         "attack_flavor": [
             "hail"
         ],
@@ -5165,7 +5212,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user lays a trap of poison spikes at the foe\u2019s feet. They poison foes that switch into battle.",
+        "description": "The user lays a trap of poison spikes at the foe’s feet. They poison foes that switch into battle.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -5211,7 +5258,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A spray of bubbles is forcefully ejected at the foe. It may also lower the target\u2019s Speed stat.",
+        "description": "A spray of bubbles is forcefully ejected at the foe. It may also lower the target’s Speed stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -5269,7 +5316,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user flashes a light that cuts the foe\u2019s accuracy. It can also be used to illuminate caves.",
+        "description": "The user flashes a light that cuts the foe’s accuracy. It can also be used to illuminate caves.",
         "attack_flavor": [],
         "effects": [
             {
@@ -5349,7 +5396,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "Any Pok\u00e9mon that hears this song faints in three turns unless it switches out of battle.",
+        "description": "Any Pokémon that hears this song faints in three turns unless it switches out of battle.",
         "attack_flavor": [
             "perish_song"
         ],
@@ -5422,7 +5469,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user whips up a turbulent whirlwind that ups the Speed of all party Pok\u00e9mon for three turns.",
+        "description": "The user whips up a turbulent whirlwind that ups the Speed of all party Pokémon for three turns.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": true
@@ -5445,7 +5492,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A spray of countless bubbles is jetted at the foe. It may also lower the target\u2019s Speed stat.",
+        "description": "A spray of countless bubbles is jetted at the foe. It may also lower the target’s Speed stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -5475,7 +5522,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user creates a haze that eliminates every stat change among all the Pok\u00e9mon engaged in battle.",
+        "description": "The user creates a haze that eliminates every stat change among all the Pokémon engaged in battle.",
         "attack_flavor": [
             "haze"
         ],
@@ -5624,7 +5671,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user attacks by hurling a blob of mud at the foe. It also reduces the target\u2019s Speed.",
+        "description": "The user attacks by hurling a blob of mud at the foe. It also reduces the target’s Speed.",
         "attack_flavor": [],
         "effects": [
             {
@@ -5709,7 +5756,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user temporarily empties its mind to forget its concerns. It sharply raises the user\u2019s Sp. Def stat.",
+        "description": "The user temporarily empties its mind to forget its concerns. It sharply raises the user’s Sp. Def stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -5764,7 +5811,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user attacks with a secret power. Its added effects vary depending on the user\u2019s environment.",
+        "description": "The user attacks with a secret power. Its added effects vary depending on the user’s environment.",
         "attack_flavor": [],
         "effects": [
             {
@@ -5989,7 +6036,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user attacks the foe with great power. However, it also lowers the user\u2019s Attack and Defense.",
+        "description": "The user attacks the foe with great power. However, it also lowers the user’s Attack and Defense.",
         "attack_flavor": [],
         "effects": [
             {
@@ -6048,7 +6095,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user hurls a shadowy blob at the foe. It may also lower the foe\u2019s Sp. Def stat.",
+        "description": "The user hurls a shadowy blob at the foe. It may also lower the foe’s Sp. Def stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -6158,7 +6205,16 @@
         "affected_by_kings_rock": true,
         "description": "The user bites with cold-infused fangs. It may also make the foe flinch or freeze. ",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "status": "Freeze"
+            },
+            {
+                "chance": 10,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Triple Kick": {
@@ -6204,7 +6260,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user performs a wobbly dance that confuses all the Pok\u00e9mon in battle. ",
+        "description": "The user performs a wobbly dance that confuses all the Pokémon in battle. ",
         "attack_flavor": [
             "teeter_dance"
         ],
@@ -6234,11 +6290,18 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user boosts the power of the Electric move it uses next. It also raises the user\u2019s Sp. Def stat.",
+        "description": "The user boosts the power of the Electric move it uses next. It also raises the user’s Sp. Def stat.",
         "attack_flavor": [
             "charge"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "spd",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Revenge": {
@@ -6284,7 +6347,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is punched with the user\u2019s full, concentrated power. It confuses the foe if it hits.",
+        "description": "The foe is punched with the user’s full, concentrated power. It confuses the foe if it hits.",
         "attack_flavor": [],
         "effects": [
             {
@@ -6415,7 +6478,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user fires a concentrated bundle of electricity. It may also raise the user\u2019s Sp. Atk stat.",
+        "description": "The user fires a concentrated bundle of electricity. It may also raise the user’s Sp. Atk stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -6638,7 +6701,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The foe is attacked with a shock wave generated by the user\u2019s gaping mouth. ",
+        "description": "The foe is attacked with a shock wave generated by the user’s gaping mouth. ",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -6712,7 +6775,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user hardens its body\u2019s surface like iron, sharply raising its Defense stat.",
+        "description": "The user hardens its body’s surface like iron, sharply raising its Defense stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -6769,7 +6832,12 @@
         "affected_by_kings_rock": true,
         "description": "The user charges the foe at an awesome speed. It can also be used to climb a waterfall.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 20,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Flash Cannon": {
@@ -6790,7 +6858,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user gathers all its light energy and releases it at once. It may also lower the foe\u2019s Sp. Def stat.",
+        "description": "The user gathers all its light energy and releases it at once. It may also lower the foe’s Sp. Def stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -6852,7 +6920,12 @@
         "affected_by_kings_rock": true,
         "description": "The foe slams the target with its steel-hard head. It may also make the target flinch.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Counter": {
@@ -6898,7 +6971,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user\u2019s type is changed depending on its environment, such as at water\u2019s edge, in grass, or in a cave.",
+        "description": "The user’s type is changed depending on its environment, such as at water’s edge, in grass, or in a cave.",
         "attack_flavor": [
             "camouflage"
         ],
@@ -6923,7 +6996,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The foe is hit with wings of steel. It may also raise the user\u2019s Defense stat. ",
+        "description": "The foe is hit with wings of steel. It may also raise the user’s Defense stat. ",
         "attack_flavor": [],
         "effects": [
             {
@@ -7008,7 +7081,12 @@
         "affected_by_kings_rock": true,
         "description": "The foe is attacked with a shock wave. It may also leave the target paralyzed. ",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "status": "Paralysis"
+            }
+        ],
         "has_field_effect": false
     },
     "Trick": {
@@ -7029,7 +7107,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user catches the foe off guard and swaps the foe\u2019s held item with its own. ",
+        "description": "The user catches the foe off guard and swaps the foe’s held item with its own. ",
         "attack_flavor": [
             "trick"
         ],
@@ -7056,7 +7134,12 @@
         "affected_by_kings_rock": true,
         "description": "A charging attack that may also leave the foe confused. It can also be used to scale rocky walls.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 20,
+                "status": "Confusion"
+            }
+        ],
         "has_field_effect": false
     },
     "Dragon Rush": {
@@ -7079,7 +7162,12 @@
         "affected_by_kings_rock": true,
         "description": "The user tackles the foe while exhibiting overwhelming menace. It may also make the target flinch.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 20,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Sky Uppercut": {
@@ -7125,7 +7213,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user slashes the foe with hard and sharp claws. It may also lower the target\u2019s Defense.",
+        "description": "The user slashes the foe with hard and sharp claws. It may also lower the target’s Defense.",
         "attack_flavor": [],
         "effects": [
             {
@@ -7156,7 +7244,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The foe becomes trapped within a maelstrom of fire that rages for two to five turns.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "trap"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -7203,7 +7293,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user lays roots that restore HP on every turn. Because it is rooted, it can\u2019t switch out.",
+        "description": "The user lays roots that restore HP on every turn. Because it is rooted, it can’t switch out.",
         "attack_flavor": [],
         "effects": [
             {
@@ -7360,7 +7450,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is blown away, to be replaced by another Pok\u00e9mon in its party. In the wild, the battle ends.",
+        "description": "The foe is blown away, to be replaced by another Pokémon in its party. In the wild, the battle ends.",
         "attack_flavor": [
             "force_switch"
         ],
@@ -7410,7 +7500,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "An earsplitting screech is emitted to sharply reduce the foe\u2019s Defense stat. ",
+        "description": "An earsplitting screech is emitted to sharply reduce the foe’s Defense stat. ",
         "attack_flavor": [],
         "effects": [
             {
@@ -7571,7 +7661,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user attacks and steals the foe\u2019s held item simultaneously. It can\u2019t steal if the user holds an item.",
+        "description": "The user attacks and steals the foe’s held item simultaneously. It can’t steal if the user holds an item.",
         "attack_flavor": [
             "thief"
         ],
@@ -7597,7 +7687,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user charges at the foe using every bit of its power. The user must rest on the next turn.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "recharge"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -7644,7 +7736,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is bound with silk blown from the user\u2019s mouth. It reduces the target\u2019s Speed stat.",
+        "description": "The foe is bound with silk blown from the user’s mouth. It reduces the target’s Speed stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -7728,7 +7820,12 @@
         "attack_flavor": [
             "third_recoil"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "status": "Burn"
+            }
+        ],
         "has_field_effect": false
     },
     "Wring Out": {
@@ -7749,7 +7846,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user powerfully wrings the foe. The more HP the foe has, the greater this attack\u2019s power.",
+        "description": "The user powerfully wrings the foe. The more HP the foe has, the greater this attack’s power.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -7772,7 +7869,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user explodes to inflict damage on all Pok\u00e9mon in battle. The user faints upon using this move.",
+        "description": "The user explodes to inflict damage on all Pokémon in battle. The user faints upon using this move.",
         "attack_flavor": [
             "self_destruct_explosion"
         ],
@@ -7798,7 +7895,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "It swamps the entire battlefield with a giant wave. It can also be used for crossing water.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "bonus_dive_damage"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -7873,7 +7972,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user releases an obscuring cloud of smoke or ink. It reduces the foe\u2019s accuracy.",
+        "description": "The user releases an obscuring cloud of smoke or ink. It reduces the foe’s accuracy.",
         "attack_flavor": [],
         "effects": [
             {
@@ -7979,7 +8078,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The foe is slammed with an enormous tree. The user can\u2019t move on the next turn.",
+        "description": "The foe is slammed with an enormous tree. The user can’t move on the next turn.",
         "attack_flavor": [
             "recharge"
         ],
@@ -8122,7 +8221,7 @@
         "category": "Status",
         "pp": 10,
         "power": null,
-        "accuracy": null,
+        "accuracy": 100,
         "priority": 0,
         "effect": "memento",
         "effect_chance": null,
@@ -8133,7 +8232,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user faints upon using this move. In return, it sharply lowers the target\u2019s Attack and Sp. Atk.",
+        "description": "The user faints upon using this move. In return, it sharply lowers the target’s Attack and Sp. Atk.",
         "attack_flavor": [
             "memento"
         ],
@@ -8195,7 +8294,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user snares the foe with grass and trips it. The heavier the foe, the greater the damage.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "weight_damage"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -8217,7 +8318,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user\u2019s body is forced to grow all at once. It raises the Sp. Atk stat. ",
+        "description": "The user’s body is forced to grow all at once. It raises the Sp. Atk stat. ",
         "attack_flavor": [],
         "effects": [
             {
@@ -8248,7 +8349,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user launches a steel bomb that sticks to the target. This attack will not miss.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "always_hit"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -8375,7 +8478,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user distracts the foe by bending a spoon. It may lower the target\u2019s accuracy.",
+        "description": "The user distracts the foe by bending a spoon. It may lower the target’s accuracy.",
         "attack_flavor": [],
         "effects": [
             {
@@ -8454,7 +8557,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "An attack move that inflicts double the damage if the user has been hurt by the foe in the same turn.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "revenge"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -8483,15 +8588,15 @@
         "effects": [
             {
                 "status": "Freeze",
-                "chance": 6.3
+                "chance": 6.67
             },
             {
                 "status": "Paralysis",
-                "chance": 6.3
+                "chance": 6.67
             },
             {
                 "status": "Burn",
-                "chance": 6.3
+                "chance": 6.67
             }
         ],
         "has_field_effect": false
@@ -8539,7 +8644,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user goes to sleep for two turns. It fully restores the user\u2019s HP and heals any status problem.",
+        "description": "The user goes to sleep for two turns. It fully restores the user’s HP and heals any status problem.",
         "attack_flavor": [
             "rest"
         ],
@@ -8667,7 +8772,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user growls in an endearing way, making the foe less wary. The target\u2019s Attack stat is lowered.",
+        "description": "The user growls in an endearing way, making the foe less wary. The target’s Attack stat is lowered.",
         "attack_flavor": [],
         "effects": [
             {
@@ -8772,7 +8877,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "After making its attack, the user rushes back to switch places with a party Pok\u00e9mon in waiting.",
+        "description": "After making its attack, the user rushes back to switch places with a party Pokémon in waiting.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -8818,7 +8923,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user sets off an earthquake that hits all the Pok\u00e9mon in the battle. ",
+        "description": "The user sets off an earthquake that hits all the Pokémon in the battle. ",
         "attack_flavor": [
             "bonus_dig_damage"
         ],
@@ -8873,7 +8978,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "A unique attack that varies in type and intensity depending on the Pok\u00e9mon using it.",
+        "description": "A unique attack that varies in type and intensity depending on the Pokémon using it.",
         "attack_flavor": [
             "hidden_power"
         ],
@@ -8898,7 +9003,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user compresses its body to make itself look smaller. The user\u2019s evasion stat is boosted.",
+        "description": "The user compresses its body to make itself look smaller. The user’s evasion stat is boosted.",
         "attack_flavor": [
             "minimize"
         ],
@@ -9016,7 +9121,12 @@
         "affected_by_kings_rock": true,
         "description": "The foe is stabbed with a tentacle or arm steeped in poison. It may also poison the foe.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "status": "Poison"
+            }
+        ],
         "has_field_effect": false
     },
     "Earth Power": {
@@ -9037,7 +9147,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user makes the ground under the foe erupt with power. It may also lower the target\u2019s Sp. Def.",
+        "description": "The user makes the ground under the foe erupt with power. It may also lower the target’s Sp. Def.",
         "attack_flavor": [],
         "effects": [
             {
@@ -9175,7 +9285,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user mimics the foe completely, copying the foe\u2019s natural ability. ",
+        "description": "The user mimics the foe completely, copying the foe’s natural ability. ",
         "attack_flavor": [
             "role_play"
         ],
@@ -9200,7 +9310,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A nutrient-draining attack. The user\u2019s HP is restored by half the damage taken by the target.",
+        "description": "A nutrient-draining attack. The user’s HP is restored by half the damage taken by the target.",
         "attack_flavor": [
             "drain_hp"
         ],
@@ -9333,7 +9443,16 @@
         "affected_by_kings_rock": true,
         "description": "The user bites with flame-cloaked fangs. It may also make the foe flinch or sustain a burn.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "status": "Burn"
+            },
+            {
+                "chance": 10,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Double Team": {
@@ -9384,7 +9503,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user generates a shock wave from within its body. It may also lower the target\u2019s Sp. Def.",
+        "description": "The user generates a shock wave from within its body. It may also lower the target’s Sp. Def.",
         "attack_flavor": [],
         "effects": [
             {
@@ -9489,7 +9608,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "A storm of sharp leaves is whipped up. The attack\u2019s recoil sharply reduces the user\u2019s Sp. Atk stat.",
+        "description": "A storm of sharp leaves is whipped up. The attack’s recoil sharply reduces the user’s Sp. Atk stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -9567,7 +9686,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "An attack that works only on a sleeping foe. It absorbs half the damage caused to heal the user\u2019s HP.",
+        "description": "An attack that works only on a sleeping foe. It absorbs half the damage caused to heal the user’s HP.",
         "attack_flavor": [
             "dream_eater",
             "drain_hp"
@@ -9593,7 +9712,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user attacks the foe at full power. The attack\u2019s recoil sharply reduces the user\u2019s Sp. Atk stat.",
+        "description": "The user attacks the foe at full power. The attack’s recoil sharply reduces the user’s Sp. Atk stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -9648,7 +9767,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "An attack move that cuts down the foe\u2019s HP to equal the user\u2019s HP. ",
+        "description": "An attack move that cuts down the foe’s HP to equal the user’s HP. ",
         "attack_flavor": [
             "endeavor"
         ],
@@ -9698,7 +9817,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user hurls mud in the foe\u2019s face to inflict damage and lower its accuracy. ",
+        "description": "The user hurls mud in the foe’s face to inflict damage and lower its accuracy. ",
         "attack_flavor": [],
         "effects": [
             {
@@ -9799,7 +9918,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "If the foe has already taken some damage in the same turn, this attack\u2019s power is doubled.",
+        "description": "If the foe has already taken some damage in the same turn, this attack’s power is doubled.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -9904,7 +10023,12 @@
         "attack_flavor": [
             "high_crit"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "status": "Poison"
+            }
+        ],
         "has_field_effect": false
     },
     "Mud Bomb": {
@@ -9925,7 +10049,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user launches a hard-packed mud ball to attack. It may also lower the target\u2019s accuracy.",
+        "description": "The user launches a hard-packed mud ball to attack. It may also lower the target’s accuracy.",
         "attack_flavor": [],
         "effects": [
             {
@@ -9955,7 +10079,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "A frenetic dance to uplift the fighting spirit. It sharply raises the user\u2019s Attack stat.",
+        "description": "A frenetic dance to uplift the fighting spirit. It sharply raises the user’s Attack stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -10033,7 +10157,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "Use it to flee from any wild Pok\u00e9mon. It may also be used to warp to the last Pok\u00e9 Center visited.",
+        "description": "Use it to flee from any wild Pokémon. It may also be used to warp to the last Poké Center visited.",
         "attack_flavor": [
             "end_wild_battle"
         ],
@@ -10108,7 +10232,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user attacks with a prehistoric power. It may also raise all the user\u2019s stats at once.",
+        "description": "The user attacks with a prehistoric power. It may also raise all the user’s stats at once.",
         "attack_flavor": [],
         "effects": [
             {
@@ -10199,7 +10323,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A nutrient-draining attack. The user\u2019s HP is restored by half the damage taken by the target.",
+        "description": "A nutrient-draining attack. The user’s HP is restored by half the damage taken by the target.",
         "attack_flavor": [
             "drain_hp"
         ],
@@ -10285,7 +10409,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "A move that boosts the power of the ally\u2019s attack in a Double Battle. ",
+        "description": "A move that boosts the power of the ally’s attack in a Double Battle. ",
         "attack_flavor": [
             "helping_hand"
         ],
@@ -10335,7 +10459,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user stimulates its brain by thinking bad thoughts. It sharply raises the user\u2019s Sp. Atk.",
+        "description": "The user stimulates its brain by thinking bad thoughts. It sharply raises the user’s Sp. Atk.",
         "attack_flavor": [],
         "effects": [
             {
@@ -10393,7 +10517,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user releases a soothing scent that heals all status problems affecting the user\u2019s party.",
+        "description": "The user releases a soothing scent that heals all status problems affecting the user’s party.",
         "attack_flavor": [
             "heal_bell"
         ],
@@ -10542,7 +10666,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A sweet scent that lowers the foe\u2019s evasiveness. It also lures wild Pok\u00e9mon if used in grass, etc.",
+        "description": "A sweet scent that lowers the foe’s evasiveness. It also lures wild Pokémon if used in grass, etc.",
         "attack_flavor": [],
         "effects": [
             {
@@ -10572,7 +10696,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user tries to cut ahead of the foe to steal and use the foe\u2019s intended move with greater power.",
+        "description": "The user tries to cut ahead of the foe to steal and use the foe’s intended move with greater power.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -10596,9 +10720,7 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
         "description": "The user attacks the foe while shouting in a startling fashion. It may also make the target flinch.",
-        "attack_flavor": [
-            "bonus_minimize_damage"
-        ],
+        "attack_flavor": [],
         "effects": [
             {
                 "chance": 30,
@@ -10625,7 +10747,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user lands and rests its body. It restores the user\u2019s HP by up to half of its max HP.",
+        "description": "The user lands and rests its body. It restores the user’s HP by up to half of its max HP.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": true
@@ -10678,7 +10800,16 @@
         "affected_by_kings_rock": true,
         "description": "The user bites with electrified fangs. It may also make the foe flinch or become paralyzed.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 10,
+                "status": "Paralysis"
+            },
+            {
+                "chance": 10,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Octazooka": {
@@ -10699,7 +10830,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user attacks by spraying ink in the foe\u2019s face or eyes. It may also lower the target\u2019s accuracy.",
+        "description": "The user attacks by spraying ink in the foe’s face or eyes. It may also lower the target’s accuracy.",
         "attack_flavor": [],
         "effects": [
             {
@@ -10757,7 +10888,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user looses a flash of energy from its polished body. It may also lower the target\u2019s accuracy.",
+        "description": "The user looses a flash of energy from its polished body. It may also lower the target’s accuracy.",
         "attack_flavor": [],
         "effects": [
             {
@@ -10812,7 +10943,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is given an intimidating leer with sharp eyes. The target\u2019s Defense stat is reduced.",
+        "description": "The foe is given an intimidating leer with sharp eyes. The target’s Defense stat is reduced.",
         "attack_flavor": [],
         "effects": [
             {
@@ -10842,7 +10973,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is scared off, to be replaced by another Pok\u00e9mon in its party. In the wild, the battle ends.",
+        "description": "The foe is scared off, to be replaced by another Pokémon in its party. In the wild, the battle ends.",
         "attack_flavor": [
             "force_switch"
         ],
@@ -10940,7 +11071,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A nutrient-draining attack. The user\u2019s HP is restored by half the damage taken by the target.",
+        "description": "A nutrient-draining attack. The user’s HP is restored by half the damage taken by the target.",
         "attack_flavor": [
             "drain_hp"
         ],
@@ -10965,7 +11096,7 @@
         "affected_by_snatch": true,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user restores its own HP by up to half of its maximum HP. It may also be used to heal an ally\u2019s HP.",
+        "description": "The user restores its own HP by up to half of its maximum HP. It may also be used to heal an ally’s HP.",
         "attack_flavor": [
             "recover"
         ],
@@ -11299,7 +11430,20 @@
         "attack_flavor": [
             "stockpile"
         ],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "def",
+                "target": "self"
+            },
+            {
+                "chance": 100,
+                "modifier": 1,
+                "stat": "spd",
+                "target": "self"
+            }
+        ],
         "has_field_effect": false
     },
     "Grudge": {
@@ -11320,7 +11464,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "If the user faints, the user\u2019s grudge fully depletes the PP of the foe\u2019s move that knocked it out.",
+        "description": "If the user faints, the user’s grudge fully depletes the PP of the foe’s move that knocked it out.",
         "attack_flavor": [
             "grudge"
         ],
@@ -11370,7 +11514,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": false,
         "affected_by_kings_rock": false,
-        "description": "The user faints. In return, the Pok\u00e9mon taking its place will have its status and HP fully restored.",
+        "description": "The user faints. In return, the Pokémon taking its place will have its status and HP fully restored.",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -11580,7 +11724,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "A horrible sound like scraping metal is emitted to sharply reduce the foe\u2019s Sp. Def stat.",
+        "description": "A horrible sound like scraping metal is emitted to sharply reduce the foe’s Sp. Def stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -11710,7 +11854,12 @@
         "affected_by_kings_rock": true,
         "description": "The user releases a horrible aura imbued with dark thoughts. It may also make the target flinch.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 20,
+                "flinch": true
+            }
+        ],
         "has_field_effect": false
     },
     "Spite": {
@@ -11756,7 +11905,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user attacks in an explosive fury. The lower the user\u2019s HP, the less powerful this attack becomes.",
+        "description": "The user attacks in an explosive fury. The lower the user’s HP, the less powerful this attack becomes.",
         "attack_flavor": [
             "eruption"
         ],
@@ -11781,7 +11930,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The foe is attacked with powdery scales blown by wind. It may also raise all the user\u2019s stats.",
+        "description": "The foe is attacked with powdery scales blown by wind. It may also raise all the user’s stats.",
         "attack_flavor": [],
         "effects": [
             {
@@ -11811,9 +11960,14 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "An inferno of scarlet flames washes over all Pok\u00e9mon in battle. It may also inflict burns.",
+        "description": "An inferno of scarlet flames washes over all Pokémon in battle. It may also inflict burns.",
         "attack_flavor": [],
-        "effects": [],
+        "effects": [
+            {
+                "chance": 30,
+                "status": "Burn"
+            }
+        ],
         "has_field_effect": false
     },
     "Beat Up": {
@@ -11834,7 +11988,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "The user gets all the party Pok\u00e9mon to attack the foe. The more party Pok\u00e9mon, the more damage.",
+        "description": "The user gets all the party Pokémon to attack the foe. The more party Pokémon, the more damage.",
         "attack_flavor": [
             "beat_up"
         ],
@@ -11884,7 +12038,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The foe is hit with a rainbow-colored beam. It may also lower the target\u2019s Attack stat.",
+        "description": "The foe is hit with a rainbow-colored beam. It may also lower the target’s Attack stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -11986,7 +12140,9 @@
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
         "description": "The user launches a huge boulder at the foe to attack. It must rest on the next turn, however.",
-        "attack_flavor": [],
+        "attack_flavor": [
+            "recharge"
+        ],
         "effects": [],
         "has_field_effect": false
     },
@@ -12008,7 +12164,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user looses a damaging burst of light. It may also reduce the target\u2019s Sp. Def stat.",
+        "description": "The user looses a damaging burst of light. It may also reduce the target’s Sp. Def stat.",
         "attack_flavor": [],
         "effects": [
             {
@@ -12063,7 +12219,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": true,
-        "description": "This attack\u2019s power increases the more the foe has powered up with stat changes. ",
+        "description": "This attack’s power increases the more the foe has powered up with stat changes. ",
         "attack_flavor": [],
         "effects": [],
         "has_field_effect": false
@@ -12114,7 +12270,7 @@
         "affected_by_snatch": false,
         "affected_by_mirror_move": true,
         "affected_by_kings_rock": false,
-        "description": "The user senses the foe\u2019s movements with its mind to ensure its next attack does not miss.",
+        "description": "The user senses the foe’s movements with its mind to ensure its next attack does not miss.",
         "attack_flavor": [
             "lock_on"
         ],
