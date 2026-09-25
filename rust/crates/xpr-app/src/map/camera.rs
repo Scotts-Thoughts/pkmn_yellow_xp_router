@@ -16,6 +16,16 @@ pub struct Camera {
     pub center: Vec2,
     pub zoom: f32,
     pub min_zoom: f32,
+    /// The scope rectangle last passed to `set_min_zoom_for` (world px).
+    /// Recorded so the zoom presets menu's "Fit" choice
+    /// (`navigator::zoom_control`) can call `fit` with a scope rect: that
+    /// function's signature is fixed by the WP-D contract
+    /// (`GRAPHICS_TOOLS_PLAN.md` §3.3) to `(ui, theme, cam, vp)`, with no
+    /// pack/scope to compute one from directly. `set_min_zoom_for` runs
+    /// every frame in `viewport()`, before the toolbar draws next frame, so
+    /// this is at worst one frame stale (only matters right after a scope
+    /// change, e.g. entering a map).
+    pub last_scope: IRect,
     anim: Option<CameraAnim>,
 }
 
@@ -30,7 +40,7 @@ struct CameraAnim {
 
 impl Default for Camera {
     fn default() -> Self {
-        Camera { center: Vec2::ZERO, zoom: 2.0, min_zoom: 0.1, anim: None }
+        Camera { center: Vec2::ZERO, zoom: 2.0, min_zoom: 0.1, last_scope: IRect::default(), anim: None }
     }
 }
 
@@ -81,6 +91,7 @@ impl Camera {
 
     /// The zoom at which the whole scope fits; used as the lower bound.
     pub fn set_min_zoom_for(&mut self, vp: Rect, scope: IRect) {
+        self.last_scope = scope;
         let w = scope.width().max(1) as f32;
         let h = scope.height().max(1) as f32;
         let fit = (vp.width() / w).min(vp.height() / h);

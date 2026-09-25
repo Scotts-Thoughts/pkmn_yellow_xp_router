@@ -17,7 +17,7 @@ use xpr_data::{GenData, Registry};
 use xpr_engine::{EvOverrideEventDefinition, NodeId};
 use xpr_ui_kit::shortcuts::format_key_sequence;
 use xpr_ui_kit::theme::{self, Theme};
-use xpr_ui_kit::widgets::{self, AmountEntry, Entry, StyledButton};
+use xpr_ui_kit::widgets::{self, AmountEntry, Entry};
 
 use crate::controller::MainController;
 use crate::custom_dvs::CustomDvsFrame;
@@ -43,12 +43,25 @@ pub enum MsgTag {
     DuplicateShortcuts,
 }
 
+impl MsgTag {
+    /// Whether "Yes" throws work away (its button is drawn in the failure
+    /// colour). The unsaved-changes prompts name their buttons instead
+    /// ([`MsgButtons::SaveDiscardCancel`]).
+    fn is_destructive(&self) -> bool {
+        matches!(self, MsgTag::DeleteEvents(_) | MsgTag::ResetAllShortcuts)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MsgButtons {
     Ok,
     YesNo,
     YesNoCancel,
     OkCreateRoute,
+    /// An unsaved-changes prompt with its buttons named for what they do:
+    /// `save` ("Save, then close") answers Yes, `discard` ("Close without
+    /// saving") answers No, and Cancel answers Cancel.
+    SaveDiscardCancel { save: &'static str, discard: &'static str },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -116,22 +129,258 @@ pub struct DialogCtx<'a> {
     pub paths: &'a Paths,
 }
 
-/// Draw the modal frame. `content` returns true to close.
-fn modal<R>(ctx: &egui::Context, theme: &Theme, id: &str, title: &str, min_width: f32, content: impl FnOnce(&mut Ui) -> R) -> R {
+// ---------------------------------------------------------------------------
+// Dialog chrome and parts
+// ---------------------------------------------------------------------------
+//
+// The card language of the redesigned panes (docs/rust_port/design/
+// pre_event_state/SPEC.md §3), one step up in elevation: a raised card with
+// a title strip, body sections headed by uppercase captions, muted help
+// text, lists in a recessed well, and a footer of right-aligned buttons
+// whose main action is filled with the accent.
+
+/// Horizontal padding of the title strip, body and footer.
+const PAD_X: f32 = 20.0;
+/// Height of the footer buttons.
+const BUTTON_H: f32 = 30.0;
+/// Width of the controls in a [`form`]'s second column.
+const FIELD_W: f32 = 260.0;
+
+/// The dialog surface: a step lighter than the cards on the pages (inputs
+/// and wells then read as recessed, as in the panes).
+fn surface(theme: &Theme) -> Color32 {
+    theme.section_bg()
+}
+
+/// Draw a dialog `width` points wide with `title` in its title strip;
+/// `content` draws the body (and usually ends with a [`footer`]).
+pub(crate) fn modal<R>(ctx: &egui::Context, theme: &Theme, id: &str, title: &str, width: f32, content: impl FnOnce(&mut Ui) -> R) -> R {
     let frame = egui::Frame::new()
-        .fill(theme.bg)
-        .stroke(Stroke::new(1.0_f32, theme.border))
-        .corner_radius(CornerRadius::same(3))
-        .inner_margin(egui::Margin::same(10));
-    let m = egui::Modal::new(egui::Id::new(id)).frame(frame).backdrop_color(Color32::from_black_alpha(120));
+        .fill(surface(theme))
+        .stroke(Stroke::new(1.0_f32, theme::lighten(theme.bg, 0.14)))
+        .corner_radius(CornerRadius::same(10))
+        .shadow(egui::Shadow { offset: [0, 12], blur: 40, spread: 0, color: Color32::from_black_alpha(150) });
+    let m = egui::Modal::new(egui::Id::new(id)).frame(frame).backdrop_color(Color32::from_black_alpha(150));
     m.show(ctx, |ui| {
-        ui.set_min_width(min_width);
-        ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-        ui.label(egui::RichText::new(title).font(theme.font_bold(10.0)).color(theme.text));
-        widgets::hline(ui, theme);
-        content(ui)
+        ui.set_width(width);
+        ui.spacing_mut().item_spacing = Vec2::ZERO;
+        let pad = PAD_X as i8;
+        egui::Frame::new().inner_margin(egui::Margin { left: pad, right: pad, top: 15, bottom: 13 }).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(egui::Label::new(egui::RichText::new(title).font(theme.font_bold(12.0)).color(theme.text_strong())).wrap());
+        });
+        let r = ui.max_rect();
+        let y = ui.cursor().min.y;
+        ui.painter().hline(r.x_range(), y + 0.5, Stroke::new(1.0_f32, theme.pane_divider()));
+        ui.add_space(1.0);
+        egui::Frame::new()
+            .inner_margin(egui::Margin { left: pad, right: pad, top: 16, bottom: 16 })
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
+                content(ui)
+            })
+            .inner
     })
     .inner
+}
+
+/// The button row that ends a dialog body: a hairline across the whole
+/// dialog, then `add` laid out right to left, so the first button added
+/// (the main action) is the rightmost. Buttons for the left edge go in a
+/// nested left-to-right layout at the end.
+fn footer(ui: &mut Ui, theme: &Theme, add: impl FnOnce(&mut Ui)) {
+    ui.add_space(8.0);
+    let r = ui.max_rect();
+    let y = ui.cursor().min.y;
+    ui.painter().hline((r.min.x - PAD_X)..=(r.max.x + PAD_X), y + 0.5, Stroke::new(1.0_f32, theme.pane_divider()));
+    ui.add_space(16.0);
+    ui.allocate_ui_with_layout(Vec2::new(ui.available_width(), BUTTON_H), egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.spacing_mut().item_spacing.x = 8.0;
+        add(ui);
+    });
+}
+
+/// How much a dialog button asks to be pressed.
+#[derive(Clone, Copy, PartialEq)]
+enum Tone {
+    /// The dialog's main action: accent fill.
+    Primary,
+    /// Everything else: outlined, quiet.
+    Secondary,
+    /// A main action that throws work away: failure-colour fill.
+    Danger,
+    /// A side option that throws work away: outlined in the failure colour.
+    DangerOutline,
+}
+
+/// A footer button (30 px tall, radius 6).
+fn action_button(ui: &mut Ui, theme: &Theme, text: &str, tone: Tone, enabled: bool) -> egui::Response {
+    button_sized(ui, theme, text, tone, enabled, BUTTON_H, 76.0, theme.body_bold())
+}
+
+/// A compact secondary button for rows inside the body (24 px tall).
+fn small_button(ui: &mut Ui, theme: &Theme, text: &str, enabled: bool) -> egui::Response {
+    button_sized(ui, theme, text, Tone::Secondary, enabled, 24.0, 0.0, theme.body())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn button_sized(ui: &mut Ui, theme: &Theme, text: &str, tone: Tone, enabled: bool, h: f32, min_w: f32, font: egui::FontId) -> egui::Response {
+    let galley = ui.painter().layout_no_wrap(text.to_string(), font, Color32::PLACEHOLDER);
+    let pad = if h >= BUTTON_H { 16.0 } else { 10.0 };
+    let size = Vec2::new((galley.size().x + 2.0 * pad).max(min_w).round(), h);
+    let (rect, resp) = ui.allocate_exact_size(size, if enabled { egui::Sense::click() } else { egui::Sense::hover() });
+    if ui.is_rect_visible(rect) {
+        let hovered = enabled && resp.hovered();
+        let pressed = enabled && resp.is_pointer_button_down_on();
+        let shade = |c: Color32| if pressed { theme::darken(c, 0.12) } else if hovered { theme::lighten(c, 0.10) } else { c };
+        let (fill, stroke, text_color) = match (tone, enabled) {
+            (Tone::Primary, true) => (shade(theme.accent), Stroke::NONE, Color32::WHITE),
+            (Tone::Danger, true) => (shade(theme::darken(theme.failure, 0.12)), Stroke::NONE, Color32::WHITE),
+            (Tone::Secondary, true) => {
+                let fill = if pressed { theme::lighten(surface(theme), 0.10) } else if hovered { theme::lighten(surface(theme), 0.06) } else { Color32::TRANSPARENT };
+                (fill, Stroke::new(1.0_f32, if hovered { theme::lighten(theme.border, 0.15) } else { theme.border }), theme.text_strong())
+            }
+            (Tone::DangerOutline, true) => {
+                let fill = if pressed { theme::with_alpha(theme.failure, 60) } else if hovered { theme::with_alpha(theme.failure, 30) } else { Color32::TRANSPARENT };
+                (fill, Stroke::new(1.0_f32, theme::tint(theme.failure, surface(theme), if hovered { 0.9 } else { 0.6 })), theme::lighten(theme.failure, 0.25))
+            }
+            (Tone::Secondary | Tone::DangerOutline, false) => (Color32::TRANSPARENT, Stroke::new(1.0_f32, theme.subtle_border), theme.disabled_text),
+            (_, false) => (theme::with_alpha(theme.accent, 70), Stroke::NONE, theme::with_alpha(Color32::WHITE, 110)),
+        };
+        ui.painter().rect(rect, CornerRadius::same(6), fill, stroke, egui::StrokeKind::Inside);
+        ui.painter().galley(rect.center() - galley.size() / 2.0, galley, text_color);
+    }
+    if enabled {
+        resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+    } else {
+        resp
+    }
+}
+
+/// An uppercase section title (header colour), with an optional muted
+/// caption at the right; every section but the first gets air above it.
+fn section(ui: &mut Ui, theme: &Theme, title: &str, right: Option<&str>) {
+    if ui.cursor().min.y > ui.max_rect().min.y + 1.0 {
+        ui.add_space(8.0);
+    }
+    widgets::card_title(ui, theme, title, right);
+}
+
+/// Muted, wrapped explanatory text.
+fn help(ui: &mut Ui, theme: &Theme, text: &str) {
+    ui.add(egui::Label::new(egui::RichText::new(text).font(theme.body()).color(theme.secondary)).wrap());
+}
+
+/// Wrapped body text.
+fn body_text(ui: &mut Ui, theme: &Theme, text: &str) {
+    ui.add(egui::Label::new(egui::RichText::new(text).font(theme.body()).color(theme.text)).wrap());
+}
+
+/// A text field in the dialogs' control style (28 px tall, radius 4).
+fn field<'a>(theme: &'a Theme, text: &'a mut String) -> Entry<'a> {
+    Entry::new(theme, text).corner_radius(4).min_height(28.0)
+}
+
+/// A two-column grid of labelled controls (dropdowns as tall as the fields).
+fn form<R>(ui: &mut Ui, id: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
+    ui.scope(|ui| {
+        ui.spacing_mut().interact_size.y = 28.0;
+        egui::Grid::new(id).num_columns(2).spacing(Vec2::new(16.0, 10.0)).show(ui, add).inner
+    })
+    .inner
+}
+
+/// A form row label.
+fn form_label(ui: &mut Ui, theme: &Theme, text: &str) {
+    widgets::label_font(ui, text, theme.body(), theme.text);
+}
+
+/// One of a set of mutually exclusive choices that act on click: a
+/// full-width card with a title, a muted detail line and a chevron.
+fn choice_row(ui: &mut Ui, theme: &Theme, title: &str, detail: &str) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 46.0), egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let hovered = resp.hovered();
+        let (fill, stroke) = if hovered { (theme.hover_bg, theme.accent) } else { (theme.bg_input, theme.card_border()) };
+        ui.painter().rect(rect, CornerRadius::same(8), fill, Stroke::new(1.0_f32, stroke), egui::StrokeKind::Inside);
+        let x = rect.min.x + 14.0;
+        ui.painter().text(egui::Pos2::new(x, rect.center().y - 8.0), egui::Align2::LEFT_CENTER, title, theme.body_bold(), theme.text_strong());
+        ui.painter().text(egui::Pos2::new(x, rect.center().y + 9.0), egui::Align2::LEFT_CENTER, detail, theme.body(), theme.secondary);
+        // chevron
+        let c = egui::Pos2::new(rect.max.x - 18.0, rect.center().y);
+        let color = if hovered { theme.text_strong() } else { theme.secondary };
+        ui.painter().line(vec![egui::Pos2::new(c.x - 3.0, c.y - 5.0), c + Vec2::new(2.0, 0.0), egui::Pos2::new(c.x - 3.0, c.y + 5.0)], Stroke::new(1.5_f32, color));
+    }
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// A read-only, recessed field showing a path (elided when it does not
+/// fit; the full path is the tooltip).
+fn path_field(ui: &mut Ui, theme: &Theme, path: &str, width: f32) {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(width.max(80.0), 24.0), egui::Sense::hover());
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect(rect, CornerRadius::same(6), theme.well_bg(), Stroke::new(1.0_f32, theme.card_border()), egui::StrokeKind::Inside);
+        let shown = widgets::elide(ui, path, &theme.body(), rect.width() - 16.0);
+        ui.painter().text(egui::Pos2::new(rect.min.x + 8.0, rect.center().y), egui::Align2::LEFT_CENTER, shown, theme.body(), theme.text);
+    }
+    resp.on_hover_text(path);
+}
+
+/// `preferred` scroll height, capped so a dialog with `other` points of
+/// title strip, footer and fixed content still fits the window.
+fn fit_h(ui: &Ui, preferred: f32, other: f32) -> f32 {
+    preferred.min((ui.ctx().content_rect().height() - 40.0 - other).max(120.0))
+}
+
+/// A recessed, scrolling list box `max_h` tall.
+fn list_well<R>(ui: &mut Ui, theme: &Theme, max_h: f32, add: impl FnOnce(&mut Ui) -> R) -> R {
+    egui::Frame::new()
+        .fill(theme.well_bg())
+        .stroke(Stroke::new(1.0_f32, theme.card_border()))
+        .corner_radius(CornerRadius::same(8))
+        .inner_margin(egui::Margin::same(4))
+        .show(ui, |ui| {
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(max_h).auto_shrink([false, false]), |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(0.0, 1.0);
+                add(ui)
+            })
+            .inner
+        })
+        .inner
+}
+
+/// A selectable row of a [`list_well`].
+fn list_row(ui: &mut Ui, theme: &Theme, text: &str, selected: bool) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let fill = if selected {
+            theme::tint(theme.accent, theme.well_bg(), 0.32)
+        } else if resp.hovered() {
+            theme.hover_bg
+        } else {
+            Color32::TRANSPARENT
+        };
+        ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
+        let (font, color) = if selected { (theme.body_bold(), theme.text_strong()) } else { (theme.body(), theme.text) };
+        ui.painter().text(egui::Pos2::new(rect.min.x + 10.0, rect.center().y), egui::Align2::LEFT_CENTER, text, font, color);
+    }
+    resp
+}
+
+/// Cover a secondary window (its own viewport, which the main window's
+/// dialog cannot cover) while a dialog is up in the main window: the dialogs
+/// are application-modal, like the Qt ones, so e.g. the popped-out map may
+/// not select or add events under an "Assign Move" dialog.
+pub fn block_secondary_window(ctx: &egui::Context, theme: &Theme) {
+    if ctx.embed_viewports() {
+        // no native windows: the "window" is an egui window in the main
+        // viewport, already under the dialog (a second modal would cover it)
+        return;
+    }
+    modal(ctx, theme, "xpr_secondary_window_blocked", "Dialog Open", 300.0, |ui| {
+        help(ui, theme, "Finish the dialog in the main window first.");
+    });
 }
 
 fn enter_pressed(ui: &Ui) -> bool {
@@ -154,48 +403,65 @@ impl MessageBox {
     /// Returns the choice when a button was pressed.
     pub fn ui(&self, ctx: &egui::Context, theme: &Theme) -> Option<MsgChoice> {
         let mut choice = None;
-        modal(ctx, theme, "xpr_message_box", &self.title, 320.0, |ui| {
-            ui.add(egui::Label::new(egui::RichText::new(&self.text).font(theme.body()).color(theme.text)).wrap());
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                match self.buttons {
-                    MsgButtons::Ok => {
-                        if widgets::button(ui, theme, "OK").clicked() || enter_pressed(ui) {
-                            choice = Some(MsgChoice::Ok);
-                        }
+        let yes = if self.tag.is_destructive() { Tone::Danger } else { Tone::Primary };
+        let width = match self.buttons {
+            // room for the two long labels and Cancel on one row
+            MsgButtons::SaveDiscardCancel { save, discard } => if save.len() + discard.len() > 40 { 540.0 } else { 480.0 },
+            _ if self.text.len() > 160 => 480.0,
+            _ => 400.0,
+        };
+        modal(ctx, theme, "xpr_message_box", &self.title, width, |ui| {
+            body_text(ui, theme, &self.text);
+            footer(ui, theme, |ui| match self.buttons {
+                MsgButtons::Ok => {
+                    if action_button(ui, theme, "OK", Tone::Primary, true).clicked() || enter_pressed(ui) {
+                        choice = Some(MsgChoice::Ok);
                     }
-                    MsgButtons::YesNo => {
-                        if widgets::button(ui, theme, "Yes").clicked() {
-                            choice = Some(MsgChoice::Yes);
-                        }
-                        if widgets::button(ui, theme, "No").clicked() || enter_pressed(ui) {
+                }
+                MsgButtons::YesNo => {
+                    if action_button(ui, theme, "Yes", yes, true).clicked() {
+                        choice = Some(MsgChoice::Yes);
+                    }
+                    if action_button(ui, theme, "No", Tone::Secondary, true).clicked() || enter_pressed(ui) {
+                        choice = Some(MsgChoice::No);
+                    }
+                }
+                MsgButtons::YesNoCancel => {
+                    if action_button(ui, theme, "Yes", yes, true).clicked() {
+                        choice = Some(MsgChoice::Yes);
+                    }
+                    if action_button(ui, theme, "No", Tone::Secondary, true).clicked() {
+                        choice = Some(MsgChoice::No);
+                    }
+                    if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || enter_pressed(ui) {
+                        choice = Some(MsgChoice::Cancel);
+                    }
+                }
+                MsgButtons::SaveDiscardCancel { save, discard } => {
+                    if action_button(ui, theme, save, Tone::Primary, true).clicked() {
+                        choice = Some(MsgChoice::Yes);
+                    }
+                    if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || enter_pressed(ui) {
+                        choice = Some(MsgChoice::Cancel);
+                    }
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        if action_button(ui, theme, discard, Tone::DangerOutline, true).clicked() {
                             choice = Some(MsgChoice::No);
                         }
+                    });
+                }
+                MsgButtons::OkCreateRoute => {
+                    if action_button(ui, theme, "OK", Tone::Primary, true).clicked() || enter_pressed(ui) {
+                        choice = Some(MsgChoice::Ok);
                     }
-                    MsgButtons::YesNoCancel => {
-                        if widgets::button(ui, theme, "Yes").clicked() {
-                            choice = Some(MsgChoice::Yes);
-                        }
-                        if widgets::button(ui, theme, "No").clicked() {
-                            choice = Some(MsgChoice::No);
-                        }
-                        if widgets::button(ui, theme, "Cancel").clicked() || enter_pressed(ui) {
-                            choice = Some(MsgChoice::Cancel);
-                        }
-                    }
-                    MsgButtons::OkCreateRoute => {
-                        if widgets::button(ui, theme, "OK").clicked() || enter_pressed(ui) {
-                            choice = Some(MsgChoice::Ok);
-                        }
-                        if widgets::button(ui, theme, "Create Route for Backport").clicked() {
-                            choice = Some(MsgChoice::Extra);
-                        }
+                    if action_button(ui, theme, "Create Route for Backport", Tone::Secondary, true).clicked() {
+                        choice = Some(MsgChoice::Extra);
                     }
                 }
             });
             if escape_pressed(ui) {
                 choice = Some(match self.buttons {
-                    MsgButtons::YesNoCancel => MsgChoice::Cancel,
+                    MsgButtons::YesNoCancel | MsgButtons::SaveDiscardCancel { .. } => MsgChoice::Cancel,
                     MsgButtons::YesNo => MsgChoice::No,
                     _ => MsgChoice::Ok,
                 });
@@ -235,34 +501,33 @@ impl LoadRouteDialog {
         let mut close = false;
         let mut outcome = None;
         let mut refilter = false;
-        modal(ctx, theme, "xpr_load_route", "Load Route", 420.0, |ui| {
-            egui::Grid::new("load_route_grid").spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
-                widgets::label(ui, theme, "Existing Routes:");
-                self.routes.ui(ui, theme, ui.id().with("routes"), Some(260.0), true);
+        modal(ctx, theme, "xpr_load_route", "Load Route", 460.0, |ui| {
+            form(ui, "load_route_grid", |ui| {
+                form_label(ui, theme, "Route");
+                self.routes.ui(ui, theme, ui.id().with("routes"), Some(FIELD_W), true);
                 ui.end_row();
-                widgets::label(ui, theme, "Filter:");
-                if Entry::new(theme, &mut self.filter).width(260.0).id(ui.id().with("filter")).show(ui).changed {
+                form_label(ui, theme, "Filter");
+                if field(theme, &mut self.filter).width(FIELD_W).hint("Filter by name").id(ui.id().with("filter")).show(ui).changed {
                     refilter = true;
                 }
                 ui.end_row();
-                widgets::label(ui, theme, "Show Backup Routes?");
-                if widgets::checkbox(ui, theme, &mut self.show_backups, "", true).changed() {
+                ui.label("");
+                if widgets::checkbox(ui, theme, &mut self.show_backups, "Show backup routes", true).changed() {
                     refilter = true;
                 }
                 ui.end_row();
             });
-            ui.vertical_centered(|ui| {
-                widgets::label(ui, theme, "Backup Routes are older versions of your route.\nEvery save makes a backup that is persisted, and can be reloaded if needed.\nThese are hidden by default because they can quickly pile up");
-                widgets::label(ui, theme, "WARNING: Any unsaved changes in your current route\nwill be lost when loading an existing route!");
-            });
+            help(ui, theme, "Backup routes are older versions of your route. Every save makes a backup that is kept and can be reloaded if needed. They are hidden by default because they can quickly pile up.");
+            ui.add_space(2.0);
+            widgets::warning_banner(ui, theme, "Any unsaved changes in your current route will be lost when loading an existing route.");
             let selected = self.routes.get().to_string();
             let can_load = selected != consts::NO_SAVED_ROUTES;
-            ui.horizontal(|ui| {
-                if (widgets::button_enabled(ui, theme, "Load Route", can_load).clicked() || enter_pressed(ui)) && can_load {
+            footer(ui, theme, |ui| {
+                if (action_button(ui, theme, "Load Route", Tone::Primary, can_load).clicked() || enter_pressed(ui)) && can_load {
                     outcome = Some(DialogOutcome::LoadRoute(io_utils::get_existing_route_path(d.paths, &selected)));
                     close = true;
                 }
-                if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+                if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
             });
@@ -296,26 +561,27 @@ impl NewFolderDialog {
         let mut close = false;
         let mut outcome = None;
         let title = if self.prev_name.is_none() { "Create New Folder" } else { "Update Folder Name" };
-        modal(ctx, theme, "xpr_new_folder", title, 360.0, |ui| {
+        modal(ctx, theme, "xpr_new_folder", title, 380.0, |ui| {
             let valid = !self.name.is_empty() && !self.folder_names.contains(&self.name);
-            egui::Grid::new("new_folder_grid").spacing(Vec2::new(10.0, 10.0)).show(ui, |ui| {
-                widgets::label(ui, theme, if self.prev_name.is_none() { "New Folder Name" } else { "Update Folder Name" });
-                let id = ui.id().with("folder_name");
-                if !self.focused {
-                    ui.memory_mut(|m| m.request_focus(id));
-                    self.focused = true;
-                }
-                let r = Entry::new(theme, &mut self.name).width(200.0).id(id).show(ui);
-                ui.end_row();
-                let label = if self.prev_name.is_none() { "New Folder" } else { "Update Folder" };
-                if (widgets::button_enabled(ui, theme, label, valid).clicked() || r.enter_pressed) && valid {
+            form_label(ui, theme, "Folder name");
+            let id = ui.id().with("folder_name");
+            if !self.focused {
+                ui.memory_mut(|m| m.request_focus(id));
+                self.focused = true;
+            }
+            let r = field(theme, &mut self.name).width(ui.available_width()).id(id).show(ui);
+            if !self.name.is_empty() && self.folder_names.contains(&self.name) && self.prev_name.as_ref() != Some(&self.name) {
+                widgets::label_font(ui, "A folder with this name already exists.", theme.body(), theme.failure);
+            }
+            footer(ui, theme, |ui| {
+                let label = if self.prev_name.is_none() { "Create Folder" } else { "Rename Folder" };
+                if (action_button(ui, theme, label, Tone::Primary, valid).clicked() || r.enter_pressed) && valid {
                     outcome = Some(DialogOutcome::NewFolder { name: self.name.clone(), prev: self.prev_name.clone(), insert_after: self.insert_after });
                     close = true;
                 }
-                if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+                if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
-                ui.end_row();
             });
         });
         (close, outcome)
@@ -370,36 +636,37 @@ impl TransferDialog {
         let mut close = false;
         let mut outcome = None;
         let mut refilter = false;
-        modal(ctx, theme, "xpr_transfer", "Transfer Events", 380.0, |ui| {
+        modal(ctx, theme, "xpr_transfer", "Transfer Events", 440.0, |ui| {
             let existing = self.transfer_type.get() == consts::TRANSFER_EXISTING_FOLDER;
             let enabled = if existing { self.dest.get() != consts::NO_FOLDERS } else { !self.all_folders.contains(&self.new_folder) };
-            egui::Grid::new("transfer_grid").spacing(Vec2::new(10.0, 10.0)).show(ui, |ui| {
-                widgets::label(ui, theme, "Transfer to:");
-                self.transfer_type.ui(ui, theme, ui.id().with("type"), Some(200.0), true);
+            form(ui, "transfer_grid", |ui| {
+                form_label(ui, theme, "Transfer to");
+                self.transfer_type.ui(ui, theme, ui.id().with("type"), Some(FIELD_W), true);
                 ui.end_row();
                 if existing {
-                    widgets::label(ui, theme, "Destination folder:");
-                    self.dest.ui(ui, theme, ui.id().with("dest"), Some(200.0), true);
+                    form_label(ui, theme, "Destination");
+                    self.dest.ui(ui, theme, ui.id().with("dest"), Some(FIELD_W), true);
                     ui.end_row();
-                    widgets::label(ui, theme, "Filter:");
-                    if Entry::new(theme, &mut self.filter).width(200.0).id(ui.id().with("filter")).show(ui).changed {
+                    form_label(ui, theme, "Filter");
+                    if field(theme, &mut self.filter).width(FIELD_W).hint("Filter folders").id(ui.id().with("filter")).show(ui).changed {
                         refilter = true;
                     }
                     ui.end_row();
                 } else {
-                    widgets::label(ui, theme, "New folder:");
-                    Entry::new(theme, &mut self.new_folder).width(200.0).id(ui.id().with("new_folder")).show(ui);
+                    form_label(ui, theme, "New folder");
+                    field(theme, &mut self.new_folder).width(FIELD_W).hint("Folder name").id(ui.id().with("new_folder")).show(ui);
                     ui.end_row();
                 }
-                if (widgets::button_enabled(ui, theme, "Transfer to Folder", enabled).clicked() || enter_pressed(ui)) && enabled {
+            });
+            footer(ui, theme, |ui| {
+                if (action_button(ui, theme, "Transfer", Tone::Primary, enabled).clicked() || enter_pressed(ui)) && enabled {
                     let folder = if existing { self.dest.get().to_string() } else { self.new_folder.trim().to_string() };
                     outcome = Some(DialogOutcome::Transfer { ids: self.ids.clone(), folder });
                     close = true;
                 }
-                if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+                if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
-                ui.end_row();
             });
         });
         if refilter {
@@ -430,16 +697,16 @@ impl CustomDvsDialog {
         let theme = d.theme;
         let mut close = false;
         let mut outcome = None;
-        modal(ctx, theme, "xpr_custom_dvs", "Custom DVs/IVs", 420.0, |ui| {
+        modal(ctx, theme, "xpr_custom_dvs", "Custom DVs/IVs", 440.0, |ui| {
             self.frame.ui(ui, theme);
-            ui.horizontal(|ui| {
-                if widgets::button(ui, theme, "Set New DVs").clicked() || enter_pressed(ui) {
+            footer(ui, theme, |ui| {
+                if action_button(ui, theme, "Set New DVs", Tone::Primary, true).clicked() || enter_pressed(ui) {
                     if let Some((dvs, ability, nature)) = self.frame.get_dvs() {
                         outcome = Some(DialogOutcome::SetDvs(dvs, ability, nature));
                     }
                     close = true;
                 }
-                if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+                if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
             });
@@ -494,14 +761,14 @@ impl CustomGenDialog {
         // species-name prompt for a backport import
         if let Some(bp) = self.pending_backport.as_mut() {
             let mut done: Option<bool> = None;
-            modal(ctx, theme, "xpr_backport_species", "Species Name", 320.0, |ui| {
-                widgets::label(ui, theme, "Enter the species name:");
-                let r = Entry::new(theme, &mut bp.species).width(260.0).id(ui.id().with("species")).show(ui);
-                ui.horizontal(|ui| {
-                    if widgets::button(ui, theme, "OK").clicked() || r.enter_pressed {
+            modal(ctx, theme, "xpr_backport_species", "Species Name", 360.0, |ui| {
+                form_label(ui, theme, "Enter the species name");
+                let r = field(theme, &mut bp.species).width(ui.available_width()).id(ui.id().with("species")).show(ui);
+                footer(ui, theme, |ui| {
+                    if action_button(ui, theme, "OK", Tone::Primary, true).clicked() || r.enter_pressed {
                         done = Some(true);
                     }
-                    if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+                    if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                         done = Some(false);
                     }
                 });
@@ -526,41 +793,53 @@ impl CustomGenDialog {
         }
         let mut open_path: Option<PathBuf> = None;
         let mut import_for: Option<(PathBuf, String)> = None;
-        modal(ctx, theme, "xpr_custom_gen", "Custom Gen Manager", 520.0, |ui| {
-            ui.vertical_centered(|ui| widgets::label(ui, theme, "Custom Gen Instructions:"));
-            let instructions = "\nCreate a custom gen when you want to play a romhack, or a modified\nversion of an official game (e.g. hacking in a pokemon from a newer gen).\nA custom gen will re-use all the damage calculations and mechanics\nfrom the base official generation, but want to route with new or changed content.\n\nCreating a custom gen will copy all the information for the official gen\ninto a new folder. Once created, click on the button below to open that\nlocation, and then modify the files as necessary.\n\nThe application loads all custom gens on startup, so when you modify\nthe custom gen, you must restart the app before those changes will be recognized.\n\nNOTE: All custom gens are validated on app startup. If any errors are detected,\nyou will get a pop-up.  The app will still work fine,\nbut any custom gens with errors detected will not be loaded\n";
-            widgets::label(ui, theme, instructions);
+        modal(ctx, theme, "xpr_custom_gen", "Custom Gen Manager", 560.0, |ui| {
+            section(ui, theme, "How custom gens work", None);
+            help(ui, theme, "Create a custom gen when you want to play a romhack, or a modified version of an official game (e.g. hacking in a pokemon from a newer gen). A custom gen re-uses all the damage calculations and mechanics from the base official generation, but lets you route with new or changed content.");
+            help(ui, theme, "Creating a custom gen copies all the information for the official gen into a new folder. Once created, open that folder from the list below and modify the files as necessary. Custom gens are loaded on startup, so restart the app after changing one.");
+            help(ui, theme, "All custom gens are validated on startup. If errors are detected you will get a pop-up; the app still works, but a custom gen with errors is not loaded.");
+            section(ui, theme, "New custom gen", None);
             let valid = self.verify_name(d.registry, &self.custom_name);
-            egui::Grid::new("custom_gen_grid").spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
-                widgets::label(ui, theme, "Base Version:");
-                self.base_version.ui(ui, theme, ui.id().with("base"), Some(200.0), true);
+            form(ui, "custom_gen_grid", |ui| {
+                form_label(ui, theme, "Base version");
+                self.base_version.ui(ui, theme, ui.id().with("base"), Some(FIELD_W), true);
                 ui.end_row();
-                widgets::label(ui, theme, "Custom Version Name:");
-                Entry::new(theme, &mut self.custom_name).width(200.0).id(ui.id().with("custom_name")).show(ui);
+                form_label(ui, theme, "Custom version name");
+                field(theme, &mut self.custom_name).width(FIELD_W).hint("Name of the new version").id(ui.id().with("custom_name")).show(ui);
                 ui.end_row();
-            });
-            if (widgets::button_enabled(ui, theme, "Create Custom Version", valid).clicked() || enter_pressed(ui)) && valid {
-                let base = self.base_version.get().to_string();
-                let name = self.custom_name.clone();
-                d.ctrl.create_custom_version(&base, &name);
-                self.populate(d.registry);
-            }
-            ui.add_space(10.0);
-            ui.vertical_centered(|ui| widgets::label(ui, theme, "All Custom Gens"));
-            egui::Grid::new("custom_gens_list").spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
-                for (path, base, name) in self.gens.clone() {
-                    widgets::label(ui, theme, format!("{} ({})", name, base));
-                    if widgets::button(ui, theme, "Open Custom Gen").clicked() {
-                        open_path = Some(path.clone());
-                    }
-                    if widgets::button(ui, theme, "Import Backport").clicked() {
-                        import_for = Some((path.clone(), name.clone()));
-                    }
-                    ui.end_row();
+                ui.label("");
+                if (action_button(ui, theme, "Create Custom Version", Tone::Primary, valid).clicked() || enter_pressed(ui)) && valid {
+                    let base = self.base_version.get().to_string();
+                    let name = self.custom_name.clone();
+                    d.ctrl.create_custom_version(&base, &name);
+                    self.populate(d.registry);
                 }
+                ui.end_row();
             });
-            ui.vertical_centered(|ui| {
-                if widgets::button(ui, theme, "Close").clicked() || escape_pressed(ui) {
+            let count = if self.gens.is_empty() { None } else { Some(format!("{}", self.gens.len())) };
+            section(ui, theme, "Your custom gens", count.as_deref());
+            if self.gens.is_empty() {
+                help(ui, theme, "No custom gens yet.");
+            }
+            for (path, base, name) in self.gens.clone() {
+                widgets::card(ui, theme, Some(egui::Margin::symmetric(12, 8)), |ui| {
+                    ui.horizontal(|ui| {
+                        ui.set_width(ui.available_width());
+                        widgets::label_font(ui, &name, theme.body_bold(), theme.text_strong());
+                        widgets::label_font(ui, format!("based on {}", base), theme.body(), theme.secondary);
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if small_button(ui, theme, "Import Backport", true).clicked() {
+                                import_for = Some((path.clone(), name.clone()));
+                            }
+                            if small_button(ui, theme, "Open Folder", true).clicked() {
+                                open_path = Some(path.clone());
+                            }
+                        });
+                    });
+                });
+            }
+            footer(ui, theme, |ui| {
+                if action_button(ui, theme, "Close", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
             });
@@ -619,61 +898,70 @@ impl BattleConfigDialog {
         let theme = d.theme;
         let mut close = false;
         modal(ctx, theme, "xpr_battle_config", "Battle Configuration", 600.0, |ui| {
-            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(500.0), |ui| {
-                ui.vertical_centered(|ui| widgets::label(ui, theme, "Battle calcs limitations and edge cases"));
-                ui.add(egui::Label::new(egui::RichText::new(
-                    "Possible kills with less than 0.1% chance are not reported.\nFor each move, a full search for kill percents is done, up to a certain # of turns (configurable below).\nUp to 3 ranges are reported: 2 fastest kills, if applicable. The number required for a guaranteed kill is always given as the last range\nFor weaker moves, the maximum number of HITS (assumes attack lands every time) needed to guarantee a kill are given instead\nWith respect to accuracy calculations, Gen 1 misses are ignored\nThe crit damage ranges for multi-hit moves in Gen 2 assume exactly one of the multi-hits crit",
-                ).font(theme.body()).color(theme.text)).wrap());
-                ui.add_space(10.0);
-                egui::Grid::new("battle_cfg_grid").spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
-                    widgets::label(ui, theme, "Damage Calc Search Depth:");
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(fit_h(ui, 520.0, 170.0)), |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
+                ui.set_width(ui.available_width() - 16.0);
+                section(ui, theme, "Damage calculation", None);
+                form(ui, "battle_cfg_calc", |ui| {
+                    form_label(ui, theme, "Search depth (turns)");
                     if widgets::AmountEntry::new(theme, ui.id().with("depth"), &mut self.search_depth).min(Some(1)).max(Some(99)).show(ui).changed {
                         let v = self.search_depth.trim().parse::<i64>().unwrap_or(xpr_core::config::DEFAULT_DAMAGE_SEARCH_DEPTH);
                         d.cfg.set_damage_search_depth(v);
                     }
                     ui.end_row();
-                    widgets::label(ui, theme, "\n# Of turns to search damage ranges to find kill %'s\nLarger gets more accurate guaranteed kills, but may take longer, especially on slower computers");
-                    ui.end_row();
-                    if widgets::checkbox_label(ui, theme, &mut self.force_full_search, "Fully calculate psywave (Not recommended):", true, true) {
-                        d.cfg.set_force_full_search(self.force_full_search);
-                    }
-                    ui.end_row();
-                    if widgets::checkbox_label(ui, theme, &mut self.ignore_accuracy, "Ignore Accuracy in Kill Ranges:", true, true) {
-                        d.cfg.set_ignore_accuracy(self.ignore_accuracy);
-                    }
-                    ui.end_row();
-                    widgets::label(ui, theme, "Player Highlight Strategy:");
-                    if self.player_strat.ui(ui, theme, ui.id().with("pstrat"), Some(160.0), true) {
+                });
+                help(ui, theme, "The number of turns searched to find kill percentages. Larger values give more accurate guaranteed kills, but may take longer, especially on slower computers.");
+                if widgets::checkbox(ui, theme, &mut self.ignore_accuracy, "Ignore accuracy in kill ranges", true).changed() {
+                    d.cfg.set_ignore_accuracy(self.ignore_accuracy);
+                }
+                if widgets::checkbox(ui, theme, &mut self.force_full_search, "Fully calculate Psywave (not recommended)", true).changed() {
+                    d.cfg.set_force_full_search(self.force_full_search);
+                }
+
+                section(ui, theme, "Highlighting", None);
+                form(ui, "battle_cfg_highlight", |ui| {
+                    form_label(ui, theme, "Player strategy");
+                    if self.player_strat.ui(ui, theme, ui.id().with("pstrat"), Some(200.0), true) {
                         d.cfg.set_player_highlight_strategy(self.player_strat.get());
                     }
                     ui.end_row();
-                    widgets::label(ui, theme, "Enemy Highlight Strategy:");
-                    if self.enemy_strat.ui(ui, theme, ui.id().with("estrat"), Some(160.0), true) {
+                    form_label(ui, theme, "Enemy strategy");
+                    if self.enemy_strat.ui(ui, theme, ui.id().with("estrat"), Some(200.0), true) {
                         d.cfg.set_enemy_highlight_strategy(self.enemy_strat.get());
                     }
                     ui.end_row();
-                    widgets::label(ui, theme, "Consistency Threshold:");
+                    form_label(ui, theme, "Consistency threshold (%)");
                     if widgets::AmountEntry::new(theme, ui.id().with("thresh"), &mut self.consistent_threshold).min(Some(1)).max(Some(99)).show(ui).changed {
                         let v = self.consistent_threshold.trim().parse::<i64>().unwrap_or(xpr_core::config::DEFAULT_CONSISTENT_THRESHOLD);
                         d.cfg.set_consistent_threshold(v);
                     }
                     ui.end_row();
                 });
-                ui.add_space(10.0);
-                ui.vertical_centered(|ui| {
-                    widgets::label(ui, theme, "Highlighting Strategies");
-                    widgets::label(ui, theme, "Guaranteed Kill");
-                });
-                widgets::label(ui, theme, "This will highlight the move that has the lowest number of turns for a 'guaranteed' kill.\n'Guaranteed' is if the move has a 99% chance or higher to kill.");
-                ui.vertical_centered(|ui| widgets::label(ui, theme, "Fastest Kill"));
-                widgets::label(ui, theme, "This will highlight the move that has the lowest number of turns for any possible kill.\nKills that have a less than 0.1% chance of occuring are ignored by the damage calcs, but if the move has at least a 1% chance of killing,\nit will be reported");
-                ui.vertical_centered(|ui| widgets::label(ui, theme, "Consistent Kill"));
-                widgets::label(ui, theme, "This will highlight the move that has the lowest number of turns for a kill that has at least a chance above the consistency threshold.\nThis can be configured to suit your preferences");
-                ui.add(egui::Label::new(egui::RichText::new("Regardless of the strategy, ties between moves with the same # of turns will be broken with successive checks for the following stats: Highest Accuracy, Punish 2 turn moves (dig/fly), Highest damage").font(theme.body()).color(theme.text)).wrap());
-                ui.add(egui::Label::new(egui::RichText::new("Hyper Beam is also special cased to not be highlighted if it cannot kill with a single non-crit hit, due to the need to recharge").font(theme.body()).color(theme.text)).wrap());
+                for (name, text) in [
+                    ("Guaranteed Kill", "Highlights the move with the fewest turns for a 'guaranteed' kill: a 99% chance or higher to kill."),
+                    ("Fastest Kill", "Highlights the move with the fewest turns for any possible kill. Kills with less than a 0.1% chance are ignored by the damage calcs, but a move with at least a 1% chance of killing is reported."),
+                    ("Consistent Kill", "Highlights the move with the fewest turns for a kill whose chance is above the consistency threshold."),
+                ] {
+                    ui.add_space(2.0);
+                    widgets::label_font(ui, name, theme.body_bold(), theme.text_strong());
+                    help(ui, theme, text);
+                }
+                help(ui, theme, "Whatever the strategy, ties between moves with the same number of turns are broken by, in order: highest accuracy, punishing 2-turn moves (Dig/Fly), highest damage. Hyper Beam is not highlighted unless it kills with a single non-crit hit, because of the recharge turn.");
+
+                section(ui, theme, "Limitations and edge cases", None);
+                for line in [
+                    "Possible kills with less than a 0.1% chance are not reported.",
+                    "For each move, a full search for kill percentages is done, up to the search depth above.",
+                    "Up to 3 ranges are reported: the 2 fastest kills, if applicable, and the number of turns for a guaranteed kill, which is always last.",
+                    "For weaker moves, the maximum number of hits needed to guarantee a kill (assuming every attack lands) is given instead.",
+                    "Gen 1 misses are ignored in accuracy calculations.",
+                    "The crit damage ranges for multi-hit moves in Gen 2 assume exactly one of the hits crits.",
+                ] {
+                    help(ui, theme, &format!("•  {}", line));
+                }
             });
-            ui.vertical_centered(|ui| {
-                if widgets::button(ui, theme, "Close").clicked() || enter_pressed(ui) || escape_pressed(ui) {
+            footer(ui, theme, |ui| {
+                if action_button(ui, theme, "Close", Tone::Primary, true).clicked() || enter_pressed(ui) || escape_pressed(ui) {
                     close = true;
                 }
             });
@@ -686,24 +974,23 @@ impl BattleConfigDialog {
 // Colour helpers shared by the colour dialogs
 // ---------------------------------------------------------------------------
 
-/// `ConfigColorUpdater`: label, "Change Color" (an in-app picker), preview.
-/// Returns the new hex when the colour changed.
+/// `ConfigColorUpdater`: label, then the hex code and a swatch that opens an
+/// in-app picker. Returns the new hex when the colour changed.
 fn color_updater(ui: &mut Ui, theme: &Theme, label: &str, current_hex: &str, enabled: bool) -> Option<String> {
     let mut result = None;
     ui.horizontal(|ui| {
-        widgets::label(ui, theme, label);
+        ui.set_min_height(26.0);
+        widgets::label_font(ui, label, theme.body(), if enabled { theme.text } else { theme.disabled_text });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let mut color = theme::parse_hex(current_hex);
-            let (rect, _) = ui.allocate_exact_size(Vec2::splat(20.0), egui::Sense::hover());
-            ui.painter().rect(rect, CornerRadius::ZERO, color, Stroke::new(1.0_f32, Color32::from_rgb(0x55, 0x55, 0x55)), egui::StrokeKind::Inside);
-            ui.add_space(6.0);
             ui.add_enabled_ui(enabled, |ui| {
+                ui.spacing_mut().interact_size = Vec2::new(44.0, 22.0);
                 let before = color;
-                egui::color_picker::color_edit_button_srgba(ui, &mut color, egui::color_picker::Alpha::Opaque);
+                egui::color_picker::color_edit_button_srgba(ui, &mut color, egui::color_picker::Alpha::Opaque).on_hover_cursor(egui::CursorIcon::PointingHand);
                 if color != before {
                     result = Some(theme::to_hex(color));
                 }
-                widgets::label(ui, theme, "Change Color");
+                widgets::label_font(ui, current_hex.to_uppercase(), theme.body(), if enabled { theme.secondary } else { theme.disabled_text });
             });
         });
     });
@@ -733,35 +1020,33 @@ impl ColorConfigDialog {
     pub fn ui(&mut self, ctx: &egui::Context, d: &mut DialogCtx) -> (bool, Option<DialogOutcome>) {
         let theme = d.theme;
         let mut close = false;
-        modal(ctx, theme, "xpr_color_config", "Font & Color Configuration", 420.0, |ui| {
-            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(600.0), |ui| {
-                egui::Grid::new("font_grid").spacing(Vec2::new(5.0, 3.0)).show(ui, |ui| {
-                    widgets::label(ui, theme, "Font Name:");
-                    self.fonts.ui(ui, theme, ui.id().with("font"), Some(200.0), true);
-                    ui.end_row();
+        let mut reset = false;
+        modal(ctx, theme, "xpr_color_config", "Font & Color Configuration", 460.0, |ui| {
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(fit_h(ui, 600.0, 170.0)), |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
+                ui.set_width(ui.available_width() - 16.0);
+                section(ui, theme, "Font", None);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().interact_size.y = 28.0;
+                    self.fonts.ui(ui, theme, ui.id().with("font"), Some(FIELD_W), true);
+                    if small_button(ui, theme, "Apply Font", true).clicked() {
+                        d.cfg.set_custom_font_name(self.fonts.get());
+                        self.changed = true;
+                    }
                 });
-                if widgets::button(ui, theme, "Set Font Name").clicked() {
-                    d.cfg.set_custom_font_name(self.fonts.get());
-                    self.changed = true;
-                }
-                ui.vertical_centered(|ui| widgets::label(ui, theme, "If your custom font is not present in the list\nMake sure that it is installed on your system\nAnd then restart the program"));
-                ui.add_space(8.0);
-                widgets::label(ui, theme, "Color Config:");
-                if widgets::button(ui, theme, "Reset all colors").clicked() {
-                    d.cfg.reset_all_colors();
-                    self.changed = true;
-                }
+                help(ui, theme, "If your font is not in the list, make sure it is installed on your system, then restart the program.");
+                section(ui, theme, "Colors", None);
                 let items: [(&str, String); 10] = [
-                    ("Success Color:", d.cfg.get_success_color().to_string()),
-                    ("Warning Color:", d.cfg.get_warning_color().to_string()),
-                    ("Failure Color:", d.cfg.get_failure_color().to_string()),
-                    ("Divider Color:", d.cfg.get_divider_color().to_string()),
-                    ("Header Color:", d.cfg.get_header_color().to_string()),
-                    ("Primary Color:", d.cfg.get_primary_color().to_string()),
-                    ("Secondary Color:", d.cfg.get_secondary_color().to_string()),
-                    ("Contrast Color:", d.cfg.get_contrast_color().to_string()),
-                    ("Background Color:", d.cfg.get_background_color().to_string()),
-                    ("Text Color:", d.cfg.get_text_color().to_string()),
+                    ("Success", d.cfg.get_success_color().to_string()),
+                    ("Warning", d.cfg.get_warning_color().to_string()),
+                    ("Failure", d.cfg.get_failure_color().to_string()),
+                    ("Divider", d.cfg.get_divider_color().to_string()),
+                    ("Header", d.cfg.get_header_color().to_string()),
+                    ("Primary", d.cfg.get_primary_color().to_string()),
+                    ("Secondary", d.cfg.get_secondary_color().to_string()),
+                    ("Contrast", d.cfg.get_contrast_color().to_string()),
+                    ("Background", d.cfg.get_background_color().to_string()),
+                    ("Text", d.cfg.get_text_color().to_string()),
                 ];
                 for (i, (label, cur)) in items.iter().enumerate() {
                     if let Some(new_hex) = color_updater(ui, theme, label, cur, true) {
@@ -780,14 +1065,23 @@ impl ColorConfigDialog {
                         self.changed = true;
                     }
                 }
-                ui.vertical_centered(|ui| widgets::label(ui, theme, "After changing colors, you must restart the program\nbefore color changes will take effect"));
+                help(ui, theme, "After changing colors, restart the program for the changes to take effect.");
             });
-            ui.vertical_centered(|ui| {
-                if widgets::button(ui, theme, "Close").clicked() || escape_pressed(ui) {
+            footer(ui, theme, |ui| {
+                if action_button(ui, theme, "Close", Tone::Primary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    if action_button(ui, theme, "Reset All Colors", Tone::Secondary, true).clicked() {
+                        reset = true;
+                    }
+                });
             });
         });
+        if reset {
+            d.cfg.reset_all_colors();
+            self.changed = true;
+        }
         (close, if close { Some(DialogOutcome::RefreshTheme) } else { None })
     }
 }
@@ -856,42 +1150,49 @@ impl HighlightColorDialog {
         let theme = d.theme;
         let mut close = false;
         let mut refresh = false;
-        modal(ctx, theme, "xpr_highlight_colors", "Configure Highlight Colors", 420.0, |ui| {
-            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(650.0), |ui| {
-                ui.vertical_centered(|ui| ui.label(egui::RichText::new("Highlight Color Configuration:").font(theme.font_bold(12.0)).color(theme.text)));
+        let mut reset = false;
+        modal(ctx, theme, "xpr_highlight_colors", "Configure Highlight Colors", 460.0, |ui| {
+            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(fit_h(ui, 620.0, 170.0)), |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
+                ui.set_width(ui.available_width() - 16.0);
+                section(ui, theme, "Highlight colors", None);
                 for i in 1..=9i64 {
                     let cur = d.cfg.get_highlight_color(i);
-                    if let Some(h) = color_updater(ui, theme, &format!("Highlight {}:", i), &cur, true) {
+                    if let Some(h) = color_updater(ui, theme, &format!("Highlight {}", i), &cur, true) {
                         d.cfg.set_highlight_color(i, &h);
                         refresh = true;
                     }
                 }
-                ui.vertical_centered(|ui| ui.label(egui::RichText::new("Fight Category Colors:").font(theme.font_bold(12.0)).color(theme.text)));
+                section(ui, theme, "Fight categories", None);
                 let mut color_major = d.cfg.get_color_major_battles();
-                if widgets::checkbox(ui, theme, &mut color_major, "Color Major Battles", true).changed() {
+                if widgets::checkbox(ui, theme, &mut color_major, "Color major battles", true).changed() {
                     d.cfg.set_color_major_battles(color_major);
                     refresh = true;
                 }
                 for (cat, label) in FIGHT_CATEGORY_LABELS {
                     let cur = d.cfg.get_fight_category_color(cat);
-                    if let Some(h) = color_updater(ui, theme, label, &cur, color_major) {
+                    if let Some(h) = color_updater(ui, theme, label.trim_end_matches(':'), &cur, color_major) {
                         d.cfg.set_fight_category_color(cat, &h);
                         refresh = true;
                     }
                 }
             });
-            ui.add_space(15.0);
-            ui.horizontal(|ui| {
-                if widgets::button(ui, theme, "Reset to Defaults").clicked() {
-                    d.cfg.reset_highlight_colors_to_defaults();
-                    d.cfg.reset_fight_category_colors();
-                    refresh = true;
-                }
-                if widgets::button(ui, theme, "Close").clicked() || escape_pressed(ui) {
+            footer(ui, theme, |ui| {
+                if action_button(ui, theme, "Close", Tone::Primary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    if action_button(ui, theme, "Reset to Defaults", Tone::Secondary, true).clicked() {
+                        reset = true;
+                    }
+                });
             });
         });
+        if reset {
+            d.cfg.reset_highlight_colors_to_defaults();
+            d.cfg.reset_fight_category_colors();
+            refresh = true;
+        }
         if refresh {
             self.changed = true;
         }
@@ -947,56 +1248,61 @@ impl AppConfigDialog {
         let mut open_images = false;
         let mut move_data = false;
         let mut move_images = false;
-        modal(ctx, theme, "xpr_app_config", "Application Settings", 480.0, |ui| {
-            egui::Grid::new("app_cfg_grid").spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
-                widgets::label(ui, theme, "App Version:");
-                widgets::label(ui, theme, consts::APP_VERSION);
+        modal(ctx, theme, "xpr_app_config", "Application Settings", 560.0, |ui| {
+            section(ui, theme, "About", None);
+            form(ui, "app_cfg_about", |ui| {
+                form_label(ui, theme, "Version");
+                widgets::label_font(ui, consts::APP_VERSION, theme.body_bold(), theme.text_strong());
                 ui.end_row();
-                widgets::label(ui, theme, "Release Date:");
-                widgets::label(ui, theme, consts::APP_RELEASE_DATE);
-                ui.end_row();
-                widgets::label(ui, theme, "Debug Logging when Recording:");
-                if widgets::checkbox(ui, theme, &mut self.debug_mode, "", true).changed() {
-                    d.cfg.set_debug_mode(self.debug_mode);
-                }
+                form_label(ui, theme, "Released");
+                widgets::label_font(ui, consts::APP_RELEASE_DATE, theme.body(), theme.text_strong());
                 ui.end_row();
             });
-            ui.vertical_centered(|ui| {
-                widgets::label(ui, theme, "Automatic updates only supported on windows machines");
-                widgets::label(ui, theme, self.latest_version_text.clone());
-                let (label, enabled) = match &self.upgrade_available {
-                    Some(_) => ("Upgrade", true),
-                    None => ("No Upgrade Needed", false),
-                };
-                if widgets::button_enabled(ui, theme, label, enabled).clicked() {
-                    outcome = Some(DialogOutcome::RestartForUpdate);
-                    close = true;
-                }
-            });
-            ui.add_space(10.0);
-            widgets::label(ui, theme, format!("Data Location: {}", d.cfg.get_user_data_dir().display()));
+
+            section(ui, theme, "Updates", None);
             ui.horizontal(|ui| {
-                if widgets::button(ui, theme, "Open Data Folder").clicked() {
-                    open_data = true;
-                }
-                if widgets::button(ui, theme, "Move Data Location").clicked() {
-                    move_data = true;
-                }
+                ui.set_width(ui.available_width());
+                widgets::label_font(ui, self.latest_version_text.clone(), theme.body(), theme.text);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let (label, tone, enabled) = match &self.upgrade_available {
+                        Some(_) => ("Upgrade", Tone::Primary, true),
+                        None => ("No Upgrade Needed", Tone::Secondary, false),
+                    };
+                    if button_sized(ui, theme, label, tone, enabled, 26.0, 0.0, theme.body()).clicked() {
+                        outcome = Some(DialogOutcome::RestartForUpdate);
+                        close = true;
+                    }
+                });
             });
-            widgets::label(ui, theme, format!("Image Location: {}", d.cfg.get_images_dir().display()));
-            ui.horizontal(|ui| {
-                if widgets::button(ui, theme, "Open Images Folder").clicked() {
-                    open_images = true;
-                }
-                if widgets::button(ui, theme, "Move Images Location").clicked() {
-                    move_images = true;
-                }
-            });
-            if widgets::button(ui, theme, "Open Config/Logs Folder").clicked() {
+            help(ui, theme, "Automatic updates are only supported on Windows.");
+
+            section(ui, theme, "Recording", None);
+            if widgets::checkbox(ui, theme, &mut self.debug_mode, "Debug logging when recording", true).changed() {
+                d.cfg.set_debug_mode(self.debug_mode);
+            }
+
+            section(ui, theme, "Storage", None);
+            for (label, path, open, relocate) in [
+                ("Data folder", d.cfg.get_user_data_dir(), &mut open_data, &mut move_data),
+                ("Images folder", d.cfg.get_images_dir(), &mut open_images, &mut move_images),
+            ] {
+                form_label(ui, theme, label);
+                ui.horizontal(|ui| {
+                    let field_w = ui.available_width() - 130.0;
+                    path_field(ui, theme, &path.display().to_string(), field_w);
+                    if small_button(ui, theme, "Open", true).clicked() {
+                        *open = true;
+                    }
+                    if small_button(ui, theme, "Move…", true).clicked() {
+                        *relocate = true;
+                    }
+                });
+            }
+            if small_button(ui, theme, "Open Config & Logs Folder", true).clicked() {
                 open_config = true;
             }
-            ui.vertical_centered(|ui| {
-                if widgets::button(ui, theme, "Close").clicked() || enter_pressed(ui) || escape_pressed(ui) {
+            footer(ui, theme, |ui| {
+                if action_button(ui, theme, "Close", Tone::Primary, true).clicked() || enter_pressed(ui) || escape_pressed(ui) {
                     close = true;
                 }
             });
@@ -1143,18 +1449,20 @@ impl ShortcutsDialog {
                 self.capturing = None;
             }
         }
-        modal(ctx, theme, "xpr_shortcuts", "Keyboard Shortcuts", 660.0, |ui| {
-            ui.horizontal(|ui| {
-                widgets::label(ui, theme, "Search:");
-                Entry::new(theme, &mut self.search).width(300.0).hint("Filter shortcuts...").id(ui.id().with("search")).show(ui);
-            });
+        let mut reset_all = false;
+        let mut export = false;
+        let mut import = false;
+        modal(ctx, theme, "xpr_shortcuts", "Keyboard Shortcuts", 680.0, |ui| {
+            field(theme, &mut self.search).width(ui.available_width()).hint("Search actions or keys").id(ui.id().with("search")).show(ui);
             let needle = self.search.to_lowercase();
-            widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(480.0), |ui| {
-                egui::Grid::new("shortcuts_grid").spacing(Vec2::new(6.0, 4.0)).striped(true).show(ui, |ui| {
-                    widgets::label_bold(ui, theme, "Action");
-                    widgets::label_bold(ui, theme, "Shortcut");
-                    widgets::label_bold(ui, theme, "Default");
-                    widgets::label_bold(ui, theme, "");
+            list_well(ui, theme, fit_h(ui, 440.0, 290.0), |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
+                egui::Frame::new().inner_margin(egui::Margin { left: 10, right: 14, top: 6, bottom: 8 }).show(ui, |ui| {
+                egui::Grid::new("shortcuts_grid").num_columns(4).spacing(Vec2::new(16.0, 6.0)).min_col_width(0.0).show(ui, |ui| {
+                    widgets::caption(ui, theme, "Action", None);
+                    widgets::caption(ui, theme, "Shortcut", None);
+                    widgets::caption(ui, theme, "Default", None);
+                    ui.label("");
                     ui.end_row();
                     for (category, ids) in SHORTCUT_CATEGORIES {
                         let visible: Vec<&&str> = ids
@@ -1168,7 +1476,7 @@ impl ShortcutsDialog {
                         if visible.is_empty() {
                             continue;
                         }
-                        widgets::label_bold(ui, theme, *category);
+                        widgets::caption(ui, theme, category, Some(theme.header));
                         ui.end_row();
                         for id in visible {
                             let label = xpr_core::config::shortcut_label(id);
@@ -1176,18 +1484,25 @@ impl ShortcutsDialog {
                             let cur = self.seq_of(id);
                             let is_custom = cur != default_seq;
                             let color = if is_custom { theme.primary } else { theme.text };
-                            widgets::label_colored(ui, theme, format!("    {}", label), color);
+                            widgets::label_font(ui, label, theme.body(), color);
                             let capturing = self.capturing.as_deref() == Some(id);
-                            let shown = if capturing { "...".to_string() } else { cur.clone() };
-                            let (rect, resp) = ui.allocate_exact_size(Vec2::new(160.0, 22.0), egui::Sense::click());
-                            let fill = if capturing { Color32::from_rgb(0x3a, 0x5a, 0x8a) } else { theme.bg_input };
-                            ui.painter().rect(rect, CornerRadius::same(2), fill, Stroke::new(1.0_f32, theme.border), egui::StrokeKind::Inside);
-                            ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, shown, theme.body(), color);
-                            if resp.clicked() {
+                            let (rect, resp) = ui.allocate_exact_size(Vec2::new(150.0, 24.0), egui::Sense::click());
+                            let (fill, stroke, shown, text_color) = if capturing {
+                                (theme::tint(theme.accent, theme.well_bg(), 0.30), theme.accent, "Press keys…".to_string(), theme.text_strong())
+                            } else if resp.hovered() {
+                                (theme.hover_bg, theme::lighten(theme.border, 0.15), cur.clone(), if is_custom { theme.primary } else { theme.text_strong() })
+                            } else {
+                                (theme.bg_input, theme.card_border(), cur.clone(), if is_custom { theme.primary } else { theme.text_strong() })
+                            };
+                            ui.painter().rect(rect, CornerRadius::same(6), fill, Stroke::new(1.0_f32, stroke), egui::StrokeKind::Inside);
+                            ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, shown, theme.body(), text_color);
+                            if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                                 self.capturing = Some(id.to_string());
                             }
-                            widgets::label_colored(ui, theme, default_seq.clone(), color);
-                            if StyledButton::new(theme, "Reset").fixed_width(52.0).show(ui).clicked() {
+                            widgets::label_font(ui, default_seq.clone(), theme.body(), theme.secondary);
+                            if !is_custom {
+                                ui.allocate_exact_size(Vec2::new(56.0, 24.0), egui::Sense::hover());
+                            } else if button_sized(ui, theme, "Reset", Tone::Secondary, true, 24.0, 56.0, theme.body()).clicked() {
                                 d.cfg.reset_shortcut(id);
                                 self.pending.retain(|(a, _)| a != id);
                                 self.set_seq(id, &default_seq);
@@ -1197,44 +1512,50 @@ impl ShortcutsDialog {
                         }
                     }
                 });
+                });
             });
-            ui.horizontal(|ui| {
-                if widgets::button(ui, theme, "Apply").clicked() && self.apply(d.cfg, message, false) {
+            help(ui, theme, "Click a shortcut, then press the new key combination. Changed shortcuts are highlighted.");
+            footer(ui, theme, |ui| {
+                let pending = !self.pending.is_empty();
+                if action_button(ui, theme, "Apply", Tone::Primary, pending).clicked() && self.apply(d.cfg, message, false) {
                     outcome = Some(DialogOutcome::ApplyShortcuts);
                 }
-                if widgets::button(ui, theme, "Reset All to Defaults").clicked() {
-                    *message = Some(MessageBox::new("Reset All Shortcuts", "Reset all keyboard shortcuts to their defaults?", MsgButtons::YesNo, MsgTag::ResetAllShortcuts));
-                }
-            });
-            ui.horizontal(|ui| {
-                if widgets::button(ui, theme, "Export Profile...").clicked() {
-                    if let Some(p) = rfd::FileDialog::new().set_title("Export Shortcut Profile").set_file_name("shortcuts.json").add_filter("JSON Files", &["json"]).save_file() {
-                        match d.cfg.export_shortcuts(&p) {
-                            Ok(_) => *message = Some(MessageBox::new("Export", &format!("Shortcuts exported to:\n{}", p.display()), MsgButtons::Ok, MsgTag::Info)),
-                            Err(e) => *message = Some(MessageBox::new("Export Error", &e.to_string(), MsgButtons::Ok, MsgTag::Info)),
-                        }
-                    }
-                }
-                if widgets::button(ui, theme, "Import Profile...").clicked() {
-                    if let Some(p) = rfd::FileDialog::new().set_title("Import Shortcut Profile").add_filter("JSON Files", &["json"]).pick_file() {
-                        match d.cfg.import_shortcuts(&p) {
-                            Ok(_) => {
-                                self.pending.clear();
-                                for (a, s) in self.editors.iter_mut() {
-                                    *s = d.cfg.get_shortcut(a);
-                                }
-                                outcome = Some(DialogOutcome::ApplyShortcuts);
-                                *message = Some(MessageBox::new("Import", "Shortcut profile imported successfully.", MsgButtons::Ok, MsgTag::Info));
-                            }
-                            Err(e) => *message = Some(MessageBox::new("Import Error", &e, MsgButtons::Ok, MsgTag::Info)),
-                        }
-                    }
-                }
-                if widgets::button(ui, theme, "Close").clicked() || (escape_pressed(ui) && self.capturing.is_none()) {
+                if action_button(ui, theme, "Close", Tone::Secondary, true).clicked() || (escape_pressed(ui) && self.capturing.is_none()) {
                     close = true;
                 }
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    export = action_button(ui, theme, "Export…", Tone::Secondary, true).clicked();
+                    import = action_button(ui, theme, "Import…", Tone::Secondary, true).clicked();
+                    reset_all = action_button(ui, theme, "Reset All…", Tone::Secondary, true).clicked();
+                });
             });
         });
+        if reset_all {
+            *message = Some(MessageBox::new("Reset All Shortcuts", "Reset all keyboard shortcuts to their defaults?", MsgButtons::YesNo, MsgTag::ResetAllShortcuts));
+        }
+        if export {
+            if let Some(p) = rfd::FileDialog::new().set_title("Export Shortcut Profile").set_file_name("shortcuts.json").add_filter("JSON Files", &["json"]).save_file() {
+                match d.cfg.export_shortcuts(&p) {
+                    Ok(_) => *message = Some(MessageBox::new("Export", &format!("Shortcuts exported to:\n{}", p.display()), MsgButtons::Ok, MsgTag::Info)),
+                    Err(e) => *message = Some(MessageBox::new("Export Error", &e.to_string(), MsgButtons::Ok, MsgTag::Info)),
+                }
+            }
+        }
+        if import {
+            if let Some(p) = rfd::FileDialog::new().set_title("Import Shortcut Profile").add_filter("JSON Files", &["json"]).pick_file() {
+                match d.cfg.import_shortcuts(&p) {
+                    Ok(_) => {
+                        self.pending.clear();
+                        for (a, s) in self.editors.iter_mut() {
+                            *s = d.cfg.get_shortcut(a);
+                        }
+                        outcome = Some(DialogOutcome::ApplyShortcuts);
+                        *message = Some(MessageBox::new("Import", "Shortcut profile imported successfully.", MsgButtons::Ok, MsgTag::Info));
+                    }
+                    Err(e) => *message = Some(MessageBox::new("Import Error", &e, MsgButtons::Ok, MsgTag::Info)),
+                }
+            }
+        }
         (close, outcome)
     }
 
@@ -1286,21 +1607,27 @@ impl FinalTrainersDialog {
         let mut close = false;
         let mut repopulate = false;
         let mut save = false;
-        modal(ctx, theme, "xpr_final_trainers", "Configure Final Trainers", 520.0, |ui| {
-            ui.add(egui::Label::new(egui::RichText::new("Pick the trainer(s) that mark the end of a run for each game.\nWhile recording, defeating any of these trainers will automatically turn recording off so no extra events are captured.").font(theme.body()).color(theme.text)).wrap());
-            ui.horizontal(|ui| {
-                widgets::label(ui, theme, "Game Version:");
-                if self.versions.ui(ui, theme, ui.id().with("version"), Some(300.0), true) {
+        let mut clear_all = false;
+        let mut reset = false;
+        modal(ctx, theme, "xpr_final_trainers", "Configure Final Trainers", 560.0, |ui| {
+            help(ui, theme, "Pick the trainers that mark the end of a run for each game. While recording, defeating any of them turns recording off, so no extra events are captured.");
+            ui.add_space(2.0);
+            form(ui, "final_trainers_form", |ui| {
+                form_label(ui, theme, "Game version");
+                if self.versions.ui(ui, theme, ui.id().with("version"), Some(FIELD_W + 40.0), true) {
                     repopulate = true;
                 }
+                ui.end_row();
+                form_label(ui, theme, "Filter");
+                field(theme, &mut self.filter).width(FIELD_W + 40.0).hint("Filter trainers by name").id(ui.id().with("filter")).show(ui);
+                ui.end_row();
             });
-            ui.horizontal(|ui| {
-                widgets::label(ui, theme, "Filter:");
-                Entry::new(theme, &mut self.filter).width(300.0).hint("Type to filter trainers by name").id(ui.id().with("filter")).show(ui);
-            });
+            let sel = self.trainers.iter().filter(|(_, c)| *c).count();
+            section(ui, theme, "Trainers", Some(&format!("{} of {} selected", sel, self.trainers.len())));
             let needle = self.filter.trim().to_lowercase();
-            egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border)).show(ui, |ui| {
-                widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(360.0).auto_shrink([false, false]), |ui| {
+            list_well(ui, theme, fit_h(ui, 340.0, 380.0), |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 6.0);
+                egui::Frame::new().inner_margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 4 }).show(ui, |ui| {
                     for (name, checked) in self.trainers.iter_mut() {
                         if !needle.is_empty() && !name.to_lowercase().contains(&needle) {
                             continue;
@@ -1311,26 +1638,26 @@ impl FinalTrainersDialog {
                     }
                 });
             });
-            let sel = self.trainers.iter().filter(|(_, c)| *c).count();
-            ui.horizontal(|ui| {
-                widgets::label(ui, theme, format!("Selected: {} / {}", sel, self.trainers.len()));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if widgets::button(ui, theme, "Close").clicked() || escape_pressed(ui) {
-                        close = true;
-                    }
-                    if widgets::button(ui, theme, "Clear All For This Game").clicked() {
-                        for (_, c) in self.trainers.iter_mut() {
-                            *c = false;
-                        }
-                        d.cfg.set_final_trainers(self.versions.get(), Vec::new());
-                    }
-                    if widgets::button(ui, theme, "Reset to Defaults").clicked() {
-                        d.cfg.reset_final_trainers(self.versions.get());
-                        repopulate = true;
-                    }
+            footer(ui, theme, |ui| {
+                if action_button(ui, theme, "Close", Tone::Primary, true).clicked() || escape_pressed(ui) {
+                    close = true;
+                }
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    reset = action_button(ui, theme, "Reset to Defaults", Tone::Secondary, true).clicked();
+                    clear_all = action_button(ui, theme, "Clear All", Tone::Secondary, sel > 0).clicked();
                 });
             });
         });
+        if clear_all {
+            for (_, c) in self.trainers.iter_mut() {
+                *c = false;
+            }
+            d.cfg.set_final_trainers(self.versions.get(), Vec::new());
+        }
+        if reset {
+            d.cfg.reset_final_trainers(self.versions.get());
+            repopulate = true;
+        }
         if save {
             let selected: Vec<String> = self.trainers.iter().filter(|(_, c)| *c).map(|(n, _)| n.clone()).collect();
             d.cfg.set_final_trainers(self.versions.get(), selected);
@@ -1355,18 +1682,20 @@ impl MatchupExportDialog {
         let theme = d.theme;
         let mut close = false;
         let mut outcome = None;
-        modal(ctx, theme, "xpr_matchup_export", "Export Matchup", 360.0, |ui| {
-            ui.vertical_centered(|ui| widgets::label(ui, theme, "Which graphic would you like to export?"));
-            ui.horizontal(|ui| {
-                for (label, mode) in [("Match Up", crate::battle_ui::ScreenshotMode::Full), ("Player Ranges", crate::battle_ui::ScreenshotMode::Player), ("Enemy Ranges", crate::battle_ui::ScreenshotMode::Enemy)] {
-                    if widgets::button(ui, theme, label).clicked() {
-                        outcome = Some(DialogOutcome::MatchupExport { idx: self.mon_idx, mode });
-                        close = true;
-                    }
+        modal(ctx, theme, "xpr_matchup_export", "Export Matchup", 400.0, |ui| {
+            help(ui, theme, "Which graphic would you like to export?");
+            for (label, detail, mode) in [
+                ("Match Up", "Both sides of the matchup", crate::battle_ui::ScreenshotMode::Full),
+                ("Player Ranges", "Your moves' damage ranges", crate::battle_ui::ScreenshotMode::Player),
+                ("Enemy Ranges", "The enemy's damage ranges", crate::battle_ui::ScreenshotMode::Enemy),
+            ] {
+                if choice_row(ui, theme, label, detail).clicked() {
+                    outcome = Some(DialogOutcome::MatchupExport { idx: self.mon_idx, mode });
+                    close = true;
                 }
-            });
-            ui.vertical_centered(|ui| {
-                if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+            }
+            footer(ui, theme, |ui| {
+                if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
             });
@@ -1396,12 +1725,12 @@ impl AssignMoveDialog {
         let theme = d.theme;
         let mut close = false;
         let mut outcome = None;
-        modal(ctx, theme, "xpr_assign_move", &format!("Assign Move to Slot {}", self.slot_idx + 1), 360.0, |ui| {
+        modal(ctx, theme, "xpr_assign_move", &format!("Assign Move to Slot {}", self.slot_idx + 1), 380.0, |ui| {
             let filter_id = ui.id().with("filter");
             if !self.focused {
                 ui.memory_mut(|m| m.request_focus(filter_id));
             }
-            let r = Entry::new(theme, &mut self.filter).width(300.0).hint("Filter moves...").id(filter_id).show(ui);
+            let r = field(theme, &mut self.filter).width(ui.available_width()).hint("Search moves").id(filter_id).show(ui);
             // A brand-new Modal id runs an invisible egui "sizing pass" on the
             // frame it first appears, which silently drops any focus
             // requested that frame; keep asking until it actually lands.
@@ -1410,20 +1739,22 @@ impl AssignMoveDialog {
             }
             let needle = self.filter.trim().to_lowercase();
             let visible: Vec<String> = self.moves.iter().filter(|m| needle.is_empty() || m.to_lowercase().contains(&needle)).cloned().collect();
-            egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border)).show(ui, |ui| {
-                widgets::show_scroll(ui, egui::ScrollArea::vertical().max_height(300.0).auto_shrink([false, false]), |ui| {
-                    for m in &visible {
-                        let is_sel = self.selected.as_deref() == Some(m.as_str());
-                        let resp = ui.selectable_label(is_sel, egui::RichText::new(m).font(theme.body()));
-                        if resp.clicked() {
-                            self.selected = Some(m.clone());
-                        }
-                        if resp.double_clicked() {
-                            outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: m.clone(), pre_state: self.pre_state });
-                            close = true;
-                        }
+            list_well(ui, theme, fit_h(ui, 320.0, 280.0), |ui| {
+                for m in &visible {
+                    let is_sel = self.selected.as_deref() == Some(m.as_str());
+                    let resp = list_row(ui, theme, m, is_sel);
+                    if resp.clicked() {
+                        self.selected = Some(m.clone());
                     }
-                });
+                    if resp.double_clicked() {
+                        outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: m.clone(), pre_state: self.pre_state });
+                        close = true;
+                    }
+                }
+                if visible.is_empty() {
+                    ui.add_space(8.0);
+                    ui.vertical_centered(|ui| widgets::label_font(ui, "No moves match", theme.body(), theme.secondary));
+                }
             });
             if r.enter_pressed {
                 let pick = self.selected.clone().or_else(|| visible.first().cloned());
@@ -1432,13 +1763,14 @@ impl AssignMoveDialog {
                     close = true;
                 }
             }
-            ui.horizontal(|ui| {
+            help(ui, theme, "Double-click a move, or press Enter to assign the selected (or first) match.");
+            footer(ui, theme, |ui| {
                 let can = self.selected.is_some();
-                if widgets::button_enabled(ui, theme, "Assign", can).clicked() && can {
+                if action_button(ui, theme, "Assign", Tone::Primary, can).clicked() && can {
                     outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: self.selected.clone().unwrap(), pre_state: self.pre_state });
                     close = true;
                 }
-                if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+                if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
             });
@@ -1479,12 +1811,13 @@ impl EvOverrideDialog {
         let (unit, cap) = if self.gen12 { ("Stat Exp", STAT_XP_CAP_GEN12) } else { ("EVs", SINGLE_STAT_EV_CAP) };
         let names = if self.gen12 { &EV_STAT_NAMES_GEN12 } else { &EV_STAT_NAMES };
         let title = if self.gen12 { "Override Stat Exp Before This Event" } else { "Override EVs Before This Event" };
-        modal(ctx, theme, "xpr_ev_override", title, 300.0, |ui| {
-            widgets::label_font(ui, format!("{} from this point on (0-{} per stat):", unit, cap), theme.body(), theme.secondary);
+        modal(ctx, theme, "xpr_ev_override", title, 360.0, |ui| {
+            help(ui, theme, &format!("{} from this point on, 0 to {} per stat.", unit, cap));
+            ui.add_space(2.0);
             let mut enter = false;
-            egui::Grid::new(ui.id().with("ev_grid")).spacing(Vec2::new(8.0, 4.0)).show(ui, |ui| {
+            egui::Grid::new(ui.id().with("ev_grid")).num_columns(2).spacing(Vec2::new(24.0, 8.0)).show(ui, |ui| {
                 for &idx in ev_field_indices(self.gen12) {
-                    widgets::label(ui, theme, format!("{}:", names[idx]));
+                    form_label(ui, theme, names[idx]);
                     let r = AmountEntry::new(theme, ui.id().with(("ev_amt", idx)), &mut self.values[idx]).min(Some(0)).max(Some(cap)).width(Some(6)).show(ui);
                     enter |= r.enter_pressed;
                     ui.end_row();
@@ -1494,15 +1827,15 @@ impl EvOverrideDialog {
             if !self.gen12 {
                 let total: i64 = parsed.map(|v| v.iter().sum()).unwrap_or(0);
                 let color = if total > TOTAL_EV_CAP { theme.failure } else { theme.secondary };
-                widgets::label_font(ui, format!("Total: {} / {}", total, TOTAL_EV_CAP), theme.body(), color);
+                widgets::label_font(ui, format!("Total {} / {}", total, TOTAL_EV_CAP), theme.body(), color);
             }
-            ui.horizontal(|ui| {
+            footer(ui, theme, |ui| {
                 let can = parsed.is_some();
-                if (widgets::button_enabled(ui, theme, "Create Override", can).clicked() || enter) && can {
+                if (action_button(ui, theme, "Create Override", Tone::Primary, can).clicked() || enter) && can {
                     outcome = Some(DialogOutcome::EvOverride(parsed.unwrap()));
                     close = true;
                 }
-                if widgets::button(ui, theme, "Cancel").clicked() || escape_pressed(ui) {
+                if action_button(ui, theme, "Cancel", Tone::Secondary, true).clicked() || escape_pressed(ui) {
                     close = true;
                 }
             });

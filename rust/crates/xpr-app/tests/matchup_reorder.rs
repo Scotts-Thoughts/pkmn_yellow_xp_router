@@ -19,7 +19,7 @@ fn setup(route: &str) -> (Config, MainController) {
     let root = repo_root();
     let paths = Paths::new(root.clone());
     // a missing file gives the default config
-    let cfg = Config::load(&root.join("rust/target/no-such-config.json"));
+    let cfg = Config::load(&xpr_app::scratch_config_path());
     let registry = Arc::new(Registry::new(root.join("raw_pkmn_data"), PathBuf::new()));
     let mut ctrl = MainController::new(registry, paths);
     ctrl.load_route(&root.join("tests/test_data").join(route));

@@ -4,6 +4,7 @@
 //! persistence, and the notification toast.
 
 pub mod geometry;
+pub mod modal;
 pub mod shortcuts;
 pub mod theme;
 pub mod toast;

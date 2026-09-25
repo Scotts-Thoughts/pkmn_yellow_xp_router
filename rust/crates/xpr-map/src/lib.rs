@@ -6,6 +6,7 @@
 
 pub mod compose;
 pub mod embedded;
+pub mod export;
 pub mod geom;
 pub mod links;
 pub mod lod;
@@ -15,6 +16,7 @@ pub mod spatial;
 pub mod sprites;
 
 pub use compose::{Compositor, RenderOpts, CHUNK_PX};
+pub use export::{ExportError, ExportRequest};
 pub use geom::{IRect, Scope};
 pub use links::{LinkQuery, Links};
 pub use lod::Pixmap;

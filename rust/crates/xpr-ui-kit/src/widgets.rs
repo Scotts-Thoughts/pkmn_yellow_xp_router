@@ -632,7 +632,8 @@ struct SearchState {
     highlighted: usize,
     open: bool,
     /// Scroll the popup to the highlighted row on the next frame it is shown
-    /// (set when the list opens on the current value).
+    /// (set when the list opens on the current value, and when the arrow
+    /// keys move the highlight).
     scroll_to_highlighted: bool,
 }
 
@@ -667,6 +668,14 @@ fn best_match_index(text: &str, options: &[String]) -> Option<usize> {
         return Some(i);
     }
     options.iter().position(|o| o.to_lowercase().contains(&lower))
+}
+
+/// Select all of the entry `edit_id`'s `text` (from the next frame on).
+fn select_all(ctx: &egui::Context, edit_id: Id, text: &str) {
+    let mut tes = TextEdit::load_state(ctx, edit_id).unwrap_or_default();
+    let range = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(text.chars().count()));
+    tes.cursor.set_char_range(Some(range));
+    TextEdit::store_state(ctx, edit_id, tes);
 }
 
 fn matching_indices(text: &str, options: &[String]) -> Vec<usize> {
@@ -762,10 +771,7 @@ impl<'a> SearchableDropdown<'a> {
             st.highlighted = current_index;
             st.scroll_to_highlighted = true;
             // select all so typing replaces the text
-            let mut tes = TextEdit::load_state(ui.ctx(), edit_id).unwrap_or_default();
-            let range = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(st.typed.chars().count()));
-            tes.cursor.set_char_range(Some(range));
-            TextEdit::store_state(ui.ctx(), edit_id, tes);
+            select_all(ui.ctx(), edit_id, &st.typed);
         }
 
         let (rect, _) = ui.allocate_exact_size(Vec2::new(w, 22.0), Sense::hover());
@@ -794,8 +800,7 @@ impl<'a> SearchableDropdown<'a> {
         }
         let out = edit.show(&mut child);
         let response = out.response;
-        let has_focus = response.has_focus();
-        result.has_focus = has_focus;
+        let mut has_focus = response.has_focus();
 
         // arrow button
         let arrow_resp = ui.interact(arrow_rect, self.id.with("arrow"), Sense::click());
@@ -825,20 +830,31 @@ impl<'a> SearchableDropdown<'a> {
             st.highlighted = current_index;
             st.scroll_to_highlighted = true;
             // select all on focus
-            let mut tes = TextEdit::load_state(ui.ctx(), edit_id).unwrap_or_default();
-            let range = egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(st.typed.chars().count()));
-            tes.cursor.set_char_range(Some(range));
-            TextEdit::store_state(ui.ctx(), edit_id, tes);
+            select_all(ui.ctx(), edit_id, &st.typed);
         }
         if arrow_resp.clicked() && self.enabled {
-            st.open = !st.open;
+            // The arrow sits outside the text entry, so this click has just
+            // made egui take the entry's focus away (if it had it). Hand the
+            // focus back and count the entry as focused for the rest of this
+            // frame: otherwise the list closes again below, before it is ever
+            // shown, and a focused entry commits its best match as if the
+            // user had clicked away.
+            let was_open = st.open && focused_before;
+            ui.memory_mut(|m| m.request_focus(edit_id));
+            has_focus = true;
             st.editing = true;
+            st.open = !was_open;
             if st.open {
-                st.highlighted = current_index;
+                // opening on untouched text lists everything, at the current value
+                st.highlighted = if st.typed == *self.current { current_index } else { 0 };
                 st.scroll_to_highlighted = true;
             }
-            ui.memory_mut(|m| m.request_focus(edit_id));
+            if !focused_before {
+                // as when the entry itself is clicked: typing replaces the text
+                select_all(ui.ctx(), edit_id, &st.typed);
+            }
         }
+        result.has_focus = has_focus;
         if response.changed() {
             st.open = true;
             st.highlighted = 0;
@@ -853,12 +869,15 @@ impl<'a> SearchableDropdown<'a> {
         let mut enter = false;
         if has_focus || focused_before {
             ui.input_mut(|i| {
+                // (keeping the highlighted row in view: long lists scroll)
                 if i.consume_key(Modifiers::NONE, Key::ArrowDown) && !matches.is_empty() {
                     st.open = true;
                     st.highlighted = (st.highlighted + 1).min(matches.len() - 1);
+                    st.scroll_to_highlighted = true;
                 }
                 if i.consume_key(Modifiers::NONE, Key::ArrowUp) {
                     st.highlighted = st.highlighted.saturating_sub(1);
+                    st.scroll_to_highlighted = true;
                 }
                 if i.consume_key(Modifiers::NONE, Key::Enter) {
                     enter = true;

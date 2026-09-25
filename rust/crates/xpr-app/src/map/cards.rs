@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use egui::{Pos2, Rect, Ui, Vec2};
+use egui::{Align, Layout, Pos2, Rect, Ui, UiBuilder, Vec2};
 use xpr_data::GenData;
 use xpr_map::{EncounterSlot, MapId, MapPack, ObjectKind, Payload};
 use xpr_ui_kit::theme::Theme;
@@ -50,15 +50,45 @@ pub struct CardOut {
     pub navigate: Option<MapId>,
 }
 
+/// Width of the object cards (trainer, item, sign, warp).
 const CARD_W: f32 = 320.0;
+/// Width of the encounter cards (a grass / water tile, a map). The table
+/// has an icon, species, level, rate, the EV yield in gens 3+, and an add
+/// button, so it needs more room than an object card.
+const ENC_CARD_W: f32 = 480.0;
+/// The encounter card without the EV column (gens 1/2).
+const ENC_CARD_W_NO_EV: f32 = 380.0;
+const ENC_ROW_H: f32 = 28.0;
+const ENC_HEAD_H: f32 = 20.0;
+const ENC_ICON: f32 = 24.0;
+/// Encounter table column widths, right to left: add button, EV yield, rate, level.
+const ENC_COL_ADD: f32 = 34.0;
+const ENC_COL_EV: f32 = 126.0;
+const ENC_COL_RATE: f32 = 58.0;
+const ENC_COL_LEVEL: f32 = 64.0;
+/// The encounter table scrolls once taller than this share of the map viewport.
+const ENC_MAX_H_FRACTION: f32 = 0.6;
 
 /// Draw the card anchored above `anchor` (screen), clamped to `vp`.
 pub fn draw_card(ui: &mut Ui, card: &Card, anchor: Pos2, vp: Rect, cx: &mut CardCtx) -> CardOut {
     let mut out = CardOut { close: false, actions: Vec::new(), navigate: None };
     let theme = cx.theme;
     let id = ui.id().with("map_card");
-    // first pass: measure with a hidden area is overkill; place at anchor, then clamp using last size
-    let last_size: Vec2 = ui.ctx().memory(|m| m.data.get_temp::<Vec2>(id)).unwrap_or(Vec2::new(CARD_W, 160.0));
+    let width = match card {
+        Card::Object { .. } => CARD_W,
+        Card::Tile { .. } | Card::Map { .. } => {
+            if has_ev_column(cx.gen.as_deref()) {
+                ENC_CARD_W
+            } else {
+                ENC_CARD_W_NO_EV
+            }
+        }
+    };
+    // never wider than the viewport allows
+    let width = width.min((vp.width() - 16.0).max(200.0));
+    let table_max_h = (vp.height() * ENC_MAX_H_FRACTION).max(160.0);
+    // place at the anchor, then clamp using the size measured last frame
+    let last_size: Vec2 = ui.ctx().memory(|m| m.data.get_temp::<Vec2>(id)).unwrap_or(Vec2::new(width, 160.0));
     let mut pos = Pos2::new(anchor.x - last_size.x / 2.0, anchor.y - last_size.y - 14.0);
     if pos.y < vp.min.y + 4.0 {
         pos.y = anchor.y + 18.0;
@@ -68,12 +98,12 @@ pub fn draw_card(ui: &mut Ui, card: &Card, anchor: Pos2, vp: Rect, cx: &mut Card
     let area = egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(pos).interactable(true);
     let resp = area.show(ui.ctx(), |ui| {
         egui::Frame::new().fill(theme.card_bg()).stroke(theme.border_stroke()).corner_radius(8.0).inner_margin(egui::Margin::same(10)).show(ui, |ui| {
-            ui.set_width(CARD_W);
+            ui.set_width(width);
             ui.spacing_mut().item_spacing = Vec2::new(6.0, 4.0);
             match card {
                 Card::Object { idx } => object_card(ui, *idx, cx, &mut out),
-                Card::Tile { map, water, grass, .. } => tile_card(ui, *map, *water, *grass, cx, &mut out),
-                Card::Map { map } => map_card(ui, *map, cx, &mut out),
+                Card::Tile { map, water, grass, .. } => tile_card(ui, *map, *water, *grass, table_max_h, cx, &mut out),
+                Card::Map { map } => map_card(ui, *map, table_max_h, cx, &mut out),
             }
         });
     });
@@ -224,67 +254,194 @@ fn trainer_card(ui: &mut Ui, names: &[String], double: bool, map_name: &str, cx:
     }
 }
 
-fn encounter_rows(ui: &mut Ui, theme: &Theme, slots: &[EncounterSlot], cx: &mut CardCtx, out: &mut CardOut) {
-    for s in slots {
-        ui.horizontal(|ui| {
-            if let Some(tex) = cx.assets.pkmn_icon(ui.ctx(), &s.species) {
-                ui.add(egui::Image::new(&tex).fit_to_exact_size(Vec2::new(18.0, 18.0)));
-            }
-            let lvl = if s.min_level == s.max_level { format!("Lv.{}", s.min_level) } else { format!("Lv.{}-{}", s.min_level, s.max_level) };
-            widgets::label_font(ui, format!("{} {}", s.species, lvl), theme.body(), theme.text);
-            let rate = if (s.rate - s.rate.round()).abs() < 0.05 { format!("{}%", s.rate.round() as i64) } else { format!("{:.1}%", s.rate) };
-            widgets::label_font(ui, rate, theme.caption_font(), theme.secondary);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if widgets::StyledButton::new(theme, "+").min_size(Vec2::new(22.0, 20.0)).show(ui).clicked() {
-                    out.actions.push(MapAction::AddWild { species: s.species.clone(), level: s.min_level });
-                }
-            });
-        });
+// ---------------------------------------------------------------------------
+// Encounter tables
+// ---------------------------------------------------------------------------
+
+/// Whether the game's encounter tables carry an EV yield column: gens 3+.
+/// Gens 1/2 hand out stat exp equal to the base stats, nothing to tabulate.
+pub fn has_ev_column(gen: Option<&GenData>) -> bool {
+    gen.map(|g| g.get_generation() >= 3).unwrap_or(false)
+}
+
+/// The EV yield of a species as "1 SpA" / "2 HP, 1 Def" (stats in HP, Atk,
+/// Def, SpA, SpD, Spe order), "—" for a species that yields nothing, and
+/// `None` when the game has no EV yields (gens 1/2) or the species is unknown.
+pub fn ev_yield_text(gen: &GenData, species: &str) -> Option<String> {
+    if gen.get_generation() < 3 {
+        return None;
+    }
+    let y = gen.pkmn_db().get_pkmn(species)?.stat_xp_yield;
+    let parts: Vec<String> = [(y.hp, "HP"), (y.attack, "Atk"), (y.defense, "Def"), (y.special_attack, "SpA"), (y.special_defense, "SpD"), (y.speed, "Spe")]
+        .into_iter()
+        .filter(|(v, _)| *v != 0)
+        .map(|(v, name)| format!("{} {}", v, name))
+        .collect();
+    Some(if parts.is_empty() { "—".to_string() } else { parts.join(", ") })
+}
+
+fn is_water_method(name: &str) -> bool {
+    ["surf", "old_rod", "good_rod", "super_rod"].iter().any(|w| name.starts_with(w))
+}
+
+fn rate_text(rate: f64) -> String {
+    if (rate - rate.round()).abs() < 0.05 {
+        format!("{}%", rate.round() as i64)
+    } else {
+        format!("{:.1}%", rate)
     }
 }
 
-fn encounter_section(ui: &mut Ui, map: MapId, water: bool, only_terrain: bool, cx: &mut CardCtx, out: &mut CardOut) {
+fn level_text(s: &EncounterSlot) -> String {
+    if s.min_level == s.max_level {
+        s.min_level.to_string()
+    } else {
+        format!("{}-{}", s.min_level, s.max_level)
+    }
+}
+
+/// The cells of one encounter row, laid out right to left from the row rect.
+struct EncCols {
+    species: Rect,
+    level: Rect,
+    rate: Rect,
+    ev: Option<Rect>,
+    add: Rect,
+}
+
+fn enc_cols(r: Rect, show_ev: bool) -> EncCols {
+    let cell = |right: f32, w: f32| Rect::from_min_max(Pos2::new(right - w, r.min.y), Pos2::new(right, r.max.y));
+    let mut x = r.max.x;
+    let add = cell(x, ENC_COL_ADD);
+    x -= ENC_COL_ADD;
+    let ev = show_ev.then(|| {
+        let c = cell(x, ENC_COL_EV);
+        x -= ENC_COL_EV;
+        c
+    });
+    let rate = cell(x, ENC_COL_RATE);
+    x -= ENC_COL_RATE;
+    let level = cell(x, ENC_COL_LEVEL);
+    x -= ENC_COL_LEVEL;
+    let species = Rect::from_min_max(r.min, Pos2::new(x, r.max.y));
+    EncCols { species, level, rate, ev, add }
+}
+
+/// Horizontal padding of the rate cell, and the wider left inset of the EV
+/// cell that keeps it clear of the right-aligned rates.
+const ENC_CELL_PAD: f32 = 6.0;
+const ENC_EV_INSET: f32 = 16.0;
+
+fn ev_cell(ev: Rect) -> Rect {
+    Rect::from_min_max(Pos2::new(ev.min.x + ENC_EV_INSET, ev.min.y), Pos2::new(ev.max.x - ENC_CELL_PAD, ev.max.y))
+}
+
+fn encounter_header(ui: &mut Ui, theme: &Theme, show_ev: bool) {
+    let r = widgets::table_row(ui, ENC_HEAD_H, None);
+    let c = enc_cols(r, show_ev);
+    let font = theme.caption_font_bold();
+    let color = theme.secondary;
+    let name_cell = Rect::from_min_max(Pos2::new(c.species.min.x + ENC_ICON + 6.0, r.min.y), Pos2::new(c.species.max.x, r.max.y));
+    widgets::col_text(ui, name_cell, "Pokémon", font.clone(), color, Align::Min);
+    widgets::col_text(ui, c.level, "Level", font.clone(), color, Align::Min);
+    widgets::col_text(ui, c.rate.shrink2(Vec2::new(ENC_CELL_PAD, 0.0)), "Rate", font.clone(), color, Align::Max);
+    if let Some(ev) = c.ev {
+        widgets::col_text(ui, ev_cell(ev), "EV yield", font, color, Align::Min);
+    }
+    widgets::hairline(ui, theme.border);
+}
+
+fn encounter_rows(ui: &mut Ui, method: &str, slots: &[EncounterSlot], show_ev: bool, cx: &mut CardCtx, out: &mut CardOut) {
     let theme = cx.theme;
-    let Some(table) = cx.pack.encounters.get(&map) else {
-        widgets::label_font(ui, "No wild Pokémon here".to_string(), theme.caption_font(), theme.secondary);
-        return;
-    };
-    let version = cx.version.clone().unwrap_or_default();
-    let water_methods = ["surf", "old_rod", "good_rod", "super_rod"];
-    let mut any = false;
-    for m in &table.methods {
-        let base = m.name.split('_').next().unwrap_or("");
-        let is_water = water_methods.iter().any(|w| m.name.starts_with(w)) || base == "surf";
-        if only_terrain && is_water != water {
+    let name_font = theme.font_bold(10.0);
+    let cell_font = theme.font(10.0);
+    let divider = theme.row_divider();
+    for (i, s) in slots.iter().enumerate() {
+        let r = widgets::table_row(ui, ENC_ROW_H, if i > 0 { Some(divider) } else { None });
+        if !ui.is_rect_visible(r) {
             continue;
         }
-        let Some(slots) = table.slots_for(&m.name, &version) else { continue };
-        if slots.is_empty() {
-            continue;
+        if ui.rect_contains_pointer(r) {
+            ui.painter().rect_filled(r, 3.0, theme.hover_bg);
         }
-        any = true;
-        ui.add_space(4.0);
-        let title = m.name.replace('_', " ");
-        let rate = m.base_rate.map(|r| format!("  ·  rate {}", r)).unwrap_or_default();
-        widgets::label_font(ui, format!("{}{}", title.to_uppercase(), rate), theme.caption_font_bold(), theme.secondary);
-        encounter_rows(ui, theme, slots, cx, out);
-    }
-    if !any {
-        widgets::label_font(ui, "No wild Pokémon for this terrain".to_string(), theme.caption_font(), theme.secondary);
+        let c = enc_cols(r, show_ev);
+        // icon + species
+        let mut x = c.species.min.x;
+        if let Some(tex) = cx.assets.pkmn_icon(ui.ctx(), &s.species) {
+            let icon = Rect::from_center_size(Pos2::new(x + ENC_ICON / 2.0, r.center().y), Vec2::splat(ENC_ICON));
+            ui.painter().image(tex.id(), icon, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), egui::Color32::WHITE);
+        }
+        x += ENC_ICON + 6.0;
+        let name_cell = Rect::from_min_max(Pos2::new(x, r.min.y), Pos2::new(c.species.max.x - 4.0, r.max.y));
+        let name = widgets::elide(ui, &s.species, &name_font, name_cell.width());
+        widgets::col_text(ui, name_cell, &name, name_font.clone(), theme.text_strong(), Align::Min);
+        widgets::col_text(ui, c.level, &level_text(s), cell_font.clone(), theme.text, Align::Min);
+        widgets::col_text(ui, c.rate.shrink2(Vec2::new(ENC_CELL_PAD, 0.0)), &rate_text(s.rate), cell_font.clone(), theme.text, Align::Max);
+        if let Some(ev) = c.ev {
+            let text = cx.gen.as_deref().and_then(|g| ev_yield_text(g, &s.species)).unwrap_or_else(|| "?".to_string());
+            let cell = ev_cell(ev);
+            let shown = widgets::elide(ui, &text, &cell_font, cell.width());
+            widgets::col_text(ui, cell, &shown, cell_font.clone(), theme.text, Align::Min);
+        }
+        // add button
+        let brect = Rect::from_center_size(c.add.center(), Vec2::new(26.0, 24.0));
+        let mut child = ui.new_child(UiBuilder::new().max_rect(brect).layout(Layout::left_to_right(Align::Center)).id_salt(("enc_add", method, i)));
+        let resp = widgets::StyledButton::new(theme, "+").min_size(Vec2::new(26.0, 24.0)).show(&mut child);
+        if resp.on_hover_text(format!("Add a wild {} Lv.{} to the route", s.species, s.min_level)).clicked() {
+            out.actions.push(MapAction::AddWild { species: s.species.clone(), level: s.min_level });
+        }
     }
 }
 
-fn tile_card(ui: &mut Ui, map: MapId, water: bool, grass: bool, cx: &mut CardCtx, out: &mut CardOut) {
+/// The encounter table of `map`: a column header, then one section per
+/// method (all of them, or only the land / water ones when `only_terrain`),
+/// in a scroll area capped at `max_h`.
+fn encounter_table(ui: &mut Ui, map: MapId, water: bool, only_terrain: bool, max_h: f32, cx: &mut CardCtx, out: &mut CardOut) {
+    let theme = cx.theme;
+    let pack: &MapPack = cx.pack;
+    let show_ev = has_ev_column(cx.gen.as_deref());
+    let version = cx.version.clone().unwrap_or_default();
+    let sections: Vec<(&str, Option<i64>, &[EncounterSlot])> = pack
+        .encounters
+        .get(&map)
+        .map(|table| {
+            table
+                .methods
+                .iter()
+                .filter(|m| !only_terrain || is_water_method(&m.name) == water)
+                .filter_map(|m| table.slots_for(&m.name, &version).filter(|s| !s.is_empty()).map(|s| (m.name.as_str(), m.base_rate, s)))
+                .collect()
+        })
+        .unwrap_or_default();
+    if sections.is_empty() {
+        let msg = if pack.encounters.contains_key(&map) { "No wild Pokémon for this terrain" } else { "No wild Pokémon here" };
+        widgets::label_font(ui, msg.to_string(), theme.caption_font(), theme.secondary);
+        return;
+    }
+    encounter_header(ui, theme, show_ev);
+    widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("enc_scroll").max_height(max_h).auto_shrink([false, true]), |ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
+        for (name, base_rate, slots) in sections {
+            ui.add_space(6.0);
+            let title = name.replace('_', " ").to_uppercase();
+            let rate = base_rate.map(|r| format!("  ·  rate {}", r)).unwrap_or_default();
+            widgets::label_font(ui, format!("{}{}", title, rate), theme.body_bold(), theme.secondary);
+            ui.add_space(2.0);
+            encounter_rows(ui, name, slots, show_ev, cx, out);
+        }
+    });
+}
+
+fn tile_card(ui: &mut Ui, map: MapId, water: bool, grass: bool, max_h: f32, cx: &mut CardCtx, out: &mut CardOut) {
     let theme = cx.theme;
     let name = cx.pack.map(map).map(|m| m.display.clone()).unwrap_or_default();
     let what = if water { "Water" } else if grass { "Tall grass" } else { "Wild Pokémon" };
     header(ui, theme, &format!("{} — {}", what, name), None, out);
-    widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("enc_scroll").max_height(260.0).auto_shrink([false, true]), |ui| {
-        encounter_section(ui, map, water, water || grass, cx, out);
-    });
+    ui.add_space(2.0);
+    encounter_table(ui, map, water, water || grass, max_h, cx, out);
 }
 
-fn map_card(ui: &mut Ui, map: MapId, cx: &mut CardCtx, out: &mut CardOut) {
+fn map_card(ui: &mut Ui, map: MapId, max_h: f32, cx: &mut CardCtx, out: &mut CardOut) {
     let theme = cx.theme;
     let Some(m) = cx.pack.map(map) else { return };
     let objs = cx.pack.objects_of(map);
@@ -297,9 +454,11 @@ fn map_card(ui: &mut Ui, map: MapId, cx: &mut CardCtx, out: &mut CardOut) {
             out.actions.push(MapAction::AddAllTrainers { map });
         }
     });
-    widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("map_enc_scroll").max_height(240.0).auto_shrink([false, true]), |ui| {
-        encounter_section(ui, map, false, false, cx, out);
-    });
+    ui.add_space(4.0);
+    if cx.pack.encounters.contains_key(&map) {
+        widgets::label_font(ui, "Wild Pokémon".to_string(), theme.body_bold(), theme.text_strong());
+    }
+    encounter_table(ui, map, false, false, max_h, cx, out);
 }
 
 /// The route event id already covering an object, for "Select in list".

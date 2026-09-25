@@ -63,7 +63,7 @@ Test-hook environment variables (all optional):
 | `XPR_SMOKE_ACTION=map` (+ `XPR_SMOKE_EVENT=<substring>`) | open the Map tab of the right pane; with `XPR_SMOKE_EVENT`, select the first event whose name contains it and "show it on the map" (SPEC §5 Phase 2 step 7) |
 | `XPR_MAP_DATA_DIR=<dir>` | read the map pack from this directory instead of the embedded copy / `map_data/` next to `raw_pkmn_data` |
 | `XPR_SMOKE_COMPARE_A` / `_B=<route path>`, `XPR_SMOKE_COMPARE_TAB=overview\|checkpoints\|diff`, `XPR_SMOKE_COMPARE_EXPAND=<n>` | with `XPR_SMOKE_ACTION=compare`: the two routes to compare, which tab to show and which checkpoint row to expand |
-| `XPR_SMOKE_EXPORT=<kind>[,<kind>...]` | run these exports right before the capture (`event_list`, `battle_summary`, `player_ranges`, `enemy_ranges`, `run_summary`, `setup_summary`, `compare`, `matchup:<n>[:player\|:enemy]`); the PNGs land in the configured images dir |
+| `XPR_SMOKE_EXPORT=<kind>[,<kind>...]` | run these exports right before the capture (`event_list`, `battle_summary`, `player_ranges`, `enemy_ranges`, `run_summary`, `setup_summary`, `compare`, `map` (the map's current view at 1× with the toggled layers; needs `XPR_SMOKE_ACTION=map`), `matchup:<n>[:player\|:enemy]`); the PNGs land in the configured images dir |
 | `XPR_FRAME_LOG=1` | log every frame slower than 1 ms (with the route-list / details draw split) and every route-list rebuild |
 
 Python side for comparisons: `py -3.14 main.py` (the plain `python` on PATH
@@ -159,6 +159,7 @@ Re-run the golden verify with the config toggles that change battle output
 - [ ] Legacy controls section (toggle in the Battle Summary menu).
 - [ ] Mon pair cards: header speed colours (faster blue / tie yellow / slower red), stat-stage setup dropdowns for both sides, setup moves, intimidate toggles, mimic selection, transform, collapsed toggle, drag grip reorder (also "reorder matchup" action).
 - [ ] Damage columns: range, kill %, N-hit kill, recoil line, best-move flags, highlight colours 1/2/3, fade for non-highlighted moves; both highlight strategies (Fastest Kill / Consistent) and the consistent threshold dialog; test-move slots (Toggle Test Moves) with searchable dropdowns; assign move via tutor dialog.
+- [ ] Metronome slot (either side): no damage until a move is picked; the selector's ▾ opens and closes the list of every move Metronome can call (a second click picks nothing, even with text typed), typing filters it, ↑/↓ keep the highlighted row in view, a row or Enter picks, the blank top row clears; the slot then shows the picked move's damage and the pick survives the delayed save and reselecting the fight. Automated: `cargo test -p xpr-app --test metronome_pick --test metronome_dropdown`.
 - [ ] Export button per matchup → matchup export dialog → PNG in the image folder (full / player / enemy).
 - [ ] Message box formatting (`format_message`, recoil) matches Python for a few known fights (compare screenshots side by side).
 - [ ] Config → Battle Config dialog (search depth, force full search, ignore accuracy) refreshes the open summary.
@@ -187,6 +188,7 @@ Other shortcuts: gym leaders 1–8, Blue 9, Elite Four/Champion Ctrl+1…Ctrl+7 
 - [ ] Every dialog opens as a modal, Escape closes, values persist: Load Route (list + search, Enter loads), New Folder, Transfer Event (folder list excludes the selection's own folder/descendants), Custom DVs (applies to the current route), Custom Gens (create / load all; reload after a change), Battle Config, Color Config (colours + font; applied live on close), Highlight Colors, App Config (data dir change → routes re-listed), Final Trainers, Matchup Export, Assign Move.
 - [ ] Message boxes: unsaved-changes prompts (quit, close route, new route from current), no-route-name, delete confirmation, update found / no update / not possible / error / apply, new-route error, info, backport result, reset-all-shortcuts, duplicate shortcuts.
 - [ ] Exception path: an operation that errors shows the exception dialog with the same message text as Python (`@handle_exceptions`).
+- [ ] Dialog look (`dialogs.rs` "Dialog chrome and parts"): title strip, uppercase section titles, footer buttons right-aligned with the main action filled (red for "Yes" on the delete-events / reset-all-shortcuts prompts, where "Yes" discards; the unsaved-changes prompts on quit, close route and new route from current name their buttons, e.g. "Save, then close" / "Close without saving" / "Cancel", and Enter cancels. "Save, then …" goes ahead only when the save worked: with no route name, or a failing save, the app stays put), lists in a recessed well; a tall dialog (Highlight Colors) still fits a small window. Picture of every dialog without a window (the app's software rasteriser): `cargo run -p xpr-app --example dialog_png -- <out_dir> [name ...]`.
 
 ## 9. Quick add popover
 
@@ -311,9 +313,32 @@ full-page PNG export). Landing page (routes table + sort toggles); editor page (
 
 Automated: `cargo test -p xpr-map` (pack loading, geometry, LOD, links,
 coverage baseline), `cargo test -p xpr-app --test map_actions --test map_view
---test embedded_map_data` (add-from-map through the controller with undo,
-headless click / focus / zoom, the embedded pack). Smoke:
-`XPR_SMOKE_ACTION=map XPR_SMOKE_EVENT=Brock` on `yellow-pinsir-lv10brock`.
+--test embedded_map_data --test encounter_card` (add-from-map through the
+controller with undo, headless click / focus / zoom, the embedded pack, the
+encounter card's EV-yield column for gens 3+ and its absence in gen 1).
+Smoke: `XPR_SMOKE_ACTION=map XPR_SMOKE_EVENT=Brock` on
+`yellow-pinsir-lv10brock`. Picture of a card without a window (the app's
+software rasteriser): `cargo run -p xpr-app --example map_card_png --
+../tests/test_data/f-ditto-tests.json MAP_ROUTE1 grass card.png` (`grass` /
+`water` pick such a step near the map's centre, `x,y` a specific step, `map`
+the map card).
+
+Graphics tools (`docs/rust_port/design/world_map/GRAPHICS_TOOLS_PLAN.md`,
+2026-09-25). Automated: `cargo test -p xpr-map --test export` (banded 1–8×
+rendering equals a whole-region render, transparency, cancel, the pixel
+bound), `cargo test -p xpr-app --test map_export --test map_tools --test
+map_navigator --test map_navigation --test map_modal_input` (the export
+pipeline and dialog, marquee / ruler / grid / labels, the navigator and zoom
+presets, finder / Tab navigation / follow / trip path, and that none of it
+reads input under a modal dialog). Smoke: add `XPR_SMOKE_EXPORT=map` to the
+map smoke run above → `<timestamp>-<route>_map.png` in the images dir.
+Pictures without a window: `cargo run -p xpr-app --example map_export_png --
+../tests/test_data/yellow-pinsir-lv10brock.json PEWTER_GYM 3 gym.png`
+(`world 1` for the whole world), `--example map_tools_png -- tools.png`
+(a selection, a measurement, the grid, labels, the Layers popup and the
+navigator in one frame), `--example map_navigator_png`, `--example
+map_route_path_png`; `cargo run -p xpr-map --example export_png -- crystal
+world.png --night --transparent` for the base image alone.
 
 Manual, on a Yellow route, then a Crystal and an Emerald one:
 
@@ -359,3 +384,47 @@ Manual, on a Yellow route, then a Crystal and an Emerald one:
   closing the window or ⤡ docks it back. The choice is remembered.
 - Close the app with the map open → it reopens on the same map and zoom.
 - Load a gen 4/5 route: the tab says "No map data for this game".
+
+Graphics tools (2026-09-25):
+
+- Toolbar: H / M / R pick the hand, marquee and ruler (the keys work while
+  the map is hovered and nothing has text focus); "Layers ▾" opens the
+  popup with every toggle (Objects / Overlays / Panels), remembered across
+  restarts; the zoom readout opens the presets menu (25–800 %, 1:1, Fit),
+  `1` is 100 %; "Export" opens the export dialog.
+- Marquee: drag with M (or Shift+drag with any tool) → a dashed, step-aligned
+  rectangle; the status strip reads "Selection: w × h steps (px)"; the bar
+  under it: Zoom fits the camera to it, Export opens the dialog on
+  "Selection", Copy puts the selection on the clipboard (paste into an image
+  editor: markers included), Add trainers makes a folder of the unfought
+  trainers inside it, ✕ / Esc clears. A plain click with M clears too.
+- Ruler: drag with R → a line with "Δ x × y · n steps"; stays until Esc or a
+  new drag; the status strip shows the same text.
+- Grid: block lines from 100 %, step lines from 300 %, map outlines always in
+  the world; Map names: readable labels over each map when zoomed out, gone
+  in a map's own scope.
+- Navigator: top-right panel shows the whole world / map with the visible
+  rectangle; click or drag in it moves the view; turning it off in Layers
+  hands the corner back to the map (clicks there open cards again).
+- Export dialog (Map menu / Ctrl+Shift+P / toolbar): View / Selection /
+  This map / Whole world, 1–8×, layer checkboxes prefilled from Layers,
+  Transparent background, the size line; Export writes
+  `<timestamp>-<route>_map.png` into the images dir with a toast whose
+  "Open Folder" works; Copy puts the image on the clipboard; Emerald's whole
+  world at 2× is refused by the size line, at 1× it exports with a progress
+  bar and Cancel stops it; while the dialog is open the map's keys do
+  nothing and global shortcuts do not fire. "Copy Map View" in the Map menu
+  copies the view at 1×.
+- Search box: "brock" lists a Trainers group, "potion" an Items group;
+  choosing one focuses the location(s) through the banner.
+- Tab / Shift+Tab with the map hovered step through the visible markers
+  (ring moves), Enter opens the card, Esc closes it; the toolbar search box
+  does not steal the Tab.
+- "Follow selection" (Layers → Panels): moving the route-list selection to a
+  trainer fight or pickup recentres the map on it without a banner.
+- "Route path" (Layers → Overlays): select an event inside a folder → that
+  folder's fights and pickups draw as numbered discs joined by straight
+  lines within the current map / the world; the selected event's disc is
+  ringed; clicking a disc selects its event in the list; an event directly
+  under the root shows "select a folder to see its path"; nothing ever
+  connects two folders.

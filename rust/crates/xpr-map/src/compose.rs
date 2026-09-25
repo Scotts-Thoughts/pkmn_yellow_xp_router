@@ -263,7 +263,14 @@ impl Compositor {
 
     /// Composite a world-pixel rectangle of a scope at native scale.
     pub fn render_region(&self, scope: Scope, rect: IRect, opts: RenderOpts) -> Pixmap {
-        let mut dst = Pixmap::filled(rect.width().max(0) as usize, rect.height().max(0) as usize, BACKGROUND);
+        self.render_region_with_fill(scope, rect, opts, BACKGROUND)
+    }
+
+    /// [`render_region`], but pixels no map covers are left as `fill`
+    /// instead of [`BACKGROUND`] (WP-A export's `transparent` option, GRAPHICS_TOOLS_PLAN
+    /// §3.4 "A": alpha-0 outside every map instead of the world background).
+    pub fn render_region_with_fill(&self, scope: Scope, rect: IRect, opts: RenderOpts, fill: [u8; 4]) -> Pixmap {
+        let mut dst = Pixmap::filled(rect.width().max(0) as usize, rect.height().max(0) as usize, fill);
         self.render_region_into(scope, rect, opts, &mut dst, 0, 0);
         dst
     }

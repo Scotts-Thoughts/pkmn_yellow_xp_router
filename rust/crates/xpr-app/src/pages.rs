@@ -14,6 +14,7 @@ use xpr_core::{Config, Paths};
 use xpr_data::model::Nature;
 use xpr_data::{GenData, Registry};
 use xpr_recorder::QuickStartPhase;
+use xpr_ui_kit::modal::behind_modal;
 use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets::{self, Entry, StyledButton};
 
@@ -107,7 +108,7 @@ impl LandingPage {
 
     #[allow(clippy::too_many_arguments)]
     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, paths: &Paths, registry: &Registry, index: &RouteIndex, actions: &mut LandingActions) {
-        let key_load = ui.input(|i| i.key_pressed(egui::Key::Enter));
+        let key_load = !behind_modal(ui) && ui.input(|i| i.key_pressed(egui::Key::Enter));
         ui.vertical_centered(|ui| {
             ui.add_space(50.0);
             ui.label(egui::RichText::new("Pokemon Solo Challenge Router").font(theme.font_bold(24.0)).color(theme.text));
@@ -289,7 +290,7 @@ impl LandingPage {
 /// The landing page while a quick start is running: what the GameHook
 /// session is doing, what it found, and the ways out.
 pub fn quick_start_ui(ui: &mut Ui, theme: &Theme, phase: &QuickStartPhase, url: &str, actions: &mut QuickStartActions) {
-    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if !behind_modal(ui) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
         actions.cancel = true;
     }
     let red = Color32::from_rgb(0xe7, 0x4c, 0x3c);
@@ -648,7 +649,7 @@ impl NewRoutePage {
             self.rebuild_base_routes(index);
         }
         let _ = self.pending_game_load;
-        let (enter, escape) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape)));
+        let (enter, escape) = if behind_modal(ui) { (false, false) } else { ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape))) };
         if escape {
             actions.cancel = true;
         }

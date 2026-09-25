@@ -28,6 +28,9 @@ pub enum ShotKind {
     SetupSummary,
     /// The active tab of the route-compare page.
     Compare,
+    /// The world map (`map/export.rs`'s synchronous path), current view at
+    /// 1× with the current toggles: `XPR_SMOKE_EXPORT=map`.
+    Map,
 }
 
 impl ShotKind {
@@ -46,6 +49,7 @@ impl ShotKind {
             ShotKind::RunSummary => "run_summary".to_string(),
             ShotKind::SetupSummary => "setup_summary".to_string(),
             ShotKind::Compare => "compare".to_string(),
+            ShotKind::Map => "map".to_string(),
         }
     }
 
@@ -280,6 +284,54 @@ impl Canvas {
         }
         let to_u8 = |v: f32| (v / a * 255.0).round().clamp(0.0, 255.0) as u8;
         [to_u8(p[0]), to_u8(p[1]), to_u8(p[2]), (a * 255.0).round() as u8]
+    }
+
+    /// Alpha-blend this canvas "over" a straight-alpha RGBA8 buffer
+    /// (row-major, no padding — `xpr_map::Pixmap::data`'s own layout) at
+    /// `(dst_x, dst_y)`, clipped to `dst_w`/the buffer's length. Used by the
+    /// map export (`map/export.rs`, WP-B) to composite the overlay layers
+    /// (markers, grid, labels, route path, the selection outline) onto the
+    /// base pixmap one band at a time, so the f32 canvas this type holds
+    /// never spans the whole exported image.
+    pub fn blend_over_rgba8(&self, dst: &mut [u8], dst_w: usize, dst_x: usize, dst_y: usize) {
+        for y in 0..self.height {
+            let dy = dst_y + y;
+            let row = dy * dst_w * 4;
+            if row >= dst.len() {
+                break;
+            }
+            for x in 0..self.width {
+                let dx = dst_x + x;
+                if dx >= dst_w {
+                    continue;
+                }
+                let src = self.pixels[y * self.width + x]; // premultiplied f32, 0..1
+                if src[3] <= 0.0 {
+                    continue;
+                }
+                let di = row + dx * 4;
+                if di + 4 > dst.len() {
+                    continue;
+                }
+                // straight-alpha dst bytes -> premultiplied f32, "over" blend, back to straight alpha
+                let da = dst[di + 3] as f32 / 255.0;
+                let mut d = [dst[di] as f32 / 255.0 * da, dst[di + 1] as f32 / 255.0 * da, dst[di + 2] as f32 / 255.0 * da, da];
+                let keep = 1.0 - src[3];
+                for c in 0..4 {
+                    d[c] = src[c] + d[c] * keep;
+                }
+                let a = d[3].clamp(0.0, 1.0);
+                if a <= 0.0 {
+                    dst[di..di + 4].copy_from_slice(&[0, 0, 0, 0]);
+                } else {
+                    let to_u8 = |v: f32| (v / a * 255.0).round().clamp(0.0, 255.0) as u8;
+                    dst[di] = to_u8(d[0]);
+                    dst[di + 1] = to_u8(d[1]);
+                    dst[di + 2] = to_u8(d[2]);
+                    dst[di + 3] = (a * 255.0).round() as u8;
+                }
+            }
+        }
     }
 
     pub fn to_image(&self) -> image::RgbaImage {
@@ -540,6 +592,39 @@ mod tests {
         // the fade is symmetric
         assert_eq!(alpha_at(&canvas, 1, 1), alpha_at(&canvas, 38, 28));
         assert_eq!(alpha_at(&canvas, 2, 0), alpha_at(&canvas, 0, 2));
+    }
+
+    /// `blend_over_rgba8` (`map/export.rs`'s overlay bands): a half-alpha
+    /// source over an opaque destination lands exactly on the "over"
+    /// formula's midpoint, straight alpha stays opaque, and a fully
+    /// transparent source pixel leaves the destination untouched.
+    #[test]
+    fn blend_over_rgba8_composites_straight_alpha_over_straight_alpha() {
+        let mut canvas = Canvas::new(2, 1);
+        canvas.pixels[0] = [0.5, 0.0, 0.0, 0.5]; // 50% red, premultiplied
+        canvas.pixels[1] = [0.0, 0.0, 0.0, 0.0]; // fully transparent
+        let mut dst = vec![0u8, 255, 0, 255, 10, 20, 30, 255]; // opaque green, then an arbitrary opaque colour
+        canvas.blend_over_rgba8(&mut dst, 2, 0, 0);
+        // 50% red over opaque green: both channels land at the midpoint (255*0.5 rounded)
+        assert_eq!(&dst[0..4], &[128, 128, 0, 255]);
+        // untouched by the second, fully transparent source pixel
+        assert_eq!(&dst[4..8], &[10, 20, 30, 255]);
+    }
+
+    /// A destination the canvas only partly overlaps (band boundaries,
+    /// world edges) is clipped, not written out of bounds.
+    #[test]
+    fn blend_over_rgba8_is_clipped_to_the_destination_bounds() {
+        let mut canvas = Canvas::new(2, 2);
+        for p in canvas.pixels.iter_mut() {
+            *p = [1.0, 1.0, 1.0, 1.0];
+        }
+        let mut dst = vec![0u8; 3 * 3 * 4];
+        // the canvas's bottom-right corner falls outside this 3x3 destination
+        canvas.blend_over_rgba8(&mut dst, 3, 2, 2);
+        let i = (2 * 3 + 2) * 4;
+        assert_eq!(&dst[i..i + 4], &[255, 255, 255, 255], "the one in-bounds pixel is opaque white");
+        assert_eq!(dst.len(), 36, "no out-of-bounds write happened (dst was not resized/panicked)");
     }
 
     #[test]

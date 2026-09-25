@@ -36,7 +36,7 @@ struct Harness {
 impl Harness {
     fn new(size: Vec2) -> Harness {
         let root = repo_root();
-        let cfg = Config::load(&root.join("rust/target/no-such-config.json"));
+        let cfg = Config::load(&xpr_app::scratch_config_path());
         let ctx = egui::Context::default();
         let mut theme = Theme::from_config(&cfg);
         theme.install_fonts(&ctx);

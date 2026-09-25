@@ -7,10 +7,18 @@
 pub mod camera;
 pub mod cards;
 pub mod chunks;
+pub mod export;
+pub mod finder;
+pub mod keynav;
 pub mod layers;
+pub mod layers_menu;
 pub mod list;
+pub mod navigator;
+pub mod overlay;
+pub mod route_path;
 pub mod sprites;
 pub mod state;
+pub mod tools;
 
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver};
@@ -23,6 +31,7 @@ use xpr_core::Config;
 use xpr_data::GenData;
 use xpr_engine::NodeId;
 use xpr_map::{game_for_version, geom, Anchor, Compositor, LinkQuery, MapId, MapKind, MapPack, ObjectGrid, ObjectKind, PackSource, Precision, Scope};
+use xpr_ui_kit::modal::behind_modal;
 use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets::{self, Entry};
 
@@ -46,7 +55,14 @@ pub enum MapAction {
     AddItem { name: String },
     AddWild { species: String, level: i64 },
     AddAllTrainers { map: MapId },
+    /// Trainers by router name into a new folder (the marquee selection's "add trainers").
+    AddTrainersNamed { folder: String, names: Vec<String> },
     SelectEvent(NodeId),
+    /// A map image export finished; the window's toast offers the folder.
+    Exported(PathBuf),
+    ExportFailed(String),
+    /// The map view / selection was copied to the clipboard.
+    CopiedImage,
     Undock,
     Dock,
     Close,
@@ -63,11 +79,21 @@ pub struct Toggles {
     pub npcs: bool,
     /// draw overworld sprites instead of circles (when zoomed in enough)
     pub sprites: bool,
+    /// step / block grid lines and map outlines (`overlay::draw_grid`)
+    pub grid: bool,
+    /// map names over the world (`overlay::draw_map_labels`)
+    pub labels: bool,
+    /// the route's order drawn over its anchors (`route_path::draw`)
+    pub path: bool,
+    /// the navigator minimap (`navigator`)
+    pub navigator: bool,
+    /// the camera follows the selected route event (`keynav::on_route_synced`)
+    pub follow: bool,
 }
 
 impl Default for Toggles {
     fn default() -> Self {
-        Toggles { trainers: true, items: true, hidden: true, warps: true, signs: false, berries: true, npcs: false, sprites: true }
+        Toggles { trainers: true, items: true, hidden: true, warps: true, signs: false, berries: true, npcs: false, sprites: true, grid: false, labels: true, path: false, navigator: true, follow: false }
     }
 }
 
@@ -84,12 +110,12 @@ impl Toggles {
         }
     }
     fn to_json(self) -> Value {
-        serde_json::json!({"trainers": self.trainers, "items": self.items, "hidden": self.hidden, "warps": self.warps, "signs": self.signs, "berries": self.berries, "npcs": self.npcs, "sprites": self.sprites})
+        serde_json::json!({"trainers": self.trainers, "items": self.items, "hidden": self.hidden, "warps": self.warps, "signs": self.signs, "berries": self.berries, "npcs": self.npcs, "sprites": self.sprites, "grid": self.grid, "labels": self.labels, "path": self.path, "navigator": self.navigator, "follow": self.follow})
     }
     fn from_json(v: &Value) -> Toggles {
         let d = Toggles::default();
         let g = |k: &str, def: bool| v.get(k).and_then(|x| x.as_bool()).unwrap_or(def);
-        Toggles { trainers: g("trainers", d.trainers), items: g("items", d.items), hidden: g("hidden", d.hidden), warps: g("warps", d.warps), signs: g("signs", d.signs), berries: g("berries", d.berries), npcs: g("npcs", d.npcs), sprites: g("sprites", d.sprites) }
+        Toggles { trainers: g("trainers", d.trainers), items: g("items", d.items), hidden: g("hidden", d.hidden), warps: g("warps", d.warps), signs: g("signs", d.signs), berries: g("berries", d.berries), npcs: g("npcs", d.npcs), sprites: g("sprites", d.sprites), grid: g("grid", d.grid), labels: g("labels", d.labels), path: g("path", d.path), navigator: g("navigator", d.navigator), follow: g("follow", d.follow) }
     }
 }
 
@@ -125,7 +151,10 @@ pub struct MapView {
     selected: Option<u32>,
     card: Option<(Card, Vec2)>,
     focus: Option<Focus>,
-    list: MapList,
+    /// `pub` so headless tests can drive the search popup directly
+    /// (`tests/map_navigation.rs`, WP-E gap G10) without synthetic text
+    /// events into the toolbar's search box.
+    pub list: MapList,
     pub state: RouteMapState,
     view_states: Value,
     view_dirty: Option<Instant>,
@@ -138,6 +167,12 @@ pub struct MapView {
     pending_focus: Option<(LinkQuery, String)>,
     /// a transient message in the status strip
     notice: Option<(String, Instant)>,
+    /// marquee selection / measure tools (`tools.rs`)
+    pub tools: tools::ToolState,
+    /// the navigator minimap (`navigator.rs`)
+    pub navigator: navigator::Navigator,
+    /// the export dialog and its worker (`export.rs`)
+    pub export: export::ExportUi,
 }
 
 impl MapView {
@@ -172,6 +207,9 @@ impl MapView {
             pending_fit: false,
             pending_focus: None,
             notice: None,
+            tools: tools::ToolState::default(),
+            navigator: navigator::Navigator::default(),
+            export: export::ExportUi::default(),
         }
     }
 
@@ -267,6 +305,7 @@ impl MapView {
     pub fn sync_route(&mut self, ctrl: &MainController) {
         let pack = self.loaded.as_ref().map(|l| l.pack.clone());
         self.state.sync(ctrl, pack.as_deref());
+        keynav::on_route_synced(self);
     }
 
     // ---- navigation ------------------------------------------------------------------
@@ -484,15 +523,20 @@ impl MapView {
             }
         }
 
-        // map list popup (over the viewport)
+        // map list popup (over the viewport): a map jumps to it, a trainer
+        // / item hit (WP-E gap G10) focuses its anchors through the banner
         if let (Some(anchor), Some(pack)) = (list_anchor, self.pack().cloned()) {
-            if let Some(id) = self.list.popup(ui, theme, &pack, anchor, (vp.height() - 20.0).max(120.0)) {
-                self.navigate_to(id, true);
+            match self.list.popup(ui, theme, &pack, ctrl, anchor, (vp.height() - 20.0).max(120.0)) {
+                Some(list::Chosen::Map(id)) => self.navigate_to(id, true),
+                Some(list::Chosen::Focus { label, anchors }) => self.focus_anchors(anchors, label),
+                None => {}
             }
         }
 
         // status strip
         self.status_strip(ui, status_rect, theme);
+        // the export dialog / a running export (`export.rs`; pushes Exported / CopiedImage)
+        export::export_ui(self, ui, theme, cfg, ctrl, &mut actions);
         self.persist(cfg);
         if self.frame_log {
             self.last_frame_ms = t0.elapsed().as_secs_f32() * 1000.0;
@@ -534,25 +578,14 @@ impl MapView {
             self.list.open = false;
         }
         ui.add_space(6.0);
-        let mut changed = false;
-        let mut chip = |ui: &mut Ui, on: &mut bool, label: &str, tip: &str| {
-            let r = widgets::StyledButton::new(theme, label).checked(*on).min_size(Vec2::new(24.0, 22.0)).show(ui).on_hover_text(tip);
-            if r.clicked() {
-                *on = !*on;
-                changed = true;
-            }
-        };
-        chip(ui, &mut self.toggles.trainers, "T", "Trainers");
-        chip(ui, &mut self.toggles.items, "I", "Items");
-        chip(ui, &mut self.toggles.hidden, "?", "Hidden items");
-        chip(ui, &mut self.toggles.warps, "W", "Warps");
-        chip(ui, &mut self.toggles.signs, "S", "Signs");
-        chip(ui, &mut self.toggles.berries, "B", "Berry trees");
-        chip(ui, &mut self.toggles.npcs, "N", "Other NPCs");
-        chip(ui, &mut self.toggles.sprites, "Sp", "Overworld sprites (instead of circles)");
-        if changed {
-            cfg.set_map_toggles(self.toggles.to_json());
-        }
+        // tools: pan / marquee / ruler (`tools.rs`)
+        self.tools.toolbar(ui, theme);
+        ui.add_space(6.0);
+        // layer visibility, grid / labels / route-path overlays and the
+        // navigator / follow panel toggles, consolidated into one popup
+        // (`layers_menu.rs`): the chip row (8 object chips + 5 more for the
+        // WP-C overlays) no longer fits the docked pane.
+        layers_menu::show(ui, theme, &mut self.toggles, cfg);
         if pack.as_ref().map(|p| p.gen == 2).unwrap_or(false) {
             let r = widgets::StyledButton::new(theme, "Night").checked(self.night).show(ui);
             if r.clicked() {
@@ -575,6 +608,10 @@ impl MapView {
                 actions.push(if self.docked { MapAction::Undock } else { MapAction::Dock });
             }
             ui.add_space(6.0);
+            if widgets::StyledButton::new(theme, "Export").enabled(pack.is_some()).show(ui).on_hover_text("Export the map as a PNG, or copy it").clicked() {
+                self.export.request_open();
+            }
+            ui.add_space(6.0);
             if widgets::StyledButton::new(theme, "Fit").show(ui).clicked() {
                 self.pending_fit = true;
             }
@@ -583,7 +620,11 @@ impl MapView {
                 self.camera.zoom_at(vp, vp.center(), 1.3);
                 self.mark_view_dirty();
             }
-            widgets::label_font(ui, format!("{:.0}%", self.camera.zoom * 100.0), theme.caption_font(), theme.secondary);
+            // the zoom readout with its presets menu (`navigator::zoom_control`)
+            let vp = self.last_vp;
+            if navigator::zoom_control(ui, theme, &mut self.camera, vp) {
+                self.mark_view_dirty();
+            }
             if widgets::StyledButton::new(theme, "−").min_size(Vec2::new(22.0, 22.0)).show(ui).clicked() {
                 let vp = self.last_vp;
                 self.camera.zoom_at(vp, vp.center(), 1.0 / 1.3);
@@ -599,6 +640,10 @@ impl MapView {
         let pack = loaded.pack.clone();
         let grid = loaded.grid.clone();
         let ctx = ui.ctx().clone();
+        // egui's own Tab-driven focus grab (see `keynav::reclaim_hover_tab_focus`)
+        // would otherwise hand the toolbar's search box keyboard focus on a
+        // bare Tab press before any of the checks below run.
+        keynav::reclaim_hover_tab_focus(ui, resp.hovered());
         let text_focused = ctx.memory(|m| m.focused().is_some());
         let scope = self.scope;
         let scope_rect = geom::scope_rect(&pack, scope);
@@ -622,7 +667,12 @@ impl MapView {
         }
 
         // ---- input ----
-        if resp.dragged() && resp.drag_delta() != Vec2::ZERO {
+        // the navigator and the tools see the pointer first; when one of
+        // them takes it the map neither pans nor hit-tests this frame
+        let on_navigator = navigator::Navigator::handle_input(self, ui, resp, vp);
+        let tool_used = !on_navigator && tools::ToolState::handle_input(self, ui, resp, vp);
+        let pointer_taken = on_navigator || tool_used;
+        if !pointer_taken && resp.dragged() && resp.drag_delta() != Vec2::ZERO {
             self.camera.pan(resp.drag_delta());
             self.list.open = false;
             self.mark_view_dirty();
@@ -645,7 +695,12 @@ impl MapView {
                 self.camera.pan(Vec2::new(scroll.x, 0.0));
                 self.mark_view_dirty();
             }
-            if !text_focused {
+            if !text_focused && !behind_modal(ui) {
+                // tool keys (H / M / R, `tools.rs`) and marker navigation (`keynav.rs`)
+                self.tools.handle_keys(&ctx);
+                keynav::handle_keys(self, ui, vp);
+                // zoom presets: `1` = 100 % (`navigator.rs`, WP-D gap G8)
+                navigator::Navigator::handle_keys(self, ui);
                 let mut pan = Vec2::ZERO;
                 ctx.input(|i| {
                     if i.key_pressed(egui::Key::ArrowLeft) {
@@ -679,14 +734,17 @@ impl MapView {
                 }
             }
         }
-        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) && !text_focused {
-            self.card = None;
-            self.focus = None;
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) && !text_focused && !behind_modal(ui) {
+            // a selection / measurement goes first; the card and the focus banner on the next Escape
+            if !self.tools.on_escape() {
+                self.card = None;
+                self.focus = None;
+            }
         }
         self.camera.clamp_to(vp, scope_rect);
 
         // pointer -> world / object
-        let pointer = resp.hover_pos().map(|p| self.camera.screen_to_world(vp, p));
+        let pointer = if on_navigator { None } else { resp.hover_pos().map(|p| self.camera.screen_to_world(vp, p)) };
         self.pointer_world = None;
         self.hover = None;
         if let Some(w) = pointer {
@@ -708,7 +766,7 @@ impl MapView {
 
         // clicks (a double-click on a warp follows it; every other click is an ordinary click)
         let mut consumed = false;
-        if resp.double_clicked() {
+        if !pointer_taken && resp.double_clicked() {
             if let Some(idx) = self.hover {
                 if let xpr_map::Payload::Warp { dest_map: Some(d), .. } = &pack.objects[idx as usize].payload {
                     if let Some(m) = pack.map_by_const(d) {
@@ -722,7 +780,8 @@ impl MapView {
         if consumed {
             return;
         }
-        if resp.clicked() {
+        let path_click = !pointer_taken && route_path::handle_click(self, ui, resp, vp, actions);
+        if !pointer_taken && !path_click && resp.clicked() {
             self.list.open = false;
             match (self.hover, pointer, self.pointer_world) {
                 (Some(idx), Some(w), _) => {
@@ -741,7 +800,7 @@ impl MapView {
                 }
             }
         }
-        if resp.secondary_clicked() {
+        if !pointer_taken && resp.secondary_clicked() {
             self.card = None;
             self.selected = None;
         }
@@ -750,8 +809,19 @@ impl MapView {
         let painter = ui.painter_at(vp);
         let wanted = layers::draw_base(&painter, vp, &self.camera, &pack, scope, self.night, &mut self.chunks);
         self.chunks.request(wanted);
+        // overlays under the markers: the grid (`overlay.rs`)
+        let oc = overlay::OverlayCtx { theme, pack: &pack, scope, cam: &self.camera, vp, ppp: ctx.pixels_per_point() };
+        overlay::draw_grid(&painter, &oc, &self.toggles);
         let mc = layers::MarkerCtx { theme, toggles: &self.toggles, state: &self.state, hover: self.hover, selected: self.selected, night: self.night, ctx: &ctx };
         layers::draw_markers(&painter, vp, &self.camera, &pack, scope, &mc, &mut self.atlas);
+        // overlays above the markers: map names (`overlay.rs`), the route path (`route_path.rs`), the tools' selection / measurement (`tools.rs`)
+        overlay::draw_map_labels(&painter, &oc, &self.toggles);
+        route_path::draw(&painter, &oc, &self.state, &self.toggles);
+        self.tools.draw(&painter, &oc);
+        // the marquee selection's floating toolbar ("Add trainers") queues
+        // actions in `handle_input` rather than pushing them straight into
+        // `actions` (it doesn't have that vec); drain them here (`tools.rs`)
+        actions.extend(self.tools.take_actions());
         // the selected route event's anchors (when not focusing) ring quietly
         if self.focus.is_none() && !self.state.selected_anchors.is_empty() {
             let list: Vec<(MapId, i32, i32, bool)> = self.state.selected_anchors.iter().map(|a| (a.map, a.x as i32, a.y as i32, a.precision == Precision::Map)).collect();
@@ -847,6 +917,9 @@ impl MapView {
                 }
             }
         }
+
+        // ---- navigator (`navigator.rs`; top-right, above the layers, cards and banner) ----
+        navigator::Navigator::draw(self, ui, vp, theme);
     }
 
     fn status_strip(&self, ui: &mut Ui, rect: Rect, theme: &Theme) {
@@ -857,6 +930,12 @@ impl MapView {
         if let Some((msg, at)) = &self.notice {
             if at.elapsed() < Duration::from_secs(4) {
                 left = msg.clone();
+            }
+        }
+        if left.is_empty() {
+            // a selection / measurement readout (`tools.rs`)
+            if let Some(t) = self.pack().and_then(|p| self.tools.status_text(p)) {
+                left = t;
             }
         }
         if left.is_empty() {
@@ -906,6 +985,21 @@ impl MapView {
 
     pub fn has_card(&self) -> bool {
         self.card.is_some()
+    }
+
+    /// Open the card a click on step `(x, y)` of `map` would open: the
+    /// encounter card of a tall-grass / water step, the map card otherwise.
+    /// False when the map is not in the current scope.
+    pub fn open_card_at_step(&mut self, map: MapId, x: i32, y: i32) -> bool {
+        let Some(pack) = self.pack().cloned() else { return false };
+        let Some((wx, wy)) = geom::step_center_px(&pack, self.scope, map, x, y) else { return false };
+        let spb = pack.geom.steps_per_block().max(1) as i32;
+        let (grass, water) = pack.terrain_at(map, (x / spb).max(0) as u32, (y / spb).max(0) as u32);
+        let card = if grass || water { Card::Tile { map, x, y, water, grass } } else { Card::Map { map } };
+        self.card = Some((card, Vec2::new(wx as f32, wy as f32)));
+        self.selected = None;
+        self.focus = None;
+        true
     }
 
     pub fn zoom(&self) -> f32 {

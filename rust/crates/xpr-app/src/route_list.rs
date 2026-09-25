@@ -13,6 +13,7 @@ use xpr_core::consts;
 use xpr_core::Config;
 use xpr_engine::view::RowValues;
 use xpr_engine::{EventDefinition, NodeId, ObjKind};
+use xpr_ui_kit::modal::behind_modal;
 use xpr_ui_kit::theme::{self, Theme};
 use xpr_ui_kit::widgets;
 
@@ -699,6 +700,8 @@ impl RouteList {
         let font = theme.body();
         let bold = theme.body_bold();
         let color_major = cfg.get_color_major_battles();
+        // rows, clicks and keys are read from raw input (see `xpr_ui_kit::modal`)
+        let blocked = behind_modal(ui);
 
         // Column values and fit-to-contents widths (the widest value of any
         // row) only change with the rows or the font.
@@ -765,9 +768,13 @@ impl RouteList {
                 let left_x = ui.cursor().min.x;
                 let mut y = body_top;
                 let clip = ui.clip_rect();
-                let pointer = ui.input(|i| i.pointer.interact_pos());
-                let primary_clicked = ui.input(|i| i.pointer.primary_clicked());
-                let secondary_clicked = ui.input(|i| i.pointer.secondary_clicked());
+                // Rows are hit-tested by hand from the raw pointer: while a
+                // dialog is up the list sees no pointer at all, or a click on
+                // the dialog selects the row under it (and moves where the
+                // dialog's event lands).
+                let pointer = if blocked { None } else { ui.input(|i| i.pointer.interact_pos()) };
+                let primary_clicked = !blocked && ui.input(|i| i.pointer.primary_clicked());
+                let secondary_clicked = !blocked && ui.input(|i| i.pointer.secondary_clicked());
                 let primary_down = ui.input(|i| i.pointer.primary_down());
                 let modifiers = ui.input(|i| i.modifiers);
                 let mut hovered_now: Option<NodeId> = None;
@@ -1175,7 +1182,7 @@ impl RouteList {
             }
         });
         // keyboard handling (list focus + no text field)
-        if key_input && self.focused {
+        if key_input && self.focused && !blocked {
             self.handle_keys(ui, ctrl, actions);
         }
         // empty-state button

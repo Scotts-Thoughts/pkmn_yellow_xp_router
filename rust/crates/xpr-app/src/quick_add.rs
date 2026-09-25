@@ -11,6 +11,7 @@ use xpr_engine::{
     EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, ObjKind,
     RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition,
 };
+use xpr_ui_kit::modal::layer_behind_modal;
 use xpr_ui_kit::theme::{self, Theme};
 use xpr_ui_kit::widgets::{self, AmountEntry, Entry, StyledButton};
 
@@ -593,9 +594,15 @@ impl QuickAddPopover {
             return None;
         }
         let mut preview = None;
+        // a dialog above the page gets the keys and clicks (the popover is
+        // part of the page, and it reads both raw)
+        let blocked = layer_behind_modal(ctx, egui::LayerId::background());
         // keys: category shortcuts, Escape/Space close
         let mut close = false;
         ctx.input_mut(|i| {
+            if blocked {
+                return;
+            }
             for (idx, key) in [egui::Key::Q, egui::Key::W, egui::Key::E, egui::Key::R, egui::Key::T].iter().enumerate() {
                 if i.consume_key(egui::Modifiers::NONE, *key) {
                     self.category = Some(idx);
@@ -672,7 +679,7 @@ impl QuickAddPopover {
                 });
         });
         // click outside closes (Qt.Popup)
-        if !self.opened_frame && ctx.input(|i| i.pointer.any_pressed()) {
+        if !self.opened_frame && !blocked && ctx.input(|i| i.pointer.any_pressed()) {
             if let Some(p) = ctx.input(|i| i.pointer.interact_pos()) {
                 if !inner.response.rect.contains(p) {
                     close = true;

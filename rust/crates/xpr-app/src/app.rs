@@ -16,6 +16,7 @@ use xpr_data::Registry;
 use xpr_engine::{NodeId, ObjKind};
 use xpr_map::LinkQuery;
 use xpr_recorder::{starter, QuickStart, QuickStartPhase, StarterInfo};
+use xpr_ui_kit::modal::{behind_modal, layer_behind_modal};
 use xpr_ui_kit::theme::{self, Theme};
 use xpr_ui_kit::widgets::{self, Entry};
 use xpr_ui_kit::{AutoClearingLabel, Geometry, ShortcutMap, ToastHost};
@@ -177,6 +178,12 @@ pub struct XprApp {
     /// live in a cloud-synced folder whose reads can stall for many seconds
     custom_gens_rx: Option<Receiver<Result<(), String>>>,
     first_frame: bool,
+    /// (display scale, monitor size) the window was last checked against;
+    /// a change means it landed on another monitor
+    window_monitor: Option<(f32, Vec2)>,
+    /// the saved position in physical pixels, applied on the first frame
+    /// (not on macOS, see `initial_viewport`)
+    restore_position_px: Option<Pos2>,
     update: UpdateState,
     pre_state_fraction: Option<f64>,
     battle_fraction: Option<f64>,
@@ -235,6 +242,7 @@ impl XprApp {
         let battle_fraction = cfg.get_battle_summary_left_fraction();
         let map_fraction = cfg.get_map_left_fraction();
         let map = MapView::new(&cfg, &paths.pokemon_raw_data);
+        let restore_position_px = saved_position_px(&cfg);
         XprApp {
             cfg,
             paths,
@@ -272,6 +280,8 @@ impl XprApp {
             deferred_post_init: None,
             custom_gens_rx: Some(ctx_rx),
             first_frame: true,
+            window_monitor: None,
+            restore_position_px,
             update: UpdateState { rx: Some(urx), startup_check: true, deferred_version: None, deferred_url: None, requested: false, check_button_enabled: true },
             pre_state_fraction,
             battle_fraction,
@@ -545,8 +555,8 @@ impl XprApp {
             }
         }
         // An open picker consumes Esc itself, so this only sees the key when
-        // it means "leave the page".
-        if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape)) {
+        // it means "leave the page" (unless a dialog above the page has it).
+        if !behind_modal(ui) && ui.ctx().input(|i| i.key_pressed(egui::Key::Escape)) {
             actions.back = true;
         }
         actions
@@ -586,7 +596,11 @@ impl XprApp {
     }
 
     fn handle_shortcuts(&mut self, ctx: &egui::Context) {
-        if self.dialog.is_some() || self.message.is_some() {
+        // the map's own export dialog (`map/export.rs`) is a modal too, but
+        // lives outside `self.dialog` / `self.message`; shortcuts must stand
+        // down for it exactly as they do for those (CLAUDE.md "raw input
+        // must respect modal dialogs")
+        if self.dialog.is_some() || self.message.is_some() || self.map.export.is_open() {
             return;
         }
         let text_focus = self.text_field_focused(ctx);
@@ -753,6 +767,11 @@ impl XprApp {
         if fire("show_on_map") {
             self.show_selected_on_map();
         }
+        if fire("export_map") {
+            // the dialog is drawn by the map itself, so it must be shown first
+            self.open_map();
+            self.map.export.request_open();
+        }
         for i in 1..=8 {
             if fire(&format!("gym_{}", i)) && !text_focus {
                 self.select_gym_leader(i - 1);
@@ -827,6 +846,19 @@ impl XprApp {
         self.ctrl.save_route(&name);
     }
 
+    /// Save for a "Save, then …" answer; true only when the route is now
+    /// saved. Without a route name the user is asked for one, and a failed
+    /// save shows its error: either way what was to follow (quit, close, new
+    /// route) does not happen, so the changes are never lost.
+    fn save_before_continuing(&mut self) -> bool {
+        if self.route_name_text.is_empty() {
+            self.show_message("No Route Name", "Please enter a route name before saving.", MsgButtons::Ok, MsgTag::NoRouteName);
+            return false;
+        }
+        self.save_route();
+        !self.ctrl.has_unsaved_changes()
+    }
+
     fn export_notes(&mut self) {
         let name = self.route_name_text.clone();
         self.ctrl.export_notes(&name);
@@ -851,7 +883,12 @@ impl XprApp {
             return;
         }
         if self.ctrl.has_unsaved_changes() {
-            self.show_message("Unsaved Changes", "Route has unsaved changes. Save before starting a new route?", MsgButtons::YesNoCancel, MsgTag::NewRouteFromCurrentUnsaved);
+            self.show_message(
+                "Unsaved Changes",
+                "Route has unsaved changes. Save before starting a new route?",
+                MsgButtons::SaveDiscardCancel { save: "Save, then start new route", discard: "Start without saving" },
+                MsgTag::NewRouteFromCurrentUnsaved,
+            );
             return;
         }
         self.ctrl.create_new_route_from_current();
@@ -862,7 +899,12 @@ impl XprApp {
             return;
         }
         if self.ctrl.has_unsaved_changes() {
-            self.show_message("Unsaved Changes", "Route has unsaved changes. Save before closing?", MsgButtons::YesNoCancel, MsgTag::CloseRouteUnsaved);
+            self.show_message(
+                "Unsaved Changes",
+                "Route has unsaved changes. Save before closing?",
+                MsgButtons::SaveDiscardCancel { save: "Save, then close", discard: "Close without saving" },
+                MsgTag::CloseRouteUnsaved,
+            );
             return;
         }
         self.ctrl.close_route();
@@ -1094,6 +1136,25 @@ impl XprApp {
                     }
                 }
                 MapAction::SelectEvent(id) => self.ctrl.select_new_events(vec![id]),
+                MapAction::AddTrainersNamed { folder, names } => {
+                    if names.is_empty() {
+                        self.toast.show("No trainers left to add there", 2500, None);
+                        continue;
+                    }
+                    let count = names.len();
+                    match self.ctrl.add_trainers_in_new_folder(&folder, &names) {
+                        Some(_) => self.toast.show(format!("Added {} trainers to {}", count, folder), 3000, None),
+                        None => self.toast.show("Could not add the trainers", 2500, None),
+                    }
+                }
+                MapAction::Exported(path) => {
+                    // like the screenshots: the status bar names the file, the toast offers the folder
+                    self.ctrl.send_message(format!("Saved map image to: {}", path.display()));
+                    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    self.toast.show(format!("Saved {}", name), 4000, path.parent().map(|p| p.to_path_buf()));
+                }
+                MapAction::ExportFailed(e) => self.ctrl.trigger_exception(format!("Couldn't export the map! {}", e)),
+                MapAction::CopiedImage => self.toast.show("Copied the map image to the clipboard", 2500, None),
                 MapAction::Undock => self.undock_map(),
                 MapAction::Dock => self.dock_map(),
                 MapAction::Close => self.close_map(),
@@ -1350,10 +1411,16 @@ impl XprApp {
         if self.page == Page::Compare && kind != ShotKind::Compare {
             return;
         }
-        if self.ctrl.is_empty() && kind != ShotKind::SetupSummary && kind != ShotKind::RunSummary && kind != ShotKind::Compare {
+        if self.ctrl.is_empty() && kind != ShotKind::SetupSummary && kind != ShotKind::RunSummary && kind != ShotKind::Compare && kind != ShotKind::Map {
             return;
         }
         if kind.battle_mode().is_some() && !self.details.is_battle_tab() {
+            return;
+        }
+        // the map pack loads on a background thread; `export_shot` reports
+        // a clear error itself if it is not ready yet (same pattern as "no
+        // run summary open" / "no event list on screen" below)
+        if kind == ShotKind::Map && !self.map.is_ready() {
             return;
         }
         if !self.pending_shots.contains(&kind) {
@@ -1411,6 +1478,15 @@ impl XprApp {
     /// `widget.render(pixmap)` onto a transparent pixmap). Returns the path.
     fn export_shot(&mut self, ctx: &egui::Context, kind: &ShotKind) -> Result<PathBuf, String> {
         let out_path = self.shot_path(kind);
+        if matches!(kind, ShotKind::Map) {
+            // the map's own synchronous path (`map/export.rs`): the current
+            // view at 1x with the current toggles, no offscreen widget canvas
+            let spec = crate::map::export::spec_for(&self.map, crate::map::export::ExportRegion::View, 1, false).ok_or("no map data loaded")?;
+            return match crate::map::export::run_export_blocking(&self.map, &self.theme, &spec, Some(&out_path))? {
+                crate::map::export::ExportOutcome::Exported(p) => Ok(p),
+                crate::map::export::ExportOutcome::Copied { .. } => Err("internal error: expected a file export".to_string()),
+            };
+        }
         let ppp = ctx.pixels_per_point();
         let max_texture_side = ctx.input(|i| i.max_texture_side);
         let mut off = Offscreen::new(&self.theme, ppp, max_texture_side);
@@ -1516,6 +1592,7 @@ impl XprApp {
                 });
                 off.rasterize(&prims, content)?
             }
+            ShotKind::Map => unreachable!("ShotKind::Map returns through map::export::run_export_blocking above"),
         };
         canvas.save(&out_path)?;
         Ok(out_path)
@@ -1525,19 +1602,24 @@ impl XprApp {
 
     fn handle_message_choice(&mut self, ctx: &egui::Context, tag: MsgTag, choice: MsgChoice) {
         match tag {
-            MsgTag::QuitUnsaved => {
-                if choice == MsgChoice::Yes {
+            // "Save, then …" (Yes) / "… without saving" (No) / Cancel
+            MsgTag::QuitUnsaved => match choice {
+                MsgChoice::Yes => {
+                    if self.save_before_continuing() {
+                        self.allow_close = true;
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                }
+                MsgChoice::No => {
                     self.allow_close = true;
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
-            }
+                _ => {}
+            },
             MsgTag::NewRouteFromCurrentUnsaved => match choice {
                 MsgChoice::Cancel => {}
                 MsgChoice::Yes => {
-                    if self.route_name_text.is_empty() {
-                        self.show_message("No Route Name", "Please enter a route name before saving.", MsgButtons::Ok, MsgTag::NoRouteName);
-                    } else {
-                        self.save_route();
+                    if self.save_before_continuing() {
                         self.ctrl.create_new_route_from_current();
                     }
                 }
@@ -1546,10 +1628,7 @@ impl XprApp {
             MsgTag::CloseRouteUnsaved => match choice {
                 MsgChoice::Cancel => {}
                 MsgChoice::Yes => {
-                    if self.route_name_text.is_empty() {
-                        self.show_message("No Route Name", "Please enter a route name before saving.", MsgButtons::Ok, MsgTag::NoRouteName);
-                    } else {
-                        self.save_route();
+                    if self.save_before_continuing() {
                         self.ctrl.close_route();
                     }
                 }
@@ -1843,6 +1922,18 @@ impl XprApp {
                     self.show_selected_on_map();
                 }
                 widgets::menu_separator(ui, &theme);
+                let map_ready = self.map.is_ready();
+                if widgets::menu_item(ui, &theme, "Export Map Image\u{2026}", &label("export_map"), map_ready) {
+                    // the dialog is drawn by the map itself, so it must be shown first
+                    self.open_map();
+                    self.map.export.request_open();
+                }
+                if widgets::menu_item(ui, &theme, "Copy Map View", "", map_ready) {
+                    // the request is only processed while the map pane is shown (like the export dialog above)
+                    self.open_map();
+                    self.map.export.request_copy(crate::map::export::ExportRegion::View);
+                }
+                widgets::menu_separator(ui, &theme);
                 let docked = self.map.docked;
                 let text = if docked { "Open Map in Its Own Window" } else { "Dock Map in the Editor" };
                 if widgets::menu_item(ui, &theme, text, "", has_route) {
@@ -2129,8 +2220,9 @@ impl XprApp {
             self.apply_details_actions(ctx, actions);
         }
         ui.allocate_rect(full, Sense::hover());
-        // keyboard focus follows the last click: outside the list, the list stops taking keys
-        if let (true, Some(p), Some(r)) = (ui.input(|i| i.pointer.primary_pressed()), ui.input(|i| i.pointer.interact_pos()), event_list_rect) {
+        // keyboard focus follows the last click: outside the list, the list
+        // stops taking keys (a click on a dialog above the page is not one)
+        if let (false, true, Some(p), Some(r)) = (behind_modal(ui), ui.input(|i| i.pointer.primary_pressed()), ui.input(|i| i.pointer.interact_pos()), event_list_rect) {
             if !r.contains(p) {
                 self.route_list.focused = false;
             }
@@ -2166,14 +2258,19 @@ impl XprApp {
             let v = i.viewport();
             (v.inner_rect, v.outer_rect, v.maximized.unwrap_or(false), v.minimized.unwrap_or(false))
         });
-        if let Some(inner) = inner {
-            let ppp = ctx.pixels_per_point();
+        // a maximized/minimized rect is not the size to come back to
+        if let Some(inner) = inner.filter(|_| !maximized && !minimized) {
+            // the size in logical units (what `with_inner_size` takes), so
+            // it survives a restart on any display scale; the position in
+            // the desktop's own units (see `initial_viewport`)
+            let zoom = ctx.zoom_factor();
+            let pos_scale = if cfg!(target_os = "macos") { zoom } else { ctx.pixels_per_point() };
             let outer = outer.unwrap_or(inner);
             let g = Geometry {
-                width: (inner.width() * ppp).round() as i32,
-                height: (inner.height() * ppp).round() as i32,
-                x: Some((outer.min.x * ppp).round() as i32),
-                y: Some((outer.min.y * ppp).round() as i32),
+                width: (inner.width() * zoom).round() as i32,
+                height: (inner.height() * zoom).round() as i32,
+                x: Some((outer.min.x * pos_scale).round() as i32),
+                y: Some((outer.min.y * pos_scale).round() as i32),
             };
             self.cfg.set_window_geometry(&g.format());
         }
@@ -2186,6 +2283,59 @@ impl XprApp {
         };
         self.cfg.set_window_state(state);
     }
+
+    /// Keep the main window no bigger than the monitor it is on. The OS
+    /// keeps a window's logical size when it crosses to a monitor with a
+    /// different display scale (Windows rescales it on the spot), so a
+    /// window sized for a 100% 4K screen comes out far larger than a 150%
+    /// one. Checked once per monitor change and on start-up, so a window
+    /// deliberately spread over two monitors is left alone. Windows gets
+    /// this (and more) from `win_monitor`, which acts inside the scale
+    /// change itself, before winit's resize can throw the window off-screen.
+    fn keep_window_on_monitor(&mut self, ctx: &egui::Context) {
+        if cfg!(windows) {
+            return;
+        }
+        let (native_ppp, monitor, inner, maximized, fullscreen) = ctx.input(|i| {
+            let v = i.viewport();
+            (v.native_pixels_per_point, v.monitor_size, v.inner_rect, v.maximized.unwrap_or(false), v.fullscreen.unwrap_or(false))
+        });
+        let (Some(native_ppp), Some(monitor), Some(inner)) = (native_ppp, monitor, inner) else {
+            return;
+        };
+        if self.window_monitor == Some((native_ppp, monitor)) {
+            return;
+        }
+        self.window_monitor = Some((native_ppp, monitor));
+        if maximized || fullscreen {
+            return;
+        }
+        if let Some(size) = fit_to_monitor(inner.size(), monitor) {
+            log::info!("window {:.0}x{:.0} does not fit its {:.0}x{:.0} monitor (scale {}); resizing to {:.0}x{:.0}", inner.width(), inner.height(), monitor.x, monitor.y, native_ppp, size.x, size.y);
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
+        }
+    }
+}
+
+/// The size a window of `size` should shrink to so it fits a monitor of
+/// `monitor` (both in points), or `None` when it already fits. The
+/// allowance leaves room for the title bar and the taskbar / menu bar.
+fn fit_to_monitor(size: Vec2, monitor: Vec2) -> Option<Vec2> {
+    let limit = monitor * 0.95;
+    if size.x <= limit.x && size.y <= limit.y {
+        return None;
+    }
+    Some(size.min(monitor * 0.9))
+}
+
+/// The saved window position in physical pixels, for the first-frame move
+/// (see `initial_viewport`); `None` on macOS, whose builder position is exact.
+fn saved_position_px(cfg: &Config) -> Option<Pos2> {
+    if cfg!(target_os = "macos") {
+        return None;
+    }
+    let g = Geometry::parse(&cfg.get_window_geometry())?;
+    Some(Pos2::new(g.x? as f32, g.y? as f32))
 }
 
 impl XprApp {
@@ -2415,7 +2565,8 @@ impl XprApp {
                 // `XPR_SMOKE_EXPORT=<kind>[,<kind>...]`: run these exports (they
                 // land in the images dir) right before the capture; kinds are
                 // `event_list`, `battle_summary`, `player_ranges`,
-                // `enemy_ranges`, `run_summary`, `setup_summary`, `compare` and
+                // `enemy_ranges`, `run_summary`, `setup_summary`, `compare`,
+                // `map` (the current map view, `map/export.rs`) and
                 // `matchup:<n>[:player|:enemy]`
                 if let Ok(list) = std::env::var("XPR_SMOKE_EXPORT") {
                     for kind in list.split(',').filter_map(smoke_export_kind) {
@@ -2466,6 +2617,11 @@ fn smoke_http_get(url: &str) -> Option<String> {
 impl eframe::App for XprApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let frame_start = Instant::now();
+        #[cfg(windows)]
+        if self.first_frame {
+            let native_ppp = ctx.input(|i| i.viewport().native_pixels_per_point).unwrap_or(1.0);
+            crate::win_monitor::install(_frame, native_ppp, self.restore_position_px.take());
+        }
         self.update_inner(ctx);
         if self.frame_log {
             let dt = frame_start.elapsed();
@@ -2506,7 +2662,12 @@ impl XprApp {
             self.first_frame = false;
             self.deferred_post_init = Some(Instant::now());
             let _ = self.fonts_installed;
+            if let Some(pos_px) = self.restore_position_px.take().filter(|_| self.cfg.get_window_state() != "zoomed") {
+                // now the window's display scale is known, place it exactly
+                ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(pos_px / ctx.pixels_per_point()));
+            }
         }
+        self.keep_window_on_monitor(ctx);
         // usually on the very first frame: the custom gens load while the OS
         // creates the window, so it opens straight onto the auto-loaded route
         if self.deferred_post_init.is_some() {
@@ -2542,7 +2703,12 @@ impl XprApp {
             if self.ctrl.has_unsaved_changes() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                 self.save_geometry(ctx);
-                self.show_message("Quit?", "Route has unsaved changes. Quit without saving?", MsgButtons::YesNo, MsgTag::QuitUnsaved);
+                self.show_message(
+                    "Unsaved Changes",
+                    "Route has unsaved changes. Save before quitting?",
+                    MsgButtons::SaveDiscardCancel { save: "Save, then quit", discard: "Quit without saving" },
+                    MsgTag::QuitUnsaved,
+                );
             } else {
                 self.save_geometry(ctx);
                 self.allow_close = true;
@@ -2665,7 +2831,8 @@ impl XprApp {
         if let Some(folder) = self.toast.ui(ctx, &theme) {
             io_utils::open_explorer(&folder);
         }
-        // secondary windows
+        // secondary windows (covered while a dialog is up in the main window)
+        let main_modal = self.dialog.is_some() || self.message.is_some();
         let mut setup_summary_rect: Option<Rect> = None;
         if self.setup_summary_open {
             let text = setup_summary_text(&self.ctrl);
@@ -2677,7 +2844,7 @@ impl XprApp {
                 egui::ViewportBuilder::default().with_title("Setup Summary").with_inner_size([420.0, 300.0]),
                 |ctx, _class| {
                     egui::TopBottomPanel::top("setup_menu").frame(egui::Frame::new().fill(theme2.bg_darker)).show(ctx, |ui| {
-                        if widgets::button(ui, &theme2, "Export Screenshot (Ctrl+P)").clicked() || ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::P)) {
+                        if widgets::button(ui, &theme2, "Export Screenshot (Ctrl+P)").clicked() || (!behind_modal(ui) && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::P))) {
                             export = true;
                         }
                     });
@@ -2685,6 +2852,9 @@ impl XprApp {
                         ui.add(egui::Label::new(egui::RichText::new(&text).font(theme2.body()).color(theme2.text)).wrap());
                         setup_summary_rect = Some(ctx.content_rect());
                     });
+                    if main_modal {
+                        crate::dialogs::block_secondary_window(ctx, &theme2);
+                    }
                     if ctx.input(|i| i.viewport().close_requested()) {
                         close = true;
                     }
@@ -2715,10 +2885,13 @@ impl XprApp {
                         closed = c;
                         export = e;
                     });
+                    if main_modal {
+                        crate::dialogs::block_secondary_window(ctx, &theme2);
+                    }
                     if ctx.input(|i| i.viewport().close_requested()) {
                         closed = true;
                     }
-                    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Backtick)) {
+                    if !layer_behind_modal(ctx, egui::LayerId::background()) && ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Backtick)) {
                         closed = true;
                     }
                 },
@@ -2749,6 +2922,9 @@ impl XprApp {
                         egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(0))).show(ctx, |ui| {
                             map_actions = map.ui(ui, &theme2, cfg, ctrl, assets);
                         });
+                        if main_modal {
+                            crate::dialogs::block_secondary_window(ctx, &theme2);
+                        }
                         if ctx.input(|i| i.viewport().close_requested()) {
                             closed = true;
                         }
@@ -2768,7 +2944,9 @@ impl XprApp {
 }
 
 /// One `XPR_SMOKE_EXPORT` entry.
-fn smoke_export_kind(name: &str) -> Option<ShotKind> {
+/// `pub` so `tests/map_export.rs` can assert `"map"` parses without running
+/// the whole smoke sequence.
+pub fn smoke_export_kind(name: &str) -> Option<ShotKind> {
     let mut parts = name.trim().split(':');
     match parts.next()? {
         "event_list" => Some(ShotKind::EventList),
@@ -2778,6 +2956,7 @@ fn smoke_export_kind(name: &str) -> Option<ShotKind> {
         "enemy_ranges" => Some(ShotKind::EnemyRanges),
         "run_summary" => Some(ShotKind::RunSummary),
         "setup_summary" => Some(ShotKind::SetupSummary),
+        "map" => Some(ShotKind::Map),
         "matchup" => {
             let idx = parts.next()?.parse::<usize>().ok()?.checked_sub(1)?;
             let mode = match parts.next() {
@@ -2792,6 +2971,12 @@ fn smoke_export_kind(name: &str) -> Option<ShotKind> {
 }
 
 /// Font/geometry helpers used by `main`.
+///
+/// The saved size is in logical units. The saved position is in the
+/// desktop's own units: points on macOS, where the builder places the window
+/// exactly, and physical pixels elsewhere, where the builder's logical
+/// position is scaled by the not-yet-known display scale (right at 100%),
+/// so the first frame moves it into place (`restore_position_px`).
 pub fn initial_viewport(cfg: &Config) -> egui::ViewportBuilder {
     let mut vb = egui::ViewportBuilder::default().with_title("Pokemon Solo Challenge Router").with_app_id("pkmn_xp_router");
     if let Some(icon) = crate::assets::app_icon() {

@@ -20,6 +20,7 @@ use xpr_core::Paths;
 use xpr_data::Registry;
 use xpr_engine::compare::{compare, digest, DiffFilter, RouteComparison, RouteDigest, RouteOrigin};
 use xpr_engine::Router;
+use xpr_ui_kit::modal::behind_modal;
 use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets::{self, Side, StyledButton};
 
@@ -651,15 +652,18 @@ impl CompareView {
         // click that opened the popup is still "this frame's click", and the
         // game filter's dropdown lives in a foreground layer of its own, so
         // neither may count as outside.
+        // Neither counts while a dialog is above the page (it gets them).
         let ctx = ui.ctx().clone();
+        let blocked = behind_modal(ui);
         let clicked_outside = !just_opened
+            && !blocked
             && ctx.input(|i| i.pointer.any_click())
             && ctx
                 .input(|i| i.pointer.interact_pos())
                 .map(|pos| !response.response.rect.contains(pos) && ctx.layer_id_at(pos).map(|l| l.order < egui::Order::Foreground).unwrap_or(true))
                 .unwrap_or(false);
         // Esc closes the popup and is consumed, so it does not also leave the page.
-        let escaped = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+        let escaped = !blocked && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
         if clicked_outside || escaped {
             close = true;
         }

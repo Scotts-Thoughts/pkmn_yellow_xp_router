@@ -65,6 +65,7 @@ trainer/item identities so the route file format does not change.
 | D12 | **Encounter tables are map-keyed** (decomp map constants), taken from the router's own `*_encounter_tables.json` for gen 1/2 and from `src/data/wild_encounters.json` in the gen 3 decomps. Version differences (Red/Blue, Gold/Silver, Ruby/Sapphire, FireRed/LeafGreen) are kept as columns and the open route's version picks one. | These sources cover 65/65, 115/115 and 116/116 maps by constant name (§2.3) — no display-name matching, which today fails for 4–20 maps per game. |
 | D13 | **Coordinates**: one world-pixel space per game at native scale (8 px tiles). Blocks are 32 px (gen 1/2) or 16 px (gen 3); every event/object position is in 16 px "steps" (px = x·16). Maps are placed in world space by the pipeline (`layout.json`), not at runtime. | Matches pokemap exactly, so pokemap's own PNG export is the golden reference for the compositor. |
 | D14 | **Threading**: `std::thread` + `mpsc` + `ctx.request_repaint()`, the app's existing idiom (`app.rs:73-120`, `compare/mod.rs:241-288`). No async runtime; `rayon` only inside the compositor for full-world overview builds. | Consistency with the rest of `xpr-app`; the recorder-style host queue is not needed because the map never mutates the route from another thread. |
+| D15 | **The route path overlay draws one folder ("trip") at a time, never the whole route** (§13, decided 2026-09-25, not built). | Events say what happens, not how the runner travelled there: Fly, Dig, Teleport, Escape Rope, boats and trains are not events (§13.1). Between trips nearly every hop is one of those, so a whole-route line would be wrong at every join; inside a trip the runner walks. |
 
 ---
 
@@ -458,7 +459,7 @@ version's game).
 | file | format | contents |
 |---|---|---|
 | `manifest.json` | JSON | `format: 1`, `game`, `gen`, `versions: ["Red","Blue"]`, `block_px` (32/16), `step_px: 16`, `world: {w_blocks, h_blocks}`, `gen3: {num_metatiles_in_primary, num_tiles_in_primary, num_pals_in_primary}` (512/512/6; FR/LG 640/640/7), blob index (`blockdata: [{map, offset, len}]`, `blocksets: [{tileset, offset, count}]`), source commit hashes of pokemap and each decomp repo, export timestamp |
-| `maps.json` | JSON | array in stable order; per map: `id` (index), `const` (`PALLET_TOWN`), `name` ("Pallet Town"), `w`, `h` (blocks; gen 3 metatiles), `kind: outdoor \| indoor`, `tileset` (gen 1/2: index + file; gen 3: `primary`, `secondary`), `palette` (gen 1: palette index; gen 2: `tod_class` morn/day/nite/indoor + `group`; gen 3: none), `connections[] {dir, map, offset}`, `warps[] {x, y, dest_map, dest_warp}`, `env`/`map_type` (informational) |
+| `maps.json` | JSON | array in stable order; per map: `id` (index), `const` (`PALLET_TOWN`), `name` (pokemap's: `Route1`, `Mt Moon B1f`), `display` (the human name in the router's location style, from the exporter's `displayName`: "Route 1", "Mt. Moon B1F", "SS Anne 1F Room 1", "Silph Co. 5F", "Hall of Fame", "Whirl Island NW"; every UI label uses this), `w`, `h` (blocks; gen 3 metatiles), `kind: outdoor \| indoor`, `tileset` (gen 1/2: index + file; gen 3: `primary`, `secondary`), `palette` (gen 1: palette index; gen 2: `tod_class` morn/day/nite/indoor + `group`; gen 3: none), `connections[] {dir, map, offset}`, `warps[] {x, y, dest_map, dest_warp}`, `env`/`map_type` (informational) |
 | `layout.json` | JSON | pokemap's computed world placement: `positions: {const: [x_blocks, y_blocks]}`, `draw_order: [const…]` (underlay, base, overlay), `regions: [{name, rect}]` (Johto/Kanto), `seeds` |
 | `blockdata.bin` | bytes | concatenation of every map's block ids: `u8` per block (gen 1/2) or `u16 LE` raw `map.bin` values (gen 3, id = `v & 0x3FF`); index in the manifest |
 | `blocksets.bin` | bytes | gen 1/2: per tileset, blocks × 16 `u8` tile indices; gen 3: per tileset, metatiles × 8 `u16 LE` packed `tile \| xflip<<10 \| yflip<<11 \| palette<<12` (bottom layer entries 0–3, top 4–7) |
@@ -647,7 +648,10 @@ window re-docks. Toggle from the View menu, the toolbar's ⤢ button, or the
   "not a bag item" note for fake balls/coins), sign text, warp (destination +
   "Go"), encounter table for the clicked grass/water tile (methods filtered
   to land or water; version columns when the game has them; the route's
-  version column highlighted). Buttons: **Add to route** (§3.7), **Show
+  version column highlighted; a Pokémon / Level / Rate / EV yield table, the
+  EV column for gens 3+ from `PokemonSpecies.stat_xp_yield`, in a card wider
+  than the object cards that scrolls past 60 % of the viewport's height).
+  Buttons: **Add to route** (§3.7), **Show
   details** (selects the linked route event if one exists), **Add all
   trainers here** on the map header card.
 - **Routed state** on markers: trainers already fought in the route (from
@@ -1073,14 +1077,17 @@ Open questions for the user (defaults chosen; say so to change them):
 - Three-column editor layout (list | details | map) with two splitters.
 - Per-event pinned anchors in route files (`"Map Anchor"`, §3.9) for
   trainers the game code cannot place.
-- Route path overlay (numbered markers / lines in route order) and
-  "follow the recorder" (gen 2 already exposes map group/number/x/y).
+- Route path overlay: designed in §13 (one trip at a time; least steps
+  later), not built. "Follow the recorder" (gen 2 already exposes map
+  group/number/x/y).
+- Travel events (walk / Fly / Dig / Teleport / Escape Rope / boat / train):
+  not modelled at all, see §13.1.
 - Gen 4/5 (Phase 7). Custom gens with their own maps.
 - Coins, Safari Zone mechanics, headbutt/rock-smash encounter UI beyond a
   table.
-- Sign text search, land:water HUD, EV yields in encounter tables (the router
-  has EV data in `PokemonSpecies.stat_xp_yield`; trivial to add to the card
-  later).
+- Sign text search, land:water HUD. (EV yields in encounter tables were added
+  on 2026-09-25: the encounter cards carry an "EV yield" column for gens 3+,
+  read from `PokemonSpecies.stat_xp_yield`.)
 
 ---
 
@@ -1212,6 +1219,178 @@ What was built (phases 0–4) and where it departs from the plan above:
   scripted rivals) count as trainers for toggles, styling and hit-testing
   (`MapObject::effective_kind`). Tests: `xpr-map/tests/sprites.rs`, the atlas
   test in `xpr-app/tests/map_view.rs`.
-- **Not done yet** (Phase 5–7): the item finder, PNG export, keyboard marker
-  navigation, "follow selection", the three-column layout, per-event pinned
-  anchors, gen 4/5.
+- **Graphics tools** (2026-09-25; the status review, gap list and plan are
+  `GRAPHICS_TOOLS_PLAN.md`): `xpr-map/src/export.rs` renders a scope region
+  at 1–8× in 256-row bands with progress, cancel, a transparent-outside-maps
+  option and a 2^28-pixel bound (Emerald's world at 1× in ~0.2 s, release).
+  `xpr-app/src/map/export.rs` is the export modal the map draws itself
+  (region: view / selection / this map / whole world; scale; night; layer
+  checkboxes; transparent background; size readout that turns into the
+  refusal past the bound), a worker thread that draws the toggled markers,
+  grid, labels, trip path and selection outline over the base image band by
+  band through `screenshot::Offscreen`, and the result as a PNG in the
+  images dir (`<timestamp>-<route>_map.png`, toast with the folder) or on
+  the clipboard (`Context::copy_image`); Map menu "Export Map Image…"
+  (`export_map`, Ctrl+Shift+P) and "Copy Map View"; `ShotKind::Map` /
+  `XPR_SMOKE_EXPORT=map`. `tools.rs`: hand / marquee / ruler (H / M / R,
+  Shift+drag from any tool, Space for a temporary hand), a step-snapped
+  selection with a floating Zoom / Export / Copy / Add-trainers bar and Esc,
+  a measurement badge ("Δ 5 × 2 · 7 steps") and the status strip readout.
+  `overlay.rs`: the grid (step lines from 300 %, block lines from 100 %, map
+  outlines always) and map-name labels with a halo in the world scope.
+  `layers_menu.rs`: the "Layers ▾" popup that replaced the toolbar chips
+  (Objects / Overlays / Panels; `map_toggles` gained `grid`, `labels`,
+  `path`, `navigator`, `follow`). `navigator.rs`: the minimap in the
+  viewport's top-right (the scope's coarsest LOD chunk with the visible
+  rectangle; click / drag moves the camera) and the zoom-presets menu on the
+  readout (25–800 %, 1:1, Fit; key `1` = 100 %). `finder.rs` + `list.rs`:
+  Trainers and Items groups under the search box that focus through the
+  banner (the item finder of Phase 5). `keynav.rs`: Tab / Shift+Tab through
+  the visible markers, Enter opens the card, "follow selection", and the
+  fix for egui's bare-Tab focus grab. `route_path.rs` + `state.rs`: the trip
+  path of §13, phase 1 (one folder at a time; enabled trainer / pickup
+  anchors with Object / Script precision; same-step collapse into "3–5"
+  badges; straight segments between consecutive nodes in the current
+  scope; a disc click selects the event; hints when no folder is selected).
+  Every raw-input read stands down behind a modal
+  (`tests/map_modal_input.rs`). Tests: `xpr-map/tests/export.rs`,
+  `xpr-app/tests/{map_export, map_tools, map_navigator, map_navigation,
+  map_modal_input}.rs`; headless pictures: `xpr-app/examples/
+  {map_export_png, map_tools_png, map_navigator_png, map_route_path_png}.rs`
+  and `xpr-map/examples/export_png.rs`.
+- **Not done yet** (Phase 6–7, §13): warp projection and least-steps paths
+  (§13.2–13.3), the three-column layout, per-event pinned anchors, gen 4/5.
+
+---
+
+## 13. Trip path overlay (decided 2026-09-25, not built)
+
+**Scope (D15): the overlay draws the path of one folder — a "trip" — at a
+time, never the whole route.** The trip is the folder selected in the route
+list, or the nearest enclosing folder of the selected event; sub-folders are
+included, in the order `Router::all_groups` walks them (`router.rs:233`).
+Events directly under the root belong to no trip and draw nothing; the status
+strip then says "select a folder to see its path".
+
+Why one trip: the router does not know *how* the runner gets from one event
+to the next. Between trips that is almost always a non-walking hop (Fly, Dig,
+Teleport, Escape Rope, the S.S. Anne, the Magnet Train, a blackout), so a
+line through the whole route would be wrong at every join. Inside a trip the
+runner walks, the line means something, and the later least-steps
+computation (§13.3) has a chance of being right.
+
+### 13.1 Not modelled: how the runner enters and leaves maps
+
+Route events record *what* happens (a fight, a pickup, a heal) and never how
+the runner arrived: walk, Fly, Dig, Teleport, Escape Rope, boat, train, cable
+car, or a blackout warp. Nothing in `EventDefinition` (`events.rs:1090`)
+carries a travel method or a position; Save / Heal / Blackout events only
+carry a free-text location (`LocationEventDefinition`). Consequences for the
+overlay and for anything built on it:
+
+- It assumes the runner **walks between consecutive events of a trip**. A
+  trip that leaves a dungeon with Dig, or ends with Fly, gets its last
+  segment drawn as a walk (or, once §13.3 exists, a step count the runner
+  never pays). Until travel events exist the overlay just does not draw
+  anything beyond the trip's last anchored event.
+- It never connects the last event of one trip to the first of the next.
+- Where a walk between two events of one trip is impossible on the walkable
+  graph (§13.3), the segment is drawn dashed with no step count, which is
+  the honest rendering of "you did not walk this".
+
+Lifting it means a **travel event kind**, e.g.
+`"travel": {"method": "fly" | "dig" | "teleport" | "escape_rope" | "boat" |
+"train" | "walk", "to": "<map const>"}`, inserted like any other event, a
+no-op for the simulation (like notes), read permissively by old files (the
+D9 recipe, `events.rs:662-668`). With it the overlay draws a dashed hop for
+every non-walking method and the pathfinder restarts from the arrival step
+(Fly: the town's landing spot; Dig / Escape Rope: the entrance warp last
+used; Teleport: the last Pokémon Center). This is a route-format change and
+gets its own decision when it is needed.
+
+### 13.2 Design
+
+- **Anchors of a trip.** For each enabled group under the folder, in route
+  order, `query_for_event` (`map/state.rs`) then `MapPack::resolve`
+  (`links.rs`). Keep trainer and item anchors with `Precision::Object` or
+  `Script`; skip map-level anchors (wild encounters, trainers the game code
+  cannot place) until per-event pinned anchors exist (§3.9): a line to the
+  middle of a map is worse than no line. A trainer with several anchors
+  (rematch spots, starter variants) uses the first one, badged "1 of n",
+  again until a pinned anchor settles it.
+- **Nodes.** Consecutive anchors on the same step collapse into one node
+  whose badge reads `3–5`. Disabled events are skipped, as the simulation
+  skips them.
+- **Segments.** v1 draws a straight line between node centres
+  (`geom::step_center_px`). §13.3 later replaces each straight segment by
+  the walked polyline in the same structure, `Vec<(MapId, i32, i32)>` per
+  segment, so the drawing code does not change.
+- **Scopes.** In `Scope::World` an indoor node is projected to the outdoor
+  step of the warp that leads outside (breadth-first over `ObjectKind::Warp`
+  objects, following `Payload::Warp.dest_map`; measured 2026-09-25, this
+  reaches every indoor map except unused copies and link-cable rooms in
+  gen 1/2 and Battle Frontier rooms entered by script in Emerald; gen 1's
+  three `LAST_MAP` warps resolve to the map that warps in). Nodes inside
+  one building collapse to one badge at its door, labelled with the range.
+  In `Scope::Map(id)` only nodes on that map are drawn; a segment that
+  leaves the map ends with an arrow on the warp it takes and the name of the
+  next map.
+- **Rendering.** A new layer in `map/layers.rs` drawn between
+  `draw_markers` and `draw_focus`: a 3 px accent polyline with a 1 px dark
+  outline, an arrow head at each segment's midpoint, numbered 14 px badges
+  in the accent colour over the sprite, the selected event's badge ringed
+  like today's focus. Everything is world px through
+  `Camera::world_to_screen` and culled to the viewport like markers. A
+  "Path" chip in the toolbar toggles it (`map_toggles`).
+- **Interaction.** Clicking a badge emits `MapAction::SelectEvent`; moving
+  the list selection moves the ring, and moving it into another folder
+  switches the trip. A folder with no anchored events shows "no map
+  positions in this folder" in the status strip.
+- **Data flow.** `RouteMapState::sync` (already rebuilt on every route
+  change) gains `trip: Option<TripPath>` — folder id, name, ordered nodes,
+  per-segment polylines. Building it is one walk over the folder's groups
+  plus link lookups, cheap enough to redo on every sync.
+- **Tests** (headless, `xpr-app/tests/map_actions.rs` style): a folder of
+  three linked trainers on Route 3 gives three nodes in order; a disabled
+  event is skipped; two events on one step collapse; a trainer in Mt. Moon
+  B1F projects to the Route 4 side entrance in world scope; a folder without
+  anchors gives `None`; root-level events give `None`.
+
+Effort: a few days. No pipeline or pack change.
+
+### 13.3 Least steps between the events of a trip (after §13.2)
+
+- **Pack**: a new `collision.bin` per game, one byte per 16 px step per map,
+  indexed like `blockdata` in the manifest: floor, wall, water, ledge (with
+  its direction), grass, door/warp, cut tree, boulder, rock-smash rock,
+  waterfall, whirlpool, ice, forced-move / spinner. Sources verified
+  2026-09-25 in the shallow clones under `pokemap/repos/`:
+  - gen 1 `data/tilesets/collision_tile_ids.asm` (passable tiles per
+    tileset; the game tests the **bottom-left 8 px tile** of the step in
+    front: `_GetTileAndCoordsInFrontOfPlayer`, `engine/overworld/
+    player_state.asm`, `lda_coord 8,11 / 8,7 / 6,9 / 10,9`), plus
+    `pair_collision_tile_ids.asm`, `ledge_tiles.asm`, `cut_tree_blocks.asm`,
+    `door_tile_ids.asm`, `warp_tile_ids.asm`;
+  - gen 2 `data/tilesets/*_collision.asm` (a `COLL_*` type per block
+    quadrant, already parsed by pokemap for grass) with
+    `data/collision/collision_permissions.asm` (LAND / WATER / WALL / TALK);
+  - gen 3: the collision (bits 10–11) and elevation (bits 12–15) of every
+    `map.bin` word are **already in the shipped blockdata** (`pack.rs:229`
+    masks them off); ledges, doors, grass and water come from each tileset's
+    `metatile_attributes.bin` (`MB_JUMP_*`, `MB_TALL_GRASS`, …).
+- **Graph**: 4-connected steps of a scope; outdoor maps adjacent through the
+  layout; warps as unit edges; ledges one-way; gen 3 elevation must match.
+  A* with the Manhattan distance. Yellow has ~95 K steps and Emerald ~316 K
+  metatiles, so a segment costs milliseconds on the map worker thread;
+  results are cached per (from, to, gates) and invalidated with the route.
+- **Gates**, in order of value: HM gates from the trip's route state (the
+  HM item and the badge are known at each event), static NPCs as walls (the
+  pack does not carry movement types yet), the sight lines of trainers the
+  trip does not fight (sight ranges exist in all three decomps; pokemap
+  parses gen 2/3 today), and a curated list of story blockers per game
+  (Snorlax, gate guards, the Cerulean Rocket, Sudowoodo, …).
+- **Output**: each segment's step count beside its arrow and the trip total
+  in the status strip. Least steps, not least time: the bike, doors, ledges
+  and spinners change frames, not steps.
+- Effort: roughly two weeks for the geometry (pipeline export, graph, A*,
+  counts), one to two more for the gates. Gen 4/5 have no map yet (§2.7).

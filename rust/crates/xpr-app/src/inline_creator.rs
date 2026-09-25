@@ -10,6 +10,7 @@ use xpr_engine::{
     BagSwap, EvOverrideEventDefinition, EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal,
     NodeId, RouteState, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition,
 };
+use xpr_ui_kit::modal::behind_modal;
 use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets::{self, AmountEntry, Entry, SearchableDropdown, StyledButton};
 
@@ -719,7 +720,7 @@ impl InlineEventCreator {
             });
         });
         // Escape discards
-        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if !behind_modal(ui) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             discard = true;
         }
         if create_now && self.can_create() {

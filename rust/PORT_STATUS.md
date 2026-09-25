@@ -51,8 +51,28 @@ Crystal 95 % (the S.S. Aqua cabins are missing from pokemap's data),
 Emerald 97 %, FireRed/LeafGreen 96 %, Ruby/Sapphire 90 % (the rest are
 unplaced beta trainers). Overworld sprites (gen 1 town palettes, gen 2 NPC
 palettes incl. night, gen 3 keyed frames) followed the same day, drawn from a
-texture atlas. Left for later (SPEC §9, §12): item finder, PNG export,
-gen 4/5.
+texture atlas. The encounter cards (2026-09-25) are a Pokémon / Level /
+Rate / EV yield table — the EV column for gens 3+ from the router's own
+species data — wider than the object cards and scrolling past 60 % of the
+viewport; `examples/map_card_png.rs` renders any card to a PNG headless.
+Map display names (`maps.json` `display`, 2026-09-25) follow the router's
+location style — "Route 1", "Mt. Moon B1F", "SS Anne", "Silph Co.",
+"Hall of Fame" — via `displayName` in pokemap's `pipeline/export-router.js`
+(1,041 of 2,546 names changed when the pack was regenerated).
+Graphics tools (2026-09-25, `docs/rust_port/design/world_map/
+GRAPHICS_TOOLS_PLAN.md`): PNG export of the view / a marquee selection / one
+map / the whole world at 1–8× with the toggled layers (`xpr-map::export`
+renders in bands with progress and cancel; the app draws markers, grid,
+labels and the trip path over it through the software rasteriser; Map menu
+"Export Map Image…" Ctrl+Shift+P, "Copy Map View", `XPR_SMOKE_EXPORT=map`),
+copy to the clipboard, marquee (M / Shift+drag) and ruler (R) tools with a
+floating Zoom / Export / Copy / Add-trainers bar, a grid and map-name
+overlay, a "Layers ▾" popup replacing the toolbar chips, a navigator
+minimap with a zoom-presets menu on the readout, trainer / item search in
+the map search box, Tab / Shift+Tab marker navigation, follow-selection,
+and the trip path overlay (one folder at a time, SPEC D15 / §13, phase 1:
+straight segments, no warp projection). Left for later: warp projection and
+least-steps paths (SPEC §13.2–13.3), per-event pinned anchors, gen 4/5.
 
 ## Damage-calc verification (2026-09-23)
 
