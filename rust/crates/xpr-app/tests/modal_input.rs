@@ -37,6 +37,10 @@ struct Harness {
     quick_add: QuickAddPopover,
     assets: Assets,
     dialog: Option<AssignMoveDialog>,
+    /// Draw a menu bar (before the page, as the app's own bar is) and
+    /// where its "File" button landed.
+    menu_bar: bool,
+    menu_button: Option<Rect>,
     size: Vec2,
 }
 
@@ -54,18 +58,32 @@ impl Harness {
         ctrl.load_route(&root.join("tests/test_data").join(route));
         let _ = ctrl.take_signals();
         let list = RouteList::new(&cfg);
-        let mut h = Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add: QuickAddPopover::new(), assets: Assets::new(), dialog: None, size: Vec2::new(1000.0, 700.0) };
+        let mut h = Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add: QuickAddPopover::new(), assets: Assets::new(), dialog: None, menu_bar: false, menu_button: None, size: Vec2::new(1000.0, 700.0) };
         h.frame(vec![]);
         h.frame(vec![]);
         h
     }
 
-    /// One frame in the app's order: the page (here the route list), the
-    /// quick-add popover, then the dialog on top of everything.
+    /// One frame in the app's order: the menu bar (if any; at the bottom
+    /// here so the list's rows stay where `row_pos` puts them), the page
+    /// (here the route list), the quick-add popover, then the dialog on top
+    /// of everything.
     fn frame(&mut self, events: Vec<Event>) {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
-        let Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add, assets, dialog, .. } = self;
+        let Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add, assets, dialog, menu_bar, menu_button, .. } = self;
         let _ = ctx.run(input, |ctx| {
+            if *menu_bar {
+                egui::TopBottomPanel::bottom("menu_bar").show(ctx, |ui| {
+                    egui::MenuBar::new().ui(ui, |ui| {
+                        let r = ui.menu_button("File", |ui| {
+                            for i in 0..8 {
+                                let _ = ui.button(format!("Menu item {i}"));
+                            }
+                        });
+                        *menu_button = Some(r.response.rect);
+                    });
+                });
+            }
             egui::CentralPanel::default().show(ctx, |ui| {
                 let mut actions = ListActions::default();
                 list.ui(ui, theme, cfg, ctrl, &mut actions, true);
@@ -149,6 +167,37 @@ fn clicks_and_keys_on_a_dialog_do_not_reach_the_route_list() {
     h.click(Harness::row_pos(3, 100.0));
     let after = h.selected();
     assert!(!after.is_empty() && after != before, "with the dialog gone a click selects again");
+}
+
+#[test]
+fn clicks_while_a_menu_is_open_do_not_reach_the_route_list() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    h.menu_bar = true;
+    h.frame(vec![]);
+    h.click(Harness::row_pos(1, 300.0));
+    let before = h.selected();
+    assert!(!before.is_empty(), "a click on a row selects it");
+
+    // a click outside the menu only closes it
+    let button = h.menu_button.expect("the menu bar is drawn");
+    h.click(button.center());
+    assert!(egui::Popup::is_any_open(&h.ctx), "the menu opened");
+    h.click(Harness::row_pos(3, 600.0));
+    assert!(!egui::Popup::is_any_open(&h.ctx), "the click closed the menu");
+    assert_eq!(h.selected(), before, "the click that closes a menu must not select the row under it");
+
+    // nor does a click on one of its items over the list
+    h.click(button.center());
+    assert!(egui::Popup::is_any_open(&h.ctx), "the menu opened again");
+    let item = Pos2::new(button.min.x + 20.0, button.min.y - 40.0);
+    h.click(item);
+    assert!(!egui::Popup::is_any_open(&h.ctx), "picking an item closes the menu");
+    assert_eq!(h.selected(), before, "a click on a menu item must not select the row under it");
+
+    // with the menu closed the list takes clicks again
+    h.click(Harness::row_pos(3, 600.0));
+    let after = h.selected();
+    assert!(!after.is_empty() && after != before, "with the menu closed a click selects again");
 }
 
 #[test]

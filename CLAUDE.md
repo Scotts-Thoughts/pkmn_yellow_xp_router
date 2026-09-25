@@ -26,6 +26,12 @@ which changed where the move event was inserted.
   when it returns true. The only exceptions are reads that run only while the
   widget has keyboard focus, or during a drag it started. egui already drops
   focus and blocks new drags under a modal.
+- Open menus (the menu bar, combo boxes) have the same problem: the click
+  that dismisses a menu, or picks one of its items over the page, is still in
+  the raw input. For pointer hit-testing, use
+  `xpr_ui_kit::modal::pointer_blocked(ui)`. It covers a modal and also a popup
+  that was open at the start of the frame. The menu bar draws first and may
+  already have closed the menu by the time the page reads the click.
 - Secondary OS windows (`show_viewport_immediate`) are separate viewports that
   the main window's modal can't cover. While `self.dialog` or `self.message` is
   set, call `dialogs::block_secondary_window` inside them.

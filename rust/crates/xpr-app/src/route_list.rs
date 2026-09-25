@@ -13,7 +13,7 @@ use xpr_core::consts;
 use xpr_core::Config;
 use xpr_engine::view::RowValues;
 use xpr_engine::{EventDefinition, NodeId, ObjKind};
-use xpr_ui_kit::modal::behind_modal;
+use xpr_ui_kit::modal::pointer_blocked;
 use xpr_ui_kit::theme::{self, Theme};
 use xpr_ui_kit::widgets;
 
@@ -700,8 +700,9 @@ impl RouteList {
         let font = theme.body();
         let bold = theme.body_bold();
         let color_major = cfg.get_color_major_battles();
-        // rows, clicks and keys are read from raw input (see `xpr_ui_kit::modal`)
-        let blocked = behind_modal(ui);
+        // rows, clicks and keys are read from raw input, so they stand down
+        // under a dialog or an open menu (see `xpr_ui_kit::modal`)
+        let blocked = pointer_blocked(ui);
 
         // Column values and fit-to-contents widths (the widest value of any
         // row) only change with the rows or the font.
@@ -769,9 +770,10 @@ impl RouteList {
                 let mut y = body_top;
                 let clip = ui.clip_rect();
                 // Rows are hit-tested by hand from the raw pointer: while a
-                // dialog is up the list sees no pointer at all, or a click on
-                // the dialog selects the row under it (and moves where the
-                // dialog's event lands).
+                // dialog or a menu is up the list sees no pointer at all, or a
+                // click on the dialog (or the click that dismisses the menu)
+                // selects the row under it (and moves where a dialog's event
+                // lands).
                 let pointer = if blocked { None } else { ui.input(|i| i.pointer.interact_pos()) };
                 let primary_clicked = !blocked && ui.input(|i| i.pointer.primary_clicked());
                 let secondary_clicked = !blocked && ui.input(|i| i.pointer.secondary_clicked());

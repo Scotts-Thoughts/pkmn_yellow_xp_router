@@ -16,7 +16,7 @@ use xpr_data::Registry;
 use xpr_engine::{NodeId, ObjKind};
 use xpr_map::LinkQuery;
 use xpr_recorder::{starter, QuickStart, QuickStartPhase, StarterInfo};
-use xpr_ui_kit::modal::{behind_modal, layer_behind_modal};
+use xpr_ui_kit::modal::{behind_modal, layer_behind_modal, pointer_blocked};
 use xpr_ui_kit::theme::{self, Theme};
 use xpr_ui_kit::widgets::{self, Entry};
 use xpr_ui_kit::{AutoClearingLabel, Geometry, ShortcutMap, ToastHost};
@@ -2221,8 +2221,8 @@ impl XprApp {
         }
         ui.allocate_rect(full, Sense::hover());
         // keyboard focus follows the last click: outside the list, the list
-        // stops taking keys (a click on a dialog above the page is not one)
-        if let (false, true, Some(p), Some(r)) = (behind_modal(ui), ui.input(|i| i.pointer.primary_pressed()), ui.input(|i| i.pointer.interact_pos()), event_list_rect) {
+        // stops taking keys (a click on a dialog or menu above the page is not one)
+        if let (false, true, Some(p), Some(r)) = (pointer_blocked(ui), ui.input(|i| i.pointer.primary_pressed()), ui.input(|i| i.pointer.interact_pos()), event_list_rect) {
             if !r.contains(p) {
                 self.route_list.focused = false;
             }
