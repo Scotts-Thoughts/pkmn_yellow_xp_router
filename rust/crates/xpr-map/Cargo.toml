@@ -1,0 +1,23 @@
+[package]
+name = "xpr-map"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+xpr-core = { path = "../xpr-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+flate2 = "1"
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[build-dependencies]
+flate2 = "1"
+
+[features]
+default = []
+embed-map-data = []
+
+[dev-dependencies]
+xpr-data = { path = "../xpr-data" }

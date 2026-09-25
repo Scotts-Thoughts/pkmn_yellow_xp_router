@@ -29,6 +29,7 @@ const NOTES_H_EXPANDED: f32 = 168.0;
 pub const SAVE_DELAY_MS: u64 = 2000;
 pub const PRE_STATE_TAB: usize = 0;
 pub const BATTLE_SUMMARY_TAB: usize = 1;
+pub const MAP_TAB: usize = 2;
 
 /// What the panel asks the window to do this frame.
 #[derive(Clone, Debug, Default)]
@@ -40,6 +41,10 @@ pub struct DetailsActions {
     pub pre_state_assign_move_slot: Option<i64>,
     /// the EV column was clicked in the Pre-Event State stats card
     pub pre_state_override_evs: bool,
+    /// the Map tab is active: the window draws the map view into this rect
+    pub map_body: Option<egui::Rect>,
+    /// the editor's "Map" button: show the selected event on the map
+    pub show_on_map: bool,
 }
 
 pub struct EventDetails {
@@ -87,6 +92,10 @@ impl EventDetails {
         self.tab == BATTLE_SUMMARY_TAB
     }
 
+    pub fn is_map_tab(&self) -> bool {
+        self.tab == MAP_TAB
+    }
+
     /// `_tab_changed_callback`
     fn tab_changed(&mut self, cfg: &Config, actions: &mut DetailsActions) {
         let is_battle = self.is_battle_tab();
@@ -100,7 +109,7 @@ impl EventDetails {
     }
 
     pub fn change_tabs(&mut self, cfg: &Config, actions: &mut DetailsActions) {
-        self.tab = 1 - self.tab;
+        self.tab = if self.tab == BATTLE_SUMMARY_TAB { PRE_STATE_TAB } else { BATTLE_SUMMARY_TAB };
         self.tab_changed(cfg, actions);
     }
 
@@ -194,7 +203,9 @@ impl EventDetails {
     /// `_handle_selection` (also fired on record-mode changes)
     pub fn handle_selection(&mut self, cfg: &Config, ctrl: &mut MainController, actions: &mut DetailsActions) {
         let force_pre = self.suppress_battle_summary;
-        if ctrl.is_record_mode_active() {
+        // the Map tab stays put: the map is a working surface, not a per-event view
+        let on_map = self.tab == MAP_TAB;
+        if ctrl.is_record_mode_active() && !on_map {
             self.set_tab(cfg, BATTLE_SUMMARY_TAB, actions);
         }
         let sel = ctrl.get_single_selected_event_id(true);
@@ -227,7 +238,9 @@ impl EventDetails {
                     }
                     .unwrap_or_default();
                     let has_battle = trainer_def.trainer_def.is_some() || trainer_def.wild_pkmn_info.is_some();
-                    if force_pre {
+                    if on_map {
+                        // keep the map
+                    } else if force_pre {
                         self.set_tab(cfg, PRE_STATE_TAB, actions);
                     } else if self.ignore_tab_switching || self.auto_switch {
                         if ctrl.is_record_mode_active() {
@@ -414,7 +427,7 @@ impl EventDetails {
         let total_h = ui.available_height();
         // egui lays out top-down, so the pinned notes footer's height is
         // reserved up front and the tab body gets the rest.
-        let notes_h = if self.notes_expanded() { NOTES_H_EXPANDED } else { NOTES_H_COLLAPSED };
+        let notes_h = if self.tab == MAP_TAB { 0.0 } else if self.notes_expanded() { NOTES_H_EXPANDED } else { NOTES_H_COLLAPSED };
         let body_h = (total_h - notes_h).max(100.0);
         let width = ui.available_width();
         ui.allocate_ui_with_layout(Vec2::new(width, body_h), egui::Layout::top_down(egui::Align::Min), |ui| {
@@ -424,7 +437,7 @@ impl EventDetails {
             let mut tab = self.tab;
             let mut auto = self.auto_switch;
             let mut auto_toggled = false;
-            if widgets::tab_bar(ui, theme, &["Pre-Event State", "Battle Summary"], &mut tab, |ui| {
+            if widgets::tab_bar(ui, theme, &["Pre-Event State", "Battle Summary", "Map"], &mut tab, |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 let r = ui.add(egui::Label::new(egui::RichText::new("Auto-switch tabs").font(theme.body()).color(theme.secondary)).sense(egui::Sense::click()));
                 if r.clicked() {
@@ -443,6 +456,12 @@ impl EventDetails {
                 cfg.set_auto_switch(auto);
             }
             let content_h = (body_h - widgets::TAB_STRIP_H).max(50.0);
+            if self.tab == MAP_TAB {
+                let r = ui.available_rect_before_wrap();
+                actions.map_body = Some(r);
+                ui.allocate_rect(r, egui::Sense::hover());
+                return;
+            }
             if self.tab == PRE_STATE_TAB {
                 self.pre_state_tab(ui, theme, cfg, ctrl, assets, content_h, actions);
             } else {
@@ -454,6 +473,9 @@ impl EventDetails {
                 });
             }
         });
+        if self.tab == MAP_TAB {
+            return;
+        }
         let (out, mode_changed) = self.notes.ui(ui, theme, cfg);
         if mode_changed {
             self.update_notes_visibility(cfg);
@@ -574,6 +596,9 @@ impl EventDetails {
                     let init = self.current_init_state.clone();
                     let ctx = EditorCtx { theme, gen: &gen, cfg, cur_state: init.as_deref(), event_type: &et, enabled: self.allow_updates };
                     let (out, reload) = self.editors.ui(ui, &ctx, assets, &before);
+                    if out.show_on_map {
+                        actions.show_on_map = true;
+                    }
                     if out.save {
                         self.update_existing_event(cfg, ctrl);
                     }

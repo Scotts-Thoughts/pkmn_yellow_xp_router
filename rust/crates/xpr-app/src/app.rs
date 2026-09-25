@@ -14,6 +14,7 @@ use xpr_core::io_utils;
 use xpr_core::{Config, Paths};
 use xpr_data::Registry;
 use xpr_engine::{NodeId, ObjKind};
+use xpr_map::LinkQuery;
 use xpr_recorder::{starter, QuickStart, QuickStartPhase, StarterInfo};
 use xpr_ui_kit::theme::{self, Theme};
 use xpr_ui_kit::widgets::{self, Entry};
@@ -28,8 +29,9 @@ use crate::dialogs::{
     DialogCtx, DialogOutcome, FinalTrainersDialog, HighlightColorDialog, LoadRouteDialog, MatchupExportDialog, MessageBox,
     MsgButtons, MsgChoice, MsgTag, NewFolderDialog, ShortcutsDialog, TransferDialog,
 };
-use crate::event_details::{DetailsActions, EventDetails, BATTLE_SUMMARY_TAB};
+use crate::event_details::{DetailsActions, EventDetails, BATTLE_SUMMARY_TAB, MAP_TAB, PRE_STATE_TAB};
 use crate::filter_bar::FilterBar;
+use crate::map::{MapAction, MapView};
 use crate::pages::{quick_start_ui, LandingActions, LandingPage, NewRouteActions, NewRoutePage, QuickStartActions};
 use crate::quick_add::QuickAddPopover;
 use crate::recorder_glue::{gamehook_url, Recorder};
@@ -143,6 +145,7 @@ pub struct XprApp {
     route_list: RouteList,
     filter_bar: FilterBar,
     details: EventDetails,
+    map: MapView,
     quick_add: QuickAddPopover,
     dialog: Option<Dialog>,
     message: Option<MessageBox>,
@@ -177,6 +180,8 @@ pub struct XprApp {
     update: UpdateState,
     pre_state_fraction: Option<f64>,
     battle_fraction: Option<f64>,
+    map_fraction: Option<f64>,
+    map_restore_pending: bool,
     splitter_save_deadline: Option<Instant>,
     splitter_dragging: bool,
     initial_splitter_applied: bool,
@@ -228,6 +233,8 @@ impl XprApp {
         let details = EventDetails::new(&cfg);
         let pre_state_fraction = cfg.get_pre_state_left_fraction();
         let battle_fraction = cfg.get_battle_summary_left_fraction();
+        let map_fraction = cfg.get_map_left_fraction();
+        let map = MapView::new(&cfg, &paths.pokemon_raw_data);
         XprApp {
             cfg,
             paths,
@@ -242,6 +249,7 @@ impl XprApp {
             route_list,
             filter_bar: FilterBar::new(),
             details,
+            map,
             quick_add: QuickAddPopover::new(),
             dialog: None,
             message: None,
@@ -267,6 +275,8 @@ impl XprApp {
             update: UpdateState { rx: Some(urx), startup_check: true, deferred_version: None, deferred_url: None, requested: false, check_button_enabled: true },
             pre_state_fraction,
             battle_fraction,
+            map_fraction,
+            map_restore_pending: true,
             splitter_save_deadline: None,
             splitter_dragging: false,
             initial_splitter_applied: false,
@@ -409,6 +419,7 @@ impl XprApp {
                 self.show_landing_page();
             }
             self.details.handle_route_change(&self.cfg, &mut self.ctrl);
+            self.map.sync_route(&self.ctrl);
             if let Some(rs) = self.run_summary.as_mut() {
                 rs.refresh(&self.ctrl);
             }
@@ -427,6 +438,7 @@ impl XprApp {
                 self.route_list.scroll_to_selected_events(&mut self.ctrl);
             }
             self.details.handle_selection(&self.cfg, &mut self.ctrl, &mut actions);
+            self.map.sync_route(&self.ctrl);
         }
         if sig.record_mode_changed {
             self.recorder.on_recording_mode_changed(&self.ctrl, &self.cfg);
@@ -464,6 +476,9 @@ impl XprApp {
 
     fn apply_details_actions(&mut self, ctx: &egui::Context, actions: DetailsActions) {
         let _ = ctx;
+        if actions.show_on_map {
+            self.show_selected_on_map();
+        }
         if let Some(_is_battle) = actions.tab_changed {
             // the splitter re-proportions from the saved fractions (drawn from state)
         }
@@ -732,6 +747,12 @@ impl XprApp {
         if fire("toggle_summary") {
             self.open_summary_window();
         }
+        if fire("toggle_map") {
+            self.toggle_map();
+        }
+        if fire("show_on_map") {
+            self.show_selected_on_map();
+        }
         for i in 1..=8 {
             if fire(&format!("gym_{}", i)) && !text_focus {
                 self.select_gym_leader(i - 1);
@@ -961,6 +982,122 @@ impl XprApp {
             let was_docked = rs.docked;
             self.cfg.set_run_summary_docked(!was_docked);
             rs.docked = !was_docked;
+        }
+    }
+
+    // ---- world map (docs/rust_port/design/world_map/SPEC.md) --------------------------
+
+    fn map_is_shown(&self) -> bool {
+        if self.map.docked {
+            self.details.is_map_tab()
+        } else {
+            self.map.open
+        }
+    }
+
+    /// Show the map: the Map tab of the right pane, or its own window.
+    fn open_map(&mut self) {
+        if self.map.docked && self.page == Page::Editor {
+            let mut da = DetailsActions::default();
+            self.details.set_tab(&self.cfg, MAP_TAB, &mut da);
+        }
+        self.map.open = true;
+        self.cfg.set_map_open(true);
+    }
+
+    fn close_map(&mut self) {
+        if self.details.is_map_tab() {
+            let mut da = DetailsActions::default();
+            self.details.set_tab(&self.cfg, PRE_STATE_TAB, &mut da);
+        }
+        self.map.open = false;
+        self.cfg.set_map_open(false);
+    }
+
+    fn toggle_map(&mut self) {
+        if self.map_is_shown() {
+            self.close_map();
+        } else {
+            self.open_map();
+        }
+    }
+
+    fn undock_map(&mut self) {
+        self.map.docked = false;
+        self.cfg.set_map_docked(false);
+        if self.details.is_map_tab() {
+            let mut da = DetailsActions::default();
+            self.details.set_tab(&self.cfg, PRE_STATE_TAB, &mut da);
+        }
+        self.map.open = true;
+        self.cfg.set_map_open(true);
+    }
+
+    fn dock_map(&mut self) {
+        self.map.docked = true;
+        self.cfg.set_map_docked(true);
+        self.open_map();
+    }
+
+    /// "Show on map": focus the selected event's trainer / item pickup / species.
+    fn show_selected_on_map(&mut self) {
+        let Some(id) = self.ctrl.get_single_selected_event_id(true) else {
+            self.toast.show("Select an event first", 2500, None);
+            return;
+        };
+        let Some(q) = crate::map::state::query_for_event(&self.ctrl, id) else {
+            self.toast.show("This event has no map location", 2500, None);
+            return;
+        };
+        if MapView::game_of(&self.ctrl).is_none() {
+            self.toast.show("No map data for this game (gens 1\u{2013}3 only)", 3000, None);
+            return;
+        }
+        self.open_map();
+        let label = match &q {
+            LinkQuery::Trainer(n) | LinkQuery::Item(n) | LinkQuery::Species(n) => n.clone(),
+        };
+        if self.map.request_focus(q, label) == Some(false) {
+            self.toast.show("No map location known for this event", 3000, None);
+        }
+    }
+
+    fn apply_map_actions(&mut self, _ctx: &egui::Context, actions: Vec<MapAction>) {
+        for a in actions {
+            match a {
+                MapAction::AddTrainer { name } => {
+                    if self.ctrl.add_trainer_fight_from_map(&name).is_none() {
+                        self.toast.show(format!("Could not add {}", name), 2500, None);
+                    }
+                }
+                MapAction::AddItem { name } => {
+                    if self.ctrl.add_item_pickup_from_map(&name).is_none() {
+                        self.toast.show(format!("Could not add {}", name), 2500, None);
+                    }
+                }
+                MapAction::AddWild { species, level } => {
+                    if self.ctrl.add_wild_from_map(&species, level).is_none() {
+                        self.toast.show(format!("Could not add {}", species), 2500, None);
+                    }
+                }
+                MapAction::AddAllTrainers { map } => {
+                    let names = self.map.trainers_to_add(map);
+                    if names.is_empty() {
+                        self.toast.show("Nothing left to add on this map", 2500, None);
+                        continue;
+                    }
+                    let base = self.map.map_display_name(map);
+                    let count = names.len();
+                    match self.ctrl.add_trainers_in_new_folder(&base, &names) {
+                        Some(_) => self.toast.show(format!("Added {} trainers from {}", count, base), 3000, None),
+                        None => self.toast.show("Could not add the trainers", 2500, None),
+                    }
+                }
+                MapAction::SelectEvent(id) => self.ctrl.select_new_events(vec![id]),
+                MapAction::Undock => self.undock_map(),
+                MapAction::Dock => self.dock_map(),
+                MapAction::Close => self.close_map(),
+            }
         }
     }
 
@@ -1696,6 +1833,26 @@ impl XprApp {
                 }
                 let _ = can_split;
             });
+            ui.menu_button("Map", |ui| {
+                ui.set_min_width(260.0);
+                let has_route = self.ctrl.get_version().is_some();
+                if widgets::menu_check_item(ui, &theme, "Show Map", &label("toggle_map"), self.map_is_shown(), has_route) {
+                    self.toggle_map();
+                }
+                if widgets::menu_item(ui, &theme, "Show Selected Event on Map", &label("show_on_map"), has_route) {
+                    self.show_selected_on_map();
+                }
+                widgets::menu_separator(ui, &theme);
+                let docked = self.map.docked;
+                let text = if docked { "Open Map in Its Own Window" } else { "Dock Map in the Editor" };
+                if widgets::menu_item(ui, &theme, text, "", has_route) {
+                    if docked {
+                        self.undock_map();
+                    } else {
+                        self.dock_map();
+                    }
+                }
+            });
             ui.menu_button("Highlight", |ui| {
                 ui.set_min_width(200.0);
                 for i in 1..=9 {
@@ -1876,8 +2033,20 @@ impl XprApp {
     fn editor_page(&mut self, ui: &mut Ui, ctx: &egui::Context) -> Option<Rect> {
         let theme = self.theme.clone();
         let total = ui.available_width();
+        if self.map_restore_pending {
+            // reopen the map tab when it was open at the last exit
+            self.map_restore_pending = false;
+            if self.map.open && self.map.docked {
+                let mut da = DetailsActions::default();
+                self.details.set_tab(&self.cfg, MAP_TAB, &mut da);
+            }
+        }
         let is_battle = self.details.is_battle_tab();
-        let mut left = if is_battle {
+        let is_map = self.details.is_map_tab();
+        let mut left = if is_map {
+            let f = self.map_fraction.filter(|f| *f > 0.0).unwrap_or(0.35);
+            (total as f64 * f).max(200.0) as f32
+        } else if is_battle {
             let f = self.battle_fraction.filter(|f| *f > 0.0).unwrap_or(0.30);
             (total as f64 * f).max(200.0) as f32
         } else {
@@ -1898,6 +2067,7 @@ impl XprApp {
         let right_rect = Rect::from_min_max(Pos2::new(handle_x + 1.5, full.min.y), full.max);
         let mut event_list_rect: Option<Rect> = None;
         let mut list_actions = ListActions::default();
+        let mut map_actions: Vec<MapAction> = Vec::new();
         let text_focus = self.text_field_focused(ctx);
         {
             let mut lui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect).layout(egui::Layout::top_down(egui::Align::Min)));
@@ -1933,7 +2103,9 @@ impl XprApp {
         if resp.dragged() {
             let new_left = (left + resp.drag_delta().x).clamp(200.0, (total - 200.0).max(200.0));
             let fraction = (new_left / total) as f64;
-            if is_battle {
+            if is_map {
+                self.map_fraction = Some(fraction);
+            } else if is_battle {
                 self.battle_fraction = Some(fraction);
             } else {
                 self.pre_state_fraction = Some(fraction);
@@ -1947,6 +2119,10 @@ impl XprApp {
             let mut actions = DetailsActions::default();
             let t = Instant::now();
             self.details.ui(&mut rui, &theme, &mut self.cfg, &mut self.ctrl, &mut self.assets, &mut actions);
+            if let Some(rect) = actions.map_body.take() {
+                let mut mui = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Min)));
+                map_actions.extend(self.map.ui(&mut mui, &theme, &mut self.cfg, &self.ctrl, &mut self.assets));
+            }
             if self.frame_log {
                 self.frame_parts.1 = t.elapsed();
             }
@@ -1960,6 +2136,7 @@ impl XprApp {
             }
         }
         self.apply_list_actions(ctx, list_actions);
+        self.apply_map_actions(ctx, map_actions);
         event_list_rect
     }
 
@@ -1967,7 +2144,9 @@ impl XprApp {
         if let Some(d) = self.splitter_save_deadline {
             if Instant::now() >= d {
                 self.splitter_save_deadline = None;
-                if self.details.is_battle_tab() {
+                if self.details.is_map_tab() {
+                    self.cfg.set_map_left_fraction(self.map_fraction);
+                } else if self.details.is_battle_tab() {
                     self.cfg.set_battle_summary_left_fraction(self.battle_fraction);
                 } else {
                     self.cfg.set_pre_state_left_fraction(self.pre_state_fraction);
@@ -2154,6 +2333,18 @@ impl XprApp {
                             self.record_button_clicked();
                         }
                         self.smoke_arm_record_stop(&path);
+                    }
+                    Ok("map") => {
+                        // open the map tab; `XPR_SMOKE_EVENT=<substring>` also selects
+                        // that event and shows it on the map
+                        self.open_map();
+                        if let Ok(w) = std::env::var("XPR_SMOKE_EVENT") {
+                            let pick = self.ctrl.router.all_groups().into_iter().find(|g| self.ctrl.router.group(*g).map(|x| x.name.contains(w.as_str())).unwrap_or(false));
+                            if let Some(g) = pick {
+                                self.ctrl.select_new_events(vec![g]);
+                                self.show_selected_on_map();
+                            }
+                        }
                     }
                     Ok("newroute") => self.open_new_route_window(),
                     Ok("summary") => self.open_summary_window(),
@@ -2541,6 +2732,33 @@ impl XprApp {
             if export {
                 self.request_shot(ShotKind::RunSummary);
             }
+        }
+        if self.map.open && !self.map.docked && self.page == Page::Editor {
+            let theme2 = theme.clone();
+            let mut closed = false;
+            let mut map_actions: Vec<MapAction> = Vec::new();
+            {
+                let map = &mut self.map;
+                let cfg = &mut self.cfg;
+                let ctrl = &self.ctrl;
+                let assets = &mut self.assets;
+                ctx.show_viewport_immediate(
+                    egui::ViewportId::from_hash_of("world_map"),
+                    egui::ViewportBuilder::default().with_title("Map").with_inner_size([960.0, 720.0]),
+                    |ctx, _class| {
+                        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(0))).show(ctx, |ui| {
+                            map_actions = map.ui(ui, &theme2, cfg, ctrl, assets);
+                        });
+                        if ctx.input(|i| i.viewport().close_requested()) {
+                            closed = true;
+                        }
+                    },
+                );
+            }
+            if closed {
+                self.close_map();
+            }
+            self.apply_map_actions(ctx, map_actions);
         }
         self.event_list_rect = event_list_rect;
         self.setup_summary_rect = setup_summary_rect;

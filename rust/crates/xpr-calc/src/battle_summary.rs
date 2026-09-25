@@ -5,6 +5,7 @@
 //! `save_transient_state` / `restore_transient_state` helpers here.
 
 use std::collections::{BTreeSet, HashMap};
+use std::sync::Arc;
 
 use indexmap::IndexMap;
 use serde_json::{json, Value};
@@ -38,6 +39,14 @@ pub struct MoveRenderInfo {
     pub stat_stage_options: Option<Vec<String>>,
     pub stat_stage_selection: String,
     pub stat_stage_info: StatStageInfo,
+    /// `Some` only for a Metronome slot: the move picked for Metronome to
+    /// call in this matchup (empty until one is picked). The ranges above are
+    /// that move's. Not part of the golden JSON (Python has no equivalent).
+    pub metronome_selection: Option<String>,
+    /// `Some` only for a Metronome slot: its dropdown's rows -- a blank (no
+    /// pick) first, then every move Metronome can call for this attacker in
+    /// this matchup (`GenData::metronome_callable_moves`).
+    pub metronome_options: Option<Arc<Vec<String>>>,
 }
 
 impl MoveRenderInfo {
@@ -776,9 +785,39 @@ impl BattleSummary {
         if move_name.is_empty() {
             return None;
         }
-        let mv = gen.move_db().get_move(move_name)?.clone();
+        let mut mv = gen.move_db().get_move(move_name)?.clone();
+        // Metronome has no damage of its own: its ranges are those of the move
+        // picked for it in this matchup (stored under "Metronome" in the custom
+        // move data), and none until one is picked. A Mimic slot copying
+        // Metronome keeps its Mimic display and stays plain Metronome.
+        let mut metronome_selection: Option<String> = None;
+        let mut metronome_options: Option<Arc<Vec<String>>> = None;
+        if mv.name == consts::METRONOME_MOVE_NAME && move_display_name.is_none_or(|d| d == consts::METRONOME_MOVE_NAME) {
+            // What Metronome can call depends on the attacker's own moves
+            // (gens 2 and 4) and on Gravity, which covers the whole field. A
+            // stored pick it can't call right now counts as no pick.
+            let known = &attacking_mon.move_list;
+            let gravity = attacking_field.gravity || defending_field.gravity;
+            let picked = self
+                .custom_move_data
+                .get(mon_idx)
+                .and_then(|c| c.side(is_player).get(consts::METRONOME_MOVE_NAME))
+                .filter(|name| gen.metronome_can_call(name, known, gravity))
+                .and_then(|name| gen.move_db().get_move(name))
+                .cloned();
+            metronome_selection = Some(picked.as_ref().map(|m| m.name.clone()).unwrap_or_default());
+            let mut options = vec![String::new()];
+            options.extend(gen.metronome_callable_moves(known, gravity));
+            metronome_options = Some(Arc::new(options));
+            if let Some(called) = picked {
+                mv = called;
+            }
+        }
         let mut display_name: Option<String> = move_display_name.map(|s| s.to_string());
-        if mv.name == consts::HIDDEN_POWER_MOVE_NAME {
+        if metronome_selection.is_some() {
+            // the header keeps showing "Metronome"; the dropdown shows the pick
+            display_name = Some(consts::METRONOME_MOVE_NAME.to_string());
+        } else if mv.name == consts::HIDDEN_POWER_MOVE_NAME {
             let (t, p) = gen.get_hidden_power(&attacking_mon.dvs);
             display_name = Some(format!("{} ({}: {})", mv.name, t, p));
         } else if mv.name == consts::NATURAL_GIFT_MOVE_NAME {
@@ -795,7 +834,13 @@ impl BattleSummary {
         let display_name = display_name.unwrap_or_else(|| mv.name.clone());
 
         let custom_lookup = self.custom_move_data.get(mon_idx).map(|c| c.side(is_player));
-        let mut custom_data_selection: Option<String> = custom_lookup.and_then(|m| m.get(move_name).cloned());
+        // A Metronome slot's custom-data entry holds the pick, so the called
+        // move runs with its own default custom data.
+        let mut custom_data_selection: Option<String> = if metronome_selection.is_some() {
+            None
+        } else {
+            custom_lookup.and_then(|m| m.get(move_name).cloned())
+        };
         let mut custom_data_options: Option<Vec<String>> = gen.get_move_custom_data(&mv.name).cloned();
         if custom_data_options.is_none() && mv.has_flavor(consts::FLAVOR_MULTI_HIT) {
             custom_data_options = Some(consts::MULTI_HIT_CUSTOM_DATA.iter().map(|s| s.to_string()).collect());
@@ -919,7 +964,8 @@ impl BattleSummary {
         };
 
         let is_mimic_placeholder = move_display_name == Some(consts::MIMIC_MOVE_NAME) && mv.name != self.mimic_selection;
-        let (stat_stage_options, stat_stage_info, stat_stage_selection) = if self.using_global_setup || is_mimic_placeholder {
+        // Metronome's header has no room for a stepper next to its dropdown
+        let (stat_stage_options, stat_stage_info, stat_stage_selection) = if self.using_global_setup || is_mimic_placeholder || metronome_selection.is_some() {
             (None, StatStageInfo::default(), "0".to_string())
         } else {
             let opts = gen.move_db().get_stat_stage_dropdown_options(&mv.name, gen.gen);
@@ -965,6 +1011,8 @@ impl BattleSummary {
             stat_stage_options,
             stat_stage_selection,
             stat_stage_info,
+            metronome_selection,
+            metronome_options,
         })
     }
 

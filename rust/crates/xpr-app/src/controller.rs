@@ -13,8 +13,8 @@ use xpr_core::{Config, Paths};
 use xpr_data::model::{Nature, StatBlock};
 use xpr_data::{GenData, Registry};
 use xpr_engine::{
-    EvOverrideEventDefinition, EventDefinition, InsertSpec, LearnMoveEventDefinition, LevelVal, NodeId, ObjKind, Router, RouteState,
-    TrainerEventDefinition, UndoManager,
+    EvOverrideEventDefinition, EventDefinition, InsertSpec, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, NodeId, ObjKind, Router,
+    RouteState, TrainerEventDefinition, UndoManager, WildPkmnEventDefinition,
 };
 
 /// The callbacks of the Python controller, as "fired this frame" flags.
@@ -743,6 +743,88 @@ impl MainController {
             self.select_new_events(vec![result]);
         }
         Some(result)
+    }
+
+    // ---- "add to route" from the world map (docs/rust_port/design/world_map/SPEC.md §3.7) ----
+
+    /// A folder name that does not exist yet ("Route 3", "Route 3 Trip:2", ...).
+    pub fn unique_folder_name(&self, base: &str) -> String {
+        let all: std::collections::HashSet<String> = self.get_all_folder_names().into_iter().collect();
+        let base = if base.trim().is_empty() { "New Folder" } else { base };
+        let mut name = base.to_string();
+        let mut count = 1;
+        while all.contains(&name) {
+            count += 1;
+            name = format!("{} Trip:{}", base, count);
+        }
+        name
+    }
+
+    fn trainer_fight_def(&self, gen: &Arc<GenData>, name: &str) -> Option<EventDefinition> {
+        let trainer = gen.trainer_db().get_trainer(name)?.clone();
+        let mut temp = EventDefinition::with_trainer(TrainerEventDefinition::new(&trainer.name));
+        if trainer.double_battle {
+            let n = temp.pokemon_list(gen).map(|l| l.len()).unwrap_or(0);
+            if let Some(t) = temp.trainer_def.as_mut() {
+                t.exp_split = vec![2; n];
+            }
+        }
+        Some(temp)
+    }
+
+    /// A trainer fight for a map marker, inserted after the selection — or,
+    /// when a folder is selected, into a new folder named after the
+    /// trainer's location (the quick-add popover's rule).
+    pub fn add_trainer_fight_from_map(&mut self, name: &str) -> Option<NodeId> {
+        let gen = self.gen()?;
+        let def = self.trainer_fight_def(&gen, name)?;
+        let location = gen.trainer_db().get_trainer(name).map(|t| t.location.clone()).unwrap_or_default();
+        let selected_id = self.get_single_selected_event_id(true);
+        let is_folder = selected_id.map(|id| self.router.obj_kind(id) == Some(ObjKind::Folder)).unwrap_or(false);
+        if is_folder {
+            let folder_name = self.unique_folder_name(&location);
+            self.finalize_new_folder(&folder_name, None, selected_id);
+            self.new_event(def, None, None, Some(&folder_name), true)
+        } else {
+            self.new_event(def, selected_id, None, None, true)
+        }
+    }
+
+    /// An item pickup ("Get Free Item") after the selection.
+    pub fn add_item_pickup_from_map(&mut self, name: &str) -> Option<NodeId> {
+        let gen = self.gen()?;
+        let item = gen.item_db().get_item(name)?.clone();
+        let after = self.get_single_selected_event_id(true);
+        self.new_event(EventDefinition::with_item(InventoryEventDefinition::new(&item.name, 1, true, false, None)), after, None, None, true)
+    }
+
+    /// A wild encounter after the selection.
+    pub fn add_wild_from_map(&mut self, species: &str, level: i64) -> Option<NodeId> {
+        let gen = self.gen()?;
+        let mon = gen.pkmn_db().get_pkmn(species)?.clone();
+        let after = self.get_single_selected_event_id(true);
+        self.new_event(EventDefinition::with_wild(WildPkmnEventDefinition::new(&mon.name, level, 1, false)), after, None, None, true)
+    }
+
+    /// Every trainer of a map, in order, into a new folder after the
+    /// selection. Returns the last event added.
+    pub fn add_trainers_in_new_folder(&mut self, folder_base: &str, names: &[String]) -> Option<NodeId> {
+        let gen = self.gen()?;
+        let defs: Vec<EventDefinition> = names.iter().filter_map(|n| self.trainer_fight_def(&gen, n)).collect();
+        if defs.is_empty() {
+            return None;
+        }
+        let folder = self.unique_folder_name(folder_base);
+        let after = self.get_single_selected_event_id(true);
+        self.finalize_new_folder(&folder, None, after);
+        let mut last = None;
+        for def in defs {
+            last = self.new_event(def, None, None, Some(&folder), false);
+        }
+        if let Some(id) = last {
+            self.select_new_events(vec![id]);
+        }
+        last
     }
 
     /// Pre-Event State's "click a move to replace it": insert a Tutor move

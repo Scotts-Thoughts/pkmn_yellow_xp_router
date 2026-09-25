@@ -13,6 +13,7 @@ xpr-core = { path = "../xpr-core" }
 xpr-data = { path = "../xpr-data", features = ["embed-data"] }
 xpr-engine = { path = "../xpr-engine" }
 xpr-calc = { path = "../xpr-calc" }
+xpr-map = { path = "../xpr-map", features = ["embed-map-data"] }
 xpr-recorder = { path = "../xpr-recorder" }
 xpr-update = { path = "../xpr-update" }
 xpr-ui-kit = { path = "../xpr-ui-kit" }

@@ -11,6 +11,7 @@ use serde_json::Value;
 
 use xpr_core::consts;
 use xpr_core::floor_div;
+use xpr_core::io_utils::sanitize_string;
 
 use crate::badges::BadgeList;
 use crate::db::{ItemDB, MinBattlesDB, MoveDB, PkmnDB, TrainerDB};
@@ -327,6 +328,44 @@ impl GenData {
         gen_consts::custom_move_data_table(self.gen).get(move_name)
     }
 
+    /// Whether Metronome can call `move_name` for a user that knows
+    /// `known_moves`, with `gravity` in effect (rules in `gen_consts`).
+    pub fn metronome_can_call(&self, move_name: &str, known_moves: &[Option<String>], gravity: bool) -> bool {
+        let known = sanitized_moves(known_moves);
+        match self.move_db.get_move(move_name) {
+            Some(mv) => self.metronome_can_call_name(&mv.name, &known, gravity),
+            None => false,
+        }
+    }
+
+    /// Every move Metronome can call for that user, in move-list order.
+    pub fn metronome_callable_moves(&self, known_moves: &[Option<String>], gravity: bool) -> Vec<String> {
+        let known = sanitized_moves(known_moves);
+        self.move_db
+            .iter()
+            .filter(|mv| self.metronome_can_call_name(&mv.name, &known, gravity))
+            .map(|mv| mv.name.clone())
+            .collect()
+    }
+
+    /// `name` is the move data's own spelling; `known` is sanitized, since a
+    /// mon's move list may spell a move the way another generation does
+    /// ("DoubleSlap" / "Double Slap").
+    fn metronome_can_call_name(&self, name: &str, known: &[String], gravity: bool) -> bool {
+        let listed = |list: &[&str]| list.iter().any(|m| m.eq_ignore_ascii_case(name));
+        if listed(gen_consts::metronome_uncallable_moves(self.gen)) {
+            return false;
+        }
+        if gen_consts::metronome_skips_known_moves(self.gen) && !known.is_empty() && known.contains(&sanitize_string(name)) {
+            return false;
+        }
+        let checks_gravity = matches!(
+            self.effective_version(),
+            consts::PLATINUM_VERSION | consts::HEART_GOLD_VERSION | consts::SOUL_SILVER_VERSION
+        );
+        !(gravity && checks_gravity && listed(&gen_consts::METRONOME_GRAVITY_BLOCKED))
+    }
+
     /// `get_hidden_power(dvs) -> (type, base_power)`
     pub fn get_hidden_power(&self, dvs: &StatBlock) -> (String, i64) {
         match self.gen {
@@ -531,4 +570,8 @@ impl GenData {
         .map_err(|e| e.to_string())?;
         Ok(folder)
     }
+}
+
+fn sanitized_moves(moves: &[Option<String>]) -> Vec<String> {
+    moves.iter().flatten().filter(|m| !m.is_empty()).map(|m| sanitize_string(m)).collect()
 }

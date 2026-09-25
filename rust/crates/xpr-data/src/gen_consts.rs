@@ -789,3 +789,69 @@ pub fn bag_limit(gen: Gen) -> Option<usize> {
         _ => None,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Metronome
+// ---------------------------------------------------------------------------
+
+const METRONOME_UNCALLABLE_GEN1: &[&str] = &["Metronome", "Struggle"];
+
+/// pokecrystal / pokegold `MetronomeExcepts`
+const METRONOME_UNCALLABLE_GEN2: &[&str] = &[
+    "Metronome", "Struggle", "Sketch", "Mimic", "Counter", "Mirror Coat", "Protect", "Detect",
+    "Endure", "Destiny Bond", "Sleep Talk", "Thief",
+];
+
+/// pokeruby / pokeemerald / pokefirered `sMovesForbiddenToCopy`
+const METRONOME_UNCALLABLE_GEN3: &[&str] = &[
+    "Metronome", "Struggle", "Sketch", "Mimic", "Counter", "Mirror Coat", "Protect", "Detect",
+    "Endure", "Destiny Bond", "Sleep Talk", "Thief", "Follow Me", "Snatch", "Helping Hand",
+    "Covet", "Trick", "Focus Punch",
+];
+
+/// pokeplatinum `sCannotMetronomeMoves`, pokeheartgold
+/// `sMetronomeUnuseableMoves` and the same table in pokediamond's battle
+/// overlay (`ov11_0225E300`)
+const METRONOME_UNCALLABLE_GEN4: &[&str] = &[
+    "Metronome", "Struggle", "Sketch", "Mimic", "Chatter", "Sleep Talk", "Assist", "Mirror Move",
+    "Counter", "Mirror Coat", "Protect", "Detect", "Endure", "Destiny Bond", "Thief", "Follow Me",
+    "Snatch", "Helping Hand", "Covet", "Trick", "Focus Punch", "Feint", "Copycat", "Me First",
+    "Switcheroo",
+];
+
+/// Black/White have no battle decomp: this is Pokémon Showdown's gen 5 set
+/// (the gen 5 moves without its `metronome` flag), whose gen 4 set matches
+/// the gen 4 decomp table above exactly.
+const METRONOME_UNCALLABLE_GEN5: &[&str] = &[
+    "After You", "Assist", "Bestow", "Chatter", "Copycat", "Counter", "Covet", "Destiny Bond",
+    "Detect", "Endure", "Feint", "Focus Punch", "Follow Me", "Freeze Shock", "Helping Hand",
+    "Ice Burn", "Me First", "Metronome", "Mimic", "Mirror Coat", "Mirror Move", "Nature Power",
+    "Protect", "Quash", "Quick Guard", "Rage Powder", "Relic Song", "Secret Sword", "Sketch",
+    "Sleep Talk", "Snarl", "Snatch", "Snore", "Struggle", "Switcheroo", "Techno Blast", "Thief",
+    "Transform", "Trick", "V-create", "Wide Guard",
+];
+
+/// Moves Metronome can never call in `gen` (gen 1: pokered / pokeyellow
+/// `MetronomePickMove` rerolls only these two).
+pub fn metronome_uncallable_moves(gen: Gen) -> &'static [&'static str] {
+    match gen {
+        Gen::One => METRONOME_UNCALLABLE_GEN1,
+        Gen::Two => METRONOME_UNCALLABLE_GEN2,
+        Gen::Three => METRONOME_UNCALLABLE_GEN3,
+        Gen::Four => METRONOME_UNCALLABLE_GEN4,
+        Gen::Five => METRONOME_UNCALLABLE_GEN5,
+    }
+}
+
+/// Whether Metronome also rerolls the moves its user knows: gen 2
+/// (`CheckUserMove` in `BattleCommand_Metronome`) and gen 4 (the known-move
+/// loop of every gen 4 game's metronome command). Gen 3 kept only an empty
+/// leftover of the loop, and gen 5 dropped the rule.
+pub fn metronome_skips_known_moves(gen: Gen) -> bool {
+    matches!(gen, Gen::Two | Gen::Four)
+}
+
+/// Moves Metronome cannot call while Gravity is in effect: Platinum's
+/// `Move_FailsInHighGravity` / HeartGold's `sGravityUnusableMoves`.
+/// Diamond/Pearl's metronome command does not check Gravity.
+pub const METRONOME_GRAVITY_BLOCKED: [&str; 6] = ["Fly", "Bounce", "Jump Kick", "Hi Jump Kick", "Splash", "Magnet Rise"];

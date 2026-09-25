@@ -64,6 +64,8 @@ pub const DEFAULT_SHORTCUTS: &[(&str, &str)] = &[
     ("scroll_end", "End"),
     ("toggle_tabs", "`"),
     ("toggle_summary", "Ctrl+`"),
+    ("toggle_map", "Ctrl+M"),
+    ("show_on_map", "Ctrl+Shift+M"),
     ("gym_1", "1"),
     ("gym_2", "2"),
     ("gym_3", "3"),
@@ -155,6 +157,8 @@ pub const SHORTCUT_LABELS: &[(&str, &str)] = &[
     ("scroll_end", "Scroll to Bottom"),
     ("toggle_tabs", "Toggle Event Tabs"),
     ("toggle_summary", "Toggle Summary Window"),
+    ("toggle_map", "Toggle Map"),
+    ("show_on_map", "Show Selected Event on Map"),
     ("gym_1", "Select Gym Leader 1"),
     ("gym_2", "Select Gym Leader 2"),
     ("gym_3", "Select Gym Leader 3"),
@@ -266,6 +270,8 @@ pub const SHORTCUT_CATEGORIES: &[(&str, &[&str])] = &[
             "scroll_end",
             "toggle_tabs",
             "toggle_summary",
+            "toggle_map",
+            "show_on_map",
             "gym_1",
             "gym_2",
             "gym_3",
@@ -461,6 +467,13 @@ pub struct Config {
     notes_collapsed: Value,
     pre_state_left_fraction: Value,
     battle_summary_left_fraction: Value,
+    map_docked: Value,
+    map_open: Value,
+    map_left_fraction: Value,
+    map_night: Value,
+    map_toggles: Value,
+    map_view_state: Value,
+    map_texture_budget_mb: Value,
 
     highlight_colors: IndexMap<i64, Value>,
     fight_category_colors: IndexMap<String, Value>,
@@ -586,6 +599,13 @@ impl Config {
             notes_collapsed: gv("notes_collapsed", Value::Bool(false)),
             pre_state_left_fraction: gv("pre_state_left_fraction", Value::Null),
             battle_summary_left_fraction: gv("battle_summary_left_fraction", Value::Null),
+            map_docked: gv("map_docked", Value::Bool(true)),
+            map_open: gv("map_open", Value::Bool(false)),
+            map_left_fraction: gv("map_left_fraction", Value::Null),
+            map_night: gv("map_night", Value::Bool(false)),
+            map_toggles: gv("map_toggles", Value::Null),
+            map_view_state: gv("map_view_state", Value::Null),
+            map_texture_budget_mb: gv("map_texture_budget_mb", Value::from(256)),
             highlight_colors,
             fight_category_colors,
             shortcut_overrides,
@@ -642,6 +662,13 @@ impl Config {
             ("notes_collapsed".into(), self.notes_collapsed.clone()),
             ("pre_state_left_fraction".into(), self.pre_state_left_fraction.clone()),
             ("battle_summary_left_fraction".into(), self.battle_summary_left_fraction.clone()),
+            ("map_docked".into(), self.map_docked.clone()),
+            ("map_open".into(), self.map_open.clone()),
+            ("map_left_fraction".into(), self.map_left_fraction.clone()),
+            ("map_night".into(), self.map_night.clone()),
+            ("map_toggles".into(), self.map_toggles.clone()),
+            ("map_view_state".into(), self.map_view_state.clone()),
+            ("map_texture_budget_mb".into(), self.map_texture_budget_mb.clone()),
         ];
         for i in 1..=9 {
             if let Some(v) = self.highlight_colors.get(&i) {
@@ -843,6 +870,24 @@ impl Config {
         self.battle_summary_left_fraction = v.map(|f| Value::from(f)).unwrap_or(Value::Null);
         self.save();
     }
+
+    // ---- world map (docs/rust_port/design/world_map/SPEC.md §3.8) ----
+    pub fn get_map_docked(&self) -> bool { self.map_docked.as_bool().unwrap_or(true) }
+    pub fn set_map_docked(&mut self, v: bool) { self.map_docked = Value::Bool(v); self.save(); }
+    pub fn get_map_open(&self) -> bool { pyjson::truthy(&self.map_open) }
+    pub fn set_map_open(&mut self, v: bool) { self.map_open = Value::Bool(v); self.save(); }
+    pub fn get_map_left_fraction(&self) -> Option<f64> { pyjson::value_as_f64(&self.map_left_fraction) }
+    pub fn set_map_left_fraction(&mut self, v: Option<f64>) {
+        self.map_left_fraction = v.map(|f| Value::from(f)).unwrap_or(Value::Null);
+        self.save();
+    }
+    pub fn get_map_night(&self) -> bool { pyjson::truthy(&self.map_night) }
+    pub fn set_map_night(&mut self, v: bool) { self.map_night = Value::Bool(v); self.save(); }
+    pub fn get_map_toggles(&self) -> Value { self.map_toggles.clone() }
+    pub fn set_map_toggles(&mut self, v: Value) { self.map_toggles = v; self.save(); }
+    pub fn get_map_view_state(&self) -> Value { self.map_view_state.clone() }
+    pub fn set_map_view_state(&mut self, v: Value) { self.map_view_state = v; self.save(); }
+    pub fn get_map_texture_budget_mb(&self) -> usize { self.map_texture_budget_mb.as_u64().unwrap_or(256).clamp(32, 4096) as usize }
 
     pub fn are_notes_visible_in_battle_summary(&self) -> bool {
         self.notes_visibility.as_str() != Some("never")

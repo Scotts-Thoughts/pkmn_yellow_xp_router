@@ -59,7 +59,9 @@ Test-hook environment variables (all optional):
 | `XPR_GAMEHOOK_URL` | recorder base URL (default `http://localhost:8085`) |
 | `XPR_SMOKE_SCREENSHOT=<png>` | capture the window ~4 s after start, then exit |
 | `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | with a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of the auto-load preference |
-| `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy\|compare` | drive the UI into a state before the smoke capture; `candy` clicks "+" candy six times on the biggest fight (or `XPR_SMOKE_FIGHT=<substring>`) |
+| `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy\|compare\|map` | drive the UI into a state before the smoke capture; `candy` clicks "+" candy six times on the biggest fight (or `XPR_SMOKE_FIGHT=<substring>`) |
+| `XPR_SMOKE_ACTION=map` (+ `XPR_SMOKE_EVENT=<substring>`) | open the Map tab of the right pane; with `XPR_SMOKE_EVENT`, select the first event whose name contains it and "show it on the map" (SPEC §5 Phase 2 step 7) |
+| `XPR_MAP_DATA_DIR=<dir>` | read the map pack from this directory instead of the embedded copy / `map_data/` next to `raw_pkmn_data` |
 | `XPR_SMOKE_COMPARE_A` / `_B=<route path>`, `XPR_SMOKE_COMPARE_TAB=overview\|checkpoints\|diff`, `XPR_SMOKE_COMPARE_EXPAND=<n>` | with `XPR_SMOKE_ACTION=compare`: the two routes to compare, which tab to show and which checkpoint row to expand |
 | `XPR_SMOKE_EXPORT=<kind>[,<kind>...]` | run these exports right before the capture (`event_list`, `battle_summary`, `player_ranges`, `enemy_ranges`, `run_summary`, `setup_summary`, `compare`, `matchup:<n>[:player\|:enemy]`); the PNGs land in the configured images dir |
 | `XPR_FRAME_LOG=1` | log every frame slower than 1 ms (with the route-list / details draw split) and every route-list rebuild |
@@ -302,3 +304,58 @@ B.json` prints every number the Overview shows, for checking by hand.
 Route compare (all three tabs on the reference Emerald pair, an expanded
 checkpoint row, a cross-generation pair with its three banners, and the
 full-page PNG export). Landing page (routes table + sort toggles); editor page (tree colours, quantities, highlights, state viewer, inventory, notes footer, status bar chips); battle summary (8 damage columns with ranges/kill %/recoil/best-move flags, custom-data & stat-stage dropdowns, intimidate, export); new-route page (box-art table, DV frame); docked run summary (gradient cells); inline creator (type dropdown, trainer editor cards). `cargo test --workspace` and the golden verify (204/204 with battles) are green.
+
+---
+
+## 17. World map (`docs/rust_port/design/world_map/SPEC.md`)
+
+Automated: `cargo test -p xpr-map` (pack loading, geometry, LOD, links,
+coverage baseline), `cargo test -p xpr-app --test map_actions --test map_view
+--test embedded_map_data` (add-from-map through the controller with undo,
+headless click / focus / zoom, the embedded pack). Smoke:
+`XPR_SMOKE_ACTION=map XPR_SMOKE_EVENT=Brock` on `yellow-pinsir-lv10brock`.
+
+Manual, on a Yellow route, then a Crystal and an Emerald one:
+
+- Map menu → Show Map (Ctrl+M): the right pane shows the Map tab beside the
+  route list; the splitter has its own position for this tab and remembers it.
+- The world opens on the first town at 200 %. Drag pans; wheel / pinch zoom
+  about the cursor; `+`/`-`/`0` keys; the toolbar's − % + Fit.
+- Zoom fully out: the whole region stays sharp (LOD levels), no black holes
+  after the first second; zoom fully in: pixels stay crisp (nearest filter).
+- Pan across the whole world at 100 %: no seams between maps or chunks, no
+  stutter; the status strip's "rendering n" drains to zero.
+- Toggles T / I / ? / W / S / B / N show and hide trainers, items, hidden
+  items, warps, signs, berry trees, other NPCs; they are remembered.
+- Search box: type "pewter" → pick Pewter Gym → the gym opens on its own;
+  "◀ World" (or Backspace) returns to the world where you were.
+- Double-click a warp (W) → the destination map opens; its card's "Go to"
+  does the same.
+- Click a trainer → card with class, location, prize money, party with
+  icons and moves; "Add to route" inserts the fight after the selected event
+  (into a new folder when a folder is selected) and selects it; undo removes
+  it. Trainers already in the route are dimmed with a check and their card
+  offers "Select in list".
+- Click an item ball / hidden item / berry tree → "Add to route" makes a
+  "Get Free Item" event; a Voltorb ball says it is not an item.
+- Click tall grass → the encounter table for walking; water → surf and rods;
+  the version column of the open route is used; "+" adds a wild encounter
+  at the slot's minimum level.
+- Click plain ground → the map card: trainer / item counts and "Add all
+  trainers here" (a folder named after the map, object order, fought ones
+  skipped).
+- Select a trainer fight in the list → editor title strip "Map" button (or
+  Ctrl+Shift+M, or Map menu) → the map jumps there, rings the marker and
+  shows the banner; ◀ ▶ cycle when a trainer has several positions (rival
+  fights); "Select in list" reselects the event; Esc dismisses.
+- Sprites: at 100 % and above, trainers, NPCs (N), item balls and berry
+  trees are their overworld sprites (gen 1 in the town's palette, gen 2 in
+  their NPC palette, gen 3 without the green key colour); "Sp" switches back
+  to circles; below 75 % circles are used; fought trainers are dimmed with a
+  check badge; gym leaders and the Elite Four show even with N off.
+- Crystal: "Night" recolours outdoor maps and NPC sprites; Falkner, Whitney,
+  the Elite Four and the rival fights all resolve from the list.
+- Undock (⤢ / Map menu): the map moves to its own window, the tab closes;
+  closing the window or ⤡ docks it back. The choice is remembered.
+- Close the app with the map open → it reopens on the same map and zoom.
+- Load a gen 4/5 route: the tab says "No map data for this game".

@@ -13,6 +13,7 @@ pub mod editors;
 pub mod event_details;
 pub mod filter_bar;
 pub mod inline_creator;
+pub mod map;
 pub mod pages;
 pub mod quick_add;
 pub mod recorder_glue;

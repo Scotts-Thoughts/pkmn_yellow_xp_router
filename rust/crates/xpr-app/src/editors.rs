@@ -77,18 +77,21 @@ impl OptionMenu {
 pub struct EditorOutput {
     pub save: bool,
     pub delayed_save: bool,
+    /// the title strip's "Map" button was clicked
+    pub show_on_map: bool,
 }
 
 impl EditorOutput {
     fn save() -> EditorOutput {
-        EditorOutput { save: true, delayed_save: false }
+        EditorOutput { save: true, delayed_save: false, show_on_map: false }
     }
     fn delayed() -> EditorOutput {
-        EditorOutput { save: false, delayed_save: true }
+        EditorOutput { save: false, delayed_save: true, show_on_map: false }
     }
     fn merge(&mut self, o: EditorOutput) {
         self.save |= o.save;
         self.delayed_save |= o.delayed_save;
+        self.show_on_map |= o.show_on_map;
     }
 }
 
@@ -1684,7 +1687,8 @@ impl EventEditors {
             .stroke(egui::Stroke::new(1.0_f32, theme.card_border()))
             .corner_radius(egui::CornerRadius::same(8))
             .inner_margin(egui::Margin::same(1));
-        outer
+        let mut show_on_map = false;
+        let (mut out, reload) = outer
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
                 ui.set_width(ui.available_width());
@@ -1709,10 +1713,12 @@ impl EventEditors {
                         widgets::chip_outlined(ui, theme, ctx.event_type, theme.header, theme.chip_bg(), theme.chip_border());
                         let bold = theme.body_bold();
                         let body = theme.body();
+                        let mappable = matches!(ctx.event_type, consts::TASK_TRAINER_BATTLE | consts::TASK_GET_FREE_ITEM | consts::TASK_FIGHT_WILD_PKMN);
                         let readout_w = readout
                             .as_ref()
                             .map(|(k, v)| widgets::text_width(ui, k, &body) + 4.0 + widgets::text_width(ui, v, &bold))
-                            .unwrap_or(0.0);
+                            .unwrap_or(0.0)
+                            + if mappable { 54.0 } else { 0.0 };
                         let text_w = (ui.available_width() - readout_w - 10.0).max(40.0);
                         let label_w = widgets::text_width(ui, &before.label, &bold).min(text_w);
                         let label = widgets::elide(ui, &before.label, &bold, label_w);
@@ -1724,13 +1730,20 @@ impl EventEditors {
                                 widgets::label_font(ui, shown, body.clone(), theme.secondary);
                             }
                         }
-                        if let Some((k, v)) = &readout {
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.spacing_mut().item_spacing.x = 4.0;
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.spacing_mut().item_spacing.x = 4.0;
+                            if mappable {
+                                let r = widgets::StyledButton::new(theme, "Map").min_size(Vec2::new(44.0, 20.0)).padding(Vec2::new(6.0, 1.0)).show(ui);
+                                if r.on_hover_text("Show this event on the map").clicked() {
+                                    show_on_map = true;
+                                }
+                                ui.add_space(6.0);
+                            }
+                            if let Some((k, v)) = &readout {
                                 widgets::label_font(ui, v.clone(), bold.clone(), theme.text);
                                 widgets::label_font(ui, *k, body.clone(), theme.secondary);
-                            });
-                        }
+                            }
+                        });
                     });
                 });
                 widgets::hairline(ui, theme.pane_divider());
@@ -1760,7 +1773,9 @@ impl EventEditors {
                     })
                     .inner
             })
-            .inner
+            .inner;
+        out.show_on_map = show_on_map;
+        (out, reload)
     }
 
 }

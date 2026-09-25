@@ -540,6 +540,7 @@ pub const ROCK_HEAD_ABILITY: &str = "Rock Head";
 
 pub const STRUGGLE_MOVE_NAME: &str = "Struggle";
 pub const MIMIC_MOVE_NAME: &str = "Mimic";
+pub const METRONOME_MOVE_NAME: &str = "Metronome";
 pub const EXPLOSION_MOVE_NAME: &str = "Explosion";
 pub const SELFDESTRUCT_MOVE_NAME: &str = "Selfdestruct";
 pub const DRAGON_RAGE_MOVE_NAME: &str = "Dragon Rage";

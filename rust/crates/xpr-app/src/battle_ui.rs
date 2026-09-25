@@ -27,6 +27,10 @@ const CANDY_BURST_MS: u64 = 250;
 const HIGHLIGHT_COLORS: [(i64, &str); 3] = [(1, "#006400"), (2, "#00008B"), (3, "#FF8C00")];
 const HIGHLIGHT_COLORS_IMMEDIATE: [(i64, &str); 3] = [(1, "#165416"), (2, "#212168"), (3, "#69400f")];
 
+/// Narrowest the Metronome dropdown gets before the "Metronome" label gives
+/// up its space to it: room for a typical move name next to the arrow.
+const METRONOME_DROPDOWN_MIN_W: f32 = 96.0;
+
 const STAT_DISPLAY_ORDER: [(&str, &str); 6] = [
     (consts::HP, "HP"),
     (consts::ATK, "Atk"),
@@ -771,12 +775,20 @@ impl BattleSummaryUi {
             let header_spacing_x = 2.0;
             header_ui.spacing_mut().item_spacing.x = header_spacing_x;
             // test move entry (mon 0) or name label
+            let is_mimic = move_name.as_deref() == Some(consts::MIMIC_MOVE_NAME);
+            let metronome_selection = mv.and_then(|m| m.metronome_selection.clone());
+            let is_metronome = metronome_selection.is_some();
+            // Metronome's options (every move it can call) come as a shared
+            // list on the move data, used below without copying it.
             let custom_data_options: Option<Vec<String>>;
             let custom_data_selection: Option<String>;
             if let Some(m) = mv {
-                if move_name.as_deref() == Some(consts::MIMIC_MOVE_NAME) {
+                if is_mimic {
                     custom_data_options = Some(m.mimic_options.clone());
                     custom_data_selection = Some(m.mimic_data.clone());
+                } else if is_metronome {
+                    custom_data_options = None;
+                    custom_data_selection = metronome_selection.clone();
                 } else {
                     custom_data_options = m.custom_data_options.clone();
                     custom_data_selection = m.custom_data_selection.clone();
@@ -792,12 +804,15 @@ impl BattleSummaryUi {
             };
             let test_moves = bc.get_test_moves(ctrl);
             let mut reserved_right = 0.0;
-            let show_custom = !is_test_move && custom_data_options.as_ref().map(|o| !o.is_empty()).unwrap_or(false) && !(should_fade);
+            let show_custom = !is_test_move && (is_metronome || custom_data_options.as_ref().map(|o| !o.is_empty()).unwrap_or(false)) && !(should_fade);
             let show_stat = !is_test_move && stat_stage_options.as_ref().map(|o| !o.is_empty()).unwrap_or(false);
-            // For a Mimic slot, the weather/screen source move is whatever move is
-            // currently being mimicked, not the literal "Mimic" display name.
-            let resolved_move_name = if move_name.as_deref() == Some(consts::MIMIC_MOVE_NAME) {
+            // For a Mimic / Metronome slot, the weather/screen source move is
+            // whatever move is currently being mimicked / called, not the
+            // literal "Mimic" / "Metronome" display name.
+            let resolved_move_name = if is_mimic {
                 mv.map(|m| m.mimic_data.clone())
+            } else if let Some(called) = metronome_selection.as_ref().filter(|s| !s.is_empty()) {
+                Some(called.clone())
             } else {
                 move_name.clone()
             };
@@ -805,7 +820,8 @@ impl BattleSummaryUi {
             let screen_for_move = resolved_move_name.as_deref().and_then(BattleSummary::get_screen_for_move);
             let cur_weather_active = weather_for_move.map(|w| bc.summary.get_weather() == w && bc.summary.weather_source_mon_idx == Some(mon_idx as i64)).unwrap_or(false);
             let screen_active = screen_for_move.map(|s| bc.summary.get_screen_source_mon_idx(is_player, s) == Some(mon_idx as i64)).unwrap_or(false);
-            let custom_default = custom_data_options.as_ref().and_then(|o| o.first().cloned());
+            // Metronome's default is no pick (a screenshot hides an unpicked one)
+            let custom_default = if is_metronome { Some(String::new()) } else { custom_data_options.as_ref().and_then(|o| o.first().cloned()) };
             let custom_is_default = custom_data_selection.as_deref().map(|s| Some(s.to_string()) == custom_default).unwrap_or(true);
             let show_custom_now = show_custom && !(screenshot && custom_is_default);
             let show_stat_now = show_stat && !(screenshot && stat_stage_selection == "0");
@@ -835,17 +851,29 @@ impl BattleSummaryUi {
             // exactly `avail - reserved_right`, so the trailing widgets always
             // end flush with the header's right edge and the stepper's "+"
             // can never be pushed out of view.
-            let custom_w = if show_custom_now {
+            let name_full_w = move_name.as_deref().map(|n| widgets::text_width(&header_ui, n, &theme.body_bold())).unwrap_or(0.0);
+            let custom_w = if !show_custom_now {
+                0.0
+            } else if is_metronome {
+                // Metronome's type-to-filter dropdown needs room for the typed
+                // text: it takes everything the "Metronome" label doesn't, and
+                // the label's space too once keeping the label would squeeze
+                // the dropdown below a usable width.
+                let room = avail - reserved_right - header_spacing_x;
+                let beside_label = room - (name_full_w + 8.0) - header_spacing_x;
+                if beside_label >= METRONOME_DROPDOWN_MIN_W {
+                    beside_label
+                } else {
+                    room.max(24.0)
+                }
+            } else {
                 let fits_at_70 = avail - (reserved_right + 70.0 + header_spacing_x) >= 20.0;
                 if fits_at_70 {
                     70.0
                 } else {
                     (avail - reserved_right - header_spacing_x).clamp(24.0, 70.0)
                 }
-            } else {
-                0.0
             };
-            let is_mimic = move_name.as_deref() == Some(consts::MIMIC_MOVE_NAME);
             if show_custom_now {
                 reserved_right += custom_w + header_spacing_x;
             }
@@ -854,9 +882,10 @@ impl BattleSummaryUi {
             let name_w = (avail - reserved_right).max(0.0);
             // Mimic's dropdown already shows the mimicked move name, so its
             // "Mimic" label goes away as soon as it would have to be elided
-            // rather than lingering as a lone "…".
-            let name_full_w = move_name.as_deref().map(|n| widgets::text_width(&header_ui, n, &theme.body_bold())).unwrap_or(0.0);
-            let hide_name = show_custom_now && (custom_w < 70.0 || (is_mimic && name_full_w > name_w - 8.0));
+            // rather than lingering as a lone "…". Metronome's goes whenever
+            // its dropdown took the label's space.
+            let hide_name = show_custom_now
+                && if is_metronome { name_w < name_full_w + 8.0 } else { custom_w < 70.0 || (is_mimic && name_full_w > name_w - 8.0) };
             // The test-move branch (mon_idx == 0) renders a search dropdown,
             // not the move name label, and Mimic never appears there — leave
             // its width computation unaffected by `hide_name`.
@@ -934,7 +963,27 @@ impl BattleSummaryUi {
                     }
                 }
             }
-            if show_custom_now {
+            if show_custom_now && is_metronome {
+                // Type to filter every move Metronome can call; the blank top
+                // row clears the pick. It already fills the label's space when
+                // the label is hidden, so there is no centering slack here.
+                let mut cur = metronome_selection.clone().unwrap_or_default();
+                let opts = mv.and_then(|m| m.metronome_options.clone()).unwrap_or_default();
+                let enabled = !screenshot && !(should_fade && !is_player);
+                let id = ui.id().with(("metronome", mon_idx, move_idx, is_player));
+                let resp = SearchableDropdown::new(theme, id, &mut cur, &opts)
+                    .widths(custom_w, custom_w)
+                    .placeholder(if hide_name { consts::METRONOME_MOVE_NAME } else { "Pick move" })
+                    .enabled(enabled)
+                    .show(&mut header_ui);
+                if resp.changed {
+                    bc.update_custom_move_data(cfg, ctrl, mon_idx, move_idx, is_player, &cur);
+                } else if hide_name && !resp.has_focus {
+                    // with the label gone, say what the dropdown is for
+                    let tip = if cur.is_empty() { "Metronome: pick the move it calls".to_string() } else { format!("Metronome calling {}", cur) };
+                    header_ui.interact(resp.rect, id.with("tip"), Sense::hover()).on_hover_text(tip);
+                }
+            } else if show_custom_now {
                 let opts = custom_data_options.clone().unwrap_or_default();
                 let mut cur = custom_data_selection.clone().unwrap_or_else(|| opts.first().cloned().unwrap_or_default());
                 let enabled = !screenshot && !(should_fade && !is_player);
