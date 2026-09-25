@@ -437,7 +437,9 @@ impl EventDetails {
             let mut tab = self.tab;
             let mut auto = self.auto_switch;
             let mut auto_toggled = false;
-            if widgets::tab_bar(ui, theme, &["Pre-Event State", "Battle Summary", "Map"], &mut tab, |ui| {
+            // no Map tab for games without a map pack (gens 1-3 only)
+            let tabs: &[&str] = if crate::map::MapView::game_of(ctrl).is_some() { &["Pre-Event State", "Battle Summary", "Map"] } else { &["Pre-Event State", "Battle Summary"] };
+            if widgets::tab_bar(ui, theme, tabs, &mut tab, |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 let r = ui.add(egui::Label::new(egui::RichText::new("Auto-switch tabs").font(theme.body()).color(theme.secondary)).sense(egui::Sense::click()));
                 if r.clicked() {

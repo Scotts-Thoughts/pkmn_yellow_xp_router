@@ -242,8 +242,14 @@ fn zoom_key_and_presets_popup_set_the_camera_zoom() {
     let readout = h.find_text(&label);
     h.click(readout);
     let row = h.find_text("400%");
+    let nav = h.view.navigator_rect().expect("the navigator panel is drawn");
+    assert!(nav.contains(row), "the presets popup drops down over the navigator here: {:?} {:?}", row, nav);
+    let center = h.view.camera_center();
     h.click(row);
     assert!((h.view.zoom() - 4.0).abs() < 1e-3, "choosing 400% in the popup set the zoom ({})", h.view.zoom());
+    // the popup is over the navigator: the click must not also recentre the camera there
+    let after = h.view.camera_center();
+    assert!((after - center).length() < 1.0, "a click on a popup row over the navigator moved the camera ({:?} -> {:?})", center, after);
 }
 
 /// Review finding (2026-09-25): a pan drag that begins outside the panel
@@ -272,4 +278,64 @@ fn a_drag_that_only_crosses_the_panel_is_not_captured() {
     let after = h.view.camera_center();
     let expected = before - Vec2::new((to.x - from.x) / zoom, (to.y - from.y) / zoom);
     assert!((after.x - expected.x).abs() < 2.0 && (after.y - expected.y).abs() < 2.0, "the drag must pan the map ({:?} -> {:?}, expected {:?}), not hand the camera to the navigator", before, after, expected);
+}
+
+/// A card opened just under the panel would be placed above its anchor,
+/// over the panel; it moves off it instead. The panel reads the raw pointer,
+/// so a click on a card button over it used to move the camera too.
+#[test]
+fn a_card_is_never_placed_over_the_panel() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    h.frame(vec![]);
+    h.wait_ready();
+    assert_eq!(h.view.request_focus(LinkQuery::Trainer("Brock 1".into()), "Brock 1".into()), Some(true));
+    h.settle();
+    h.wait_chunks_idle();
+    h.frame(vec![]);
+    let nav = h.view.navigator_rect().expect("the navigator panel is drawn");
+    let pack = h.view.pack().unwrap().clone();
+    let gym = pack.map_by_const("PEWTER_GYM").unwrap().id;
+    // a step (in or around the gym) just under the panel, so the card's default spot (centred
+    // above the anchor) covers the panel
+    let mut step = None;
+    'search: for y in -60..100 {
+        for x in -60..100 {
+            let Some(p) = h.view.step_screen_pos(gym, x, y) else { continue };
+            if p.x > nav.min.x + 40.0 && p.x < nav.max.x - 40.0 && p.y > nav.max.y + 100.0 && p.y < nav.max.y + 130.0 {
+                step = Some((x, y));
+                break 'search;
+            }
+        }
+    }
+    let (x, y) = step.expect("a gym step just under the panel");
+    assert!(h.view.open_card_at_step(gym, x, y));
+    // a few frames: the card measures itself, then places with that size
+    for _ in 0..4 {
+        h.frame(vec![]);
+    }
+    let nav = h.view.navigator_rect().unwrap();
+    let anchor = h.view.step_screen_pos(gym, x, y).unwrap();
+    let popups: Vec<Rect> = h.ctx.memory(|m| {
+        let areas = m.areas();
+        areas.visible_layer_ids().into_iter().filter(|l| l.order == egui::Order::Foreground).filter_map(|l| m.area_rect(l.id)).filter(|r| r.area() > 0.0 && *r != nav).collect()
+    });
+    // sanity: the card's default spot, centred above the anchor, does cover the panel
+    let card = popups.iter().find(|r| r.width() >= 300.0).expect("the card's area");
+    let default = Rect::from_min_size(Pos2::new(anchor.x - card.width() / 2.0, anchor.y - card.height() - 14.0), card.size());
+    assert!(default.intersects(nav), "the chosen step puts the card's default spot over the panel ({:?} vs {:?})", default, nav);
+    let covering: Vec<Rect> = h.ctx.memory(|m| {
+        let areas = m.areas();
+        areas.visible_layer_ids().into_iter().filter(|l| l.order == egui::Order::Foreground).filter_map(|l| m.area_rect(l.id)).filter(|r| r.area() > 0.0 && *r != nav && r.intersects(nav)).collect()
+    });
+    assert!(h.view.has_card());
+    assert!(covering.is_empty(), "no popup may cover the navigator {:?}: {:?}", nav, covering);
+
+    // and a click on the card's close button, now off the panel, closes it without moving the camera
+    let center = h.view.camera_center();
+    // (the toolbar's own "×" closes the map; the card's is below the toolbar)
+    let close = h.texts.iter().find(|(s, p)| s == "×" && p.y > TOOLBAR_H).map(|(_, p)| *p).expect("the card's close button");
+    assert!(!nav.contains(close), "the close button is off the panel");
+    h.click(close);
+    assert!(!h.view.has_card(), "the card's close button closed it");
+    assert_eq!(h.view.camera_center(), center);
 }

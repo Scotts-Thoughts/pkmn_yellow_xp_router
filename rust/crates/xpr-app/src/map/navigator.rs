@@ -5,7 +5,7 @@
 //! outlined; click or drag moves the camera. The zoom readout of the toolbar
 //! opens a menu of presets.
 
-use egui::{Color32, Pos2, Rect, Response, Stroke, Ui, Vec2};
+use egui::{Color32, LayerId, Pos2, Rect, Response, Stroke, Ui, Vec2};
 use xpr_map::{geom, CHUNK_PX};
 use xpr_ui_kit::modal::behind_modal;
 use xpr_ui_kit::theme::{self, Theme};
@@ -34,6 +34,8 @@ pub struct Navigator {
     /// each frame, so it reads last frame's geometry, same as the rest of
     /// the viewport's one-frame-stale layout (`MapView::last_vp`).
     rect: Option<Rect>,
+    /// The panel's own `Area` layer, set by `draw`.
+    layer: Option<LayerId>,
     /// A drag that began on the panel is still in progress, kept true even
     /// if the pointer strays outside the panel mid-drag (a minimap should
     /// keep tracking the drag, not drop it at the edge).
@@ -64,7 +66,17 @@ impl Navigator {
 
         let ctx = ui.ctx();
         let (pos, down, pressed, released) = ctx.input(|i| (i.pointer.interact_pos(), i.pointer.primary_down(), i.pointer.primary_pressed(), i.pointer.primary_released()));
-        let over = pos.map(|p| rect.contains(p)).unwrap_or(false);
+        // a popup over the panel (a card, the zoom presets or layers menu)
+        // gets the pointer, so a click on one of its buttons can't also move
+        // the camera. Any other visible layer above the page that contains
+        // the pointer counts, whatever its stacking order: `ctx.layer_id_at`
+        // can't be used, since the panel's own area is paint-only and has no
+        // size, so egui never reports it as the top layer
+        let nav_layer = view.navigator.layer;
+        let under_popup = |p: Pos2| {
+            ctx.memory(|m| m.areas().visible_layer_ids().into_iter().any(|l| l.order > egui::Order::Background && Some(l) != nav_layer && m.area_rect(l.id).is_some_and(|r| r.contains(p))))
+        };
+        let over = pos.map(|p| rect.contains(p) && !under_popup(p)).unwrap_or(false);
         if released {
             view.navigator.dragging = false;
         }
@@ -130,7 +142,9 @@ impl Navigator {
         }
         let visible = view.camera.visible_world(vp).intersect(&scope_r);
 
-        egui::Area::new(ui.id().with("map_navigator_panel")).order(egui::Order::Foreground).fixed_pos(rect.min).show(ui.ctx(), |ui| {
+        let area = egui::Area::new(ui.id().with("map_navigator_panel")).order(egui::Order::Foreground).fixed_pos(rect.min);
+        view.navigator.layer = Some(area.layer());
+        area.show(ui.ctx(), |ui| {
             let painter = ui.painter();
             painter.rect(rect, 4.0, theme.card_bg(), theme.border_stroke(), egui::StrokeKind::Inside);
             let content = rect.shrink(CONTENT_INSET);

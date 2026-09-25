@@ -193,3 +193,142 @@ fn sprites_fill_the_atlas_when_zoomed_in_and_circles_take_over_when_zoomed_out()
     h.settle();
     assert!(h.view.sprite_frames() > n, "Route 3's trainers add frames once zoomed back in ({} -> {})", n, h.view.sprite_frames());
 }
+
+/// Opens Brock's gym with nothing selected and returns Brock's screen position.
+fn brock_on_screen(h: &mut Harness) -> Pos2 {
+    h.frame(vec![]);
+    h.wait_ready();
+    let pack = h.view.pack().unwrap().clone();
+    assert_eq!(h.view.request_focus(LinkQuery::Trainer("Brock 1".into()), "Brock 1".into()), Some(true));
+    h.settle();
+    let brock = pack.objects.iter().position(|o| o.kind == ObjectKind::Trainer && o.trainer_names().iter().any(|n| n == "Brock 1")).unwrap() as u32;
+    h.view.object_screen_pos(brock).expect("Brock is on screen")
+}
+
+#[test]
+fn a_click_drag_pans_the_map_without_opening_a_card() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    let start = brock_on_screen(&mut h);
+    let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
+    h.frame(vec![Event::PointerMoved(start)]);
+    h.frame(vec![button(start, true)]);
+    assert!(!h.view.has_card(), "nothing opens on press");
+    let mut pos = start;
+    for _ in 0..8 {
+        pos += Vec2::new(10.0, 6.0);
+        h.frame(vec![Event::PointerMoved(pos)]);
+    }
+    h.frame(vec![button(pos, false)]);
+    h.frame(vec![]);
+    assert!(!h.view.has_card(), "a drag never opens a card");
+    let brock = h.view.pack().unwrap().objects.iter().position(|o| o.trainer_names().iter().any(|n| n == "Brock 1")).unwrap() as u32;
+    let moved = h.view.object_screen_pos(brock).unwrap() - start;
+    assert!(moved.length() > 50.0, "the drag panned the map (moved {moved:?})");
+    let start = start + moved;
+
+    // dragging back onto the marker before letting go is still a drag
+    h.frame(vec![button(start, true)]);
+    h.frame(vec![Event::PointerMoved(start + Vec2::new(40.0, 0.0))]);
+    h.frame(vec![Event::PointerMoved(start)]);
+    h.frame(vec![button(start, false)]);
+    h.frame(vec![]);
+    assert!(!h.view.has_card(), "a drag that returns to its start is still a drag");
+
+    // a press held past egui's click window that then moves is a drag too
+    h.frame(vec![button(start, true)]);
+    for _ in 0..90 {
+        h.frame(vec![]);
+    }
+    h.frame(vec![Event::PointerMoved(start + Vec2::new(40.0, 0.0))]);
+    h.frame(vec![button(start + Vec2::new(40.0, 0.0), false)]);
+    h.frame(vec![]);
+    assert!(!h.view.has_card(), "a slow drag never opens a card");
+}
+
+#[test]
+fn a_slow_click_without_moving_still_opens_the_card_on_release() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    let pos = brock_on_screen(&mut h);
+    let button = |pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
+    h.frame(vec![Event::PointerMoved(pos)]);
+    h.frame(vec![button(true)]);
+    // hold well past egui's 0.8 s click window (headless frames advance its clock by 1/60 s)
+    for _ in 0..90 {
+        h.frame(vec![]);
+    }
+    assert!(!h.view.has_card(), "nothing opens while the button is held");
+    h.frame(vec![button(false)]);
+    h.frame(vec![]);
+    assert!(h.view.card_object().is_some(), "releasing a held click opens the card");
+}
+
+#[test]
+fn clicking_what_the_open_card_already_shows_closes_it() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    let brock_pos = brock_on_screen(&mut h);
+    let pack = h.view.pack().unwrap().clone();
+    let brock = pack.objects.iter().position(|o| o.trainer_names().iter().any(|n| n == "Brock 1")).unwrap() as u32;
+    h.click(brock_pos);
+    assert_eq!(h.view.card_object(), Some(brock));
+    h.click(brock_pos + Vec2::new(2.0, 1.0));
+    assert!(!h.view.has_card(), "a second click on the trainer closes its card");
+    h.click(brock_pos);
+    assert_eq!(h.view.card_object(), Some(brock), "a third click opens it again");
+
+    // two different floor steps of the gym show the same map card: the second click closes it
+    let gym = pack.map_by_const("PEWTER_GYM").unwrap().id;
+    let b = &pack.objects[brock as usize];
+    let objects: Vec<Pos2> = pack.object_range(gym).filter_map(|i| h.view.object_screen_pos(i)).collect();
+    let mut floors = Vec::new();
+    for dy in 1..8i32 {
+        for dx in -3..4i32 {
+            let Some(p) = h.view.step_screen_pos(gym, b.x as i32 + dx, b.y as i32 + dy) else { continue };
+            let on_screen = p.x > 40.0 && p.x < 960.0 && p.y > 80.0 && p.y < 640.0;
+            let clear = objects.iter().all(|o| (o.x - p.x).abs() > 56.0 || (o.y - p.y).abs() > 56.0);
+            if on_screen && clear {
+                floors.push(p);
+            }
+        }
+    }
+    assert!(floors.len() >= 2, "two free floor steps on screen");
+    h.click(floors[0]);
+    assert!(h.view.card_is_map(), "a floor click swaps the trainer card for the map card");
+    h.click(floors[1]);
+    assert!(!h.view.has_card(), "another step of the same map closes the map card");
+}
+
+#[test]
+fn the_card_glides_when_it_flips_below_its_marker() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    let start = brock_on_screen(&mut h);
+    let pack = h.view.pack().unwrap().clone();
+    let brock = pack.objects.iter().position(|o| o.trainer_names().iter().any(|n| n == "Brock 1")).unwrap() as u32;
+    h.click(start);
+    h.frame(vec![]);
+    let card = h.view.card_rect().expect("the card is drawn");
+    assert!(card.max.y <= start.y, "the card opens above Brock");
+
+    // drag Brock up to the top edge: there's no room above, so the card moves below him
+    let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
+    // (the card's top relative to Brock, every frame of the drag and after)
+    let offset = |h: &Harness| h.view.card_rect().unwrap().min.y - h.view.object_screen_pos(brock).unwrap().y;
+    let mut offsets = vec![offset(&h)];
+    let mut pos = start + Vec2::new(0.0, 80.0);
+    h.frame(vec![Event::PointerMoved(pos)]);
+    h.frame(vec![button(pos, true)]);
+    while h.view.object_screen_pos(brock).unwrap().y > 70.0 {
+        pos.y -= 8.0;
+        h.frame(vec![Event::PointerMoved(pos)]);
+        offsets.push(offset(&h));
+    }
+    h.frame(vec![button(pos, false)]);
+    for _ in 0..60 {
+        h.frame(vec![]);
+        offsets.push(offset(&h));
+    }
+    let settled = *offsets.last().unwrap();
+    assert!(settled > 0.0, "the card ends up below Brock (offset {settled})");
+    let travel = settled - offsets[0];
+    assert!(travel > 100.0, "the card moved from above Brock to below him: {offsets:?}");
+    assert!(offsets.windows(2).all(|w| (w[1] - w[0]).abs() < travel * 0.5), "no single-frame jump: {offsets:?}");
+}

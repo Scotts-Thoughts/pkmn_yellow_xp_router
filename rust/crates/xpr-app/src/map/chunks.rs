@@ -134,10 +134,12 @@ impl ChunkCache {
         self.pending.len()
     }
 
-    /// Ask the worker for these chunks (highest priority first). Sends only
-    /// when the wanted set changed, so a static view costs nothing.
+    /// Ask the worker for these chunks (highest priority first). Chunks that
+    /// are cached or already on their way are left out, so nothing renders
+    /// twice; a chunk the budget evicted is asked for again. Sends only when
+    /// the wanted set changed, so a static view costs nothing.
     pub fn request(&mut self, wanted: Vec<ChunkKey>) {
-        let wanted: Vec<ChunkKey> = wanted.into_iter().filter(|k| !self.entries.contains_key(k)).collect();
+        let wanted: Vec<ChunkKey> = wanted.into_iter().filter(|k| !self.entries.contains_key(k) && !self.pending.contains(k)).collect();
         if wanted.is_empty() || wanted == self.last_wanted {
             return;
         }
@@ -200,10 +202,13 @@ impl Drop for ChunkCache {
     }
 }
 
+/// Renders what it is asked for, in order. It keeps no record of what it
+/// has already rendered: the UI thread only asks for chunks it has neither
+/// cached nor pending, so a repeat means the chunk was evicted and is
+/// wanted again (skipping it left the view on the coarse fallback forever).
 fn worker(rx: Receiver<Job>, tx: Sender<(u32, ChunkKey, Pixmap)>) {
     let mut comp: Option<(Arc<Compositor>, u32)> = None;
     let mut queue: VecDeque<ChunkKey> = VecDeque::new();
-    let mut done: HashSet<(u32, ChunkKey)> = HashSet::new();
     loop {
         // take the newest instructions; a new render list replaces the queue
         let msg = if queue.is_empty() {
@@ -223,15 +228,14 @@ fn worker(rx: Receiver<Job>, tx: Sender<(u32, ChunkKey, Pixmap)>) {
             Some(Job::SetCompositor(c, gen)) => {
                 comp = Some((c, gen));
                 queue.clear();
-                done.clear();
                 continue;
             }
-            Some(Job::Render(list, gen)) => {
+            Some(Job::Render(list, _gen)) => {
                 // the new list goes first (it is what is visible now); older
                 // requests keep their place behind it so nothing is dropped
                 let old: Vec<ChunkKey> = queue.drain(..).collect();
                 for k in list.iter().chain(old.iter()) {
-                    if !done.contains(&(gen, *k)) && !queue.contains(k) {
+                    if !queue.contains(k) {
                         queue.push_back(*k);
                     }
                 }
@@ -241,14 +245,7 @@ fn worker(rx: Receiver<Job>, tx: Sender<(u32, ChunkKey, Pixmap)>) {
         }
         let Some(key) = queue.pop_front() else { continue };
         let Some((c, gen)) = &comp else { continue };
-        if done.contains(&(*gen, key)) {
-            continue;
-        }
         let px = c.render_chunk(key.scope, key.level, key.cx, key.cy, key.opts());
-        done.insert((*gen, key));
-        if done.len() > 4096 {
-            done.clear();
-        }
         if tx.send((*gen, key, px)).is_err() {
             return;
         }

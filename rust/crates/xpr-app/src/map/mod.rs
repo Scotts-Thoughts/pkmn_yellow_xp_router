@@ -9,6 +9,7 @@ pub mod cards;
 pub mod chunks;
 pub mod export;
 pub mod finder;
+pub mod item_search;
 pub mod keynav;
 pub mod layers;
 pub mod layers_menu;
@@ -155,11 +156,19 @@ pub struct MapView {
     /// (`tests/map_navigation.rs`, WP-E gap G10) without synthetic text
     /// events into the toolbar's search box.
     pub list: MapList,
+    /// the toolbar's "Find an item…" box (`item_search.rs`)
+    pub item_search: item_search::ItemSearch,
     pub state: RouteMapState,
     view_states: Value,
     view_dirty: Option<Instant>,
     last_vp: Rect,
     pointer_world: Option<(MapId, i32, i32, bool, bool)>,
+    /// how far the pointer has strayed from the press during the current
+    /// primary drag on the viewport; a drag that never left the click radius
+    /// is still a click when the button comes up
+    drag_travel: Option<f32>,
+    /// where the open card was drawn last frame
+    card_rect: Option<Rect>,
     frame_log: bool,
     last_frame_ms: f32,
     pending_fit: bool,
@@ -197,11 +206,14 @@ impl MapView {
             card: None,
             focus: None,
             list: MapList::default(),
+            item_search: item_search::ItemSearch::default(),
             state: RouteMapState::default(),
             view_states: cfg.get_map_view_state(),
             view_dirty: None,
             last_vp: Rect::NOTHING,
             pointer_world: None,
+            drag_travel: None,
+            card_rect: None,
             frame_log: std::env::var_os("XPR_FRAME_LOG").is_some(),
             last_frame_ms: 0.0,
             pending_fit: false,
@@ -228,8 +240,16 @@ impl MapView {
     /// The game to show for a controller's version (custom gens use their base).
     pub fn game_of(ctrl: &MainController) -> Option<&'static str> {
         let gen: Option<Arc<GenData>> = ctrl.gen();
-        let version = gen.as_ref().map(|g| g.base_version_name().unwrap_or(g.version_name()).to_string()).or_else(|| ctrl.get_version().map(|s| s.to_string()))?;
-        game_for_version(&version)
+        match gen {
+            Some(g) => Self::game_of_gen(&g),
+            None => game_for_version(ctrl.get_version()?),
+        }
+    }
+
+    /// The game to show for a gen (custom gens use their base); `None` when
+    /// there is no map pack for it (gens 1-3 only), which hides the Map tab.
+    pub fn game_of_gen(gen: &GenData) -> Option<&'static str> {
+        game_for_version(gen.base_version_name().unwrap_or(gen.version_name()))
     }
 
     /// Start loading the game's pack if it is not the current one.
@@ -502,7 +522,7 @@ impl MapView {
 
         // toolbar
         let mut tui = ui.new_child(egui::UiBuilder::new().max_rect(toolbar_rect).layout(egui::Layout::left_to_right(egui::Align::Center)));
-        let list_anchor = self.toolbar(&mut tui, theme, cfg, &mut actions);
+        let (list_anchor, item_anchor) = self.toolbar(&mut tui, theme, cfg, &mut actions);
 
         // viewport
         ui.painter().rect_filled(vp, 0.0, egui::Color32::from_rgb(10, 10, 24));
@@ -532,6 +552,12 @@ impl MapView {
                 None => {}
             }
         }
+        // item search popup: choosing an item loops the banner through its instances
+        if let (Some(anchor), Some(pack)) = (item_anchor, self.pack().cloned()) {
+            if let Some(name) = self.item_search.popup(ui, theme, &pack, anchor, (vp.height() - 20.0).max(120.0)) {
+                self.choose_item(name);
+            }
+        }
 
         // status strip
         self.status_strip(ui, status_rect, theme);
@@ -544,7 +570,8 @@ impl MapView {
         actions
     }
 
-    fn toolbar(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, actions: &mut Vec<MapAction>) -> Option<Rect> {
+    /// Returns the anchors of the map search and the item search popups.
+    fn toolbar(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, actions: &mut Vec<MapAction>) -> (Option<Rect>, Option<Rect>) {
         ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
         ui.add_space(4.0);
         let pack = self.pack().cloned();
@@ -577,6 +604,32 @@ impl MapView {
         if er.escape_pressed {
             self.list.open = false;
         }
+        // item search (`item_search.rs`): Enter picks the top match, then steps
+        // through its instances
+        let ir = Entry::new(theme, &mut self.item_search.query).width(130.0).hint("Find an item…").id(ui.id().with("map_item_search")).show(ui);
+        let item_anchor = ir.response.as_ref().map(|r| r.rect);
+        if ir.changed || ir.has_focus && ui.input(|i| i.pointer.any_click()) {
+            self.item_search.open = true;
+            self.list.open = false;
+        }
+        if let Some(r) = &ir.response {
+            if r.clicked() || r.gained_focus() {
+                self.item_search.open = true;
+                self.list.open = false;
+            }
+        }
+        if ir.escape_pressed {
+            self.item_search.open = false;
+        }
+        if ir.enter_pressed {
+            self.item_search_enter();
+            if let Some(r) = &ir.response {
+                r.request_focus();
+            }
+        }
+        if self.list.open {
+            self.item_search.open = false;
+        }
         ui.add_space(6.0);
         // tools: pan / marquee / ruler (`tools.rs`)
         self.tools.toolbar(ui, theme);
@@ -600,7 +653,7 @@ impl MapView {
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
-            if widgets::StyledButton::new(theme, "✕").min_size(Vec2::new(22.0, 22.0)).show(ui).on_hover_text("Close the map").clicked() {
+            if widgets::StyledButton::new(theme, "×").min_size(Vec2::new(22.0, 22.0)).show(ui).on_hover_text("Close the map").clicked() {
                 actions.push(MapAction::Close);
             }
             let (glyph, tip) = if self.docked { ("⤢", "Open the map in its own window") } else { ("⤡", "Dock the map back into the editor") };
@@ -631,7 +684,41 @@ impl MapView {
                 self.mark_view_dirty();
             }
         });
-        anchor
+        (anchor, item_anchor)
+    }
+
+    /// Enter in the item box: the next instance of the item being looped
+    /// through, or else the first item matching the query.
+    fn item_search_enter(&mut self) {
+        let Some(pack) = self.pack().cloned() else { return };
+        let looping = self.item_search.active.as_deref().filter(|a| self.focus_label() == Some(*a) && a.eq_ignore_ascii_case(self.item_search.query.trim()));
+        if looping.is_some() {
+            self.step_focus(true);
+            return;
+        }
+        let hits = item_search::find(&pack, &self.item_search.query);
+        let q = self.item_search.query.trim();
+        if let Some(hit) = hits.iter().find(|h| h.name.eq_ignore_ascii_case(q)).or(hits.first()) {
+            self.choose_item(hit.name.clone());
+        }
+    }
+
+    /// Focus every instance of an item (balls and hidden items).
+    pub fn choose_item(&mut self, name: String) {
+        let Some(pack) = self.pack().cloned() else { return };
+        let anchors = item_search::instances(&pack, &name);
+        self.item_search.open = false;
+        self.item_search.query = name.clone();
+        self.item_search.active = Some(name.clone());
+        self.focus_anchors(anchors, name);
+    }
+
+    /// Move the focus banner to its next (or previous) anchor.
+    pub fn step_focus(&mut self, next: bool) {
+        let Some(f) = self.focus.as_mut() else { return };
+        let n = f.anchors.len();
+        f.idx = if next { (f.idx + 1) % n } else { (f.idx + n - 1) % n };
+        self.go_to_focus(true);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -672,6 +759,19 @@ impl MapView {
         let on_navigator = navigator::Navigator::handle_input(self, ui, resp, vp);
         let tool_used = !on_navigator && tools::ToolState::handle_input(self, ui, resp, vp);
         let pointer_taken = on_navigator || tool_used;
+        // cards open when the button comes up, and only if the press didn't
+        // pan the map. egui reports a click only for presses shorter than
+        // 0.8 s and turns a longer hold into a drag, so a held press that
+        // never moved counts as a click here too.
+        if resp.drag_started_by(egui::PointerButton::Primary) {
+            self.drag_travel = Some(0.0);
+        }
+        if let (Some(travel), Some(origin), Some(p)) = (self.drag_travel.as_mut(), ctx.input(|i| i.pointer.press_origin()), resp.interact_pointer_pos()) {
+            *travel = travel.max(origin.distance(p));
+        }
+        let held_click = resp.drag_stopped_by(egui::PointerButton::Primary)
+            && self.drag_travel.take().is_some_and(|t| t <= ctx.options(|o| o.input_options.max_click_dist));
+        let clicked = resp.clicked() || held_click;
         if !pointer_taken && resp.dragged() && resp.drag_delta() != Vec2::ZERO {
             self.camera.pan(resp.drag_delta());
             self.list.open = false;
@@ -780,18 +880,27 @@ impl MapView {
         if consumed {
             return;
         }
-        let path_click = !pointer_taken && route_path::handle_click(self, ui, resp, vp, actions);
-        if !pointer_taken && !path_click && resp.clicked() {
+        let path_click = !pointer_taken && route_path::handle_click(self, ui, resp, clicked, vp, actions);
+        if !pointer_taken && !path_click && clicked {
             self.list.open = false;
-            match (self.hover, pointer, self.pointer_world) {
-                (Some(idx), Some(w), _) => {
-                    self.selected = Some(idx);
-                    self.card = Some((Card::Object { idx }, w));
-                    self.focus = None;
-                }
+            let hit = match (self.hover, pointer, self.pointer_world) {
+                (Some(idx), Some(w), _) => Some((Card::Object { idx }, w)),
                 (None, Some(w), Some((map, x, y, grass, water))) => {
-                    self.selected = None;
-                    let card = if grass || water { Card::Tile { map, x, y, water, grass } } else { Card::Map { map } };
+                    Some((if grass || water { Card::Tile { map, x, y, water, grass } } else { Card::Map { map } }, w))
+                }
+                _ => None,
+            };
+            // clicking what the open card already shows closes it rather than moving it
+            let toggle_off = matches!((&hit, &self.card), (Some((new, _)), Some((open, _))) if new.same_table(open));
+            match hit {
+                Some((card, w)) if !toggle_off => {
+                    self.selected = match card {
+                        Card::Object { idx } => Some(idx),
+                        _ => None,
+                    };
+                    if self.selected.is_some() {
+                        self.focus = None;
+                    }
                     self.card = Some((card, w));
                 }
                 _ => {
@@ -840,6 +949,7 @@ impl MapView {
         }
 
         // ---- card ----
+        self.card_rect = None;
         if let Some((card, world_pos)) = self.card.clone() {
             let anchor = self.camera.world_to_screen(vp, world_pos);
             if !vp.expand(60.0).contains(anchor) {
@@ -850,7 +960,10 @@ impl MapView {
                 _ => None,
             };
             let mut ccx = CardCtx { theme, pack: &pack, gen: ctrl.gen(), version: ctrl.get_version().map(|s| s.to_string()), state: &self.state, ctrl, assets, routed_event };
-            let out = cards::draw_card(ui, &card, anchor, vp, &mut ccx);
+            // kept off the navigator minimap (last frame's rect; it is drawn below)
+            let avoid = self.navigator_rect();
+            let out = cards::draw_card(ui, &card, anchor, vp, avoid, &mut ccx);
+            self.card_rect = Some(out.rect);
             actions.extend(out.actions);
             if out.close {
                 self.card = None;
@@ -858,6 +971,10 @@ impl MapView {
             }
             if let Some(id) = out.navigate {
                 self.navigate_to(id, true);
+            }
+            if let Some(idx) = out.open_object {
+                self.selected = Some(idx);
+                keynav::open_selected_card(self);
             }
         }
 
@@ -867,10 +984,15 @@ impl MapView {
             let label = f.label.clone();
             let a = f.anchors[f.idx].clone();
             let map_name = pack.map(a.map).map(|m| m.display.clone()).unwrap_or_default();
-            let where_ = match a.precision {
+            let mut where_ = match a.precision {
                 Precision::Map => format!("{} (somewhere on this map)", map_name),
                 _ => map_name,
             };
+            match a.object.and_then(|i| pack.objects.get(i as usize)).map(|o| o.kind) {
+                Some(ObjectKind::Item) => where_.push_str(" · item ball"),
+                Some(ObjectKind::HiddenItem) => where_.push_str(" · hidden item"),
+                _ => {}
+            }
             let mut prev = false;
             let mut next = false;
             let mut close = false;
@@ -884,7 +1006,7 @@ impl MapView {
                         widgets::label_font(ui, format!("Showing {}", label), theme.body_bold(), theme.text_strong());
                         widgets::label_font(ui, format!("— {} ({} of {})", where_, f.idx + 1, n), theme.body(), theme.secondary);
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if widgets::StyledButton::new(theme, "✕").min_size(Vec2::new(20.0, 20.0)).show(ui).clicked() {
+                            if widgets::StyledButton::new(theme, "×").min_size(Vec2::new(20.0, 20.0)).show(ui).clicked() {
                                 close = true;
                             }
                             if let Some(id) = self.state.selected_id {
@@ -906,10 +1028,7 @@ impl MapView {
             if close {
                 self.focus = None;
             } else if prev || next {
-                if let Some(f) = self.focus.as_mut() {
-                    f.idx = if next { (f.idx + 1) % n } else { (f.idx + n - 1) % n };
-                }
-                self.go_to_focus(true);
+                self.step_focus(next);
             }
             if select {
                 if let Some(id) = self.state.selected_id {
@@ -981,6 +1100,11 @@ impl MapView {
 
     pub fn card_is_tile(&self) -> bool {
         matches!(&self.card, Some((Card::Tile { .. }, _)))
+    }
+
+    /// Where the open card was drawn last frame (headless tests).
+    pub fn card_rect(&self) -> Option<Rect> {
+        self.card_rect
     }
 
     pub fn has_card(&self) -> bool {

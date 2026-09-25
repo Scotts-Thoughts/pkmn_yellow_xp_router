@@ -308,7 +308,7 @@ fn floating_toolbar(view: &mut MapView, ui: &Ui, vp: Rect, sel: Selection) {
                 export = ui.button("Export").on_hover_text("Export the selection as a PNG").clicked();
                 copy = ui.button("Copy").on_hover_text("Copy the selection to the clipboard").clicked();
                 add = ui.button("Add trainers").on_hover_text("Add the selection's undefeated trainers to the route").clicked();
-                clear = ui.button("✕").on_hover_text("Clear the selection").clicked();
+                clear = ui.button("×").on_hover_text("Clear the selection").clicked();
             });
         });
     });

@@ -1713,7 +1713,7 @@ impl EventEditors {
                         widgets::chip_outlined(ui, theme, ctx.event_type, theme.header, theme.chip_bg(), theme.chip_border());
                         let bold = theme.body_bold();
                         let body = theme.body();
-                        let mappable = matches!(ctx.event_type, consts::TASK_TRAINER_BATTLE | consts::TASK_GET_FREE_ITEM | consts::TASK_FIGHT_WILD_PKMN);
+                        let mappable = matches!(ctx.event_type, consts::TASK_TRAINER_BATTLE | consts::TASK_GET_FREE_ITEM | consts::TASK_FIGHT_WILD_PKMN) && crate::map::MapView::game_of_gen(ctx.gen).is_some();
                         let readout_w = readout
                             .as_ref()
                             .map(|(k, v)| widgets::text_width(ui, k, &body) + 4.0 + widgets::text_width(ui, v, &bold))

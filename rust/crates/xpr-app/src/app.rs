@@ -1037,8 +1037,17 @@ impl XprApp {
         }
     }
 
+    /// Whether the open route's game has a map pack (gens 1-3); without one
+    /// the Map tab, the map window and the map menu items are unavailable.
+    fn map_available(&self) -> bool {
+        MapView::game_of(&self.ctrl).is_some()
+    }
+
     /// Show the map: the Map tab of the right pane, or its own window.
     fn open_map(&mut self) {
+        if !self.map_available() {
+            return;
+        }
         if self.map.docked && self.page == Page::Editor {
             let mut da = DetailsActions::default();
             self.details.set_tab(&self.cfg, MAP_TAB, &mut da);
@@ -1914,7 +1923,7 @@ impl XprApp {
             });
             ui.menu_button("Map", |ui| {
                 ui.set_min_width(260.0);
-                let has_route = self.ctrl.get_version().is_some();
+                let has_route = self.map_available();
                 if widgets::menu_check_item(ui, &theme, "Show Map", &label("toggle_map"), self.map_is_shown(), has_route) {
                     self.toggle_map();
                 }
@@ -2131,6 +2140,11 @@ impl XprApp {
                 let mut da = DetailsActions::default();
                 self.details.set_tab(&self.cfg, MAP_TAB, &mut da);
             }
+        }
+        if self.details.is_map_tab() && !self.map_available() {
+            // the route's game has no map pack: the Map tab is gone
+            let mut da = DetailsActions::default();
+            self.details.set_tab(&self.cfg, PRE_STATE_TAB, &mut da);
         }
         let is_battle = self.details.is_battle_tab();
         let is_map = self.details.is_map_tab();
@@ -2906,7 +2920,7 @@ impl XprApp {
                 self.request_shot(ShotKind::RunSummary);
             }
         }
-        if self.map.open && !self.map.docked && self.page == Page::Editor {
+        if self.map.open && !self.map.docked && self.page == Page::Editor && self.map_available() {
             let theme2 = theme.clone();
             let mut closed = false;
             let mut map_actions: Vec<MapAction> = Vec::new();

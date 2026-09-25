@@ -65,6 +65,10 @@ pub fn draw_grid(painter: &egui::Painter, oc: &OverlayCtx, toggles: &Toggles) {
     }
 }
 
+/// One size for every map label, so small and large maps read alike (sizing
+/// by map width made neighbouring labels visibly mismatched).
+const MAP_LABEL_FONT_SIZE: f32 = 13.0;
+
 /// Map display names at map centres (world scope), readable when zoomed out
 /// (SPEC WP-C "C": drawn when the map is at least ~80 screen px wide,
 /// elided to its screen width, with a dark halo; nothing in a map scope).
@@ -87,8 +91,7 @@ pub fn draw_map_labels(painter: &egui::Painter, oc: &OverlayCtx, toggles: &Toggl
         if screen_w < 80.0 {
             continue;
         }
-        let font_size = (screen_w / 18.0).clamp(9.0, 14.0);
-        let font = oc.theme.font_bold(font_size);
+        let font = oc.theme.font_bold(MAP_LABEL_FONT_SIZE);
         let center = Pos2::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0);
         let label = elide_for_painter(painter, &m.display, &font, (screen_w - 10.0).max(12.0));
         draw_halo_text(painter, center, egui::Align2::CENTER_CENTER, &label, font, Color32::WHITE, theme::with_alpha(Color32::BLACK, 0xC8));

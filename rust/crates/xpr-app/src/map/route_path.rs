@@ -90,11 +90,11 @@ pub fn draw(painter: &egui::Painter, oc: &OverlayCtx, state: &RouteMapState, tog
 /// "Interaction"). Called from `mod.rs::viewport` right before the
 /// ordinary click block so a disc hit takes priority over opening a
 /// map/tile card underneath it; returns true when a disc was hit.
-pub fn handle_click(view: &mut MapView, ui: &Ui, resp: &egui::Response, vp: Rect, actions: &mut Vec<MapAction>) -> bool {
+pub fn handle_click(view: &mut MapView, ui: &Ui, resp: &egui::Response, clicked: bool, vp: Rect, actions: &mut Vec<MapAction>) -> bool {
     if xpr_ui_kit::modal::behind_modal(ui) {
         return false;
     }
-    if !view.toggles.path || !resp.clicked() {
+    if !view.toggles.path || !clicked {
         return false;
     }
     let Some(pos) = resp.interact_pointer_pos() else { return false };

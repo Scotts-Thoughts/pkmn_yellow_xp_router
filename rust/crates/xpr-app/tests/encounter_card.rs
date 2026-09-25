@@ -10,7 +10,7 @@ use egui::{Event, Modifiers, PointerButton, Pos2, RawInput, Rect, Shape, Vec2};
 
 use xpr_app::assets::Assets;
 use xpr_app::controller::MainController;
-use xpr_app::map::cards::{ev_yield_text, has_ev_column};
+use xpr_app::map::cards::{ev_yield_text, has_ev_column, party_ev_parts, party_ev_text, stat_color};
 use xpr_app::map::{MapAction, MapView};
 use xpr_core::{Config, Paths};
 use xpr_data::Registry;
@@ -58,6 +58,46 @@ fn ev_yields_come_from_the_species_data_in_gens_3_and_up() {
     let platinum = reg.get_version("Platinum").unwrap();
     assert!(has_ev_column(Some(&platinum)));
     assert_eq!(ev_yield_text(&platinum, "Chimchar").as_deref(), Some("1 Spe"));
+}
+
+#[test]
+fn a_trainers_party_ev_total_sums_its_species() {
+    let reg = registry();
+    let emerald = reg.get_version("Emerald").unwrap();
+    let party = |g: &xpr_data::GenData, name: &str| g.trainer_db().get_trainer(name).unwrap_or_else(|| panic!("no trainer {}", name)).pkmn.clone();
+    // Roselia (1 SpA in gen 3, per pokeemerald) x2 + Shroomish (1 HP)
+    assert_eq!(party_ev_text(&emerald, &party(&emerald, "Aroma Lady Rose")).as_deref(), Some("EVs: 1 HP, 2 SpA"));
+    // Geodude x2 + Nosepass, 1 Def each
+    assert_eq!(party_ev_text(&emerald, &party(&emerald, "Leader Roxanne")).as_deref(), Some("EVs: 3 Def"));
+    assert_eq!(party_ev_text(&emerald, &[]), None);
+    // gens 1/2: stat exp is the summed base stats, one Special
+    let yellow = reg.get_version("Yellow").unwrap();
+    // Caterpie x2 + Weedle
+    assert_eq!(party_ev_text(&yellow, &party(&yellow, "BugCatcher 4")).as_deref(), Some("Stat exp: 130 HP, 95 Atk, 100 Def, 60 Spc, 140 Spe"));
+    // the parts carry each stat's index, for its colour; Spc takes the SpA slot
+    let (prefix, parts) = party_ev_parts(&yellow, &party(&yellow, "BugCatcher 4")).unwrap();
+    assert_eq!(prefix, "Stat exp");
+    assert_eq!(parts.iter().map(|p| p.0).collect::<Vec<_>>(), vec![0, 1, 2, 3, 5]);
+    assert_eq!(parts[3], (3, 60, "Spc"));
+}
+
+#[test]
+fn stat_colours_are_distinct_and_follow_the_background() {
+    let dark = egui::Color32::from_rgb(30, 30, 30);
+    let light = egui::Color32::from_rgb(240, 240, 240);
+    for bg in [dark, light] {
+        let colours: Vec<_> = (0..6).map(|i| stat_color(i, bg)).collect();
+        for i in 0..6 {
+            for j in i + 1..6 {
+                assert_ne!(colours[i], colours[j], "stats {} and {} share a colour", i, j);
+            }
+        }
+    }
+    // a light card gets the deeper shades
+    for i in 0..6 {
+        let (d, l) = (stat_color(i, dark), stat_color(i, light));
+        assert!(d.r() as u32 + d.g() as u32 + d.b() as u32 > l.r() as u32 + l.g() as u32 + l.b() as u32, "stat {}", i);
+    }
 }
 
 // ---------------------------------------------------------------------------

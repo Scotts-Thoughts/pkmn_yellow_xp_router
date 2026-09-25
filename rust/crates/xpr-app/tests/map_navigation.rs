@@ -15,6 +15,7 @@ use egui::{Event, Key, Modifiers, PointerButton, Pos2, RawInput, Rect, Shape, Ve
 use xpr_app::assets::Assets;
 use xpr_app::controller::MainController;
 use xpr_app::map::finder::{find_items, find_trainers};
+use xpr_app::map::item_search;
 use xpr_app::map::{MapAction, MapView};
 use xpr_core::{Config, Paths};
 use xpr_data::Registry;
@@ -222,6 +223,83 @@ fn the_search_popup_lists_a_trainers_group_and_choosing_the_hit_focuses_it() {
     h.settle();
     let gym = h.view.pack().unwrap().map_by_const("PEWTER_GYM").unwrap().id;
     assert_eq!(h.view.scope(), Scope::Map(gym), "Brock's gym, an indoor map, switched the scope");
+}
+
+#[test]
+fn item_search_lists_balls_and_hidden_items_and_loops_through_them() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    h.frame(vec![]);
+    h.wait_ready();
+    let pack = h.view.pack().unwrap().clone();
+
+    // Yellow's Nuggets: 3 item balls and 5 hidden (map_data/yellow/objects.json)
+    let hits = item_search::find(&pack, "nugg");
+    assert_eq!(hits, vec![item_search::ItemHit { name: "Nugget".into(), balls: 3, hidden: 5 }]);
+    assert_eq!(item_search::instances(&pack, "Nugget").len(), 8);
+    assert!(item_search::find(&pack, "").len() > 20, "an empty query lists every item on the map");
+
+    h.view.item_search.query = "nugget".to_string();
+    h.view.item_search.open = true;
+    h.frame(vec![]);
+    h.frame(vec![]);
+    let (_, row_pos) = h.text_positions.iter().find(|(t, _)| t == "Nugget").cloned().expect("a \"Nugget\" row is drawn in the popup");
+    assert!(h.texts.iter().any(|t| t == "3 balls · 5 hidden"), "the row shows its counts: {:?}", h.texts);
+    h.click(row_pos + Vec2::new(15.0, 8.0));
+    assert_eq!(h.view.focus_label(), Some("Nugget"));
+    assert!(!h.view.item_search.open, "choosing closes the popup");
+    h.settle();
+    assert!(h.texts.iter().any(|t| t.contains("(1 of 8)")), "the banner counts the instances: {:?}", h.texts);
+
+    // the banner loops through all eight, naming each one's kind, and wraps
+    let mut kinds = (0, 0);
+    for _ in 0..8 {
+        let line = h.texts.iter().find(|t| t.contains(" of 8)")).cloned().unwrap();
+        if line.contains("· item ball") {
+            kinds.0 += 1;
+        } else if line.contains("· hidden item") {
+            kinds.1 += 1;
+        }
+        h.view.step_focus(true);
+        h.settle();
+    }
+    assert_eq!(kinds, (3, 5));
+    assert!(h.texts.iter().any(|t| t.contains("(1 of 8)")), "wrapped back to the first");
+}
+
+#[test]
+fn the_map_card_lists_the_maps_trainers_and_their_teams() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    h.frame(vec![]);
+    h.wait_ready();
+    let pack = h.view.pack().unwrap().clone();
+    let route3 = pack.map_by_const("ROUTE_3").unwrap().id;
+    h.view.navigate_to(route3, false);
+    h.settle();
+    assert!(h.view.open_card_at_step(route3, 0, 0));
+    h.frame(vec![]);
+    h.frame(vec![]);
+    assert!(h.view.card_is_map());
+    // each trainer gets a row with its prize money, total exp and party levels (the
+    // last rows are scrolled out of this 700px window)
+    for name in ["BugCatcher 4", "Youngster 1", "Lass 1", "BugCatcher 5"] {
+        assert!(h.texts.iter().any(|t| t == name), "{} has a row: {:?}", name, h.texts);
+    }
+    assert!(h.texts.iter().any(|t| t == "¥165 · 278 exp"), "Youngster 1's prize money and exp: {:?}", h.texts);
+    assert!(h.texts.iter().any(|t| t == "14"), "a party level: {:?}", h.texts);
+    assert!(h.texts.iter().any(|t| t == "Stat exp: 130 HP, 95 Atk, 100 Def, 60 Spc, 140 Spe"), "BugCatcher 4's stat exp: {:?}", h.texts);
+
+    // "+" on a row adds that trainer
+    let (_, bug) = h.text_positions.iter().find(|(t, _)| t == "BugCatcher 4").cloned().unwrap();
+    let (_, plus) = h.text_positions.iter().filter(|(t, p)| t == "+" && p.x > bug.x && (p.y - bug.y).abs() < 40.0).min_by(|a, b| (a.1.y - bug.y).abs().total_cmp(&(b.1.y - bug.y).abs())).cloned().expect("BugCatcher 4's add button");
+    let actions = h.click(plus + Vec2::new(3.0, 5.0));
+    assert!(actions.iter().any(|a| matches!(a, MapAction::AddTrainer { name } if name == "BugCatcher 4")), "{:?}", actions);
+    assert!(h.view.card_is_map(), "adding keeps the map card open");
+
+    // clicking a row opens that trainer's own card
+    let (_, lass) = h.text_positions.iter().find(|(t, _)| t == "Lass 1").cloned().unwrap();
+    h.click(lass + Vec2::new(10.0, 5.0));
+    let lass_obj = pack.object_range(route3).find(|&i| pack.objects[i as usize].trainer_names().iter().any(|n| n == "Lass 1")).unwrap();
+    assert_eq!(h.view.card_object(), Some(lass_obj));
 }
 
 // ---------------------------------------------------------------------------

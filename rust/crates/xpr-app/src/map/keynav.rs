@@ -102,7 +102,7 @@ fn step_selection(view: &mut MapView, vp: Rect, forward: bool) {
 
 /// Enter: open the selected object's card and clear any focus banner (the
 /// selection ring keeps drawing for `view.selected` either way).
-fn open_selected_card(view: &mut MapView) {
+pub(super) fn open_selected_card(view: &mut MapView) {
     let Some(idx) = view.selected else { return };
     let Some(pack) = view.pack().cloned() else { return };
     let scope = view.scope();
