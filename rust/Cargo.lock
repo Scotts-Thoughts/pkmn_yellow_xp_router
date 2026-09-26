@@ -4298,6 +4298,7 @@ version = "6.0.0"
 dependencies = [
  "indexmap",
  "log",
+ "rayon",
  "serde",
  "serde_json",
  "xpr-core",

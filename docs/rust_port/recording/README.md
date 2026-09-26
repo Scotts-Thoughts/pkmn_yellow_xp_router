@@ -1,7 +1,9 @@
 # Recording harness
 
 Replays a scripted GameHook session to the Rust app without an emulator or
-Poke-A-Byte. (Until 2026-09-18 this folder also held a Python-vs-Rust pair
+Poke-A-Byte. Gen 5 is checked against real runs instead: see [gen5.md](gen5.md)
+(what the games do and how the recorder reads it) and `gen5_replay/` (Super
+Shuckie replays played back headlessly into a private Poke-A-Byte). (Until 2026-09-18 this folder also held a Python-vs-Rust pair
 diff, `run_pair.py`; it went with the Python app. All five replay scenarios
 recorded byte-identical routes in both apps as of 2026-09-12.)
 
@@ -33,7 +35,7 @@ Scenarios: `quickstart_yellow` and `quickstart_emerald` are for
 `run_quickstart.py` (the party starts empty and the starter lands in slot 1 a
 few seconds in). `emerald_geodude` (gen 3), `yellow_charmander` (gen 1,
 deprecated mapper), `crystal_totodile` (gen 2, deprecated mapper),
-`platinum_chimchar` (gen 4), `black_tepig` (gen 5) and `emerald_thief`
+`platinum_chimchar` (gen 4) and `emerald_thief`
 (gen 3: Thief in trainer and wild battles, taking the loot off, selling it)
 are full replay scenarios that walk every recorder path of their generation:
 registration, area folders (and "Trip 2"), wild / trainer / multi-mon /

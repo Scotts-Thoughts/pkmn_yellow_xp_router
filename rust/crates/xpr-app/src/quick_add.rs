@@ -254,6 +254,8 @@ pub struct QuickItemAdd {
     amount: String,
     purchase_cost: String,
     sell_cost: String,
+    /// The move a single-target PP item (Ether, PP Up, ...) is used on.
+    pp_move: OptionMenu,
 }
 
 impl QuickItemAdd {
@@ -263,6 +265,7 @@ impl QuickItemAdd {
             item_type: OptionMenu::new(consts::ITEM_TYPES.iter().map(|s| s.to_string()).collect(), None),
             items: OptionMenu::new(vec![consts::NO_ITEM.to_string()], None),
             mart: OptionMenu::new(vec![consts::ITEM_TYPE_ALL_ITEMS.to_string()], None),
+            pp_move: OptionMenu::default(),
             amount: "1".to_string(),
             purchase_cost: String::new(),
             sell_cost: String::new(),
@@ -326,13 +329,23 @@ impl QuickItemAdd {
         let gen = ctrl.gen();
         let can_insert = ctrl.can_insert_after_current_selection();
         let item = gen.as_ref().and_then(|g| g.item_db().get_item(self.items.get()).cloned());
+        let pp_effect = match (&item, &gen) {
+            (Some(i), Some(g)) => g.pp_item_effect(&i.name),
+            _ => None,
+        };
         let (get_ok, use_ok, hold_ok, tm_ok) = match (&item, &gen) {
             (Some(i), Some(g)) if can_insert => {
-                let is_use = g.get_valid_vitamins().contains(&i.name.as_str()) || g.get_valid_ev_berries().contains(&i.name.as_str()) || i.name == consts::RARE_CANDY;
+                let is_use = g.get_valid_vitamins().contains(&i.name.as_str()) || g.get_valid_ev_berries().contains(&i.name.as_str()) || i.name == consts::RARE_CANDY || pp_effect.is_some();
                 (true, is_use, g.get_generation() != 1, i.move_name.is_some())
             }
             _ => (false, false, false, false),
         };
+        // the moves a single-target PP item can go on, at the insertion point
+        let pp_needs_target = pp_effect.map(|e| e.needs_target()).unwrap_or(false);
+        if pp_needs_target {
+            let moves: Vec<String> = ctrl.get_active_state().map(|st| st.solo_pkmn.move_list.iter().flatten().filter(|m| !m.is_empty()).cloned().collect()).unwrap_or_default();
+            self.pp_move.new_values(moves, None);
+        }
         // the bag can only be rearranged in gen 1; the new event starts empty
         // and is arranged in the details panel
         let reorder_ok = can_insert && gen.as_ref().map(|g| g.supports_bag_reorder()).unwrap_or(false);
@@ -363,6 +376,11 @@ impl QuickItemAdd {
                     sel_changed = true;
                 }
                 ui.end_row();
+                if pp_needs_target {
+                    widgets::label(ui, theme, "On move:");
+                    self.pp_move.ui(ui, theme, ui.id().with("pp_move"), Some(120.0), !self.pp_move.options.is_empty());
+                    ui.end_row();
+                }
                 widgets::label(ui, theme, "Purchase:");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| widgets::label(ui, theme, self.purchase_cost.clone()));
                 widgets::label(ui, theme, "Sell Price:");
@@ -385,7 +403,10 @@ impl QuickItemAdd {
                     ctrl.new_event(EventDefinition::with_item(InventoryEventDefinition::new(&name, amt, true, false, None)), after, None, None, true);
                 }
                 if StyledButton::new(theme, "Drop").fixed_width(60.0).enabled(get_ok).show(ui).clicked() && get_ok {
-                    ctrl.new_event(EventDefinition::with_item(InventoryEventDefinition::new(&name, amt, false, false, None)), after, None, None, true);
+                    let mut ie = InventoryEventDefinition::new(&name, amt, false, false, None);
+                    // a dropped PP item restores nothing
+                    ie.no_effect = pp_effect.is_some();
+                    ctrl.new_event(EventDefinition::with_item(ie), after, None, None, true);
                 }
                 ui.add_space(10.0);
                 if StyledButton::new(theme, "Use").fixed_width(60.0).enabled(use_ok).show(ui).clicked() && use_ok {
@@ -394,6 +415,9 @@ impl QuickItemAdd {
                             ctrl.new_event(EventDefinition::with_vitamin(VitaminEventDefinition::new(&name, amt)), after, None, None, true);
                         } else if name == consts::RARE_CANDY {
                             ctrl.new_event(EventDefinition::with_rare_candy(amt), after, None, None, true);
+                        } else if pp_effect.is_some() {
+                            let target = Some(self.pp_move.get()).filter(|m| pp_needs_target && !m.is_empty());
+                            ctrl.new_event(EventDefinition::with_item(InventoryEventDefinition::use_on(&name, amt, target)), after, None, None, true);
                         }
                     }
                 }

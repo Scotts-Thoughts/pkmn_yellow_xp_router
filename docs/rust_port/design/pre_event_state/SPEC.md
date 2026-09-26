@@ -246,6 +246,37 @@ Four rows of 34 px: slot number (11 px muted, 14 px column) + move name
 (12 px bold strong); empty slot = `—` in muted. Source: `solo_pkmn.move_list`
 padded to 4.
 
+PP (added 2026-09-25; see `../pp_tracking/PLAN.md` §5.2). When an event is
+selected, each known move's row also shows PP from the PP ledger:
+
+- **Numbers.** `cur / max` right-aligned, 12 px bold, e.g. `12 / 15`.
+  Negative values use a real minus sign (`−3 / 15`). The move name is
+  elided to the space left.
+- **Colour.**
+  - `failure` when `cur <= 0`;
+  - `warning` when the selected fight (or matchup) spends more of the
+    move than `cur`;
+  - otherwise `secondary`.
+- **PP Ups.** Up to three 4 px `secondary` dots left of the numbers.
+- **Hover tooltip.** `Move: cur / max PP (n PP Ups)`, `This event uses N`
+  for a fight, then the slot's history since it was last full: the
+  refill or learn line, then `−3  Brock 1: Onix (Water Gun, 3 hits)`-style
+  lines. It shows at most 14 lines, keeping the first.
+- **Right-click menu.** `Use <item> on <move>` for each single-target PP
+  item in the bag before the event (`Use <item>` for an Elixir). Picking
+  one inserts that use before the selected event. Left-click still offers
+  the tutor dialog.
+
+With no event selected (route start), the rows show no PP.
+
+PP lines are added to the §5.6 warning banners:
+
+- `Surf is at −3 PP before this event: heal first`
+- `This fight needs Surf ×6, but it has 2 PP left` (for a single matchup:
+  `This matchup needs …`)
+- the ledger's notes, e.g. `Surf was already full; the game would refuse
+  this Ether`
+
 ### 5.5 Bag card
 
 Title row: **BAG** left, `N of 20 slots` caption right (N = item count,

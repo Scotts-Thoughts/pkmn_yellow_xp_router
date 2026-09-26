@@ -321,6 +321,14 @@ pub const ALL_HIGHLIGHT_LABELS: [&str; 9] = [
 pub const IS_KEY_ITEM: &str = "key_item";
 pub const PURCHASE_PRICE: &str = "purchase_price";
 pub const CUSTOM_PRICE_KEY: &str = "custom_price";
+/// The move a single-target PP item (Ether, PP Up, …) was used on; stored in
+/// the trailing object of an inventory event, next to `custom_price`.
+pub const TARGET_MOVE_KEY: &str = "target_move";
+/// The PP item was tossed rather than used (no PP effect).
+pub const NO_EFFECT_KEY: &str = "no_effect";
+/// Per-slot PP-Up counts of the solo mon in a serialized state (written
+/// only when any is non-zero).
+pub const PP_UPS_KEY: &str = "pp_ups";
 pub const MARTS: &str = "marts";
 
 pub const EVENT_TAG_IMPORTANT: &str = "important";
@@ -537,9 +545,12 @@ pub const RECOIL_FLAVOR_DIVISORS: [(&str, i64); 3] = [
 ];
 pub const RECOIL_MAX_HP_FLAVOR_DIVISORS: [(&str, i64); 1] = [(FLAVOR_RECOIL_QUARTER_MAX_HP, 4)];
 pub const ROCK_HEAD_ABILITY: &str = "Rock Head";
+/// Gens 3+: every use of a move that targets the holder costs 1 extra PP.
+pub const PRESSURE_ABILITY: &str = "Pressure";
 
 pub const STRUGGLE_MOVE_NAME: &str = "Struggle";
 pub const MIMIC_MOVE_NAME: &str = "Mimic";
+pub const TRANSFORM_MOVE_NAME: &str = "Transform";
 pub const METRONOME_MOVE_NAME: &str = "Metronome";
 pub const EXPLOSION_MOVE_NAME: &str = "Explosion";
 pub const SELFDESTRUCT_MOVE_NAME: &str = "Selfdestruct";

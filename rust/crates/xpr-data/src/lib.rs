@@ -15,6 +15,7 @@ pub mod stats;
 
 pub use badges::BadgeList;
 pub use db::{ItemDB, MinBattlesDB, MoveDB, PkmnDB, TrainerDB};
+pub use gen_consts::{PpAmount, PpItemEffect, PpLock};
 pub use gen_data::{E4Entry, GenData};
 pub use model::{
     BaseItem, CustomMoveData, EnemyPkmn, FieldStatus, Gen, Move, MoveEffect, Nature, PokemonSpecies, StageModifiers,

@@ -5,6 +5,8 @@ pub mod gen1;
 pub mod gen2;
 pub mod gen3;
 pub mod gen45;
+pub mod gen5;
+pub mod gen5_places;
 
 use std::sync::Arc;
 
@@ -56,17 +58,18 @@ pub fn create_recorder(info: &StartInfo, controller: Arc<RecorderController>) ->
         }
         5 => {
             use gen45::Flavor;
-            if base == consts::BLACK_VERSION {
-                Some((names(&["Pokemon Black"]), Box::new(gen45::Gen45Machine::new(controller, info, Flavor::BlackWhite))))
+            let (flavor, name) = if base == consts::BLACK_VERSION {
+                (Flavor::BlackWhite, "Pokemon Black")
             } else if base == consts::WHITE_VERSION {
-                Some((names(&["Pokemon White"]), Box::new(gen45::Gen45Machine::new(controller, info, Flavor::BlackWhite))))
+                (Flavor::BlackWhite, "Pokemon White")
             } else if base == consts::BLACK_2_VERSION {
-                Some((names(&["Pokemon Black 2"]), Box::new(gen45::Gen45Machine::new(controller, info, Flavor::Black2White2))))
+                (Flavor::Black2White2, "Pokemon Black 2")
             } else if base == consts::WHITE_2_VERSION {
-                Some((names(&["Pokemon White 2"]), Box::new(gen45::Gen45Machine::new(controller, info, Flavor::Black2White2))))
+                (Flavor::Black2White2, "Pokemon White 2")
             } else {
-                None
-            }
+                return None;
+            };
+            Some((names(&[name]), Box::new(gen5::Gen5Machine::new(controller, info, flavor))))
         }
         _ => None,
     }

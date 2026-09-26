@@ -1,5 +1,5 @@
 //! `xpr-golden verify <golden_dir> [--limit N] [--filter SUBSTR]`
-//! `xpr-golden dump <out_dir> <route.json>...`
+//! `xpr-golden dump <out_dir> [--battles] <route.json>...`
 //! `xpr-golden bench <route.json>`
 
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ use xpr_golden::record;
 fn usage() -> ! {
     eprintln!("usage:");
     eprintln!("  xpr-golden verify <golden_dir> [--limit N] [--filter SUBSTR] [--max-diffs N] [--no-battles]");
-    eprintln!("  xpr-golden dump <out_dir> <route.json>...");
+    eprintln!("  xpr-golden dump <out_dir> [--battles] <route.json>...");
     eprintln!("  xpr-golden bench <route.json>");
     std::process::exit(2);
 }
@@ -165,9 +165,18 @@ fn dump(args: &[String]) {
     let out_dir = PathBuf::from(&args[0]);
     std::fs::create_dir_all(&out_dir).expect("out dir");
     let reg = registry(None);
-    for route in &args[1..] {
+    // `--battles`: also record every fight's battle summary, as `verify` does
+    let with_battles = args[1..].iter().any(|a| a == "--battles");
+    let cfg = xpr_core::Config::load(&xpr_core::Paths::global_config_dir().join("config.json"));
+    for route in args[1..].iter().filter(|a| *a != "--battles") {
         let mut router = Router::new(reg.clone());
-        let rec = record::build_record(&mut router, Path::new(route), true);
+        let mut rec = record::build_record(&mut router, Path::new(route), true);
+        if with_battles && rec.get("load_error").is_none() {
+            let summary_cfg = xpr_golden::battles::summary_config(&cfg, &router);
+            if let serde_json::Value::Object(o) = &mut rec {
+                o.insert("battles".into(), xpr_golden::battles::dump_battles(&router, &summary_cfg));
+            }
+        }
         let name = Path::new(route).file_stem().unwrap().to_string_lossy().to_string();
         let text = serde_json::to_string_pretty(&rec).unwrap();
         std::fs::write(out_dir.join(format!("{}.rust.json", name)), text).unwrap();

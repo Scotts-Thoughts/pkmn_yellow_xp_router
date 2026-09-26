@@ -68,7 +68,15 @@
         "Leader Brycen": "TM79 Frost Breath",
         "Leader Drayden": "TM82 Dragon Tail",
         "Leader Iris": "TM82 Dragon Tail",
-        "Leader Marlon": "TM55 Scald"
+        "Leader Marlon": "TM55 Scald",
+        "Leader Cheren (156)": "TM83 Work Up",
+        "Leader Roxie (157)": "TM09 Venoshock",
+        "Leader Burgh (154)": "TM76 Struggle Bug",
+        "Leader Elesa (153)": "TM72 Volt Switch",
+        "Leader Clay (158)": "TM78 Bulldoze",
+        "Leader Skyla (155)": "TM62 Acrobatics",
+        "Leader Drayden (159)": "TM82 Dragon Tail",
+        "Leader Marlon (160)": "TM55 Scald"
     },
     "trainer_timing_info": {
         "intro_time": 4.69,

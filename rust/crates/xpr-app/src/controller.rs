@@ -65,6 +65,11 @@ pub struct MainController {
     /// The next route mutation joins the previous one as a single undo step
     /// (a burst of candy / vitamin clicks).
     coalesce_next_undo: bool,
+    /// Bumped on every route or version change; the PP ledger rebuilds when
+    /// it moved.
+    route_revision: u64,
+    /// Current PP before every event (see [`MainController::ensure_pp`]).
+    pub pp: crate::pp_ledger::PpLedger,
 }
 
 impl MainController {
@@ -85,6 +90,8 @@ impl MainController {
             custom_image_path: None,
             signals: Signals::default(),
             coalesce_next_undo: false,
+            route_revision: 0,
+            pp: crate::pp_ledger::PpLedger::new(),
         }
     }
 
@@ -125,12 +132,27 @@ impl MainController {
     }
 
     fn on_version_change(&mut self) {
+        self.route_revision += 1;
         self.signals.version_changed = true;
     }
 
     fn on_route_change(&mut self) {
+        self.route_revision += 1;
         self.unsaved_changes = true;
         self.signals.route_changed = true;
+    }
+
+    /// Bumped on every route or version change.
+    pub fn route_revision(&self) -> u64 {
+        self.route_revision
+    }
+
+    /// Bring the PP ledger (`self.pp`) up to date; free when neither the
+    /// route nor the calc settings changed since the last call. Everything
+    /// that shows PP calls this first.
+    pub fn ensure_pp(&mut self, cfg: &Config) {
+        let sc = crate::pp_ledger::pp_summary_config(cfg);
+        self.pp.ensure(&self.router, self.route_revision, &sc);
     }
 
     fn on_filter_change(&mut self) {
@@ -846,6 +868,17 @@ impl MainController {
             None,
             false,
         )
+    }
+
+    /// Insert a use of the PP item `item_name` (on `target_move` when it
+    /// acts on one move) before the selected event (the Pre-Event State
+    /// moves card's menu).
+    pub fn use_pp_item_before_selected(&mut self, item_name: &str, target_move: Option<&str>) -> Option<NodeId> {
+        let id = self.get_single_selected_event_id(true)?;
+        if !matches!(self.router.obj_kind(id), Some(ObjKind::Group) | Some(ObjKind::Item)) {
+            return None;
+        }
+        self.new_event(EventDefinition::with_item(InventoryEventDefinition::use_on(item_name, 1, target_move)), None, Some(id), None, false)
     }
 
     /// Insert an EV Override event (`[hp, atk, def, spa, spd, spe]`) before

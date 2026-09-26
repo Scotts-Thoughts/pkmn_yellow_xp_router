@@ -8,6 +8,7 @@ pub mod gen2;
 pub mod gen3;
 pub mod gen4;
 pub mod gen5;
+pub mod pp;
 
 use xpr_data::model::{EnemyPkmn, FieldStatus, Gen, Move, StageModifiers, StatBlock};
 use xpr_data::GenData;

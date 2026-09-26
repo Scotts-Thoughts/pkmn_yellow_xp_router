@@ -511,6 +511,9 @@ impl XprApp {
                 }
             }
         }
+        if let Some((item, target)) = &actions.pre_state_use_pp_item {
+            self.ctrl.use_pp_item_before_selected(item, target.as_deref());
+        }
         if actions.pre_state_override_evs {
             if let Some(id) = self.ctrl.get_single_selected_event_id(true) {
                 let is_event = matches!(self.ctrl.router.obj_kind(id), Some(ObjKind::Group) | Some(ObjKind::Item));

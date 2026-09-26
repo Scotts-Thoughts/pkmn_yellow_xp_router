@@ -65,6 +65,11 @@ pub struct InventoryEventDefinition {
     pub is_acquire: bool,
     pub with_money: bool,
     pub custom_price: Option<i64>,
+    /// The move a single-target PP item (Ether, PP Up, …) was used on.
+    /// Rust-only; only meaningful on a use (`!is_acquire && !with_money`).
+    pub target_move: Option<String>,
+    /// The item was tossed rather than used: no PP effect. Rust-only.
+    pub no_effect: bool,
 }
 
 impl InventoryEventDefinition {
@@ -75,7 +80,23 @@ impl InventoryEventDefinition {
             is_acquire,
             with_money,
             custom_price,
+            target_move: None,
+            no_effect: false,
         }
+    }
+
+    /// A use of `item_name` from the bag, on `target_move` when the item acts
+    /// on one move.
+    pub fn use_on(item_name: &str, item_amount: i64, target_move: Option<&str>) -> Self {
+        InventoryEventDefinition {
+            target_move: target_move.map(|s| s.to_string()),
+            ..InventoryEventDefinition::new(item_name, item_amount, false, false, None)
+        }
+    }
+
+    /// Whether this is a use / toss from the bag (not a find, buy or sale).
+    pub fn is_use(&self) -> bool {
+        !self.is_acquire && !self.with_money
     }
 
     pub fn serialize(&self) -> Value {
@@ -85,8 +106,20 @@ impl InventoryEventDefinition {
             Value::Bool(self.is_acquire),
             Value::Bool(self.with_money),
         ];
+        // the trailing object is written only when something in it is set,
+        // so routes without these stay byte-identical to the Python format
+        let mut extra: Vec<(&str, Value)> = Vec::new();
         if let Some(p) = self.custom_price {
-            result.push(pyjson::object(vec![(consts::CUSTOM_PRICE_KEY, Value::from(p))]));
+            extra.push((consts::CUSTOM_PRICE_KEY, Value::from(p)));
+        }
+        if let Some(t) = &self.target_move {
+            extra.push((consts::TARGET_MOVE_KEY, Value::String(t.clone())));
+        }
+        if self.no_effect {
+            extra.push((consts::NO_EFFECT_KEY, Value::Bool(true)));
+        }
+        if !extra.is_empty() {
+            result.push(pyjson::object(extra));
         }
         Value::Array(result)
     }
@@ -101,11 +134,17 @@ impl InventoryEventDefinition {
             return None;
         }
         let mut custom_price = None;
+        let mut target_move = None;
+        let mut no_effect = false;
         if items.len() > 4 {
             custom_price = match &items[4] {
                 Value::Object(_) => get(&items[4], consts::CUSTOM_PRICE_KEY).and_then(pyjson::value_as_i64),
                 other => pyjson::value_as_i64(other),
             };
+            if items[4].is_object() {
+                target_move = get(&items[4], consts::TARGET_MOVE_KEY).and_then(s_or_none).filter(|t| !t.is_empty());
+                no_effect = get(&items[4], consts::NO_EFFECT_KEY).map(truthy).unwrap_or(false);
+            }
         }
         Some(InventoryEventDefinition {
             item_name: str_of(&items[0]),
@@ -113,10 +152,20 @@ impl InventoryEventDefinition {
             is_acquire: truthy(&items[2]),
             with_money: truthy(&items[3]),
             custom_price,
+            target_move,
+            no_effect,
         })
     }
 
     pub fn to_string(&self) -> String {
+        if self.is_use() {
+            if self.no_effect {
+                return format!("Toss {} x{}", self.item_name, self.item_amount);
+            }
+            if let Some(t) = &self.target_move {
+                return format!("Use {} x{} on {}", self.item_name, self.item_amount, t);
+            }
+        }
         let action = if self.is_acquire && self.with_money {
             "Purchase"
         } else if self.is_acquire {

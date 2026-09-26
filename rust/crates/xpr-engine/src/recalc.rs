@@ -282,6 +282,11 @@ impl Router {
         } else if let Some(i) = &item.event_definition.item_event_def {
             let (st, e) = if i.is_acquire {
                 cur_state.add_item(&gen, &i.item_name, i.item_amount, i.with_money, i.custom_price)
+            } else if i.is_use() {
+                // PP items act on the mon (PP Ups) or ask for a target move
+                let (st, e, w) = cur_state.use_item(&gen, &i.item_name, i.item_amount, i.target_move.as_deref(), i.no_effect)?;
+                warning_message = w;
+                (st, e)
             } else {
                 cur_state.remove_item(&gen, &i.item_name, i.item_amount, i.with_money, i.custom_price)
             };

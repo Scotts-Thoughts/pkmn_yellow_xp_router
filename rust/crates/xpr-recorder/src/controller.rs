@@ -579,7 +579,7 @@ impl SessionEvents for Session {
 
     fn on_mapper_loaded(&mut self, store: &PropertyStore) -> Vec<String> {
         let game_name = store.game_name().unwrap_or("");
-        let correct_mapper_loaded = self.expected_names.iter().any(|t| game_name.contains(t.as_str()));
+        let correct_mapper_loaded = self.expected_names.iter().any(|t| names_game(game_name, t));
         log::info!(
             "Successfully loaded mapper. Got gameName: {}, to be validated against: {:?} (result: {})",
             game_name,
@@ -635,6 +635,13 @@ impl SessionEvents for Session {
     }
 }
 
+/// Whether the mapper's `game_name` names the game `expected`: it contains it,
+/// and not as the start of a sequel's name ("Pokemon Black" is not "Pokemon
+/// Black 2 - Beta").
+pub fn names_game(game_name: &str, expected: &str) -> bool {
+    game_name.match_indices(expected).any(|(i, m)| !game_name[i + m.len()..].trim_start().starts_with(|c: char| c.is_ascii_digit()))
+}
+
 /// `validate_constants` for one key: case-correct it against the mapper or
 /// record it as invalid.
 pub fn fix_key(store: &PropertyStore, key: &mut String, invalid: &mut Vec<String>) {
@@ -675,4 +682,20 @@ pub fn new_active_flag() -> ActiveFlag {
 
 pub fn is_set(flag: &ActiveFlag) -> bool {
     flag.load(Ordering::SeqCst)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::names_game;
+
+    #[test]
+    fn a_game_name_is_not_its_sequel() {
+        assert!(names_game("Pokemon Black - Beta", "Pokemon Black"));
+        assert!(!names_game("Pokemon Black 2 - Beta", "Pokemon Black"));
+        assert!(names_game("Pokemon Black 2 - Beta", "Pokemon Black 2"));
+        assert!(!names_game("Pokemon White 2 - Beta", "Pokemon White"));
+        assert!(names_game("Pokemon Red and Blue", "Pokemon Red and Blue"));
+        assert!(names_game("Pokemon Emerald - Deprecated Mapper (v1.6.x)", "Pokemon Emerald"));
+        assert!(!names_game("Pokemon Crystal", "Pokemon Emerald"));
+    }
 }

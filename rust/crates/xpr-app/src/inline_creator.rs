@@ -91,6 +91,13 @@ struct ConfigState {
     /// the swaps of a reorder event being edited (the strip has no field for
     /// them; the details panel is where the order is arranged)
     swaps: Vec<BagSwap>,
+    /// a use of a PP item that acts on one move: the move menu shows
+    pp_needs_target: bool,
+    pp_move: String,
+    pp_moves: Vec<String>,
+    /// an edited use was marked tossed (the details panel sets it; the
+    /// strip keeps it)
+    pp_tossed: bool,
 }
 
 /// Focus targets in layout order.
@@ -102,6 +109,8 @@ enum Field {
     Trainer,
     Item,
     Qty,
+    /// the move a single-target PP item (Ether, PP Up, ...) is used on
+    PpMove,
     Pkmn,
     Level,
     Vitamin,
@@ -202,6 +211,7 @@ impl InlineEventCreator {
                 self.cfg.items = self.all_items.clone();
                 self.cfg.item = self.cfg.items.first().cloned().unwrap_or_default();
                 self.cfg.qty = "1".to_string();
+                self.refresh_pp(ctrl, None);
             }
             "wild_pkmn" => {
                 self.cfg.pkmn = self.all_pkmn.first().cloned().unwrap_or_default();
@@ -243,6 +253,24 @@ impl InlineEventCreator {
         }
         self.cfg.trainer = trainers[0].clone();
         self.cfg.trainers = trainers;
+    }
+
+    /// The PP-item move menu of a use: shown when the item acts on one move,
+    /// listing the moves known at the insertion point; `keep` is the move to
+    /// select.
+    fn refresh_pp(&mut self, ctrl: &MainController, keep: Option<String>) {
+        let needs = self.type_key == Some("use_item")
+            && ctrl.gen().and_then(|g| g.pp_item_effect(&self.cfg.item)).map(|e| e.needs_target()).unwrap_or(false);
+        self.cfg.pp_needs_target = needs;
+        let mut moves = vec![crate::editors::PP_TARGET_NONE.to_string()];
+        if let Some(st) = self.state_at_insertion_point(ctrl) {
+            moves.extend(st.solo_pkmn.move_list.iter().flatten().filter(|m| !m.is_empty()).cloned());
+        }
+        self.cfg.pp_move = match keep {
+            Some(k) if moves.contains(&k) => k,
+            _ => moves[0].clone(),
+        };
+        self.cfg.pp_moves = moves;
     }
 
     /// `_refresh_dest` (TM and tutor variants)
@@ -314,6 +342,8 @@ impl InlineEventCreator {
                         self.cfg.item = ie.item_name.clone();
                     }
                     self.cfg.qty = ie.item_amount.to_string();
+                    self.cfg.pp_tossed = ie.no_effect;
+                    self.refresh_pp(ctrl, ie.target_move.clone());
                 }
             }
             "hold_item" => {
@@ -404,6 +434,7 @@ impl InlineEventCreator {
         let mut f = vec![Field::Type];
         match self.type_key {
             Some("trainer") => f.extend([Field::Loc, Field::Cls, Field::Trainer]),
+            Some("use_item") if self.cfg.pp_needs_target => f.extend([Field::Item, Field::Qty, Field::PpMove]),
             Some("get_item") | Some("buy_item") | Some("sell_item") | Some("use_item") => f.extend([Field::Item, Field::Qty]),
             Some("hold_item") => f.push(Field::Item),
             Some("wild_pkmn") => f.extend([Field::Pkmn, Field::Level, Field::Qty]),
@@ -488,7 +519,10 @@ impl InlineEventCreator {
                     } else if n == consts::RARE_CANDY {
                         Some(EventDefinition::with_rare_candy(q))
                     } else {
-                        Some(EventDefinition::with_item(InventoryEventDefinition::new(n, q, false, false, None)))
+                        let target = Some(self.cfg.pp_move.as_str()).filter(|t| self.cfg.pp_needs_target && *t != crate::editors::PP_TARGET_NONE);
+                        let mut ie = InventoryEventDefinition::use_on(n, q, target);
+                        ie.no_effect = self.cfg.pp_tossed;
+                        Some(EventDefinition::with_item(ie))
                     }
                 }
             }
@@ -630,10 +664,20 @@ impl InlineEventCreator {
                         widgets::label(ui, theme, "Item:");
                         let items = self.cfg.items.clone();
                         let r = SearchableDropdown::new(theme, self.id.with("item"), &mut self.cfg.item, &items).widths(130.0, 200.0).request_focus(focus == Some(Field::Item)).show(ui);
+                        if r.changed {
+                            let keep = Some(self.cfg.pp_move.clone());
+                            self.refresh_pp(ctrl, keep);
+                        }
                         self.handle_nav(&r, Field::Item, &mut create_now);
                         widgets::label(ui, theme, "Qty:");
                         let r = AmountEntry::new(theme, self.id.with("qty"), &mut self.cfg.qty).min(Some(1)).max(Some(999)).request_focus(focus == Some(Field::Qty)).show(ui);
                         self.handle_amount_nav(r.enter_pressed, r.tab_pressed, r.backtab_pressed, Field::Qty, &mut create_now);
+                        if self.cfg.pp_needs_target {
+                            widgets::label(ui, theme, "On:");
+                            let moves = self.cfg.pp_moves.clone();
+                            let r = SearchableDropdown::new(theme, self.id.with("pp_move"), &mut self.cfg.pp_move, &moves).widths(130.0, 200.0).request_focus(focus == Some(Field::PpMove)).show(ui);
+                            self.handle_nav(&r, Field::PpMove, &mut create_now);
+                        }
                     }
                     Some("hold_item") => {
                         widgets::label(ui, theme, "Item:");

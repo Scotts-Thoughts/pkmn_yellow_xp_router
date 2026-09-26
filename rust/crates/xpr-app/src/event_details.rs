@@ -41,6 +41,9 @@ pub struct DetailsActions {
     pub pre_state_assign_move_slot: Option<i64>,
     /// the EV column was clicked in the Pre-Event State stats card
     pub pre_state_override_evs: bool,
+    /// a PP item was picked from a move row's menu in the Pre-Event State
+    /// moves card: (item, target move), to use before the selected event
+    pub pre_state_use_pp_item: Option<(String, Option<String>)>,
     /// the Map tab is active: the window draws the map view into this rect
     pub map_body: Option<egui::Rect>,
     /// the editor's "Map" button: show the selected event on the map
@@ -566,8 +569,35 @@ impl EventDetails {
         }
     }
 
+    /// The Moves card's PP view of the selected event (and the PP banner
+    /// lines), bringing the PP ledger up to date first. `None` with no
+    /// event selected.
+    fn moves_pp(cfg: &Config, ctrl: &mut MainController) -> Option<(state_views::MovesPp, Vec<String>)> {
+        let id = ctrl.get_single_selected_event_id(true)?;
+        ctrl.ensure_pp(cfg);
+        let snapshot = ctrl.pp.before(id)?.clone();
+        let gen = ctrl.gen()?;
+        let bag_items: Vec<(String, bool)> = ctrl
+            .router
+            .init_state_of(id)
+            .map(|st| {
+                st.inventory
+                    .cur_items
+                    .iter()
+                    .filter_map(|b| gen.pp_item_effect(&b.base_item.name).map(|e| (b.base_item.name.clone(), e.needs_target())))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let view = state_views::MovesPp { snapshot, spend: ctrl.pp.spend(id), history: std::array::from_fn(|i| ctrl.pp.history(id, i).to_vec()), bag_items };
+        Some((view, ctrl.pp.messages(&ctrl.router, id)))
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn pre_state_tab(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, ctrl: &mut MainController, assets: &mut Assets, height: f32, actions: &mut DetailsActions) {
+        let (moves_pp, pp_messages) = match Self::moves_pp(cfg, ctrl) {
+            Some((v, m)) => (Some(v), m),
+            None => (None, Vec::new()),
+        };
         widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("pre_state_scroll").max_height(height).auto_shrink([false, false]), |ui| {
             let pad = PANE_PAD as i8;
             egui::Frame::new().inner_margin(egui::Margin { left: pad, right: pad, top: pad, bottom: pad }).show(ui, |ui| {
@@ -576,14 +606,18 @@ impl EventDetails {
                 let gen = ctrl.gen();
                 let state = self.current_init_state.clone();
                 let before = Self::before_info(ctrl);
-                let clicks = state_views::state_viewer(ui, theme, gen.as_deref(), state.as_deref(), &mut self.last_pkmn, assets, &before);
+                let clicks = state_views::state_viewer(ui, theme, gen.as_deref(), state.as_deref(), moves_pp.as_ref(), &mut self.last_pkmn, assets, &before);
                 if clicks.move_slot.is_some() {
                     actions.pre_state_assign_move_slot = clicks.move_slot;
+                }
+                if clicks.use_pp_item.is_some() {
+                    actions.pre_state_use_pp_item = clicks.use_pp_item.clone();
                 }
                 if clicks.evs {
                     actions.pre_state_override_evs = true;
                 }
-                let warnings = Self::selected_warnings(ctrl);
+                let mut warnings = Self::selected_warnings(ctrl);
+                warnings.extend(pp_messages.iter().cloned());
                 if !warnings.is_empty() {
                     ui.add_space(state_views::CARD_GAP);
                     for (i, w) in warnings.iter().enumerate() {

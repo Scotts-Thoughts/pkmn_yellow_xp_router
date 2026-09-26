@@ -1,0 +1,20 @@
+[package]
+name = "shuckie-feeder"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+supershuckie-core = { path = "../ss-snap/supershuckie-core" }
+supershuckie-replay-recorder = { path = "../ss-snap/supershuckie-replay-recorder" }
+supershuckie-pokeabyte-integration = { path = "../ss-snap/supershuckie-pokeabyte-integration" }
+png = "0.17"
+
+[patch.crates-io]
+safeboy = { path = "../ss-snap/third-party/safeboy" }
+
+[profile.release]
+opt-level = 3
+panic = "abort"
+debug = false

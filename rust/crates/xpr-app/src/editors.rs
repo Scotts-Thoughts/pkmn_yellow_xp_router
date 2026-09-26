@@ -905,9 +905,48 @@ pub struct InventoryEventEditor {
     cost_label: String,
     consume_held: bool,
     hold_nothing: bool,
+    /// `Some(needs a target move)` while a PP item is being used.
+    pp_item: Option<bool>,
+    /// The move a single-target PP item is used on (first row: none chosen).
+    pp_target: OptionMenu,
+    /// The PP item was tossed, not used.
+    pp_tossed: bool,
 }
 
+/// The first row of the PP-item move menu: no move chosen yet.
+pub const PP_TARGET_NONE: &str = "(choose a move)";
+
 impl InventoryEventEditor {
+    /// Refresh the PP-item rows for the selected item: whether it is a PP
+    /// item and which moves it can go on (the event's init state). `target`
+    /// is the move to select; `None` keeps the current pick when possible.
+    fn refresh_pp(&mut self, ctx: &EditorCtx, target: Option<Option<&str>>) {
+        self.pp_item = if self.event_type == consts::TASK_USE_ITEM {
+            ctx.gen.pp_item_effect(self.item_selector.get()).map(|e| e.needs_target())
+        } else {
+            None
+        };
+        let want: Option<String> = match target {
+            Some(t) => t.map(|s| s.to_string()),
+            None => Some(self.pp_target.get().to_string()).filter(|s| !s.is_empty() && s != PP_TARGET_NONE),
+        };
+        let mut moves: Vec<String> = vec![PP_TARGET_NONE.to_string()];
+        if let Some(st) = ctx.cur_state {
+            moves.extend(st.solo_pkmn.move_list.iter().flatten().filter(|m| !m.is_empty()).cloned());
+        }
+        // a stored target the mon no longer knows stays visible (the route
+        // list flags it as an error)
+        if let Some(w) = &want {
+            if !moves.contains(w) {
+                moves.push(w.clone());
+            }
+        }
+        self.pp_target.new_values(moves, want.as_deref());
+        if want.is_none() {
+            self.pp_target.set(PP_TARGET_NONE);
+        }
+    }
+
     fn init_menus(&mut self, ctx: &EditorCtx) {
         if self.item_type.options.is_empty() {
             self.item_type.new_values(consts::ITEM_TYPES.iter().map(|s| s.to_string()).collect(), None);
@@ -984,6 +1023,8 @@ impl InventoryEventEditor {
         self.item_type.set(consts::ITEM_TYPE_ALL_ITEMS);
         self.amount = "1".to_string();
         self.set_event_type(ctx.event_type);
+        self.pp_tossed = false;
+        self.refresh_pp(ctx, Some(None));
     }
 
     pub fn load_event(&mut self, ctx: &EditorCtx, def: &EventDefinition) {
@@ -996,6 +1037,8 @@ impl InventoryEventEditor {
             if let Some(ie) = &def.item_event_def {
                 self.item_selector.set(&ie.item_name);
                 self.amount = ie.item_amount.to_string();
+                self.pp_tossed = ie.no_effect;
+                self.refresh_pp(ctx, Some(ie.target_move.as_deref()));
             }
         } else if let Some(h) = &def.hold_item {
             if let Some(n) = &h.item_name {
@@ -1013,7 +1056,15 @@ impl InventoryEventEditor {
         match self.event_type.as_str() {
             consts::TASK_GET_FREE_ITEM => Ok(EventDefinition::with_item(InventoryEventDefinition::new(name, amt()?, true, false, None))),
             consts::TASK_PURCHASE_ITEM => Ok(EventDefinition::with_item(InventoryEventDefinition::new(name, amt()?, true, true, None))),
-            consts::TASK_USE_ITEM => Ok(EventDefinition::with_item(InventoryEventDefinition::new(name, amt()?, false, false, None))),
+            consts::TASK_USE_ITEM => {
+                let target = match (self.pp_item, self.pp_target.get()) {
+                    (Some(true), t) if !self.pp_tossed && !t.is_empty() && t != PP_TARGET_NONE => Some(t),
+                    _ => None,
+                };
+                let mut ie = InventoryEventDefinition::use_on(name, amt()?, target);
+                ie.no_effect = self.pp_item.is_some() && self.pp_tossed;
+                Ok(EventDefinition::with_item(ie))
+            }
             consts::TASK_SELL_ITEM => Ok(EventDefinition::with_item(InventoryEventDefinition::new(name, amt()?, false, true, None))),
             consts::TASK_HOLD_ITEM => {
                 let held = if self.hold_nothing { None } else { Some(name) };
@@ -1068,6 +1119,19 @@ impl InventoryEventEditor {
                 widgets::label(ui, theme, self.cost_label.clone());
                 ui.end_row();
             }
+            if self.pp_item == Some(true) {
+                widgets::label(ui, theme, "On move:");
+                if self.pp_target.ui(ui, theme, ui.id().with("pp_target"), Some(val_width), ctx.enabled && !self.pp_tossed) {
+                    out.merge(EditorOutput::save());
+                }
+                ui.end_row();
+            }
+            if self.pp_item.is_some() {
+                if widgets::checkbox_label(ui, theme, &mut self.pp_tossed, "Tossed (no PP effect)", true, ctx.enabled) {
+                    out.merge(EditorOutput::save());
+                }
+                ui.end_row();
+            }
             if show_hold {
                 if widgets::checkbox_label(ui, theme, &mut self.consume_held, "Consume previously held item?", true, ctx.enabled) {
                     out.merge(EditorOutput::save());
@@ -1081,6 +1145,9 @@ impl InventoryEventEditor {
         });
         if filter_changed {
             self.item_filter_callback(ctx);
+        }
+        if selector_changed || filter_changed {
+            self.refresh_pp(ctx, None);
         }
         if selector_changed && self.item_selector_callback(ctx) {
             out.merge(EditorOutput::save());

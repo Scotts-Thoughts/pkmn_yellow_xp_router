@@ -47,6 +47,12 @@ pub struct MoveRenderInfo {
     /// pick) first, then every move Metronome can call for this attacker in
     /// this matchup (`GenData::metronome_callable_moves`).
     pub metronome_options: Option<Arc<Vec<String>>>,
+    /// Player moves only: the turns this move needs for a guaranteed KO at
+    /// the lowest roll (misses and crits ignored), counting a variable 2-5
+    /// hit use as 2 hits and Triple Kick as 3 kicks whatever the page's pick
+    /// (PP tracking, docs/rust_port/design/pp_tracking/PLAN.md §1.2). `None`
+    /// when the move does no damage. Not part of the golden JSON.
+    pub pp_turns: Option<i64>,
 }
 
 impl MoveRenderInfo {
@@ -344,14 +350,39 @@ impl BattleSummary {
             self.load_empty(gen.as_deref(), cfg);
             return Ok(());
         };
-        let Some(td) = group.event_definition.trainer_def.clone() else {
+        if group.event_definition.trainer_def.is_none() {
             self.load_empty(gen.as_deref(), cfg);
             return Ok(());
-        };
+        }
         let gen = gen.ok_or("no gen")?;
-        let ed = &group.event_definition;
-        let trainer_obj = ed.get_first_trainer_obj(&gen)?.ok_or("no trainer")?.clone();
-        let second_trainer_obj = ed.get_second_trainer_obj(&gen)?.cloned();
+        // the fight items in battle order: the mon each one KOs and the state
+        // it starts from (level-up learn items carry no trainer definition)
+        let mut fights: Vec<(EnemyPkmn, Option<Arc<RouteState>>)> = Vec::new();
+        for id in &group.event_items {
+            let item = router.item(*id).ok_or("missing item")?;
+            if item.event_definition.trainer_def.is_none() {
+                continue;
+            }
+            if let Some(mon) = &item.to_defeat_mon {
+                fights.push((mon.clone(), item.init_state.clone()));
+            }
+        }
+        self.load_trainer_fights(&gen, gid, &group.event_definition, &fights, cfg)
+    }
+
+    /// `load_from_event` without a `Router`: a trainer fight from its
+    /// definition and its fight items (`(mon KO'd, item init state)` in
+    /// battle order). Used by the PP tracking, which may run off the UI
+    /// thread.
+    pub fn load_from_parts(&mut self, gen: &GenData, group_id: NodeId, def: &EventDefinition, fights: &[(EnemyPkmn, Arc<RouteState>)], cfg: &SummaryConfig) -> Result<(), String> {
+        let fights: Vec<(EnemyPkmn, Option<Arc<RouteState>>)> = fights.iter().map(|(m, s)| (m.clone(), Some(s.clone()))).collect();
+        self.load_trainer_fights(gen, group_id, def, &fights, cfg)
+    }
+
+    fn load_trainer_fights(&mut self, gen: &GenData, gid: NodeId, ed: &EventDefinition, fights: &[(EnemyPkmn, Option<Arc<RouteState>>)], cfg: &SummaryConfig) -> Result<(), String> {
+        let td = ed.trainer_def.clone().ok_or("no trainer")?;
+        let trainer_obj = ed.get_first_trainer_obj(gen)?.ok_or("no trainer")?.clone();
+        let second_trainer_obj = ed.get_second_trainer_obj(gen)?.cloned();
 
         if Some(gid) != self.event_group_id {
             self.vitamin_shadows.clear();
@@ -372,16 +403,16 @@ impl BattleSummary {
         self.wild_max_dv_mons.clear();
         self.player_setup_move_list = td.setup_moves.clone();
         self.player_field_move_list = td.player_field_moves.clone();
-        self.player_stage_modifier = calc_stage_modifier(&gen, &self.player_setup_move_list);
+        self.player_stage_modifier = calc_stage_modifier(gen, &self.player_setup_move_list);
         self.enemy_setup_move_list = td.enemy_setup_moves.clone();
         self.enemy_field_move_list = td.enemy_field_moves.clone();
-        self.enemy_stage_modifier = calc_stage_modifier(&gen, &self.enemy_setup_move_list);
-        self.cached_definition_order = ed.get_pokemon_list(&gen, true)?.iter().map(|(_, m)| m.mon_order - 1).collect();
+        self.enemy_stage_modifier = calc_stage_modifier(gen, &self.enemy_setup_move_list);
+        self.cached_definition_order = ed.get_pokemon_list(gen, true)?.iter().map(|(_, m)| m.mon_order - 1).collect();
         // intimidate sets (definition order -> display order) need the cached order
         self.player_intimidate = self.intimidate_from_def_order(td.player_intimidate.as_deref());
         self.enemy_intimidate = self.intimidate_from_def_order(td.enemy_intimidate.as_deref());
 
-        let pokemon_list = ed.pokemon_list(&gen)?;
+        let pokemon_list = ed.pokemon_list(gen)?;
         if td.custom_move_data.is_empty() {
             self.custom_move_data = empty_side_maps(pokemon_list.len());
         } else {
@@ -420,18 +451,14 @@ impl BattleSummary {
         self.original_enemy_mon_list.clear();
 
         let mut cur_item_idx = 0usize;
-        let items: Vec<NodeId> = group.event_items.clone();
         for cur_pkmn in &pokemon_list {
-            while cur_item_idx < items.len() {
-                let item = router.item(items[cur_item_idx]).ok_or("missing item")?;
+            while cur_item_idx < fights.len() {
+                let (defeated, init) = &fights[cur_item_idx];
                 cur_item_idx += 1;
-                if item.event_definition.trainer_def.is_none() {
-                    continue;
-                }
-                if item.to_defeat_mon.as_ref().map(|m| m.py_eq(cur_pkmn)).unwrap_or(false) {
+                if defeated.py_eq(cur_pkmn) {
                     self.original_enemy_mon_list.push(cur_pkmn.clone());
                     let mut transformed = pokemon_list[0].clone();
-                    let init = item.init_state.as_ref().ok_or("no init state")?;
+                    let init = init.as_ref().ok_or("no init state")?;
                     let player = init.solo_pkmn.get_pkmn_obj(&init.badges, Some(&self.player_stage_modifier));
                     transformed.level = player.level;
                     transformed.cur_stats.hp = player.cur_stats.hp;
@@ -441,7 +468,7 @@ impl BattleSummary {
                 }
             }
         }
-        self.full_refresh(Some(&gen), cfg);
+        self.full_refresh(Some(gen), cfg);
         Ok(())
     }
 
@@ -484,27 +511,78 @@ impl BattleSummary {
 
         let mut cur_state = init_state.clone();
         for cur_enemy in enemy_mons {
-            self.original_enemy_mon_list.push(cur_enemy.clone());
-            let mut transformed = enemy_mons[0].clone();
             let player = cur_state.solo_pkmn.get_pkmn_obj(&cur_state.badges, None);
-            transformed.level = player.level;
-            transformed.cur_stats.hp = player.cur_stats.hp;
-            self.transformed_mon_list.push(transformed);
-            self.original_player_mon_list.push(player);
-            if is_wild {
-                if let Some(m) = gen.create_wild_pkmn(&cur_enemy.name, cur_enemy.level, 0) {
-                    self.wild_min_dv_mons.push(m);
-                }
-                if let Some(m) = gen.create_wild_pkmn(&cur_enemy.name, cur_enemy.level, 15) {
-                    self.wild_max_dv_mons.push(m);
-                }
-            }
+            self.push_state_matchup(gen, cur_enemy, &enemy_mons[0], player, is_wild);
             cur_state = cur_state.defeat_pkmn(gen, cur_enemy, None, 1, 0)?.0;
         }
         self.double_battle_flag = trainer_name
             .and_then(|t| gen.trainer_db().get_trainer(t))
             .map(|t| t.double_battle)
             .unwrap_or(false);
+        self.full_refresh(Some(gen), cfg);
+        Ok(())
+    }
+
+    /// One matchup of `load_from_state`: the enemy, the transformed copy of
+    /// the first enemy at the player's level and HP, the player, and for a
+    /// wild fight the enemy at its lowest and highest DVs.
+    fn push_state_matchup(&mut self, gen: &GenData, cur_enemy: &EnemyPkmn, first_enemy: &EnemyPkmn, player: EnemyPkmn, is_wild: bool) {
+        self.original_enemy_mon_list.push(cur_enemy.clone());
+        let mut transformed = first_enemy.clone();
+        transformed.level = player.level;
+        transformed.cur_stats.hp = player.cur_stats.hp;
+        self.transformed_mon_list.push(transformed);
+        self.original_player_mon_list.push(player);
+        if is_wild {
+            if let Some(m) = gen.create_wild_pkmn(&cur_enemy.name, cur_enemy.level, 0) {
+                self.wild_min_dv_mons.push(m);
+            }
+            if let Some(m) = gen.create_wild_pkmn(&cur_enemy.name, cur_enemy.level, 15) {
+                self.wild_max_dv_mons.push(m);
+            }
+        }
+    }
+
+    /// A wild fight from its fight items (`(mon KO'd, item init state)` in
+    /// battle order): `load_from_state`'s summary, but each matchup's player
+    /// comes from its own item, so a move learned between two wild mons of
+    /// one group counts from the next mon on.
+    pub fn load_wild_from_parts(&mut self, gen: &GenData, fights: &[(EnemyPkmn, Arc<RouteState>)], cfg: &SummaryConfig) -> Result<(), String> {
+        let Some((first_enemy, _)) = fights.first() else {
+            self.load_empty(Some(gen), cfg);
+            return Ok(());
+        };
+        self.event_group_id = None;
+        self.trainer_name = String::new();
+        self.second_trainer_name = String::new();
+        self.second_trainer_name_raw = Value::String(String::new());
+        self.weather = Some(consts::WEATHER_NONE.to_string());
+        self.weather_source_mon_idx = None;
+        self.player_screens.clear();
+        self.enemy_screens.clear();
+        self.player_intimidate = None;
+        self.enemy_intimidate = None;
+        self.mimic_selection = String::new();
+        self.is_player_transformed = false;
+        self.player_setup_move_list.clear();
+        self.player_field_move_list.clear();
+        self.enemy_setup_move_list.clear();
+        self.enemy_field_move_list.clear();
+        self.custom_move_data = empty_side_maps(fights.len());
+        self.stat_stage_setup = empty_side_maps(fights.len());
+        self.collapsed_mons.clear();
+        self.is_wild_battle = true;
+        self.wild_min_dv_mons.clear();
+        self.wild_max_dv_mons.clear();
+        self.cached_definition_order = (0..fights.len() as i64).collect();
+        self.original_player_mon_list.clear();
+        self.original_enemy_mon_list.clear();
+        self.transformed_mon_list.clear();
+        for (enemy, init) in fights {
+            let player = init.solo_pkmn.get_pkmn_obj(&init.badges, None);
+            self.push_state_matchup(gen, enemy, first_enemy, player, true);
+        }
+        self.double_battle_flag = false;
         self.full_refresh(Some(gen), cfg);
         Ok(())
     }
@@ -963,6 +1041,39 @@ impl BattleSummary {
             _ => Vec::new(),
         };
 
+        let pp_turns = if is_player {
+            let page_min = hits.as_ref().map(|h| h.min_damage()).or(normal_ranges.as_ref().map(|r| r.min_damage));
+            let min = match pp_hit_count_option(&mv, custom_data_options.as_deref()).filter(|c| *c != custom_str) {
+                None => page_min,
+                Some(pp_custom) => {
+                    if self.is_wild_battle && mon_idx < self.wild_min_dv_mons.len() {
+                        let common = CommonArgs {
+                            gen,
+                            mv: &mv,
+                            attacking_stages: &attacking_stages,
+                            defending_stages: &defending_stages,
+                            attacking_field: &attacking_field,
+                            defending_field: &defending_field,
+                            custom: &pp_custom,
+                            weather: &current_weather,
+                            is_double_battle: self.double_battle_flag,
+                            is_wild_battle: self.is_wild_battle,
+                        };
+                        let tanky = common.calc(&attacking_mon, &self.wild_max_dv_mons[mon_idx], false, attacking_mon_stats.as_ref(), None);
+                        let squishy = common.calc(&attacking_mon, &self.wild_min_dv_mons[mon_idx], false, attacking_mon_stats.as_ref(), None);
+                        DamageRange::merge_min_max(tanky.as_ref(), squishy.as_ref()).map(|r| r.min_damage)
+                    } else {
+                        let mut args = kill_args;
+                        args.custom_move_data = &pp_custom;
+                        hit_model(gen, &args).map(|h| h.min_damage()).or_else(|| calculate_damage(gen, &args).map(|r| r.min_damage))
+                    }
+                }
+            };
+            min.filter(|m| *m > 0).map(|m| (defending_mon.cur_stats.hp + m - 1) / m)
+        } else {
+            None
+        };
+
         let is_mimic_placeholder = move_display_name == Some(consts::MIMIC_MOVE_NAME) && mv.name != self.mimic_selection;
         // Metronome's header has no room for a stepper next to its dropdown
         let (stat_stage_options, stat_stage_info, stat_stage_selection) = if self.using_global_setup || is_mimic_placeholder || metronome_selection.is_some() {
@@ -1013,6 +1124,7 @@ impl BattleSummary {
             stat_stage_info,
             metronome_selection,
             metronome_options,
+            pp_turns,
         })
     }
 
@@ -1555,32 +1667,11 @@ impl BattleSummary {
 
             // Step 1: the player's moves
             if let Some(player_mon) = self.original_player_mon_list.get(mon_idx) {
-                for move_name in player_mon.move_list.iter().flatten() {
-                    if move_name.is_empty() {
+                for slot_move in player_mon.move_list.iter().flatten() {
+                    let Some(entry) = self.player_setup_entry(move_db, matchup_setup, slot_move) else {
                         continue;
-                    }
-                    // A Mimic slot's stepper is stored under (and resolves its
-                    // stat effect from) the mimicked move, not "Mimic" itself.
-                    let move_name: &str = if move_name == consts::MIMIC_MOVE_NAME && !self.mimic_selection.is_empty() {
-                        &self.mimic_selection
-                    } else {
-                        move_name
                     };
-                    let count = matchup_setup
-                        .player
-                        .get(move_name)
-                        .and_then(|s| damage::py_int(s))
-                        .unwrap_or(0);
-                    if count <= 0 {
-                        continue;
-                    }
-                    let info = move_db.get_stat_stage_info(move_name);
-                    if !info.has_stat_effect {
-                        continue;
-                    }
-                    if !info.is_guaranteed && !info.is_damaging {
-                        continue;
-                    }
+                    let (move_name, count, info) = (entry.move_name.as_str(), entry.count, entry.info);
                     if info.targets_self && !info.is_damaging {
                         if info.is_belly_drum {
                             persistent_player = persistent_player.set_attack_stage(count);
@@ -1666,6 +1757,84 @@ impl BattleSummary {
             enemy_modifiers.push(cur_enemy);
         }
         (player_modifiers, enemy_modifiers)
+    }
+
+    /// A player stat-stage stepper that `calc_per_matchup_stage_modifiers`
+    /// applies for the move in `slot_move`: the move whose stepper is read (a
+    /// Mimic slot's stepper is stored under, and resolves its stat effect
+    /// from, the mimicked move), its count and its stat-stage info. `None`
+    /// when the stepper changes nothing. The PP tracking counts exactly these
+    /// uses, so PP and damage agree.
+    fn player_setup_entry(&self, move_db: &xpr_data::MoveDB, matchup_setup: &CustomMoveData, slot_move: &str) -> Option<SetupEntry> {
+        if slot_move.is_empty() {
+            return None;
+        }
+        let move_name: &str = if slot_move == consts::MIMIC_MOVE_NAME && !self.mimic_selection.is_empty() {
+            &self.mimic_selection
+        } else {
+            slot_move
+        };
+        let count = matchup_setup.player.get(move_name).and_then(|s| damage::py_int(s)).unwrap_or(0);
+        if count <= 0 {
+            return None;
+        }
+        let info = move_db.get_stat_stage_info(move_name);
+        if !info.has_stat_effect || (!info.is_guaranteed && !info.is_damaging) {
+            return None;
+        }
+        Some(SetupEntry { move_name: move_name.to_string(), count, info })
+    }
+
+    /// The setup uses the player spends PP on in matchup `mon_idx`, as
+    /// `(slot, setup move, uses, targets the enemy)`. Per-matchup steppers
+    /// count as that many uses (Belly Drum's stepper holds the resulting
+    /// stage, so it is one use); the legacy global setup list is one use per
+    /// entry, spent once per fight in the first matchup.
+    pub fn player_setup_uses(&self, gen: &GenData, mon_idx: usize) -> Vec<SetupUse> {
+        let move_db = gen.move_db();
+        let Some(player_mon) = self.original_player_mon_list.get(mon_idx) else {
+            return Vec::new();
+        };
+        let slot_of = |name: &str| -> Option<usize> {
+            player_mon.move_list.iter().position(|m| m.as_deref() == Some(name)).or_else(|| {
+                // a mimicked setup move is the Mimic slot's
+                if !self.mimic_selection.is_empty() && name == self.mimic_selection {
+                    player_mon.move_list.iter().position(|m| m.as_deref() == Some(consts::MIMIC_MOVE_NAME))
+                } else {
+                    None
+                }
+            })
+        };
+        let mut out: Vec<SetupUse> = Vec::new();
+        let mut add = |slot: usize, move_name: &str, uses: i64, targets_enemy: bool| {
+            if let Some(u) = out.iter_mut().find(|u| u.slot == slot) {
+                u.uses += uses;
+            } else {
+                out.push(SetupUse { slot, move_name: move_name.to_string(), uses, targets_enemy });
+            }
+        };
+        if self.using_global_setup {
+            if mon_idx == 0 {
+                for name in self.player_setup_move_list.iter().filter(|m| !m.is_empty()) {
+                    if let Some(slot) = slot_of(name) {
+                        let info = move_db.get_stat_stage_info(name);
+                        add(slot, name, 1, info.has_stat_effect && !info.targets_self);
+                    }
+                }
+            }
+            return out;
+        }
+        let empty = CustomMoveData::default();
+        let matchup_setup = self.stat_stage_setup.get(mon_idx).unwrap_or(&empty);
+        for (slot, slot_move) in player_mon.move_list.iter().enumerate() {
+            let Some(slot_move) = slot_move else { continue };
+            let Some(entry) = self.player_setup_entry(move_db, matchup_setup, slot_move) else {
+                continue;
+            };
+            let uses = if entry.info.is_belly_drum { 1 } else { entry.count };
+            add(slot, slot_move, uses, !entry.info.targets_self);
+        }
+        out
     }
 
     pub fn can_support_prefight_candies(&self) -> bool {
@@ -1754,6 +1923,26 @@ impl BattleSummary {
             "per_matchup_enemy_modifiers": self.per_matchup_enemy_modifiers.iter().map(stage_json).collect::<Vec<_>>(),
         })
     }
+}
+
+/// See [`BattleSummary::player_setup_entry`].
+struct SetupEntry {
+    move_name: String,
+    count: i64,
+    info: StatStageInfo,
+}
+
+/// One setup move's uses in a matchup (see
+/// [`BattleSummary::player_setup_uses`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct SetupUse {
+    /// The move slot that pays the PP.
+    pub slot: usize,
+    /// The slot's move (`Mimic` for a mimicked setup move).
+    pub move_name: String,
+    pub uses: i64,
+    /// Whether the move targets the enemy (Pressure doubles its PP cost).
+    pub targets_enemy: bool,
 }
 
 /// The per-call-invariant arguments of the wild min/max DV damage calls.
@@ -1901,4 +2090,21 @@ pub fn is_move_better(new_move: &MoveRenderInfo, prev_move: Option<&MoveRenderIn
         return false;
     }
     new_move.max_damage > prev_move.max_damage
+}
+
+/// The hit-count pick PP assumes for a move whose hit count the page lets
+/// the user choose: a variable 2-5 hit move (and a gen 1 trapping move, one
+/// use of which is the whole 2-5 turn trap) counts as its fewest hits,
+/// Triple Kick as all 3 kicks (its count only varies through misses, which
+/// the guaranteed KO ignores). `None` for every other move, whose PP uses
+/// the page's own numbers.
+pub fn pp_hit_count_option(mv: &xpr_data::model::Move, options: Option<&[String]>) -> Option<String> {
+    let opts = options?;
+    if mv.name == xpr_data::gen_consts::TRIPLE_KICK_MOVE {
+        return opts.last().cloned();
+    }
+    [consts::MULTI_HIT_2, xpr_data::gen_consts::PARTIAL_TRAP_2_TURNS]
+        .into_iter()
+        .find(|o| opts.iter().any(|x| x == o))
+        .map(|o| o.to_string())
 }

@@ -855,3 +855,97 @@ pub fn metronome_skips_known_moves(gen: Gen) -> bool {
 /// `Move_FailsInHighGravity` / HeartGold's `sGravityUnusableMoves`.
 /// Diamond/Pearl's metronome command does not check Gravity.
 pub const METRONOME_GRAVITY_BLOCKED: [&str; 6] = ["Fly", "Bounce", "Jump Kick", "Hi Jump Kick", "Splash", "Magnet Rise"];
+
+// ---------------------------------------------------------------------------
+// PP
+// ---------------------------------------------------------------------------
+
+/// How much PP an item restores.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PpAmount {
+    Points(i64),
+    Full,
+}
+
+/// What a PP item does when used from the bag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PpItemEffect {
+    /// Ether, Max Ether, Leppa Berry, Mysteryberry: one chosen move.
+    RestoreOne(PpAmount),
+    /// Elixir, Max Elixir: every move.
+    RestoreAll(PpAmount),
+    /// One more PP Up on a chosen move (at most 3).
+    PpUp,
+    /// PP Ups of a chosen move straight to 3.
+    PpMax,
+}
+
+impl PpItemEffect {
+    /// Whether the item acts on one chosen move (and so needs a target).
+    pub fn needs_target(&self) -> bool {
+        !matches!(self, PpItemEffect::RestoreAll(_))
+    }
+}
+
+/// The PP items of a generation, matched by `sanitize_string` so the data's
+/// spellings resolve (gens 1-2 `Elixer`, gen 2 `Pp Up` and `Mysteryberry`).
+/// Amounts are from the decomps (docs/rust_port/design/pp_tracking/PLAN.md §2).
+pub fn pp_item_effect(gen: Gen, sanitized_name: &str) -> Option<PpItemEffect> {
+    let restore = match sanitized_name {
+        "ether" => Some(PpItemEffect::RestoreOne(PpAmount::Points(10))),
+        "maxether" => Some(PpItemEffect::RestoreOne(PpAmount::Full)),
+        "elixir" | "elixer" => Some(PpItemEffect::RestoreAll(PpAmount::Points(10))),
+        "maxelixir" | "maxelixer" => Some(PpItemEffect::RestoreAll(PpAmount::Full)),
+        "ppup" => Some(PpItemEffect::PpUp),
+        _ => None,
+    };
+    if restore.is_some() {
+        return restore;
+    }
+    match (gen, sanitized_name) {
+        (Gen::Two, "mysteryberry") => Some(PpItemEffect::RestoreOne(PpAmount::Points(5))),
+        (Gen::Three | Gen::Four | Gen::Five, "leppaberry") => Some(PpItemEffect::RestoreOne(PpAmount::Points(10))),
+        (Gen::Three | Gen::Four | Gen::Five, "ppmax") => Some(PpItemEffect::PpMax),
+        _ => None,
+    }
+}
+
+/// How a move pays PP over the turns of a KO.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PpLock {
+    /// One PP per turn (every ordinary move).
+    PerTurn,
+    /// One PP buys at least this many turns of a lock.
+    Lock(i64),
+    /// One PP for the rest of the fight (gen 1 Rage).
+    OncePerFight,
+}
+
+/// Moves that charge PP once per lock, not per turn (decomp-verified; see
+/// PLAN.md §1.3). Gen 1 Wrap / Bind / Fire Spin / Clamp are not here: the
+/// damage calc already treats one use as the whole 2-5 turn trap.
+pub fn pp_lock(gen: Gen, sanitized_move: &str) -> PpLock {
+    match gen {
+        // `.ThrashingAboutCheck` skips DecrementPP; the lock is 3-4 turns.
+        // `DecrementPP` returns while `USING_RAGE`, which only leaving the
+        // battle clears.
+        Gen::One => match sanitized_move {
+            "thrash" | "petaldance" => PpLock::Lock(3),
+            "rage" => PpLock::OncePerFight,
+            _ => PpLock::PerTurn,
+        },
+        // `BattleCommand_DoTurn` skips PP under SUBSTATUS_RAMPAGE (2-3 turns);
+        // Rollout is not in that mask.
+        Gen::Two => match sanitized_move {
+            "thrash" | "outrage" | "petaldance" => PpLock::Lock(2),
+            _ => PpLock::PerTurn,
+        },
+        // gen 3 scripts run `ppreduce` only without STATUS2_MULTIPLETURNS;
+        // gen 4 marks PP as spent while the mon cannot pick a command.
+        Gen::Three | Gen::Four | Gen::Five => match sanitized_move {
+            "thrash" | "outrage" | "petaldance" | "uproar" => PpLock::Lock(2),
+            "rollout" | "iceball" => PpLock::Lock(5),
+            _ => PpLock::PerTurn,
+        },
+    }
+}

@@ -91,6 +91,50 @@ impl GenData {
         self.get_generation() == 1
     }
 
+    // ---- PP ------------------------------------------------------------------
+
+    /// What `item_name` does as a PP item in this generation; `None` for any
+    /// other item.
+    pub fn pp_item_effect(&self, item_name: &str) -> Option<gen_consts::PpItemEffect> {
+        gen_consts::pp_item_effect(self.gen, &sanitize_string(item_name))
+    }
+
+    /// The move's max PP with `pp_ups` PP Ups: gens 1-2 add
+    /// `min(base / 5, 7)` per PP Up (a 40-PP move tops out at 61), gens 3+
+    /// add `base * 20 * pp_ups / 100` in one step. `None` for an unknown move
+    /// or one without PP data.
+    pub fn max_pp(&self, move_name: &str, pp_ups: u8) -> Option<i64> {
+        let base = self.move_db().get_move(move_name)?.pp?;
+        let ups = i64::from(pp_ups.min(3));
+        Some(match self.gen {
+            Gen::One | Gen::Two => base + ups * (base / 5).min(7),
+            Gen::Three | Gen::Four | Gen::Five => base + base * 20 * ups / 100,
+        })
+    }
+
+    /// Whether PP Up / PP Max can raise this move's PP: always in gen 1;
+    /// gen 2 refuses Sketch by id; gens 3+ refuse a max of 4 or less (only
+    /// Sketch, base PP 1).
+    pub fn can_raise_pp(&self, move_name: &str) -> bool {
+        match self.gen {
+            Gen::One => true,
+            Gen::Two => sanitize_string(move_name) != "sketch",
+            Gen::Three | Gen::Four | Gen::Five => self.max_pp(move_name, 0).map(|m| m > 4).unwrap_or(false),
+        }
+    }
+
+    /// How `move_name` pays PP over the turns of a KO (locked moves pay once
+    /// per lock).
+    pub fn pp_lock(&self, move_name: &str) -> gen_consts::PpLock {
+        gen_consts::pp_lock(self.gen, &sanitize_string(move_name))
+    }
+
+    /// Whether Pressure makes moves that target its holder cost 1 extra PP
+    /// (gens 3+).
+    pub fn has_pressure_pp_cost(&self) -> bool {
+        self.gen.number() >= 3
+    }
+
     pub fn pkmn_db(&self) -> &PkmnDB {
         &self.pkmn_db
     }

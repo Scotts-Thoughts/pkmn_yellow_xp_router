@@ -15,6 +15,7 @@ pub mod filter_bar;
 pub mod inline_creator;
 pub mod map;
 pub mod pages;
+pub mod pp_ledger;
 pub mod quick_add;
 pub mod recorder_glue;
 pub mod route_index;

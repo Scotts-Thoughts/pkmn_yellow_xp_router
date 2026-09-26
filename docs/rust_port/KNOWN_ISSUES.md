@@ -231,6 +231,27 @@ a fight in the editor and saving pads it to `[1, -1, ...]` and then
 `thief_mons` back on the mon the log names ("stole X from the enemy mon at
 party position N").
 
+### Gen 5 recorder (rewritten 2026-09-25)
+
+Black/White and Black 2/White 2 no longer use the gen 4 machine: the gen 5
+games update the party only when a battle ends, keep per-party-slot battle
+structs, decrypt party mons in place while editing them and never use up TMs,
+and the old port of the Python `BlackRecorder` (never run against a real
+game) mis-recorded most of that (level-ups as rare candies, TM moves as
+level-up moves, no enemy faints, no saves, trainer vs wild decided before the
+id was set). `xpr-recorder::games::gen5` reads settled snapshots instead and
+was checked against full Super Shuckie replays of real runs; what the games
+do, what the mappers get wrong and the gaps that remain are in
+`docs/rust_port/recording/gen5.md`. The two that affect users:
+
+- **Black 2 / White 2 saves are not detected** with the current mappers
+  (`flags.new_game` reads a byte that never changes). The recorder says so
+  once, and a reset then adds a note instead of rolling the route back to a
+  save it never saw. Fixed by pointing the mappers' `flags.new_game` at the
+  party block's save counter (`0x221E958`, Black 2 `- 0x40`).
+- **Area names** come from the recorder's own zone table (read from the
+  ROMs): the Black/White mappers name zones from the place-name list.
+
 ### EV Override (all gens, Rust only; added 2026-09-18)
 
 A testing aid with no in-game equivalent: an `"EV Override"` event pins
@@ -260,6 +281,68 @@ keyed like a serialized stat block (`hp`, `attack`, `defense`, `speed`,
 - The Python app has no such event type, so it opens one as an empty notes
   event and drops it on re-save; the golden records carry no filter key
   for it.
+
+### PP tracking (all gens, Rust only; added 2026-09-25)
+
+The Pre-Event State Moves card shows each move's `cur / max` PP before the
+selected event. Design and rules: `docs/rust_port/design/pp_tracking/PLAN.md`.
+
+**How it works.**
+
+- **Where current PP lives.** Current PP is not part of the route state.
+  The PP ledger (`xpr-app/src/pp_ledger.rs`) derives it after
+  recalculation, from:
+  - fight spends: `xpr-calc/src/pp.rs`, cached per fight and computed on
+    rayon threads;
+  - refills (heal, blackout);
+  - PP items;
+  - the learn-move rules.
+- **What the engine keeps.** Only the per-slot PP-Up counts
+  (`SoloPokemon.pp_ups`) and the PP-item target move.
+- **Target move storage.** Stored as Rust-only `target_move` / `no_effect`
+  keys in the trailing object of an inventory event, written only when
+  set.
+- **When it rebuilds.** Only when something shows PP (Moves card, banner,
+  quick add), and only if the route revision or the calc settings
+  changed.
+- **Cost.** `pp_bench` on the three big routes (24 threads): cold build
+  8–29 ms, a no-op check 0 ms. A late edit costs 4–19 ms (every fight
+  from the cache). A candy before the first gym costs 5–24 ms.
+
+**Behaviour to know.**
+
+- **Existing routes get amber rows.** An Ether / Max Ether / PP Up / PP
+  Max / Leppa Berry / Mysteryberry "Use/Drop" event without a target move
+  now shows an amber **warning** ("Choose the move … was used on") until a
+  move is picked in the details panel or the event is marked **Tossed**.
+  Across 67 saved routes this flags 288 existing events; nothing else in
+  their records changed. An Elixir without a target counts as used.
+- **Refused uses are consumed anyway.** A PP Up / PP Max past 3 PP Ups
+  (or on Sketch) is an **error** on the row but still leaves the bag, like
+  a vitamin over the cap. The game refuses it and keeps the item. An
+  Ether or Elixir on a full move is also consumed; the ledger adds a note
+  for it on the event ("the game would refuse this Ether").
+- **Negative PP.** PP may go negative (the banner says to heal first).
+  Restores are plain arithmetic: −3 plus an Ether is 7.
+- **Wild Pressure mons.** A wild mon's ability is unknown, so PP assumes
+  Pressure when its species can have it (the worst case, like the damage's
+  DV range).
+- **Quick add.** Quick add's Use button accepts PP items, with an **On
+  move** menu for single-target ones, and its Drop button marks a PP item
+  as tossed. A move row's right-click menu in the Moves card inserts a
+  PP-item use before the selected event.
+
+**Known gaps, to close later.**
+
+| Gap | Effect |
+|---|---|
+| Held Leppa Berry (gens 3–5) / held Mysteryberry (gen 2) restoring PP when a move hits 0 | Ignored: PP reads up to 10 lower than the game until the next heal. Using one from the bag is modeled. |
+| Damaging setup moves (Mud-Slap ×2 on the battle page) | Their PP is charged, but their damage is not taken off the enemy's HP, so the KO move's count is slightly high. |
+| A gen 1 Thrash / Wrap lock carrying into the next enemy mon | Each matchup is charged on its own (slight over-count). |
+| Spread moves in double battles | Charged once per enemy mon. |
+| Skill Link (gens 4–5) | Not modeled by the calc; PP assumes 2 hits like any variable multi-hit move. |
+| Thief / Covet steals, Pay Day, weather / screen moves on the battle page | Their own PP is not charged. |
+| Recorder | Records Ethers and PP Ups without a target (amber until one is picked). No PP data is read from GameHook yet. |
 
 ## UI divergences (egui vs. Qt)
 

@@ -11,7 +11,7 @@ use xpr_core::floor_div;
 use xpr_data::badges::BadgeList;
 use xpr_data::exp;
 use xpr_data::model::{BaseItem, EnemyPkmn, Nature, PokemonSpecies, StageModifiers, StatBlock};
-use xpr_data::GenData;
+use xpr_data::{GenData, PpItemEffect};
 
 use crate::events::BagSwap;
 
@@ -216,6 +216,10 @@ pub struct SoloPokemon {
     pub percent_xp_to_next_level: i64,
     pub percent_xp_to_next_level_str: String,
     pub cur_stats: StatBlock,
+    /// PP Ups applied to each move slot (0-3 each). A learned move resets
+    /// its slot; current PP itself is tracked outside the route state (see
+    /// docs/rust_port/design/pp_tracking/PLAN.md).
+    pub pp_ups: [u8; 4],
 }
 
 /// Arguments of the Python constructor that have defaults.
@@ -228,6 +232,9 @@ pub struct SoloPokemonArgs {
     pub gained_xp: i64,
     pub gained_stat_xp: Option<StatBlock>,
     pub held_item: Option<String>,
+    /// `None`: zeros for a fresh mon; `RouteState::rebuild` carries the
+    /// current values forward when this is left `None`.
+    pub pp_ups: Option<[u8; 4]>,
 }
 
 impl SoloPokemon {
@@ -341,13 +348,14 @@ impl SoloPokemon {
             percent_xp_to_next_level: percent,
             percent_xp_to_next_level_str: percent_str,
             cur_stats,
+            pp_ups: args.pp_ups.unwrap_or([0; 4]),
         })
     }
 
     /// `serialize` (note the Python dict literal writes `xp` and
     /// `xp_to_next_level` twice; the second value wins: Appendix B item 2).
     pub fn serialize(&self) -> Value {
-        xpr_core::pyjson::object(vec![
+        let mut pairs = vec![
             (consts::SPECIES_KEY, Value::String(self.species_def.name.clone())),
             (consts::LEVEL, Value::from(self.cur_level)),
             (consts::XP, Value::from(self.cur_xp)),
@@ -362,7 +370,13 @@ impl SoloPokemon {
             (consts::ABILITY_KEY, Value::String(self.ability.clone())),
             (consts::NATURE_KEY, Value::String(self.nature.display_name())),
             (consts::XP_TO_NEXT_LEVEL, Value::from(self.percent_xp_to_next_level)),
-        ])
+        ];
+        // Rust-only key, written only when set so that routes without PP Ups
+        // keep their golden state records
+        if self.pp_ups.iter().any(|u| *u != 0) {
+            pairs.push((consts::PP_UPS_KEY, Value::Array(self.pp_ups.iter().map(|u| Value::from(*u)).collect())));
+        }
+        xpr_core::pyjson::object(pairs)
     }
 
     /// Python `__eq__`
@@ -376,6 +390,7 @@ impl SoloPokemon {
             && self.cur_stats == other.cur_stats
             && self.held_item == other.held_item
             && self.move_list == other.move_list
+            && self.pp_ups == other.pp_ups
     }
 
     pub fn get_net_gain_from_stat_xp(&self, badges: &BadgeList) -> StatBlock {
@@ -423,6 +438,18 @@ impl SoloPokemon {
             ability: self.ability.clone(),
             nature: self.nature,
         }
+    }
+
+    /// The slot holding `move_name` (exact name first, then ignoring case and
+    /// punctuation).
+    pub fn slot_of_move(&self, move_name: &str) -> Option<usize> {
+        if let Some(i) = self.move_list.iter().position(|m| m.as_deref() == Some(move_name)) {
+            return Some(i);
+        }
+        let wanted = xpr_core::io_utils::sanitize_string(move_name);
+        self.move_list
+            .iter()
+            .position(|m| m.as_deref().map(xpr_core::io_utils::sanitize_string).as_deref() == Some(wanted.as_str()))
     }
 
     /// `get_move_destination(move_name, dest, force) -> (dest, bool)`
@@ -480,8 +507,10 @@ impl RouteState {
         ])
     }
 
-    fn rebuild(&self, args: SoloPokemonArgs, badges: BadgeList, name: Option<&str>, species: Option<Arc<PokemonSpecies>>) -> Result<SoloPokemon, String> {
+    fn rebuild(&self, mut args: SoloPokemonArgs, badges: BadgeList, name: Option<&str>, species: Option<Arc<PokemonSpecies>>) -> Result<SoloPokemon, String> {
         let cur = &self.solo_pkmn;
+        // every mutator keeps the PP Ups unless it says otherwise
+        args.pp_ups = args.pp_ups.or(Some(cur.pp_ups));
         SoloPokemon::new(
             name.unwrap_or(&cur.name),
             species.unwrap_or_else(|| cur.species_def.clone()),
@@ -524,12 +553,17 @@ impl RouteState {
 
         // _learn_move
         let mut new_movelist = self.solo_pkmn.move_list.clone();
+        let mut new_pp_ups = self.solo_pkmn.pp_ups;
         let (actual_dest, _) = self.solo_pkmn.get_move_destination(move_name, dest, force);
         if let Some(d) = actual_dest {
             if d < 0 || (d as usize) >= new_movelist.len() {
                 return Err("list assignment index out of range".to_string());
             }
             new_movelist[d as usize] = move_name.map(|s| s.to_string());
+            // every game clears the slot's PP Ups when a move is written over it
+            if let Some(u) = new_pp_ups.get_mut(d as usize) {
+                *u = 0;
+            }
         }
         let mon = self.rebuild(
             SoloPokemonArgs {
@@ -538,6 +572,7 @@ impl RouteState {
                 realized_stat_xp: Some(self.solo_pkmn.realized_stat_xp),
                 unrealized_stat_xp: Some(self.solo_pkmn.unrealized_stat_xp),
                 held_item: self.solo_pkmn.held_item.clone(),
+                pp_ups: Some(new_pp_ups),
                 ..Default::default()
             },
             self.badges.clone(),
@@ -744,6 +779,7 @@ impl RouteState {
                 gained_xp,
                 gained_stat_xp: Some(gained_stat_xp),
                 held_item: cur.held_item.clone(),
+                pp_ups: None,
             },
             new_badges.clone(),
             None,
@@ -840,6 +876,85 @@ impl RouteState {
                 (RouteState::new(self.solo_pkmn.clone(), self.badges.clone(), inv), e)
             }
         }
+    }
+
+    /// Use (or toss) `amount` of an item from the bag. The item always leaves
+    /// the bag, even for uses the game would refuse; the row reports those as
+    /// errors, as it does for a vitamin over the cap (PLAN.md D7).
+    ///
+    /// PP items: PP Up / PP Max raise the target move's PP Ups here (current
+    /// PP is tracked outside the route state). Ether-type items only have
+    /// their target checked. Returns `(state, error, warning)`; the warning
+    /// asks for a missing target move.
+    pub fn use_item(&self, gen: &GenData, item_name: &str, amount: i64, target_move: Option<&str>, no_effect: bool) -> Result<(RouteState, String, String), String> {
+        let (after_bag, bag_error) = self.remove_item(gen, item_name, amount, false, None);
+        let mut errors: Vec<String> = Vec::new();
+        if !bag_error.is_empty() {
+            errors.push(bag_error);
+        }
+        let effect = if no_effect { None } else { gen.pp_item_effect(item_name) };
+        let Some(effect) = effect else {
+            return Ok((after_bag, errors.join(", "), String::new()));
+        };
+        if !effect.needs_target() {
+            return Ok((after_bag, errors.join(", "), String::new()));
+        }
+        let Some(target) = target_move.filter(|t| !t.is_empty()) else {
+            return Ok((after_bag, errors.join(", "), format!("Choose the move {} was used on", item_name)));
+        };
+        let cur = &after_bag.solo_pkmn;
+        let Some(slot) = cur.slot_of_move(target) else {
+            errors.push(format!("{} does not know {}", cur.name, target));
+            return Ok((after_bag, errors.join(", "), String::new()));
+        };
+        let raises = match effect {
+            PpItemEffect::PpUp => Some(amount.max(0)),
+            // one PP Max does the work of every PP Up left
+            PpItemEffect::PpMax => Some(if amount > 0 { 3 } else { 0 }),
+            PpItemEffect::RestoreOne(_) | PpItemEffect::RestoreAll(_) => None,
+        };
+        let Some(raises) = raises else {
+            return Ok((after_bag, errors.join(", "), String::new()));
+        };
+        if !gen.can_raise_pp(target) {
+            errors.push(format!("{} cannot raise the PP of {}", item_name, target));
+            return Ok((after_bag, errors.join(", "), String::new()));
+        }
+        let have = cur.pp_ups[slot];
+        let applied = raises.min(i64::from(3 - have.min(3)));
+        let refused = match effect {
+            PpItemEffect::PpMax => {
+                if applied == 0 {
+                    amount.max(0)
+                } else {
+                    amount.max(0) - 1
+                }
+            }
+            _ => raises - applied,
+        };
+        if refused > 0 {
+            errors.push(format!("Ineffective {}: {} already has 3 PP Ups", item_name, target));
+        }
+        if applied == 0 {
+            return Ok((after_bag, errors.join(", "), String::new()));
+        }
+        let mut pp_ups = cur.pp_ups;
+        pp_ups[slot] = have + applied as u8;
+        let mon = after_bag.rebuild(
+            SoloPokemonArgs {
+                move_list: Some(cur.move_list.clone()),
+                cur_xp: cur.cur_xp,
+                realized_stat_xp: Some(cur.realized_stat_xp),
+                unrealized_stat_xp: Some(cur.unrealized_stat_xp),
+                held_item: cur.held_item.clone(),
+                pp_ups: Some(pp_ups),
+                ..Default::default()
+            },
+            after_bag.badges.clone(),
+            None,
+            None,
+        )?;
+        Ok((RouteState::new(mon, after_bag.badges.clone(), after_bag.inventory.clone()), errors.join(", "), String::new()))
     }
 
     /// `hold_item(item_name, consumed)`

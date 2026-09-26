@@ -11,6 +11,7 @@ use xpr_ui_kit::theme::Theme;
 use xpr_ui_kit::widgets::{self, fmt_thousands, CARD_TITLE_H};
 
 use crate::assets::Assets;
+use crate::pp_ledger::{fmt_pp, PpChange, PpSnapshot};
 
 /// Gap between cards.
 pub const CARD_GAP: f32 = 12.0;
@@ -361,13 +362,88 @@ pub fn stats_card(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, last: Optio
 // Moves card
 // ---------------------------------------------------------------------------
 
+/// What the Moves card shows about PP (an owned copy of the ledger's view of
+/// the selected event, see `pp_ledger`).
+#[derive(Clone, Debug, Default)]
+pub struct MovesPp {
+    pub snapshot: PpSnapshot,
+    /// PP the selected fight (or matchup) spends per slot.
+    pub spend: Option<[i64; 4]>,
+    /// Each slot's history since it was last full.
+    pub history: [Vec<PpChange>; 4],
+    /// PP items in the bag before the event, and whether each acts on one
+    /// move (Ether) rather than all of them (Elixir).
+    pub bag_items: Vec<(String, bool)>,
+}
+
 fn moves_inner_height() -> f32 {
     CARD_TITLE_H + TITLE_GAP + 4.0 * MOVE_ROW_H
 }
 
+const PIP_R: f32 = 2.0;
+const PIP_STEP: f32 = 6.0;
+
+/// The right-hand `cur / max` block of a move row (and its PP-Up pips);
+/// returns its width.
+fn paint_pp(ui: &Ui, theme: &Theme, r: Rect, pp: &crate::pp_ledger::SlotPp, spend: i64) -> f32 {
+    let font = theme.body_bold();
+    let text = format!("{} / {}", fmt_pp(pp.cur), pp.max);
+    let color = if pp.cur <= 0 {
+        theme.failure
+    } else if spend > pp.cur {
+        theme.warning
+    } else {
+        theme.secondary
+    };
+    let tw = widgets::text_width(ui, &text, &font);
+    widgets::col_text(ui, r, &text, font, color, Align::Max);
+    let mut w = tw;
+    if pp.pp_ups > 0 {
+        let x0 = r.max.x - tw - 8.0 - PIP_STEP * f32::from(pp.pp_ups.min(3)) + PIP_R;
+        for i in 0..pp.pp_ups.min(3) {
+            ui.painter().circle_filled(Pos2::new(x0 + PIP_STEP * f32::from(i), r.center().y), PIP_R, theme.secondary);
+        }
+        w += 8.0 + PIP_STEP * f32::from(pp.pp_ups.min(3));
+    }
+    w
+}
+
+/// Hover text for a move row: the PP numbers and what happened to them since
+/// the move was last full.
+fn pp_tooltip(ui: &mut Ui, theme: &Theme, pp: &crate::pp_ledger::SlotPp, spend: i64, history: &[PpChange]) {
+    ui.set_max_width(360.0);
+    let mut head = format!("{}: {} / {} PP", pp.move_name, fmt_pp(pp.cur), pp.max);
+    if pp.pp_ups > 0 {
+        head.push_str(&format!(" ({} PP Up{})", pp.pp_ups, if pp.pp_ups == 1 { "" } else { "s" }));
+    }
+    widgets::label(ui, theme, head);
+    if spend > 0 {
+        widgets::label(ui, theme, format!("This event uses {}", spend));
+    }
+    // the most recent lines matter most; long histories keep their start
+    const MAX_LINES: usize = 14;
+    let lines: Vec<&PpChange> = if history.len() > MAX_LINES {
+        history.iter().take(1).chain(history.iter().skip(history.len() - (MAX_LINES - 1))).collect()
+    } else {
+        history.iter().collect()
+    };
+    for (i, c) in lines.iter().enumerate() {
+        if i == 1 && history.len() > MAX_LINES {
+            widgets::label(ui, theme, format!("… {} more", history.len() - MAX_LINES));
+        }
+        let line = match c.amount {
+            None => c.text.clone(),
+            Some(a) if a >= 0 => format!("+{}  {}", a, c.text),
+            Some(a) => format!("{}  {}", fmt_pp(a), c.text),
+        };
+        widgets::label(ui, theme, line);
+    }
+}
+
 /// Draws the Moves card; returns the slot (0-3) clicked this frame, if any,
-/// so the caller can offer to replace it via a Tutor event.
-pub fn moves_card(ui: &mut Ui, theme: &Theme, last: Option<&LastPkmn>, min_inner_h: f32) -> Option<i64> {
+/// so the caller can offer to replace it via a Tutor event, and a PP item
+/// picked from a row's menu (item, target move) to use before the event.
+pub fn moves_card(ui: &mut Ui, theme: &Theme, last: Option<&LastPkmn>, pp: Option<&MovesPp>, min_inner_h: f32) -> (Option<i64>, Option<(String, Option<String>)>) {
     let mut moves: Vec<String> = last.map(|l| l.pkmn.move_list.iter().map(|m| m.clone().unwrap_or_default()).collect()).unwrap_or_default();
     moves.truncate(4);
     while moves.len() < 4 {
@@ -376,6 +452,7 @@ pub fn moves_card(ui: &mut Ui, theme: &Theme, last: Option<&LastPkmn>, min_inner
     let n = moves.iter().filter(|m| !m.is_empty()).count();
     let can_click = last.is_some();
     let mut clicked_slot: Option<i64> = None;
+    let mut use_item: Option<(String, Option<String>)> = None;
     widgets::card(ui, theme, None, |ui| {
         ui.set_min_height(min_inner_h);
         ui.spacing_mut().item_spacing.y = 0.0;
@@ -384,25 +461,46 @@ pub fn moves_card(ui: &mut Ui, theme: &Theme, last: Option<&LastPkmn>, min_inner
         let divider = theme.row_divider();
         for (i, m) in moves.iter().enumerate() {
             let r = widgets::table_row(ui, MOVE_ROW_H, Some(divider));
+            let slot_pp = pp.and_then(|p| p.snapshot.slots[i].as_ref()).filter(|s| !m.is_empty() && s.move_name == *m);
+            let spend = pp.and_then(|p| p.spend).map(|s| s[i]).unwrap_or(0);
             if can_click {
-                let resp = ui.interact(r, ui.id().with(("move_row", i)), Sense::click());
+                let mut resp = ui.interact(r, ui.id().with(("move_row", i)), Sense::click());
                 if resp.clicked() {
                     clicked_slot = Some(i as i64);
                 }
-                resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+                resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+                if let (Some(sp), Some(p)) = (slot_pp, pp) {
+                    let history = &p.history[i];
+                    resp = resp.on_hover_ui(|ui| pp_tooltip(ui, theme, sp, spend, history));
+                    // PP items from the bag, used on this move before the event
+                    if !p.bag_items.is_empty() {
+                        resp.context_menu(|ui| {
+                            for (item, targeted) in &p.bag_items {
+                                let text = if *targeted { format!("Use {} on {}", item, m) } else { format!("Use {}", item) };
+                                if widgets::menu_item(ui, theme, &text, "", true) {
+                                    use_item = Some((item.clone(), targeted.then(|| m.clone())));
+                                }
+                            }
+                        });
+                    }
+                }
             }
             let slot = Rect::from_min_max(r.min, Pos2::new(r.min.x + 14.0, r.max.y));
             widgets::col_text(ui, slot, &(i + 1).to_string(), theme.caption_font(), theme.secondary, Align::Min);
-            let cell = Rect::from_min_max(Pos2::new(r.min.x + 24.0, r.min.y), r.max);
+            let mut cell = Rect::from_min_max(Pos2::new(r.min.x + 24.0, r.min.y), r.max);
+            if let Some(sp) = slot_pp {
+                let w = paint_pp(ui, theme, cell, sp, spend);
+                cell.max.x -= w + 10.0;
+            }
             if m.is_empty() {
                 widgets::col_text(ui, cell, "—", theme.body(), theme.secondary, Align::Min);
             } else {
-                let shown = widgets::elide(ui, m, &theme.body_bold(), cell.width());
+                let shown = widgets::elide(ui, m, &theme.body_bold(), cell.width().max(0.0));
                 widgets::col_text(ui, cell, &shown, theme.body_bold(), theme.text_strong(), Align::Min);
             }
         }
     });
-    clicked_slot
+    (clicked_slot, use_item)
 }
 
 // ---------------------------------------------------------------------------
@@ -481,15 +579,18 @@ pub fn bag_card(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory>, min_i
 /// is one, and otherwise keeps showing the last mon (with `—` in the EV
 /// columns and an empty bag).
 /// What the Pre-Event State cards were clicked on this frame.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct StateViewerClicks {
     /// a move slot (0-3) of the Moves card
     pub move_slot: Option<i64>,
     /// the "EVs real / total" column of the Stats card
     pub evs: bool,
+    /// a PP item picked from a move row's menu: (item, target move)
+    pub use_pp_item: Option<(String, Option<String>)>,
 }
 
-pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Option<&RouteState>, last_pkmn: &mut Option<LastPkmn>, assets: &mut Assets, before: &BeforeInfo) -> StateViewerClicks {
+#[allow(clippy::too_many_arguments)]
+pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Option<&RouteState>, pp: Option<&MovesPp>, last_pkmn: &mut Option<LastPkmn>, assets: &mut Assets, before: &BeforeInfo) -> StateViewerClicks {
     if let Some(s) = state {
         *last_pkmn = Some(LastPkmn {
             pkmn: s.solo_pkmn.get_pkmn_obj(&s.badges, None),
@@ -523,7 +624,7 @@ pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Op
         ui.horizontal_top(|ui| {
             ui.spacing_mut().item_spacing.x = CARD_GAP;
             column(ui, stats_w, &mut |ui| clicks.evs = stats_card(ui, theme, gen, last, state, h));
-            column(ui, moves_w, &mut |ui| clicks.move_slot = moves_card(ui, theme, last, h));
+            column(ui, moves_w, &mut |ui| (clicks.move_slot, clicks.use_pp_item) = moves_card(ui, theme, last, pp, h));
         });
         ui.add_space(CARD_GAP);
         bag_card(ui, theme, inventory, bag_inner_height(n_items));
@@ -536,7 +637,7 @@ pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Op
         ui.horizontal_top(|ui| {
             ui.spacing_mut().item_spacing.x = CARD_GAP;
             column(ui, stats_w, &mut |ui| clicks.evs = stats_card(ui, theme, gen, last, state, h));
-            column(ui, moves_w, &mut |ui| clicks.move_slot = moves_card(ui, theme, last, h));
+            column(ui, moves_w, &mut |ui| (clicks.move_slot, clicks.use_pp_item) = moves_card(ui, theme, last, pp, h));
             column(ui, bag_w, &mut |ui| bag_card(ui, theme, inventory, h));
         });
     }

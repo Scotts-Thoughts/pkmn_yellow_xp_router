@@ -18,7 +18,8 @@ Run: `cd rust && cargo run --release -p xpr-app [-- --debug]` (uses the same
 config / data directories as the Python app; see `TESTING.md` § 0 for an
 isolated run and the test-hook environment variables).
 Tests: `cd rust && cargo test --workspace`.
-Golden verification: `cargo run --release -p xpr-golden -- verify <golden_dir>` (usage in `crates/xpr-golden/src/main.rs`; the Python corpus generator was removed with the Python app).
+Golden verification: `cargo run --release -p xpr-golden -- verify <golden_dir>` (usage in `crates/xpr-golden/src/main.rs`; the Python corpus generator was removed with the Python app). To check a change against the previous build without a corpus, run `xpr-golden dump <dir> --battles <route.json>...` with both builds and diff the two directories. The PP tracking change was checked this way: 67 routes and 8,428 battle summaries identical, apart from the intended PP-item warnings.
+PP tracking: `docs/rust_port/design/pp_tracking/PLAN.md`; `cargo run --release -p xpr-app --bin pp_bench -- <route.json>...` times the PP ledger.
 Test plan: `TESTING.md`. Divergences: `docs/rust_port/KNOWN_ISSUES.md`.
 
 ## Crates

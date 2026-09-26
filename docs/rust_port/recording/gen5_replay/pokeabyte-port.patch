@@ -1,0 +1,82 @@
+--- a/src/PokeAByte.Protocol/Metadata.cs
++++ b/src/PokeAByte.Protocol/Metadata.cs
+@@ -16,7 +16,10 @@
+ 
+ public static class SharedConstants
+ {
+-    public const string MemoryMappedFileName = "EDPS_MemoryData.bin";
++    /// Test-harness patch: the UDP port comes from POKEAPROTOCOL_PORT (default 55356) and the
++    /// shared memory name follows Super Shuckie's per-port naming.
++    public static readonly int Port = int.TryParse(Environment.GetEnvironmentVariable("POKEAPROTOCOL_PORT"), out var p) ? p : 55356;
++    public static readonly string MemoryMappedFileName = Port == 55356 ? "EDPS_MemoryData.bin" : $"EDPS_MemoryData_{Port}.bin";
+     public const string MemoryMappedFilePathOSX = "/tmp/EDPS_MemoryData.bin";
+     public const string MemoryMappedFilePathLinux = "/dev/shm/EDPS_MemoryData.bin";
+ 
+--- a/src/PokeAByte.Infrastructure/Drivers/PokeAProtocol/PokeAProtocolClient.cs
++++ b/src/PokeAByte.Infrastructure/Drivers/PokeAProtocol/PokeAProtocolClient.cs
+@@ -1,4 +1,4 @@
+-﻿using System.Net;
++using System.Net;
+ using System.Net.Sockets;
+ using PokeAByte.Domain;
+ using PokeAByte.Domain.Interfaces;
+@@ -9,7 +9,7 @@
+ 
+ public class PokeAProtocolClient : IDisposable
+ {
+-    private IPEndPoint _remoteEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 55356);
++    private IPEndPoint _remoteEndpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), SharedConstants.Port);
+     private UdpClient _client;
+     private CancellationTokenSource _connectionCts;
+     private int _fileSize;
+--- a/src/PokeAByte.Infrastructure/Drivers/PokeAProtocol/PokeAProtocolDriver.cs
++++ b/src/PokeAByte.Infrastructure/Drivers/PokeAProtocol/PokeAProtocolDriver.cs
+@@ -1,4 +1,4 @@
+-﻿using System.Net;
++using System.Net;
+ using System.Net.Sockets;
+ using PokeAByte.Domain.Interfaces;
+ using PokeAByte.Domain.Models;
+@@ -88,7 +88,7 @@
+     public static async Task<bool> Probe(AppSettings appSettings)
+     {
+         using var client = new UdpClient();
+-        var remote = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 55356);
++        var remote = new IPEndPoint(IPAddress.Parse("127.0.0.1"), SharedConstants.Port);
+         try
+         {
+             using CancellationTokenSource cancellationTokenSource = new();
+--- a/src/PokeAByte.Domain/Models/BuildEnvironment.cs
++++ b/src/PokeAByte.Domain/Models/BuildEnvironment.cs
+@@ -2,7 +2,7 @@
+ 
+ public static class BuildEnvironment
+ {
+-    public static string ConfigurationDirectory { get; set; } = Path.Combine(
++    public static string ConfigurationDirectory { get; set; } = Environment.GetEnvironmentVariable("POKEABYTE_CONFIG_DIR") ?? Path.Combine(
+         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+         "PokeAByte"
+     );
+--- a/src/PokeAByte.Web/PokeAByte.Web.csproj
++++ b/src/PokeAByte.Web/PokeAByte.Web.csproj
+@@ -1,4 +1,4 @@
+-<Project Sdk="Microsoft.NET.Sdk.Web" InitialTargets="NpmRunBuild">
++<Project Sdk="Microsoft.NET.Sdk.Web">
+ 
+   <PropertyGroup>
+     <TargetFramework>net10.0</TargetFramework>
+@@ -25,13 +25,7 @@
+     <DebugType>None</DebugType>
+   </PropertyGroup>
+ 
+-  <Target BeforeTargets="PrepareForBuild" Name="NpmInstall" Inputs="../Frontend/package.json" Outputs="../Frontend/node_modules/.install-stamp">
+-    <Exec Command="npm ci" WorkingDirectory="../Frontend" />
+-    <Touch Files="../Frontend/node_modules/.install-stamp" AlwaysCreate="true" />
+-  </Target>
+-  <Target Name="NpmRunBuild" DependsOnTargets="NpmInstall">
+-    <Exec Command="npm run build" WorkingDirectory="../Frontend" />
+-  </Target>
++  
+   <ItemGroup>
+     <ProjectReference Include="..\PokeAByte.Domain\PokeAByte.Domain.csproj" />
+     <ProjectReference Include="..\PokeAByte.Infrastructure\PokeAByte.Infrastructure.csproj" />

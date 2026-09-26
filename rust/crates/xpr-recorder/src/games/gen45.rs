@@ -1,7 +1,8 @@
-//! Port of `route_recording/game_recorders/gen_four/*` (Platinum, HG/SS) and
-//! `gen_five/*` (Black/White, B2/W2): one machine parameterised by a key table
-//! and a few per-gen switches (the gen 5 files are a copy of gen 4 with the
-//! mapper gaps of `MAPPER_GAPS.md` and a data-driven battle initialisation).
+//! Port of `route_recording/game_recorders/gen_four/*` (Platinum, HG/SS): one
+//! machine parameterised by a key table and a few per-game switches. Gen 5 has
+//! its own machine (`gen5.rs`), which shares this file's name conversion
+//! ([`Gen45Converter`], hence the gen 5 [`Flavor`]s) and event processing
+//! ([`process_one`]).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
@@ -135,15 +136,10 @@ pub struct Gen45Keys {
 
 impl Gen45Keys {
     pub fn configure(flavor: Flavor) -> Gen45Keys {
-        let gen5 = flavor.is_gen5();
         let team = |suffix: &str| -> Vec<String> { (0..6).map(|i| format!("player.team.{}.{}", i, suffix)).collect() };
         let bag = |pocket: &str, field: &str, n: usize| -> Vec<String> { (0..n).map(|i| format!("bag.{}.{}.{}", pocket, i, field)).collect() };
-        let (items_n, medicine_n, balls_n, berries_n, tmhm_n) = match flavor {
-            Flavor::Platinum | Flavor::HeartGoldSoulSilver => (40, 20, 16, 63, 99),
-            Flavor::BlackWhite => (40, 48, 0, 30, 102),
-            Flavor::Black2White2 => (146, 48, 0, 34, 101),
-        };
-        let opt = |s: &str| if gen5 { None } else { Some(s.to_string()) };
+        let (items_n, medicine_n, balls_n, berries_n, tmhm_n) = (40, 20, 16, 63, 99);
+        let opt = |s: &str| Some(s.to_string());
         let mut k = Gen45Keys {
             flavor,
             meta_state: "meta.state".into(),
@@ -187,20 +183,16 @@ impl Gen45Keys {
             battle_first_enemy_level: "battle.opponent.active_pokemon.level".into(),
             battle_first_enemy_hp: "battle.opponent.active_pokemon.stats.hp".into(),
             battle_first_enemy_party_pos: "battle.opponent.party_position".into(),
-            battle_first_enemy_pid: if gen5 {
-                "battle.opponent.team.0.internals.personality_value".into()
-            } else {
-                "battle.opponent.active_pokemon.internals.personality_value".into()
-            },
+            battle_first_enemy_pid: "battle.opponent.active_pokemon.internals.personality_value".into(),
             battle_second_enemy_species: opt("battle.opponent_2.active_pokemon.species"),
             battle_second_enemy_level: opt("battle.opponent_2.active_pokemon.level"),
             battle_second_enemy_hp: opt("battle.opponent_2.active_pokemon.stats.hp"),
             battle_second_enemy_party_pos: opt("battle.opponent_2.party_position"),
             battle_second_enemy_pid: opt("battle.opponent_2.active_pokemon.internals.personality_value"),
             battle_enemy_1_pid: (0..6).map(|i| format!("battle.opponent.team.{}.internals.personality_value", i)).collect(),
-            battle_enemy_2_pid: if gen5 { Vec::new() } else { (0..6).map(|i| format!("battle.opponent_2.team.{}.internals.personality_value", i)).collect() },
+            battle_enemy_2_pid: (0..6).map(|i| format!("battle.opponent_2.team.{}.internals.personality_value", i)).collect(),
             enemy_team_species: (0..6).map(|i| format!("battle.opponent.team.{}.species", i)).collect(),
-            enemy_2_team_species: if gen5 { Vec::new() } else { (0..6).map(|i| format!("battle.opponent_2.team.{}.species", i)).collect() },
+            enemy_2_team_species: (0..6).map(|i| format!("battle.opponent_2.team.{}.species", i)).collect(),
             save_count: opt("meta.saves"),
             audio_sound_effect_1: opt("audio.save_sound"),
             audio_sound_effect_2: opt("audio.heal_sound"),
@@ -285,9 +277,7 @@ impl Gen45Keys {
         v.extend(self.stat_exp.iter().cloned());
         v.extend(self.all_item_fields.iter().cloned());
         v.extend(self.team_species.iter().cloned());
-        if !self.flavor.is_gen5() {
-            v.extend(self.team_held_item.iter().cloned());
-        }
+        v.extend(self.team_held_item.iter().cloned());
         v.push(self.battle_solo_hp.clone());
         v.extend(self.battle_team_hp.iter().cloned());
         v.push(self.meta_state.clone());
@@ -779,12 +769,8 @@ impl Gen45Machine {
     }
 
     fn convert_species(&self, store: &PropertyStore, species: Option<&str>, held_key: Option<&str>) -> Option<String> {
-        if self.flavor.is_gen5() {
-            self.conv.pkmn_name_convert(species, None)
-        } else {
-            let held = held_key.and_then(|k| store.str_of(k));
-            self.conv.pkmn_name_convert(species, held.as_deref())
-        }
+        let held = held_key.and_then(|k| store.str_of(k));
+        self.conv.pkmn_name_convert(species, held.as_deref())
     }
 
     fn mon_key(&self, store: &PropertyStore, mon_idx: usize) -> MonKey {
@@ -1314,19 +1300,10 @@ impl Gen45Machine {
 
     /// `_battle_ready`
     fn battle_ready(&mut self, store: &PropertyStore) {
-        if self.flavor.is_gen5() {
-            if self.battle.battle_started {
-                return;
-            }
-            if !xpr_core::pyjson::truthy(&store.get_value(Some(&self.keys.battle_first_enemy_species))) {
-                return;
-            }
-        } else {
-            let battle_mode = self.opt_value(store, &self.keys.trainer_battle_flag);
-            if battle_mode.is_null() || battle_mode.as_str() == Some("null") {
-                self.battle.delayed_initialization.reset();
-                return;
-            }
+        let battle_mode = self.opt_value(store, &self.keys.trainer_battle_flag);
+        if battle_mode.is_null() || battle_mode.as_str() == Some("null") {
+            self.battle.delayed_initialization.reset();
+            return;
         }
         self.battle.trainer_1 = store.get_value(Some(&self.keys.battle_trainer_a_number));
         self.battle.trainer_2 = store.get_value(Some(&self.keys.battle_trainer_b_number));
@@ -1339,11 +1316,7 @@ impl Gen45Machine {
                 self.battle.multi_battle = true;
             }
         }
-        if self.flavor.is_gen5() {
-            self.battle.is_trainer_battle = Some(if xpr_core::pyjson::truthy(&self.battle.trainer_1) { "Trainer" } else { "Wild" }.to_string());
-        } else {
-            self.battle.is_trainer_battle = self.opt_value(store, &self.keys.trainer_battle_flag).as_str().map(|s| s.to_string());
-        }
+        self.battle.is_trainer_battle = self.opt_value(store, &self.keys.trainer_battle_flag).as_str().map(|s| s.to_string());
         self.battle.original_level = store_i64(store, &self.keys.mon_level);
         if self.is_trainer() {
             log::info!("trainer battle found");
@@ -1970,10 +1943,6 @@ impl Gen45Machine {
     fn battle_transition(&mut self, store: &PropertyStore, new: &GameHookProperty, prev: &GameHookProperty) -> GameState {
         let state = GameState::Battle;
         let k = self.keys.clone();
-        // gen 5: initialise the instant the battle data is available
-        if self.flavor.is_gen5() && !self.battle.battle_started {
-            self.battle_ready(store);
-        }
         // solo HP hitting 0 starts blackout detection
         if new.path == k.battle_solo_hp {
             if new.as_i64().map(|v| v <= 0).unwrap_or(false) && !self.battle.solo_hp_zero {
@@ -2418,7 +2387,7 @@ fn repr_items_i64(map: &ItemCache) -> String {
 }
 
 /// `_process_events` body (gens 4/5).
-fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv: &Gen45Converter) {
+pub(crate) fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv: &Gen45Converter) {
     let gen = &ctx.gen;
     let gen5 = conv.flavor.is_gen5();
     if cur_event.notes == reset_flag() {
@@ -2686,7 +2655,7 @@ impl GameRecorder for Gen45Machine {
     }
 
     fn shutdown(&mut self) {
-        log::info!("Shutting down {} recording FSM", if self.flavor.is_gen5() { "Black/White" } else { "Platinum" });
+        log::info!("Shutting down {} recording FSM", if self.flavor.is_hgss() { "HG/SS" } else { "Platinum" });
         crate::controller::deactivate(&self.active);
     }
 }
