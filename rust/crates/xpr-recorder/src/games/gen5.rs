@@ -26,9 +26,16 @@
 //! - TMs are not used up when taught.
 //! - After a Rare Candy or an evolution the level (species) changes first and
 //!   the forget-a-move choice arrives later, after the dialogue.
-//! - A save shows as `flags.new_game` flipping: it is bit 0 of the save
-//!   counter in the footer of a save block, which every save increments.
-//! - A reset clears the player id (and the party) until a save is loaded.
+//! - A save shows as `flags.new_game` flipping when it is bit 0 of the save
+//!   counter in the footer of the trainer-info save block. The game only
+//!   rewrites the blocks that changed, and that one holds the play time, so it
+//!   is rewritten by every save.
+//! - A reset empties the party. Black/White and White 2 clear the player id
+//!   with it, Black 2 does not; Black 2 / White 2 then load the save while the
+//!   title screen menus are up and read garbage as the player id until the
+//!   game goes on. So after a reset the save file is recognised by its
+//!   Pokémon, and what the route keeps is decided by comparing the loaded save
+//!   with the last saved and the pre-reset state.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
@@ -49,11 +56,15 @@ use crate::controller::{is_set, new_active_flag, ActiveFlag, EventQueue, GameRec
 use crate::gamehook::{value_as_i64, GameHookProperty, PropertyStore};
 use crate::host::StartInfo;
 
-/// Where the save counter `flags.new_game` must be read from to report saves:
-/// the footer of the party's save block in Black, White, Black 2 and White 2.
-/// The Black 2 and White 2 mappers read an unrelated byte (0x221DA14 - 0x40 and
+/// Where `flags.new_game` must be read from for every save to be seen: the save
+/// counter of the trainer-info block (Black, White, Black 2, White 2). The
+/// Black 2 and White 2 mappers read an unrelated byte (0x221DA14 - 0x40 and
 /// 0x221DA14), which never changes.
-const SAVE_COUNTER_ADDRESSES: [i64; 4] = [0x2234EE0, 0x2234F00, 0x221E918, 0x221E958];
+const SAVE_COUNTER_ADDRESSES: [i64; 4] = [0x2235014, 0x2235034, 0x221EA94, 0x221EAD4];
+/// The party block's save counter, which the Black and White mappers read: a
+/// save made with the party exactly as it was at the previous save does not
+/// rewrite that block, so it goes unseen.
+const PARTY_BLOCK_COUNTERS: [i64; 2] = [0x2234EE0, 0x2234F00];
 /// `battle.other.battle` while a battle is on (the same in both games).
 const BATTLE_WORD: i64 = 21828;
 /// How long the party and bag must stay unchanged before a change is read.
@@ -363,9 +374,17 @@ pub struct Gen5Machine {
     /// the level has already changed, so the choice can arrive in a later diff
     pending_levelup: Vec<(String, i64, String)>,
     /// `flags.new_game` is read from a save counter (see [`SAVE_COUNTER_ADDRESSES`]);
-    /// without it saves go unseen, so a reset must not roll events back
+    /// without it a reset only rolls events back when the loaded save matches a
+    /// state the recorder knows
     saves_detectable: bool,
     warned_saves: bool,
+    /// the overworld state when the last save was recorded
+    saved: Option<Snap>,
+    /// the overworld state when the game was reset (before a battle, for a
+    /// reset during one)
+    pre_reset: Option<Snap>,
+    /// the game was reset: what the route keeps is decided once the save loads
+    reset_pending: bool,
 }
 
 fn opt_str(v: &Value) -> Option<String> {
@@ -413,6 +432,9 @@ impl Gen5Machine {
             pending_levelup: Vec::new(),
             saves_detectable: false,
             warned_saves: false,
+            saved: None,
+            pre_reset: None,
+            reset_pending: false,
         }
     }
 
@@ -456,6 +478,17 @@ impl Gen5Machine {
         self.gen.pkmn_db().get_pkmn(&converted).map(|p| p.name.clone())
     }
 
+    /// The router's name for a mapper item name: TMs get their move, and the
+    /// item data's own spelling is used (the converter title-cases, so "PP UP"
+    /// comes out as "Pp Up").
+    fn item_name(&self, raw: &str) -> Option<String> {
+        let name = self.conv.item_name_convert(Some(raw))?;
+        if let Some(full) = self.tm_names.get(&name) {
+            return Some(full.clone());
+        }
+        Some(self.gen.item_db().get_item(&name).map(|i| i.name.clone()).unwrap_or(name))
+    }
+
     /// One party slot, or why it cannot be trusted right now.
     fn read_mon(&self, store: &PropertyStore, slot: usize) -> Result<Mon, String> {
         let k = &self.keys;
@@ -481,7 +514,7 @@ impl Gen5Machine {
             let raw = store.str_of(&k.moves[slot][m]);
             raw.and_then(|r| self.conv.move_name_convert(Some(&r)))
         });
-        let held = store.str_of(&k.held[slot]).and_then(|h| self.conv.item_name_convert(Some(&h)));
+        let held = store.str_of(&k.held[slot]).and_then(|h| self.item_name(&h));
         Ok(Mon {
             slot,
             pid,
@@ -510,10 +543,7 @@ impl Gen5Machine {
         let mut items: IndexMap<String, i64> = IndexMap::new();
         for (item_key, qty_key) in &self.keys.bag {
             let Some(raw) = store.str_of(item_key) else { continue };
-            let Some(mut name) = self.conv.item_name_convert(Some(&raw)) else { continue };
-            if let Some(full) = self.tm_names.get(&name) {
-                name = full.clone();
-            }
+            let Some(name) = self.item_name(&raw) else { continue };
             let qty = Self::i64_of(store, qty_key);
             if qty <= 0 {
                 continue;
@@ -1107,36 +1137,70 @@ impl Gen5Machine {
         let now = Instant::now();
         let in_battle = self.in_battle(store);
         let player_id = Self::i64_of(store, &self.keys.player_id);
+        // a soft reset empties the party (the recorder only follows a game with
+        // one). The player id is no signal: Black 2 keeps it through the reset,
+        // and both B2W2 games read it as 0 now and then while a save loads.
+        let reset = Self::i64_of(store, &self.keys.team_count) == 0;
         match self.phase {
-            Phase::Uninitialized | Phase::Resetting => {
+            Phase::Uninitialized => {
                 if player_id == 0 || in_battle || now.duration_since(self.last_change) < SETTLE {
                     return;
                 }
                 let Ok(snap) = self.read_snap(store) else { return };
-                if self.phase == Phase::Resetting {
-                    if self.player_id.is_some() && self.player_id != Some(snap.player_id) {
-                        log::info!("[gen5] a different save file was loaded");
-                        self.controller.route_restarted();
-                        self.solo_pid = None;
-                    }
-                } else if self.player_id.is_some() && self.player_id != Some(snap.player_id) {
+                if self.player_id.is_some() && self.player_id != Some(snap.player_id) {
                     self.controller.route_restarted();
                 }
                 self.initialize(snap);
                 self.enter_area(store);
                 self.set_phase(Phase::Overworld);
             }
+            Phase::Resetting => {
+                if player_id == 0 || in_battle || now.duration_since(self.last_change) < SETTLE {
+                    return;
+                }
+                let Ok(snap) = self.read_snap(store) else { return };
+                if self.same_save_file(&snap) {
+                    // the save is loaded while the title screen menus are still up;
+                    // Black 2 / White 2 read garbage as the player id until the
+                    // game goes on, so wait for the real one
+                    if self.player_id.is_some_and(|id| id != snap.player_id) {
+                        return;
+                    }
+                    if std::mem::take(&mut self.reset_pending) {
+                        self.settle_reset(&snap);
+                    }
+                } else {
+                    log::info!("[gen5] a different save file was loaded");
+                    self.controller.route_restarted();
+                    self.solo_pid = None;
+                    self.saved = None;
+                    self.reset_pending = false;
+                }
+                self.pre_reset = None;
+                self.initialize(snap);
+                self.enter_area(store);
+                self.set_phase(Phase::Overworld);
+            }
             Phase::Overworld => {
-                if player_id == 0 {
+                if reset {
                     self.begin_reset();
                     return;
                 }
-                if self.player_id.is_some() && self.player_id != Some(player_id) && now.duration_since(self.last_change) >= SETTLE {
-                    log::info!("[gen5] player id changed: a new save file");
-                    self.controller.route_restarted();
-                    self.solo_pid = None;
-                    self.set_phase(Phase::Uninitialized);
-                    return;
+                if player_id != 0 && self.player_id.is_some() && self.player_id != Some(player_id) && now.duration_since(self.last_change) >= SETTLE {
+                    if let Ok(snap) = self.read_snap(store) {
+                        if self.same_save_file(&snap) {
+                            log::info!("[gen5] the player id reads {} now (was {:?})", player_id, self.player_id);
+                            self.player_id = Some(player_id);
+                        } else {
+                            log::info!("[gen5] player id changed: a new save file");
+                            self.controller.route_restarted();
+                            self.solo_pid = None;
+                            self.saved = None;
+                            self.player_id = None;
+                            self.set_phase(Phase::Uninitialized);
+                            return;
+                        }
+                    }
                 }
                 let battle_starting = in_battle;
                 if self.dirty && (battle_starting || self.save_pending || now.duration_since(self.last_change) >= SETTLE) {
@@ -1163,6 +1227,7 @@ impl Gen5Machine {
                     let area = self.area.clone().unwrap_or_default();
                     log::info!("[gen5] the game was saved in {}", area);
                     self.queue_event(EventDefinition::with_save(&area));
+                    self.saved = self.baseline.clone();
                 }
                 if battle_starting {
                     if let Some(pre) = self.baseline.clone() {
@@ -1171,7 +1236,7 @@ impl Gen5Machine {
                 }
             }
             Phase::Battle => {
-                if player_id == 0 {
+                if reset {
                     self.battle = None;
                     self.begin_reset();
                     return;
@@ -1202,8 +1267,57 @@ impl Gen5Machine {
     fn begin_reset(&mut self) {
         log::info!("[gen5] the game was reset");
         self.save_pending = false;
-        if self.saves_detectable {
-            // back to the last save
+        self.pending_reward = None;
+        self.pending_levelup.clear();
+        self.blackout_heal_pending = false;
+        // (a second reset before the save loaded keeps the first one's state)
+        if !self.reset_pending {
+            self.pre_reset = self.baseline.take();
+        }
+        self.reset_pending = true;
+        self.baseline = None;
+        self.dirty = false;
+        self.set_phase(Phase::Resetting);
+    }
+
+    /// Whether `snap`, read after a reset, is from the save file being followed:
+    /// its party shares a Pokémon with the last known one. (The player id cannot
+    /// tell while Black 2 / White 2 read garbage for it.)
+    fn same_save_file(&self, snap: &Snap) -> bool {
+        let known: HashSet<i64> = [&self.pre_reset, &self.baseline, &self.saved]
+            .into_iter()
+            .flatten()
+            .flat_map(|s| s.team.iter().map(|m| m.pid))
+            .chain(self.solo_pid)
+            .collect();
+        if known.is_empty() {
+            return self.player_id.is_none_or(|id| id == snap.player_id);
+        }
+        snap.team.iter().any(|m| known.contains(&m.pid))
+    }
+
+    /// The save the game loaded after a reset decides how much of the route stays.
+    fn settle_reset(&mut self, loaded: &Snap) {
+        let at_save = self.saved.as_ref().map(|s| same_state(s, loaded));
+        let at_reset = self.pre_reset.as_ref().is_some_and(|s| same_state(s, loaded));
+        if at_save == Some(true) {
+            log::info!("[gen5] the last save was loaded");
+            self.queue_event(EventDefinition::notes_only(&reset_flag()));
+        } else if at_reset {
+            // everything recorded before the reset is in the save: it was made
+            // after the last save that was seen, with nothing changed since
+            let area = self.area.clone().unwrap_or_default();
+            log::info!("[gen5] the loaded save is the state before the reset: saved in {}", area);
+            self.queue_event(EventDefinition::with_save(&area));
+            self.saved = Some(loaded.clone());
+        } else if self.saves_detectable {
+            if at_save == Some(false) {
+                let msg = "The game loaded a save that does not match the last save the recorder saw, so the route was rolled back to that one: check the events after it.";
+                log::warn!("[gen5] {}", msg);
+                self.controller.host().post(move |h| h.send_message(msg));
+            } else {
+                log::info!("[gen5] no save seen since recording started: back to the route's last save");
+            }
             self.queue_event(EventDefinition::notes_only(&reset_flag()));
         } else {
             self.queue_event(EventDefinition::notes_only(&format!(
@@ -1211,9 +1325,6 @@ impl Gen5Machine {
                 consts::RECORDING_ERROR_FRAGMENT
             )));
         }
-        self.baseline = None;
-        self.dirty = false;
-        self.set_phase(Phase::Resetting);
     }
 
     fn spawn_processing_thread(&self) {
@@ -1234,6 +1345,13 @@ fn healed(old: &Snap, new: &Snap) -> bool {
         && old.team.iter().zip(new.team.iter()).all(|(a, b)| a.pid == b.pid && a.max_hp == b.max_hp && a.level == b.level)
         && new.team.iter().all(|m| m.max_hp > 0 && m.hp == m.max_hp)
         && old.team.iter().any(|m| m.hp < m.max_hp)
+}
+
+/// The same party, bag and money. Friendship is left out: walking raises it
+/// without any other change, so a snapshot can be behind on it.
+fn same_state(a: &Snap, b: &Snap) -> bool {
+    let key = |m: &Mon| Mon { friendship: 0, ..m.clone() };
+    a.money == b.money && a.items == b.items && a.team.len() == b.team.len() && a.team.iter().zip(&b.team).all(|(x, y)| key(x) == key(y))
 }
 
 /// No item left the bag (a potion is not a heal).
@@ -1293,11 +1411,14 @@ impl GameRecorder for Gen5Machine {
         self.keys = Gen5Keys::configure(store);
         self.settle_paths = self.keys.settle_paths();
         let save_address = store.get(&self.keys.save_flag).and_then(|p| value_as_i64(&p.address));
-        let detectable = save_address.map(|a| SAVE_COUNTER_ADDRESSES.contains(&a)).unwrap_or(false);
+        let detectable = save_address.is_some_and(|a| SAVE_COUNTER_ADDRESSES.contains(&a) || PARTY_BLOCK_COUNTERS.contains(&a));
+        if save_address.is_some_and(|a| PARTY_BLOCK_COUNTERS.contains(&a)) {
+            log::info!("[gen5] saves are read from the party's save block: a save with the party unchanged since the previous one goes unseen");
+        }
         if !detectable && !self.warned_saves {
             self.warned_saves = true;
             let msg = format!(
-                "This Poke-A-Byte mapper cannot tell the recorder when the game saves ({} is read from {}), so a reset will not remove the events recorded since your last save.",
+                "This Poke-A-Byte mapper cannot tell the recorder when the game saves ({} is read from {}). After a reset the recorder can only tell what to keep when nothing changed between your last save and the reset; otherwise delete the events after your last save by hand.",
                 self.keys.save_flag,
                 save_address.map(|a| format!("0x{:X}", a)).unwrap_or_else(|| "nowhere".into())
             );

@@ -244,11 +244,20 @@ was checked against full Super Shuckie replays of real runs; what the games
 do, what the mappers get wrong and the gaps that remain are in
 `docs/rust_port/recording/gen5.md`. The two that affect users:
 
-- **Black 2 / White 2 saves are not detected** with the current mappers
-  (`flags.new_game` reads a byte that never changes). The recorder says so
-  once, and a reset then adds a note instead of rolling the route back to a
-  save it never saw. Fixed by pointing the mappers' `flags.new_game` at the
-  party block's save counter (`0x221E958`, Black 2 `- 0x40`).
+- **Saves need a mapper fix** (`docs/rust_port/recording/gen5_mappers_save_counter.patch`,
+  one line per mapper, pointing `flags.new_game` at the trainer-info save
+  block's counter, which every save rewrites). With the stock mappers:
+  Black 2 / White 2 saves are not detected at all (`flags.new_game` reads a
+  byte that never changes; the recorder says so once), and Black / White miss
+  a save made with the party unchanged since the previous one (they read the
+  party block's counter, and the game only rewrites blocks that changed).
+  After a reset the recorder compares the save the game loads with the state
+  at the last save it saw and with the state at the reset, so a missed save
+  followed by nothing is still handled; otherwise the route goes back to the
+  last save seen (or, with no save detection, only gets a note).
+- **Resets** are detected by the party emptying (Black 2 keeps the player id
+  through a reset) and the save file is recognised by its Pokémon: Black 2 /
+  White 2 read garbage as the player id while the title screen is up.
 - **Area names** come from the recorder's own zone table (read from the
   ROMs): the Black/White mappers name zones from the place-name list.
 

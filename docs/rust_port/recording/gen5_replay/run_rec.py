@@ -18,6 +18,8 @@ ap.add_argument("--route", default=None, help="VERSION|MON for --mode record (ne
 ap.add_argument("--save-name", default="recorded")
 ap.add_argument("--pab", default="http://127.0.0.1:8095")
 ap.add_argument("--mapper", default="STANDARD/gen5/pokemon_black.xml")
+ap.add_argument("--script", default=None, help="a file of drive.py steps played (paced) instead of the replay; /done ends it")
+ap.add_argument("--no-seek", action="store_true", help="leave the feeder where it is (a replay-less feeder cannot seek)")
 args = ap.parse_args()
 
 work = os.path.abspath(args.work)
@@ -28,7 +30,11 @@ json.dump({"user_data_location": data_dir, "debug_mode": True, "auto_load_most_r
            # keep the test window off the user's screens
            "tkinter_window_geometry": "1400x900+12000+12000"}, open(os.path.join(cfg_dir, "config.json"), "w"), indent=4)
 
-fx.get("/pause"); fx.goto(args.start); fx.get("/speed", x=args.speed)
+fx.get("/pause")
+fx.get("/done", v=0)
+if not args.no_seek:
+    fx.goto(args.start)
+fx.get("/speed", x=args.speed)
 import urllib.request
 def load_mapper():
     req = urllib.request.Request(args.pab + "/mapper-service/change-mapper", data=json.dumps(args.mapper).encode(), method="PUT", headers={"Content-Type": "application/json"})
@@ -63,7 +69,14 @@ si.wShowWindow = 4  # SW_SHOWNOACTIVATE: do not take focus from the user
 app = subprocess.Popen([args.exe], env=env, cwd=r"A:\pkmn_yellow_xp_router", stdout=out, stderr=subprocess.STDOUT, startupinfo=si)
 time.sleep(8)  # let the app connect and arm the quick start
 t0 = time.time()
-fx.get("/runto", frame=args.until)
+if args.script:
+    steps = [l.strip() for l in open(args.script, encoding="utf-8") if l.strip() and not l.lstrip().startswith("#")]
+    port = fx.BASE.rsplit(":", 1)[1]
+    here = os.path.dirname(os.path.abspath(__file__))
+    subprocess.run([sys.executable, os.path.join(here, "drive.py"), port, "paced", *steps], cwd=here, stdout=out, stderr=subprocess.STDOUT)
+    fx.get("/done")
+else:
+    fx.get("/runto", frame=args.until)
 while app.poll() is None:
     time.sleep(5)
     st = fx.status()

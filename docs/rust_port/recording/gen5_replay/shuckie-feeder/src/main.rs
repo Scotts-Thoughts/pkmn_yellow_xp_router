@@ -1,8 +1,11 @@
 //! Headless Super Shuckie replay player that serves the game's memory to Poke-A-Byte.
 //!
 //! ```text
-//! shuckie-feeder --rom <rom.nds> --replay <file.replay> [--port 55390] [--http 30190]
-//!                [--speed 4] [--start <frame>] [--paused]
+//! shuckie-feeder --rom <rom.nds> [--replay <file.replay>] [--sav <cartridge.sav>] [--port 55390]
+//!                [--http 30190] [--speed 4] [--start <frame>] [--paused]
+//!
+//! Without --replay the game boots from the cartridge save (or a blank one) and only /press
+//! gives it input; /play runs it with nothing pressed.
 //! ```
 //!
 //! HTTP control (GET, all replies are JSON or plain text):
@@ -25,6 +28,8 @@
 //!                                run N frames with this input instead of the replay's (the game
 //!                                leaves the replay until the next /goto)
 //!   /savestate?path=P  /loadstate?path=P
+//!   /savesram?path=P             write the cartridge save (a .sav another ROM can boot from)
+//!   /done[?v=0]                  mark the session over (a /press script ends with it), or not
 //!   /quit
 
 use std::collections::HashMap;
@@ -50,7 +55,7 @@ struct Request {
 
 struct Feeder {
     core: NintendoDS,
-    player: ReplayFilePlayer,
+    player: Option<ReplayFilePlayer>,
     server: PokeAByteIntegrationServer,
     frame: u64,
     total_frames: u64,
@@ -74,8 +79,9 @@ fn parse_num(s: &str) -> Option<u64> {
 impl Feeder {
     /// Feed replay packets up to and including the next `NextFrame`. `false` when the replay ends.
     fn feed_frame(&mut self) -> bool {
+        let Some(player) = self.player.as_mut() else { return true };
         loop {
-            match self.player.next_packet() {
+            match player.next_packet() {
                 Ok(None) | Err(_) => return false,
                 Ok(Some(packet)) => match packet {
                     Packet::NextFrame { .. } => return true,
@@ -135,9 +141,12 @@ impl Feeder {
     }
 
     fn seek(&mut self, target: u64) -> Result<(), String> {
+        let Some(player) = self.player.as_mut() else {
+            return if target == self.frame { Ok(()) } else { Err("no replay to seek in".into()) };
+        };
         let mut kf = target;
         loop {
-            match self.player.go_to_keyframe(kf) {
+            match player.go_to_keyframe(kf) {
                 Ok(()) => break,
                 Err(ReplaySeekError::NoSuchKeyframe { best, .. }) => {
                     if best > target {
@@ -148,11 +157,11 @@ impl Feeder {
                 Err(e) => return Err(format!("seek error: {e:?}")),
             }
         }
-        let meta = match self.player.next_packet() {
+        let meta = match player.next_packet() {
             Ok(Some(Packet::Keyframe { metadata, .. })) => metadata.clone(),
             other => return Err(format!("expected a keyframe packet, got {other:?}")),
         };
-        self.core.load_save_state(self.player.current_keyframe_state()).map_err(|e| format!("load state: {e}"))?;
+        self.core.load_save_state(player.current_keyframe_state()).map_err(|e| format!("load state: {e}"))?;
         self.core.set_input_encoded(meta.input.as_slice());
         self.frame = meta.elapsed_frames;
         self.stalled = false;
@@ -290,12 +299,14 @@ impl Feeder {
                 }
             }
             "/bookmarks" => {
-                let t = self.player.bookmark_table();
+                let Some(player) = self.player.as_ref() else { return "[]".into() };
+                let t = player.bookmark_table();
                 let items: Vec<String> = t.bookmarks.iter().map(|b| format!("{{\"name\":{:?},\"frame\":{},\"out\":{}}}", b.name, b.in_frame, b.out_frame().map(|f| f.to_string()).unwrap_or("null".into()))).collect();
                 format!("[{}]", items.join(","))
             }
             "/keyframes" => {
-                let k = self.player.all_keyframes();
+                let Some(player) = self.player.as_ref() else { return "{\"count\":0}".into() };
+                let k = player.all_keyframes();
                 format!(
                     "{{\"count\":{},\"first\":{},\"last\":{}}}",
                     k.len(),
@@ -446,7 +457,8 @@ impl Feeder {
                 let mut enc = Vec::new();
                 self.core.encode_input(supershuckie_core::emulator::Input::new(), &mut enc);
                 self.core.set_input_encoded(&enc);
-                self.stalled = true;
+                // with a replay, its input no longer fits the game
+                self.stalled = self.player.is_some();
                 self.status()
             }
             "/savestate" => match q("path") {
@@ -467,6 +479,18 @@ impl Feeder {
                 },
                 None => "{\"error\":\"readable path required\"}".into(),
             },
+            "/savesram" => match q("path") {
+                Some(p) => match std::fs::write(&p, self.core.save_sram()) {
+                    Ok(()) => format!("{{\"ok\":true,\"frame\":{}}}", self.frame),
+                    Err(e) => format!("{{\"error\":{:?}}}", e.to_string()),
+                },
+                None => "{\"error\":\"path required\"}".into(),
+            },
+            "/done" => {
+                // a scripted session is over (the app's smoke stop polls for it); v=0 clears it
+                self.done = q("v").as_deref() != Some("0");
+                self.status()
+            }
             "/quit" => {
                 std::process::exit(0);
             }
@@ -528,6 +552,12 @@ fn percent_decode(s: &str) -> String {
 }
 
 fn main() {
+    // seeking in newer replays (v7) needs more than the main thread's 1 MB of stack
+    let worker = std::thread::Builder::new().name("feeder".into()).stack_size(256 << 20).spawn(run).expect("spawn");
+    let _ = worker.join();
+}
+
+fn run() {
     let mut args = std::env::args().skip(1);
     let mut rom = None;
     let mut replay = None;
@@ -537,10 +567,12 @@ fn main() {
     let mut start = 0u64;
     let mut paused = false;
     let mut until: Option<u64> = None;
+    let mut sav = None;
     while let Some(a) = args.next() {
         match a.as_str() {
             "--rom" => rom = args.next(),
             "--replay" => replay = args.next(),
+            "--sav" => sav = args.next(),
             "--port" => port = args.next().unwrap().parse().unwrap(),
             "--http" => http = args.next().unwrap().parse().unwrap(),
             "--speed" => speed = args.next().unwrap().parse().unwrap(),
@@ -551,13 +583,16 @@ fn main() {
         }
     }
     let rom = std::fs::read(rom.expect("--rom required")).expect("read rom");
-    let replay_path = replay.expect("--replay required");
-    let t = Instant::now();
-    let bytes = std::fs::read(&replay_path).expect("read replay");
-    let player = ReplayFilePlayer::new(bytes, true).expect("parse replay");
-    let total_frames = player.get_total_frames();
-    eprintln!("[feeder] replay v{} {} frames, {} keyframes, parsed in {:.1}s", player.get_replay_version(), total_frames, player.all_keyframes().len(), t.elapsed().as_secs_f64());
-    let core = NintendoDS::new_from_rom(&rom, None, std_timestamp_provider(), false).expect("load rom");
+    let player = replay.map(|replay_path| {
+        let t = Instant::now();
+        let bytes = std::fs::read(&replay_path).expect("read replay");
+        let player = ReplayFilePlayer::new(bytes, true).expect("parse replay");
+        eprintln!("[feeder] replay v{} {} frames, {} keyframes, parsed in {:.1}s", player.get_replay_version(), player.get_total_frames(), player.all_keyframes().len(), t.elapsed().as_secs_f64());
+        player
+    });
+    let total_frames = player.as_ref().map(|p| p.get_total_frames()).unwrap_or(0);
+    let sram = sav.map(|p| std::fs::read(p).expect("read sav"));
+    let core = NintendoDS::new_from_rom(&rom, sram.as_deref(), std_timestamp_provider(), false).expect("load rom");
     let server = PokeAByteIntegrationServer::begin_listen(port).expect("bind poke-a-byte port");
     let mut feeder = Feeder { core, player, server, frame: 0, total_frames, playing: !paused, speed, run_until: None, stalled: false, served_frames: 0, done: false };
     feeder.seek(start).expect("initial seek");

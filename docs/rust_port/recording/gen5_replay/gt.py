@@ -74,7 +74,9 @@ for frame, st, ch in Trace(path):
             tr = battle["trainer"]
             name = TR.get(tr, {}).get("trainer_name") if tr else None
             name2 = TR.get(battle["trainer2"], {}).get("trainer_name") if battle["trainer2"] else None
-            emit(battle["start"], t, "trainer" if tr else "wild", id=tr, name=name, second=name2, fainted=battle["fainted"], lost=lost)
+            # a soft reset also clears the battle word: the party is empty then
+            kind = "reset" if pcount == 0 else "trainer" if tr else "wild"
+            emit(battle["start"], t, kind, id=tr, name=name, second=name2, fainted=battle["fainted"], lost=lost)
         battle = None
     if party and not in_battle:
         mons = [pkm_info(bytes(party[4 + 220 * i: 4 + 220 * (i + 1)]), GAME) for i in range(min(pcount, 6))]

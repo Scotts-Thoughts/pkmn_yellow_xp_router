@@ -23,20 +23,38 @@ back headlessly (see [Checking against real runs](#checking-against-real-runs)).
 | Gym TMs | The leader's TM arrives in the overworld after the battle. | The trainer's `fight_reward` is dropped from the next bag gain (the processing thread's "previous event" check misses it once a held-item event sits in between). |
 | Whiteout | The end-of-battle party update has every HP at 0 and the money reduced; the heal comes ~200 frames later with the warp. | Blackout (plus the trainer-loss flag and the defeated mons for a trainer); the heal that follows is not recorded as a Pokémon Center heal. |
 | Heals | Pokémon Center, Mom, Nurse trainers: every party HP back to max with nothing else changing. | A Heal event when every party member is back at full HP and no item left the bag. |
-| Saves | Every save increments a u16 counter in the footer of each save block. `flags.new_game` is bit 0 of the party block's counter in Black (0x2234EE0) and White (0x2234F00), so it flips on every save. In the Black 2 / White 2 mappers it reads 0x221DA14 (-0x40), which never changes; the party block's counter there is 0x221E958 (White 2) / 0x221E918 (Black 2). | A flip of `flags.new_game` in the overworld is a save, but only when the mapper reads it from one of those four addresses. Otherwise saves are not reported, the user is told once, and a reset leaves a note instead of rolling events back to a save that was never seen. |
-| Resets | A soft reset clears `player.player_id`, the party count and the money within ~60 frames (`meta.state` "No Pokemon"). | `player_id == 0` is a reset. |
+| Saves | Each save block has a u16 save counter in its footer, and a save only rewrites (and counts up) the blocks that changed since the last save. The trainer-info block holds the play time, so every save rewrites it: its counter is at 0x2235014 (Black), 0x2235034 (White), 0x221EA94 (Black 2), 0x221EAD4 (White 2). The stock mappers read `flags.new_game` elsewhere: Black/White read bit 0 of the *party* block's counter (0x2234EE0 / 0x2234F00), which a save with the party exactly as it was at the previous save leaves alone (the White 2 run had two such saves; saving twice in a row does it too); Black 2 / White 2 read 0x221DA14 (-0x40), which never changes. | A flip of `flags.new_game` in the overworld is a save when the mapper reads it from a save counter (trainer-info block, or the party block with the gap above). A mapper that reads it anywhere else cannot report saves: the user is told once. `gen5_mappers_save_counter.patch` points all four mappers at the trainer-info counter. |
+| Resets | A soft reset empties the party (count 0) and the money in one frame. Black/White and White 2 clear `player.player_id` with it; Black 2 keeps it. The save is loaded ~100 frames later, while the title screen is still up (party, money and save counter all back); Black/White have the player id back in the same frame, Black 2 / White 2 read garbage for it (White 2: 8354702 → 0 → 4096 → 3211313 → 0, ~950 frames at the replay's pace, longer if the player waits on the Continue menu) until the game goes on. | `player.team_count == 0` is a reset (the id alone is 0 now and then while B2W2 load). The save file is recognised by its Pokémon (a party PID the recorder knows), not by the player id, and the recorder waits for the real id before going on. What the route keeps is decided when the save loads, by comparing it with the state at the last save seen and the state at the reset: the last save → everything after it goes (the controller's reset rollback); the state at the reset → nothing goes, a save event marks the spot (a save the mapper missed); neither → back to the last save anyway, with a message, or with a mapper that reports no saves only a note. |
 | Areas | Black/White: `overworld.map_index` is the zone id (4 bytes); the mapper names it from the *place-name* list, a different numbering (zone 7, the Striaton Gym, reads "Nacrene City"). Black 2/White 2: `overworld.map_index` is one byte holding the place-name id itself (117 = Aspertia City). | `games/gen5_places.rs`: the zone → place table and the place names read from the ROMs (byte 0x1A of each zone header in `a/0/1/2`; text file 89 / 109 of `a/0/0/2`). |
 
-Verified on Black: the save counter increments exactly once per save (14 saves in
-a 4h23 run), and a scan of the cartridge flash found the same 14 write bursts and
-no others.
+Verified: the trainer-info counter went up once per save on all 14 saves of the
+Black run (a scan of the cartridge flash found the same 14 write bursts and no
+others), all 10 of the White run, all of the White 2 run (including the two the
+party counter missed) and on Black 2, and on a second save made right after the
+first on Black and Black 2, where the party counter stayed put.
+
+Resets, with the patched mappers (September 2026):
+
+* White 2, the real run: saved, beat Veteran Rhona, reset, reloaded (through the
+  garbage player ids), beat her again. The route holds the save and one Rhona.
+  Frames 940k-1062k (Drayden, Plasma, Marlon): every save seen, three resets, each
+  back to the latest save with the one change made since removed.
+* Black, the Krookodile run: two resets in the middle of Elite Four fights, both
+  back to the save before the fight; all 108 trainers match.
+* Black, White and Black 2, scripted (`gen5_replay/scripts/*_resets.txt`, input
+  injected by the feeder): save, toss an item, reset (the toss goes), toss one,
+  save, toss another, reset (the last toss goes), reset again with nothing changed
+  (nothing goes). Each route ends up as save, the second toss, save.
 
 ## Mapper problems worth fixing upstream
 
-* `pokemon_black_2.xml` / `pokemon_white_2.xml`: `flags.new_game` should read the
-  save counter at `0x221E958 - 0x40` / `0x221E958` (`length="1" bits="0"`), like
-  the Black/White mappers read `0x2234EE0`. Until then B2W2 saves are not recorded
-  and resets are not rolled back.
+* All four mappers: `flags.new_game` should read the trainer-info block's save
+  counter (`gen5_mappers_save_counter.patch`, one line per mapper). With the stock
+  Black 2 / White 2 mappers saves are not recorded at all; with the stock Black /
+  White mappers a save made with the party unchanged since the previous save is
+  missed. A reset then rolls back to the save before it, unless nothing changed
+  between the missed save and the reset (the loaded save is then recognised as
+  the state at the reset).
 * `pokemon_black.xml` / `pokemon_white.xml`: `overworld.map_name` looks the zone id
   up in the place-name list (see above).
 * `pokemon_white_2.xml`: `meta.state` can stay at `To Battle` through a battle
@@ -74,10 +92,18 @@ pieces are in `gen5_replay/`:
 
 | Piece | What it is |
 |---|---|
-| `shuckie-feeder/` | A small Rust program on `supershuckie-core`: plays a replay (seek, pace, pause, override the input) and serves the memory to Poke-A-Byte on its own UDP port (`EDPS_MemoryData_<port>.bin`). HTTP control on `--http` (`/status`, `/goto`, `/runto`, `/play`, `/press`, `/read`, `/dump`, `/trace`, `/savescan`, `/screenshot`, …; see the top of `main.rs`). Builds with MSYS2's UCRT64 cargo against a Super Shuckie checkout (paths in `Cargo.toml` / `build.rs`). |
+| `shuckie-feeder/` | A small Rust program on `supershuckie-core`: plays a replay (seek, pace, pause, override the input) and serves the memory to Poke-A-Byte on its own UDP port (`EDPS_MemoryData_<port>.bin`). HTTP control on `--http` (`/status`, `/goto`, `/runto`, `/play`, `/press`, `/read`, `/dump`, `/trace`, `/savescan`, `/screenshot`, `/savestate`, `/loadstate`, `/savesram`, `/done`, …; see the top of `main.rs`). Without `--replay` it boots the ROM from `--sav` (a cartridge save, e.g. one `/savesram` wrote from another game's replay: Black 2 loads White 2's) and only `/press` drives it. Builds with MSYS2's UCRT64 cargo against a Super Shuckie checkout (paths in `Cargo.toml` / `build.rs`). |
 | `pokeabyte-port.patch` | Lets a second Poke-A-Byte run beside the user's: `POKEAPROTOCOL_PORT` (and the matching shared-memory name), `POKEABYTE_CONFIG_DIR`; run it with `ASPNETCORE_URLS=http://localhost:8095`. |
-| `run_rec.py` | Seeks the feeder, (re)loads the mapper, starts the app with `XPR_SMOKE_ACTION=quickstart` (off-screen, without focus) and records until the feeder reaches `--until`. |
+| `run_rec.py` | Seeks the feeder, (re)loads the mapper, starts the app with `XPR_SMOKE_ACTION=quickstart` (off-screen, without focus) and records until the feeder reaches `--until`. With `--script` it plays a `drive.py` step file instead of the replay (`--no-seek` keeps a state loaded with `/loadstate`) and ends with `/done`. |
+| `drive.py`, `scripts/` | Button presses, touch-screen taps and screenshots as steps (`a:4:40`, `tap@64,138:4:150`, `shot:name`); the reset sessions above. Menus differ between the games (Black 2 asks twice before saving, White leaves the "saved the game" box up, the bag remembers its pocket until a reset), so dry-run a script with its screenshots before recording it. |
 | `fx.py`, `g5.py` | Feeder client; gen 5 decoding (party decryption, bag pockets, mapper glossaries). |
-| `gt.py`, `compare.py` | Ground truth from a `/trace` of the same run (battles, faints, losses, bag and money changes) and a comparison with the recorded route. |
+| `gt.py`, `compare.py`, `sample_counters.py` | Ground truth from a `/trace` of the same run (battles, faints, losses, bag and money changes) and a comparison with the recorded route; save counters sampled through a replay. |
 
 A full run at 4x takes about an hour; a trace of one runs at ~300 frames/s.
+
+A long playback can drift from the original run after a soft reset: the White 2
+`/trace` from frame 395k missed two saves (at ~983k and ~1026k) that seeking to the
+replay's keyframes shows, most likely because the game reseeds its RNG from the
+emulated clock. Check the state after a reset with `/goto` (it starts from a
+keyframe) rather than trusting a trace that ran through the reset. `gt.py` marks
+a battle that a reset ended as `reset`, not as a win.

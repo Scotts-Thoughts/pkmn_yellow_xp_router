@@ -89,3 +89,33 @@ about 300 frames a second.
 game with your own input from any frame (a soft reset is
 `/press?keys=l,r,start,select&frames=10`; tap the bottom screen with
 `touch=X,Y`).
+
+## Scripted sessions (saves and resets)
+
+The replays have few resets, and none exist for Black 2, so resets were tested
+with input the feeder injects:
+
+```
+# Black 2: no replay; boot from White 2's cartridge save (/savesram on a White 2 feeder)
+shuckie-feeder --rom "Black2-2026 v1.nds" --sav w2.sav --paused --http 30192 --port 55394
+# get to the overworld once (drive.py steps), then keep that point
+curl "http://127.0.0.1:30192/savestate?path=b2/overworld.state"
+
+# every run: load the state, then record while drive.py plays the script
+curl "http://127.0.0.1:30192/loadstate?path=b2/overworld.state"
+FX_BASE=http://127.0.0.1:30192 py -3.14 run_rec.py --work runs/b2_resets --start 0 --until 40000     --speed 2 --no-seek --script scripts/b2_resets.txt --pab http://127.0.0.1:8098     --mapper STANDARD/gen5/pokemon_black_2.xml --mode record --route "Black 2|Blastoise"
+```
+
+`drive.py <port> <steps>` plays steps such as `a:4:40` (hold A 4 frames, then 40
+idle frames), `l+r+start+select:10:300` (soft reset), `tap@64,138:4:150` (touch
+the bottom screen) and `shot:name` (screenshot to `shots/name.png`); `paced`
+makes the rest run at the feeder's speed. `scripts/*_resets.txt` save, toss an
+item, reset, toss, save, toss, reset and reset again; each expects the route
+to end as save, toss, save. The menus differ per game and the bag remembers its
+pocket until a reset, so dry-run a script against the feeder and look at its
+screenshots before recording it. The states they start from came from
+`b-landorus-1-10502.replay` frame 505300 (Black), `w-basculin-0-13300.replay`
+frame 654000 (White) and White 2's save loaded into Black 2.
+
+`sample_counters.py <port> <from> <to> <step> <addr>...` samples u16s through a
+replay with `/goto` (for the save counters: every save shows as a step).

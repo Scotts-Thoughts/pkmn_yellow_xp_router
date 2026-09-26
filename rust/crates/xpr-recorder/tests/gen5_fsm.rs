@@ -18,7 +18,7 @@ use xpr_recorder::controller::GameRecorder;
 use xpr_recorder::games::gen45::Flavor;
 use xpr_recorder::games::gen5::{Gen5Keys, Gen5Machine};
 use xpr_recorder::host::{HostHandle, PrevEvent, RecorderHost, StartInfo};
-use xpr_recorder::{PropertyStore, RecorderController};
+use xpr_recorder::{GameState, PropertyStore, RecorderController};
 
 #[derive(Default)]
 struct Log {
@@ -129,7 +129,9 @@ impl RecorderHost for FakeHost {
 }
 
 const SOLO_PID: i64 = 3321910785;
-const SAVE_FLAG_ADDRESS: i64 = 0x2234EE0;
+const PLAYER_ID: i64 = 43059;
+/// `flags.new_game` read from the trainer-info block's save counter (Black)
+const SAVE_FLAG_ADDRESS: i64 = 0x2235014;
 
 /// A Black mapper property list: the solo Tepig in slot 1, a small bag.
 fn mapper(save_flag_address: i64) -> Value {
@@ -137,7 +139,7 @@ fn mapper(save_flag_address: i64) -> Value {
     let mut add = |path: &str, value: Value| props.push(json!({"path": path, "value": value}));
     for (path, value) in [
         ("meta.state", json!("Overworld")),
-        ("player.player_id", json!(43059)),
+        ("player.player_id", json!(PLAYER_ID)),
         ("player.team_count", json!(1)),
         ("bag.money", json!(3000)),
         ("overworld.map_name", json!("Nuvema Town")),
@@ -245,6 +247,18 @@ impl Sim {
         self.batch(&[("battle.other.battle", json!(0)), ("battle.other.battle_end", json!(0)), ("battle.opponent.id", json!(550))]);
         self.settle();
     }
+    /// A soft reset: the player id, the party and the money are cleared together.
+    fn reset(&mut self) {
+        self.batch(&[("player.player_id", json!(0)), ("player.team_count", json!(0)), ("bag.money", json!(0))]);
+        self.settle();
+    }
+    /// The save loads: `state` on top of the party slot the reset left.
+    fn load(&mut self, state: &[(&str, Value)]) {
+        let mut changes: Vec<(&str, Value)> = vec![("player.team_count", json!(1)), ("player.player_id", json!(PLAYER_ID))];
+        changes.extend(state.iter().cloned());
+        self.batch(&changes);
+        self.settle();
+    }
 }
 
 fn wait_for(log: &Arc<Mutex<Log>>, what: &str, pred: impl Fn(&Log) -> bool) {
@@ -260,21 +274,25 @@ fn wait_for(log: &Arc<Mutex<Log>>, what: &str, pred: impl Fn(&Log) -> bool) {
 }
 
 fn setup(save_flag_address: i64) -> (Arc<Mutex<Log>>, Sim, Arc<RecorderController>) {
+    setup_game("Black", Flavor::BlackWhite, save_flag_address)
+}
+
+fn setup_game(version: &str, flavor: Flavor, save_flag_address: i64) -> (Arc<Mutex<Log>>, Sim, Arc<RecorderController>) {
     let root = xpr_core::consts::find_source_root().expect("source root");
     let reg = Arc::new(Registry::new(root.join("raw_pkmn_data"), PathBuf::new()));
-    let gen = reg.get_version("Black").expect("black");
+    let gen = reg.get_version(version).expect("version");
     let log = Arc::new(Mutex::new(Log::default()));
     let host = FakeHost { gen: gen.clone(), log: log.clone() };
     let controller = RecorderController::new(HostHandle::direct(Box::new(host)), Arc::new(|| {}));
     let info = StartInfo {
-        version: "Black".into(),
+        version: version.into(),
         gen: gen.clone(),
         url: String::new(),
         debug_mode: false,
         dvs: Some(gen.make_stat_block(31, 31, 31, 31, 31, 31, false)),
         solo_species: Some("Tepig".into()),
     };
-    let mut machine = Gen5Machine::new(controller.clone(), &info, Flavor::BlackWhite);
+    let mut machine = Gen5Machine::new(controller.clone(), &info, flavor);
     let store = PropertyStore::from_mapper(&mapper(save_flag_address)).unwrap();
     let (watch, invalid) = machine.on_mapper_loaded(&store);
     assert!(invalid.is_empty(), "invalid keys: {:?}", invalid);
@@ -282,7 +300,7 @@ fn setup(save_flag_address: i64) -> (Arc<Mutex<Log>>, Sim, Arc<RecorderControlle
     machine.startup(&store);
     let mut sim = Sim { store, machine };
     sim.settle(); // UNINITIALIZED -> OVERWORLD
-    assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Overworld));
+    assert_eq!(controller.get_game_state(), Some(GameState::Overworld));
     (log, sim, controller)
 }
 
@@ -437,24 +455,142 @@ fn black_session_records_what_the_game_did() {
         assert_eq!(l.events.iter().filter(|(_, d)| d.heal.is_some()).count(), 1);
     }
 
-    // a soft reset: back to the save
-    sim.batch(&[("player.player_id", json!(0)), ("player.team_count", json!(0)), ("bag.money", json!(0))]);
-    sim.settle();
+    // a soft reset, and the save made after the heal loads: everything after it goes
+    sim.reset();
+    sim.load(&[
+        ("player.team.0.species", json!("Tepig")),
+        ("player.team.0.level", json!(10)),
+        ("player.team.0.exp", json!(700)),
+        ("player.team.0.moves.0.move", json!("Tackle")),
+        ("player.team.0.moves.3.move", json!("Odor Sleuth")),
+        ("player.team.0.stats.hp_max", json!(35)),
+        ("player.team.0.stats.hp", json!(35)),
+        ("bag.money", json!(3112)),
+    ]);
     wait_for(&log, "reset", |l| l.events.last().map(|(_, d)| d.save.is_some()).unwrap_or(false));
+    let l = log.lock().unwrap();
+    assert!(!l.events.iter().any(|(_, d)| d.wild_pkmn_info.is_some() || d.blackout.is_some() || d.evolution.is_some()), "the fights after the save are gone");
+    assert_eq!(trainer_names(&l), vec!["Youngster Jimmy".to_string()]);
+}
+
+fn potions(log: &Log) -> usize {
+    log.events.iter().filter(|(_, d)| d.item_event_def.as_ref().map(|i| i.item_name == "Potion").unwrap_or(false)).count()
+}
+
+fn saves(log: &Log) -> usize {
+    log.events.iter().filter(|(_, d)| d.save.is_some()).count()
 }
 
 #[test]
-fn a_save_flag_read_from_elsewhere_does_not_roll_back_resets() {
+fn a_white_2_reset_waits_for_the_real_player_id() {
+    let (log, mut sim, controller) = setup_game("White 2", Flavor::Black2White2, 0x221EAD4);
+    assert!(log.lock().unwrap().messages.is_empty(), "saves can be seen");
+    // a Potion bought, the game saved, another Potion bought
+    sim.batch(&[("bag.medicine.0.quantity", json!(3)), ("bag.money", json!(2700))]);
+    sim.settle();
+    sim.batch(&[("flags.new_game", json!(false))]);
+    sim.settle();
+    sim.batch(&[("bag.medicine.0.quantity", json!(4)), ("bag.money", json!(2400))]);
+    sim.settle();
+    wait_for(&log, "purchases", |l| potions(l) == 2);
+    let ready = controller.is_ready();
+
+    // the save loads while the title screen is up; the player id reads garbage
+    // (and 0 now and then) until the game goes on
+    sim.reset();
+    sim.batch(&[("player.team_count", json!(1)), ("bag.medicine.0.quantity", json!(3)), ("bag.money", json!(2700)), ("flags.new_game", json!(true))]);
+    sim.settle();
+    for id in [8354702, 0, 4096, 49, 0] {
+        sim.batch(&[("player.player_id", json!(id))]);
+        sim.settle();
+        assert_eq!(controller.get_game_state(), Some(GameState::Resetting), "player id {}", id);
+    }
+    sim.batch(&[("player.player_id", json!(PLAYER_ID))]);
+    sim.settle();
+    assert_eq!(controller.get_game_state(), Some(GameState::Overworld));
+    wait_for(&log, "back to the save", |l| l.events.last().map(|(_, d)| d.save.is_some()).unwrap_or(false) && potions(l) == 1);
+    assert_eq!(controller.is_ready(), ready, "the route was not restarted");
+
+    // the id reads 0 for a moment with the party still there: not a reset
+    sim.batch(&[("player.player_id", json!(0))]);
+    sim.batch(&[("player.player_id", json!(PLAYER_ID))]);
+    sim.settle();
+    assert_eq!(controller.get_game_state(), Some(GameState::Overworld));
+    std::thread::sleep(Duration::from_millis(250));
+    assert_eq!(saves(&log.lock().unwrap()), 1);
+}
+
+#[test]
+fn a_black_2_reset_keeps_the_player_id() {
+    let (log, mut sim, controller) = setup_game("Black 2", Flavor::Black2White2, 0x221EA94);
+    sim.batch(&[("flags.new_game", json!(false))]);
+    sim.settle();
+    sim.batch(&[("bag.medicine.0.quantity", json!(1))]);
+    sim.settle();
+    wait_for(&log, "potion", |l| potions(l) == 1);
+    // only the party and the money are cleared; the id turns to garbage after the save loads
+    sim.batch(&[("player.team_count", json!(0)), ("bag.money", json!(0))]);
+    sim.settle();
+    assert_eq!(controller.get_game_state(), Some(GameState::Resetting));
+    sim.batch(&[("player.team_count", json!(1)), ("bag.money", json!(3000)), ("bag.medicine.0.quantity", json!(2))]);
+    for id in [31630, 0, 4096, 49] {
+        sim.batch(&[("player.player_id", json!(id))]);
+        sim.settle();
+        assert_eq!(controller.get_game_state(), Some(GameState::Resetting), "player id {}", id);
+    }
+    sim.batch(&[("player.player_id", json!(PLAYER_ID))]);
+    sim.settle();
+    wait_for(&log, "back to the save", |l| potions(l) == 0 && l.events.last().map(|(_, d)| d.save.is_some()).unwrap_or(false));
+}
+
+#[test]
+fn a_save_the_mapper_missed_is_found_when_the_game_loads_it() {
+    // the Black and White mappers read the party block's save counter, which
+    // a save with the party as it was at the previous save leaves alone
+    let (log, mut sim, _controller) = setup(0x2234EE0);
+    assert!(log.lock().unwrap().messages.is_empty());
+    sim.batch(&[("flags.new_game", json!(false))]);
+    sim.settle();
+    sim.batch(&[("bag.medicine.0.quantity", json!(3)), ("bag.money", json!(2700))]);
+    sim.settle();
+    wait_for(&log, "purchase", |l| potions(l) == 1);
+    // saved again (unseen), then reset: the save that loads has the Potion
+    sim.reset();
+    sim.load(&[("bag.medicine.0.quantity", json!(3)), ("bag.money", json!(2700))]);
+    wait_for(&log, "the missed save", |l| saves(l) == 2);
+    let l = log.lock().unwrap();
+    assert!(l.events.last().unwrap().1.save.is_some());
+    assert_eq!(potions(&l), 1, "the purchase was saved");
+}
+
+#[test]
+fn without_saves_a_reset_is_undone_only_when_the_loaded_save_is_known() {
     // the Black 2 / White 2 mappers read `flags.new_game` from a byte that never changes
     let (log, mut sim, _controller) = setup(0x221DA14);
     assert_eq!(log.lock().unwrap().messages.len(), 1, "the user is told that saves cannot be seen");
+
+    // a reset loads the state from before it: that is where the game was saved
+    sim.reset();
+    sim.load(&[("bag.money", json!(3000))]);
+    wait_for(&log, "save found by the reset", |l| saves(l) == 1);
+
+    // a Potion used, then a reset loads that save again: the Potion comes back
     sim.batch(&[("bag.medicine.0.quantity", json!(1))]);
     sim.settle();
-    sim.batch(&[("player.player_id", json!(0)), ("player.team_count", json!(0))]);
+    wait_for(&log, "potion", |l| potions(l) == 1);
+    sim.reset();
+    sim.load(&[("bag.money", json!(3000)), ("bag.medicine.0.quantity", json!(2))]);
+    wait_for(&log, "rolled back", |l| potions(l) == 0);
+
+    // a Potion used, saved without being seen after another one, then a reset:
+    // the loaded save is no state the recorder knows, so it only leaves a note
+    sim.batch(&[("bag.medicine.0.quantity", json!(1))]);
     sim.settle();
+    wait_for(&log, "potion again", |l| potions(l) == 1);
+    sim.reset();
+    sim.load(&[("bag.money", json!(3000)), ("bag.medicine.0.quantity", json!(0))]);
     wait_for(&log, "reset note", |l| l.events.iter().any(|(_, d)| d.notes.contains("The game was reset")));
-    let l = log.lock().unwrap();
-    assert!(l.events.iter().any(|(_, d)| d.item_event_def.as_ref().map(|i| i.item_name == "Potion").unwrap_or(false)), "nothing was rolled back");
+    assert_eq!(potions(&log.lock().unwrap()), 1, "nothing was rolled back");
 }
 
 #[test]

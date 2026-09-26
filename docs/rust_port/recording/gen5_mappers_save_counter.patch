@@ -1,0 +1,44 @@
+--- a/STANDARD/gen5/pokemon_black.xml
++++ b/STANDARD/gen5/pokemon_black.xml
+@@ -783,7 +783,7 @@
+ 			</encounter_tables>
+         </overworld>
+ 		<flags>
+-			<property name="new_game" type="bool" address="0x2234EE0 + {version_offset}" length="1" bits="0"/>
++			<property name="new_game" type="bool" address="0x2235014 + {version_offset}" length="1" bits="0"/>
+ 			<property name="0x4030" type="int" address="0x223BD0C + (2 * 0) + {version_offset}"  length="2" />
+ 			<property name="0x4031" type="int" address="0x223BD0C + (2 * 1) + {version_offset}"  length="2" />
+ 			<property name="0x4032" type="int" address="0x223BD0C + (2 * 2) + {version_offset}"  length="2" />
+--- a/STANDARD/gen5/pokemon_white.xml
++++ b/STANDARD/gen5/pokemon_white.xml
+@@ -783,7 +783,7 @@
+ 			</encounter_tables>
+         </overworld>
+ 		<flags>
+-			<property name="new_game" type="bool" address="0x2234EE0 + {version_offset}" length="1" bits="0"/>
++			<property name="new_game" type="bool" address="0x2235014 + {version_offset}" length="1" bits="0"/>
+ 			<property name="0x4030" type="int" address="0x223BD0C + (2 * 0) + {version_offset}"  length="2" />
+ 			<property name="0x4031" type="int" address="0x223BD0C + (2 * 1) + {version_offset}"  length="2" />
+ 			<property name="0x4032" type="int" address="0x223BD0C + (2 * 2) + {version_offset}"  length="2" />
+--- a/STANDARD/gen5/pokemon_black_2.xml
++++ b/STANDARD/gen5/pokemon_black_2.xml
+@@ -905,7 +905,7 @@
+ 			</encounter_tables>
+         </overworld>
+ 		<flags>
+-			<property name="new_game" type="bool" address="0x221DA14 - 0x40" length="1" bits="0"/>
++			<property name="new_game" type="bool" address="0x221EAD4 - 0x40" length="1" bits="0"/>
+ 			<!--
+ 				Where are the Black/White flags located?
+ 
+--- a/STANDARD/gen5/pokemon_white_2.xml
++++ b/STANDARD/gen5/pokemon_white_2.xml
+@@ -905,7 +905,7 @@
+ 			</encounter_tables>
+         </overworld>
+ 		<flags>
+-			<property name="new_game" type="bool" address="0x221DA14" length="1" bits="0"/>
++			<property name="new_game" type="bool" address="0x221EAD4" length="1" bits="0"/>
+ 			<!--
+ 				Where are the Black/White flags located?
+ 
