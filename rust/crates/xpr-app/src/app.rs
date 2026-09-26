@@ -1176,12 +1176,15 @@ impl XprApp {
 
     fn select_gym_leader(&mut self, idx: usize) {
         let Some(gen) = self.ctrl.gen() else { return };
-        let names = gen.get_gym_leader_names();
-        if idx >= names.len() {
+        let entries = gen.get_gym_leader_entries();
+        if idx >= entries.len() {
             return;
         }
-        if let Some(eid) = self.ctrl.find_first_event_by_trainer_name(&names[idx]) {
-            self.ctrl.select_new_events(vec![eid]);
+        for name in entries[idx].names() {
+            if let Some(eid) = self.ctrl.find_first_event_by_trainer_name(&name) {
+                self.ctrl.select_new_events(vec![eid]);
+                return;
+            }
         }
     }
 

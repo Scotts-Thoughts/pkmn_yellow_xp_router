@@ -73,8 +73,14 @@ Resets, with the patched mappers (September 2026):
   depend on the route's level then fail: a TM taught over a level-up move the
   route's mon has not reached yet reports "Mon didn't have X", and purchases can
   exceed the route's (lower) money.
-* Gym TMs in Black 2 / White 2: `fights_info.json` keyed the rewards by Black/White
-  names; the B2W2 leaders (`Leader Roxie (157)`, …) are now listed too.
+* `raw_pkmn_data/gen_five/fights_info.json` is shared by both games and names
+  trainers exactly as the trainer data does (`Leader Cheren (156)`,
+  `⒆⒇ Trainer Rival (163)`): the major-fight categories (highlight colours, run
+  summary, Major Battles filter), the badges and the gym TMs. It used to list bare
+  names ("Cheren", "Hugh"), so no gen 5 fight was highlighted and no badge was
+  awarded. Black 2 / White 2's Challenge Mode leaders and league are listed too; the
+  gym and Elite Four hotkeys take whichever variant the route has
+  (`GenData::get_gym_leader_entries`).
 * Wings (+1 EV items) are recorded as plain item use: the engine has no wing
   support.
 * Tag / multi battles (a second opponent): both trainers are recorded, but the

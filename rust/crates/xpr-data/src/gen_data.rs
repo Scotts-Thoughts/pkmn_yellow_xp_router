@@ -279,14 +279,37 @@ impl GenData {
                     filter_by(&["Roark", "Gardenia", "Maylene", "Wake", "Fantina", "Byron", "Candice", "Volkner"])
                 }
             }
-            Gen::Five => {
-                let unova: Vec<&str> = if self.is_bw2() {
-                    vec!["Cheren", "Roxie", "Burgh", "Elesa", "Clay", "Skyla", "Drayden", "Marlon"]
-                } else {
-                    vec!["Chili", "Cilan", "Cress", "Lenora", "Burgh", "Elesa", "Clay", "Skyla", "Brycen", "Drayden", "Iris"]
-                };
-                sort_by_keys(filter_by(&unova), &unova)
-            }
+            Gen::Five => self.get_gym_leader_entries().iter().flat_map(|e| e.names()).collect(),
+        }
+    }
+
+    /// One entry per gym, in order, for the gym hotkeys: every fight that gym
+    /// can be. Black/White's Striaton gym is one of three leaders and its last
+    /// gym is Drayden or Iris; Black 2 / White 2 have a Challenge Mode team for
+    /// every leader. Before gen 5 each gym is one name.
+    pub fn get_gym_leader_entries(&self) -> Vec<E4Entry> {
+        if self.gen != Gen::Five {
+            return self.get_gym_leader_names().into_iter().map(E4Entry::Single).collect();
+        }
+        let gyms: &[&[&str]] = if self.is_bw2() {
+            &[&["Cheren"], &["Roxie"], &["Burgh"], &["Elesa"], &["Clay"], &["Skyla"], &["Drayden"], &["Marlon"]]
+        } else {
+            &[&["Chili", "Cilan", "Cress"], &["Lenora"], &["Burgh"], &["Elesa"], &["Clay"], &["Skyla"], &["Brycen"], &["Drayden", "Iris"]]
+        };
+        let leaders = self.category(consts::FIGHT_CATEGORY_GYM_LEADER);
+        gyms.iter()
+            .filter_map(|keys| self.entry_of(leaders.iter().filter(|n| keys.iter().any(|k| n.contains(k)))))
+            .collect()
+    }
+
+    /// The names of this version's trainers among `names` (the fight lists
+    /// cover both games of a generation) as one entry, `None` when there are none.
+    fn entry_of<'a>(&self, names: impl Iterator<Item = &'a String>) -> Option<E4Entry> {
+        let mut own: Vec<String> = names.filter(|n| self.trainer_db.get_trainer(n).is_some()).cloned().collect();
+        match own.len() {
+            0 => None,
+            1 => own.pop().map(E4Entry::Single),
+            _ => Some(E4Entry::Alternatives(own)),
         }
     }
 
@@ -358,11 +381,13 @@ impl GenData {
                 }
             }
             Gen::Five => {
-                let order = ["Shauntal", "Marshal", "Grimsley", "Caitlin"];
-                let mut e4 = filter(&all_e4, &order);
-                e4.sort_by_key(|n| order.iter().position(|k| n.contains(k)).unwrap_or(99));
-                let mut r = singles(&e4);
-                r.extend(singles(&all_champ));
+                // each member (and the champion) once, with their rematch and
+                // Challenge Mode teams as alternatives, first battle first
+                let mut r: Vec<E4Entry> = ["Shauntal", "Marshal", "Grimsley", "Caitlin"]
+                    .iter()
+                    .filter_map(|k| self.entry_of(all_e4.iter().filter(|n| n.contains(k))))
+                    .collect();
+                r.extend(self.entry_of(all_champ.iter()));
                 r
             }
         }
