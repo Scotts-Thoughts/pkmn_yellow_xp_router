@@ -70,3 +70,11 @@ the Hall of Fame autosave so the "reset" has nothing to roll back).
   detection client for the real recorder once the starter has been read.
 * `Recorded Time` comes from Super Shuckie's live timer, so it differs between
   runs when Super Shuckie happens to be running.
+
+## Gen 6 and later
+
+[gen6plus_mappers.md](gen6plus_mappers.md) is the plan for adding a recorder
+for a game past gen 5: what the gen 3/4/5 recorders detect and from which
+mapper property, the properties a new mapper must offer (named like gen 5's so
+`gen5.rs` can be reused), the state of the gen 6/7 mappers in the mapper repo,
+and the procedure and measurements to make before writing the machine.

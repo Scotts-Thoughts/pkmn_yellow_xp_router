@@ -1009,6 +1009,10 @@ and a screenshot in the PR. Estimates assume one developer.
 
 ### Phase 7 — Gen 4/5 (deferred; own spec)
 
+> 2026-09-26: pokemap now renders all five DS games (commit `9ff6859`), so the
+> image-source blocker below is gone. What pokemap must export for parity
+> (pack format 2, linking rules, gaps) is in `GEN45_REQUIREMENTS.md`.
+
 Blocked on an image source that can be shipped: run pokemap's apicula/trimesh
 renderer for Platinum (and write the missing Diamond/Pearl and HGSS pipelines)
 or another ROM-derived render; Bulbapedia images are out (§2.7). Also: fix
