@@ -68,12 +68,26 @@ struct QuantityEditor {
     opened_frame: bool,
 }
 
+/// A press on a folder or event row, which becomes a drag once the pointer
+/// moves `DRAG_THRESHOLD` away with the button still down.
 #[derive(Clone, Debug)]
 struct DragState {
+    /// The row the press landed on, and the modifiers held then.
+    row: NodeId,
+    modifiers: egui::Modifiers,
+    /// The events being moved, in route order (set when the drag starts).
     ids: Vec<NodeId>,
     start: Pos2,
     active: bool,
 }
+
+/// How far a press must move to become a drag (egui's click distance, so a
+/// release short of it is still a click).
+const DRAG_THRESHOLD: f32 = 6.0;
+/// While dragging, the pointer this close to the top or bottom of the rows
+/// scrolls the list, faster the closer it gets (points per second at most).
+const AUTOSCROLL_MARGIN: f32 = 24.0;
+const AUTOSCROLL_SPEED: f32 = 900.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum DropPos {
@@ -757,7 +771,10 @@ impl RouteList {
             // shifted by the horizontal scroll offset so the columns line up.
             let (header_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), HEADER_HEIGHT), Sense::hover());
             let avail_h = ui.available_height();
-            let mut area = egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h);
+            // No drag-to-scroll: a drag on the rows moves events, and the
+            // rows only sense hover, so egui would hand the drag to the
+            // scroll area and scroll the list along with the pointer.
+            let mut area = egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h).scroll_source(egui::scroll_area::ScrollSource { drag: false, ..egui::scroll_area::ScrollSource::ALL });
             if let Some(offset) = self.export_scroll {
                 area = area.scroll_offset(offset);
             }
@@ -777,10 +794,18 @@ impl RouteList {
                 let pointer = if blocked { None } else { ui.input(|i| i.pointer.interact_pos()) };
                 let primary_clicked = !blocked && ui.input(|i| i.pointer.primary_clicked());
                 let secondary_clicked = !blocked && ui.input(|i| i.pointer.secondary_clicked());
+                // A drag starts on the press: egui reports a click on release.
+                let primary_pressed = !blocked && ui.input(|i| i.pointer.primary_pressed());
                 let primary_down = ui.input(|i| i.pointer.primary_down());
+                let dragging = self.drag.as_ref().map(|d| d.active).unwrap_or(false);
+                if dragging {
+                    // found again below if the pointer is still on a row
+                    self.drop_target = None;
+                }
                 let modifiers = ui.input(|i| i.modifiers);
                 let mut hovered_now: Option<NodeId> = None;
-                let mut clicked_row: Option<(usize, Rect)> = None;
+                let mut clicked_row: Option<usize> = None;
+                let mut pressed_row: Option<usize> = None;
                 let mut right_clicked_row: Option<usize> = None;
                 let mut toggle_check: Option<NodeId> = None;
                 let mut toggle_expand: Option<usize> = None;
@@ -952,7 +977,10 @@ impl RouteList {
                         if rect.contains(p) && clip.contains(p) {
                             let on_plus = plus_btn_rect.map(|r| r.contains(p)).unwrap_or(false);
                             if primary_clicked && !check_rect.contains(p) && !branch_rect.contains(p) && !on_plus {
-                                clicked_row = Some((idx, rect));
+                                clicked_row = Some(idx);
+                            }
+                            if primary_pressed && !check_rect.contains(p) && !branch_rect.contains(p) && !on_plus && matches!(row.kind, RowKind::Folder | RowKind::Group) {
+                                pressed_row = Some(idx);
                             }
                             if secondary_clicked {
                                 right_clicked_row = Some(idx);
@@ -963,7 +991,7 @@ impl RouteList {
                     if let Some(drag) = &self.drag {
                         if drag.active {
                             if let Some(p) = pointer {
-                                if rect.contains(p) {
+                                if rect.contains(p) && clip.contains(p) {
                                     let pos = if row.kind == RowKind::Folder && (p.y - rect.min.y) > h * 0.25 && (rect.max.y - p.y) > h * 0.25 {
                                         DropPos::On
                                     } else if p.y < rect.center().y {
@@ -1059,7 +1087,7 @@ impl RouteList {
                     let w = (srect.width() + 16.0).max(45.0);
                     let erect = Rect::from_min_size(Pos2::new(srect.center().x - w / 2.0, srect.min.y), Vec2::new(w, srect.height()));
                     self.quantity_editor = Some(QuantityEditor { group_id: gid, text: qty.to_string(), rect: erect, opened_frame: true });
-                } else if let Some((idx, rect)) = clicked_row {
+                } else if let Some(idx) = clicked_row {
                     let row = self.rows[idx].clone();
                     self.close_quantity_editor(ctrl);
                     self.focused = true;
@@ -1074,13 +1102,6 @@ impl RouteList {
                         }
                     } else {
                         self.select_row_click(ctrl, row.id, modifiers);
-                        // start a potential drag
-                        if row.kind == RowKind::Folder || row.kind == RowKind::Group {
-                            let ids = self.get_all_selected_event_ids(ctrl, false);
-                            if !ids.is_empty() {
-                                self.drag = Some(DragState { ids, start: pointer.unwrap_or(rect.min), active: false });
-                            }
-                        }
                     }
                 } else if let Some(idx) = right_clicked_row {
                     let row = self.rows[idx].clone();
@@ -1114,26 +1135,46 @@ impl RouteList {
                         self.remove_inline_creator(actions);
                     }
                 }
-                // drag progress / release
-                if let Some(drag) = self.drag.as_mut() {
-                    if primary_down {
-                        if let Some(p) = pointer {
-                            if !drag.active && (p - drag.start).length() > 6.0 {
-                                drag.active = true;
-                            }
-                        }
-                    } else {
-                        let d = self.drag.take().unwrap();
-                        if d.active {
-                            if let Some(target) = self.drop_target.take() {
-                                self.finish_drop(ctrl, &d.ids, target);
-                            }
-                        }
-                        self.drop_target = None;
+                // drag: press, start, release
+                if let (Some(idx), Some(p)) = (pressed_row, pointer) {
+                    self.drag = Some(DragState { row: self.rows[idx].id, modifiers, ids: Vec::new(), start: p, active: false });
+                    self.drop_target = None;
+                }
+                if primary_down {
+                    let start = match (&self.drag, pointer) {
+                        (Some(d), Some(p)) => !d.active && (p - d.start).length() > DRAG_THRESHOLD,
+                        _ => false,
+                    };
+                    if start {
+                        self.start_drag(ctrl);
                     }
+                } else if let Some(d) = self.drag.take() {
+                    if d.active {
+                        if let Some(target) = self.drop_target.take() {
+                            self.finish_drop(ctrl, &d.ids, target);
+                        }
+                    }
+                    self.drop_target = None;
                 }
                 if self.drag.as_ref().map(|d| d.active).unwrap_or(false) {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                    // scroll near the top or bottom edge, also while the pointer rests there
+                    if let Some(p) = pointer {
+                        if p.x >= clip.min.x && p.x <= clip.max.x {
+                            let up = (clip.min.y + AUTOSCROLL_MARGIN - p.y) / AUTOSCROLL_MARGIN;
+                            let down = (p.y - (clip.max.y - AUTOSCROLL_MARGIN)) / AUTOSCROLL_MARGIN;
+                            let dt = ui.input(|i| i.stable_dt).min(0.1);
+                            let step = AUTOSCROLL_SPEED * dt;
+                            if up > 0.0 {
+                                ui.scroll_with_delta(Vec2::new(0.0, step * up.min(1.0)));
+                            } else if down > 0.0 {
+                                ui.scroll_with_delta(Vec2::new(0.0, -step * down.min(1.0)));
+                            }
+                            if up > 0.0 || down > 0.0 {
+                                ui.ctx().request_repaint();
+                            }
+                        }
+                    }
                 }
                 // quantity editor overlay
                 if let Some(qe) = self.quantity_editor.as_mut() {
@@ -1352,6 +1393,27 @@ impl RouteList {
             return;
         }
         ctrl.update_existing_event(qe.group_id, def);
+    }
+
+    /// The press has moved far enough to be a drag. As in Qt, a press on a
+    /// selected row drags the whole selection; any other row is selected
+    /// first (with the press's modifiers) and dragged with what that leaves
+    /// selected.
+    fn start_drag(&mut self, ctrl: &mut MainController) {
+        let Some((row, modifiers)) = self.drag.as_ref().map(|d| (d.row, d.modifiers)) else { return };
+        if !self.selection.contains(&row) {
+            self.select_row_click(ctrl, row, modifiers);
+        }
+        let mut ids = self.get_all_selected_event_ids(ctrl, false);
+        // keep their order in the route, not the order they were selected in
+        ids.sort_by_key(|id| self.rows.iter().position(|r| r.id == *id).unwrap_or(usize::MAX));
+        match self.drag.as_mut() {
+            Some(d) if !ids.is_empty() => {
+                d.ids = ids;
+                d.active = true;
+            }
+            _ => self.drag = None,
+        }
     }
 
     /// `_resolve_drop_target` + `move_events_to_position`

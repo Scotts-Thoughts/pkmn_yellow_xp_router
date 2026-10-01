@@ -125,6 +125,22 @@ impl Harness {
         self.frame(vec![button(false)]);
     }
 
+    /// Press at `from`, move to `to` over a few frames, release there.
+    fn drag(&mut self, from: Pos2, to: Pos2) {
+        let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
+        self.frame(vec![Event::PointerMoved(from), button(from, true)]);
+        for i in 1..=8 {
+            self.frame(vec![Event::PointerMoved(from + (to - from) * (i as f32 / 8.0))]);
+        }
+        self.frame(vec![button(to, false)]);
+    }
+
+    /// The events in the same folder as `id`, in order.
+    fn siblings(&self, id: i64) -> Vec<i64> {
+        let parent = self.ctrl.router.parent_of(id).expect("the event has a folder");
+        self.ctrl.router.children_of(parent)
+    }
+
     fn press(&mut self, key: Key) {
         self.frame(vec![Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }]);
     }
@@ -170,6 +186,44 @@ fn clicks_and_keys_on_a_dialog_do_not_reach_the_route_list() {
 }
 
 #[test]
+fn a_drag_on_a_dialog_does_not_move_route_list_rows() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    // rows 3-6 are the four events of the Viridian City folder
+    h.click(Harness::row_pos(3, 300.0));
+    let event = h.selected()[0];
+    let before = h.siblings(event);
+
+    h.open_dialog();
+    let dialog = h.dialog_rect();
+    // across the dialog, over the rows under it
+    let top = ((dialog.min.y + 10.0 - 31.0) / ROW_HEIGHT).ceil() as usize;
+    let (from, to) = (Harness::row_pos(top, dialog.min.x + 4.0), Harness::row_pos(top + 3, dialog.min.x + 4.0));
+    assert!(dialog.contains(from) && dialog.contains(to), "{dialog:?} covers the drag");
+    h.drag(from, to);
+    // and across the backdrop beside it
+    h.drag(Harness::row_pos(3, 100.0), Harness::row_pos(6, 100.0));
+    assert_eq!(h.siblings(event), before, "a drag that starts under a dialog moves nothing");
+
+    // a press on the backdrop, then Escape with the button still down: the
+    // rest of the drag is no longer under the dialog, but its press was
+    let (from, to) = (Harness::row_pos(3, 100.0), Harness::row_pos(5, 100.0));
+    let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
+    h.frame(vec![Event::PointerMoved(from), button(from, true)]);
+    h.press(Key::Escape);
+    assert!(h.dialog.is_none(), "Escape cancels the dialog");
+    for i in 1..=8 {
+        h.frame(vec![Event::PointerMoved(from + (to - from) * (i as f32 / 8.0))]);
+    }
+    h.frame(vec![button(to, false)]);
+    assert_eq!(h.siblings(event), before, "a press under a dialog does not become a drag once it closes");
+
+    // with the dialog gone the same drag moves the event
+    h.close_dialog();
+    h.drag(Harness::row_pos(3, 100.0), Harness::row_pos(5, 100.0));
+    assert_ne!(h.siblings(event), before, "with the dialog gone a drag moves the event");
+}
+
+#[test]
 fn clicks_while_a_menu_is_open_do_not_reach_the_route_list() {
     let mut h = Harness::new("yellow-pinsir-lv10brock.json");
     h.menu_bar = true;
@@ -198,6 +252,30 @@ fn clicks_while_a_menu_is_open_do_not_reach_the_route_list() {
     h.click(Harness::row_pos(3, 600.0));
     let after = h.selected();
     assert!(!after.is_empty() && after != before, "with the menu closed a click selects again");
+}
+
+#[test]
+fn a_drag_while_a_menu_is_open_does_not_move_route_list_rows() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    h.menu_bar = true;
+    h.frame(vec![]);
+    // rows 3-6 are the four events of the Viridian City folder
+    h.click(Harness::row_pos(3, 600.0));
+    let event = h.selected()[0];
+    let before = h.siblings(event);
+
+    let button = h.menu_button.expect("the menu bar is drawn");
+    h.click(button.center());
+    assert!(egui::Popup::is_any_open(&h.ctx), "the menu opened");
+    h.drag(Harness::row_pos(3, 600.0), Harness::row_pos(5, 600.0));
+    assert!(egui::Popup::is_any_open(&h.ctx), "a drag is not the click that closes a menu");
+    assert_eq!(h.siblings(event), before, "a drag under an open menu moves nothing");
+
+    // with the menu closed the same drag moves the event
+    h.click(Harness::row_pos(8, 600.0));
+    assert!(!egui::Popup::is_any_open(&h.ctx), "the click closed the menu");
+    h.drag(Harness::row_pos(3, 600.0), Harness::row_pos(5, 600.0));
+    assert_ne!(h.siblings(event), before, "with the menu closed a drag moves the event");
 }
 
 #[test]

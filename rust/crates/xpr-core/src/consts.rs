@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-pub const APP_VERSION: &str = "v6.0a";
+pub const APP_VERSION: &str = "v6.0b";
 pub const APP_RELEASE_DATE: &str = "2026-Sep-11";
 /// The Python release this port reproduces (used by the golden tooling).
 pub const REFERENCE_APP_VERSION: &str = "v5.0a";
