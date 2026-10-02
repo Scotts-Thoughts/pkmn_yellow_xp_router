@@ -3,6 +3,10 @@
 //! which are pipeline inputs/outputs, not runtime data) into `OUT_DIR` and
 //! generate the lookup table `embedded.rs` includes. Mirrors
 //! `xpr-data/build.rs`, but for arbitrary files (JSON, binary blobs, PNG).
+//!
+//! The gen 4/5 pictures (`imagery.zip`, 47–91 MB a game) are left out: the
+//! app executable embeds them itself (`xpr-app/build.rs`), so the library and
+//! every test binary that links it stay small.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -45,7 +49,7 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<String>) {
         let name = entry.file_name().to_string_lossy().to_string();
         if p.is_dir() {
             collect(root, &p, out);
-        } else if name != "coverage.md" && name != "overrides.json" && !name.starts_with('.') {
+        } else if name != "coverage.md" && name != "overrides.json" && name != "imagery.zip" && !name.starts_with('.') {
             let rel = p.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
             out.push(rel);
         }

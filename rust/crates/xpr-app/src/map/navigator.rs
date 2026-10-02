@@ -130,7 +130,7 @@ impl Navigator {
 
         // the coarsest chunk: one texture covers the whole scope (§3.4 "D")
         let lvl = layers::max_level(&pack, scope);
-        let key = ChunkKey { scope, level: lvl, cx: 0, cy: 0, night: view.night };
+        let key = ChunkKey { scope, level: lvl, cx: 0, cy: 0, night: view.night, mask: view.toggles.mask };
         let span = (CHUNK_PX << lvl) as f32;
         // the chunk spans `span` world px from the origin; the scope may be smaller
         let uv_max = Pos2::new((scope_r.width() as f32 / span).min(1.0), (scope_r.height() as f32 / span).min(1.0));

@@ -18,6 +18,8 @@ pub struct ChunkKey {
     pub cx: u32,
     pub cy: u32,
     pub night: bool,
+    /// image worlds: dim what the masks hide
+    pub mask: bool,
 }
 
 impl ChunkKey {
@@ -25,7 +27,7 @@ impl ChunkKey {
         CHUNK_PX << self.level
     }
     pub fn opts(&self) -> RenderOpts {
-        RenderOpts { night: self.night }
+        RenderOpts { night: self.night, mask: self.mask }
     }
 }
 
@@ -162,7 +164,7 @@ impl ChunkCache {
                         continue;
                     }
                     let image = ColorImage::from_rgba_unmultiplied([px.w, px.h], &px.data);
-                    let name = format!("map:{:?}:{}:{}:{}:{}", key.scope, key.level, key.cx, key.cy, key.night as u8);
+                    let name = format!("map:{:?}:{}:{}:{}:{}{}", key.scope, key.level, key.cx, key.cy, key.night as u8, key.mask as u8);
                     let tex = ctx.load_texture(name, image, texture_options());
                     self.entries.insert(key, Entry { tex, last_used: self.frame });
                     uploaded += 1;

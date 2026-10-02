@@ -240,14 +240,30 @@ fn object_card(ui: &mut Ui, idx: u32, cx: &mut CardCtx, out: &mut CardOut) {
             }
             trainer_card(ui, variants, *double, &map_name, cx, out);
         }
-        (ObjectKind::Npc, Payload::Npc { battles, label }) => {
+        (ObjectKind::Npc, Payload::Npc { battles, label, text_key }) => {
             if battles.is_empty() {
                 header(ui, theme, label.as_deref().unwrap_or("NPC"), Some(&map_name), out);
+                if let Some(text) = text_key.as_ref().and_then(|k| cx.pack.sign_text.get(k)) {
+                    ui.add(egui::Label::new(egui::RichText::new(text).font(theme.body()).color(theme.text)).wrap());
+                }
             } else {
                 trainer_card(ui, battles, false, &map_name, cx, out);
             }
         }
-        (ObjectKind::Item, Payload::Item { item, raw, fake }) | (ObjectKind::HiddenItem, Payload::Item { item, raw, fake }) | (ObjectKind::Berry, Payload::Item { item, raw, fake }) => {
+        (ObjectKind::Obstacle, Payload::Obstacle { obstacle, label }) => {
+            let title = label.clone().unwrap_or_else(|| "Obstacle".to_string());
+            header(ui, theme, &title, Some(&map_name), out);
+            let needs = match obstacle.as_str() {
+                "cut" => "Needs Cut",
+                "rock_smash" => "Needs Rock Smash",
+                "strength" => "Needs Strength",
+                _ => "",
+            };
+            if !needs.is_empty() {
+                widgets::label_font(ui, needs.to_string(), theme.caption_font(), theme.secondary);
+            }
+        }
+        (ObjectKind::Item, Payload::Item { item, raw, fake, count }) | (ObjectKind::HiddenItem, Payload::Item { item, raw, fake, count }) | (ObjectKind::Berry, Payload::Item { item, raw, fake, count }) => {
             let title = match o.kind {
                 ObjectKind::HiddenItem => "Hidden item",
                 ObjectKind::Berry => "Berry tree",
@@ -255,7 +271,8 @@ fn object_card(ui: &mut Ui, idx: u32, cx: &mut CardCtx, out: &mut CardOut) {
             };
             match item {
                 Some(name) => {
-                    header(ui, theme, name, Some(&map_name), out);
+                    let title = if *count > 1 { format!("{} ×{}", name, count) } else { name.clone() };
+                    header(ui, theme, &title, Some(&map_name), out);
                     let acquired = cx.state.is_acquired(name);
                     if acquired {
                         widgets::label_font(ui, "Already picked up in this route".to_string(), theme.caption_font(), theme.success);
@@ -286,7 +303,18 @@ fn object_card(ui: &mut Ui, idx: u32, cx: &mut CardCtx, out: &mut CardOut) {
             let text = cx.pack.sign_text.get(text_key).cloned().unwrap_or_else(|| text_key.clone());
             ui.add(egui::Label::new(egui::RichText::new(text).font(theme.body()).color(theme.text)).wrap());
         }
-        (ObjectKind::Warp, Payload::Warp { dest_map, dest_warp }) => {
+        (ObjectKind::Warp, Payload::Warp { dynamic: true, candidates, .. }) => {
+            // an elevator (or a gate the game chooses): every floor it can lead to
+            header(ui, theme, "Warp", Some(&format!("{} → chosen in-game", map_name)), out);
+            for c in candidates {
+                if let Some(d) = cx.pack.map_by_const(c) {
+                    if widgets::StyledButton::new(theme, format!("Go to {}", d.display)).show(ui).clicked() {
+                        out.navigate = Some(d.id);
+                    }
+                }
+            }
+        }
+        (ObjectKind::Warp, Payload::Warp { dest_map, dest_warp, .. }) => {
             let dest = dest_map.as_ref().and_then(|c| cx.pack.map_by_const(c));
             let dest_name = dest.map(|m| m.display.clone()).or_else(|| dest_map.clone()).unwrap_or_else(|| "?".into());
             header(ui, theme, "Warp", Some(&format!("{} → {}{}", map_name, dest_name, dest_warp.map(|w| format!(" (warp {})", w)).unwrap_or_default())), out);
@@ -452,6 +480,7 @@ pub fn stat_color(stat: usize, bg: egui::Color32) -> egui::Color32 {
 }
 
 fn is_water_method(name: &str) -> bool {
+    // gen 5's "surf_spots" (rippling water) and "super_rod_spots" (fishing ripples) included
     ["surf", "old_rod", "good_rod", "super_rod"].iter().any(|w| name.starts_with(w))
 }
 
@@ -582,38 +611,93 @@ fn encounter_rows(ui: &mut Ui, method: &str, slots: &[EncounterSlot], show_ev: b
 /// The encounter table of `map`: a column header, then one section per
 /// method (all of them, or only the land / water ones when `only_terrain`),
 /// in a scroll area capped at `max_h` (the room the viewport leaves).
+///
+/// Gens 4/5 split a map's encounters by condition (time of day, swarms,
+/// the Poké Radar, dual-slot cartridges, radio, seasons): a table
+/// `<method>_<condition>` is the whole method as met under that one
+/// condition. The card then shows a row of condition chips and, for every
+/// method, the table of the chosen condition where it has one.
 fn encounter_table(ui: &mut Ui, map: MapId, water: bool, only_terrain: bool, max_h: f32, cx: &mut CardCtx, out: &mut CardOut) {
     let theme = cx.theme;
     let pack: &MapPack = cx.pack;
     let show_ev = has_ev_column(cx.gen.as_deref());
     let version = cx.version.clone().unwrap_or_default();
-    let sections: Vec<(&str, Option<i64>, &[EncounterSlot])> = pack
-        .encounters
-        .get(&map)
-        .map(|table| {
-            table
-                .methods
-                .iter()
-                .filter(|m| !only_terrain || is_water_method(&m.name) == water)
-                .filter_map(|m| table.slots_for(&m.name, &version).filter(|s| !s.is_empty()).map(|s| (m.name.as_str(), m.base_rate, s)))
-                .collect()
-        })
-        .unwrap_or_default();
+    let Some(table) = pack.encounters.get(&map) else {
+        widgets::label_font(ui, "No wild Pokémon here".to_string(), theme.caption_font(), theme.secondary);
+        return;
+    };
+    let relevant: Vec<&xpr_map::EncounterMethod> = table.methods.iter().filter(|m| !only_terrain || is_water_method(&m.name) == water).collect();
+    // (method name shown, title, base rate)
+    let mut chosen: Vec<(String, String, Option<i64>)> = Vec::new();
+    match &pack.image {
+        Some(img) if !img.encounter_methods.is_empty() => {
+            let split = |name: &str| -> Option<(String, Option<String>)> {
+                let base = img.encounter_methods.iter().map(|(b, _)| b).filter(|b| name == b.as_str() || name.starts_with(&format!("{}_", b))).max_by_key(|b| b.len())?;
+                let cond = (name.len() > base.len()).then(|| name[base.len() + 1..].to_string());
+                Some((base.clone(), cond))
+            };
+            let parts: Vec<(String, Option<String>, &xpr_map::EncounterMethod)> = relevant.iter().filter_map(|m| split(&m.name).map(|(b, c)| (b, c, *m))).collect();
+            let present: Vec<(String, String)> = img.encounter_conditions.iter().filter(|(c, _)| parts.iter().any(|(_, pc, _)| pc.as_deref() == Some(c.as_str()))).cloned().collect();
+            // a seasonal zone (gen 5) has no plain tables, only one per season
+            let seasonal = !present.is_empty() && parts.iter().all(|(_, c, _)| c.is_some());
+            let default_cond = if seasonal { present.first().map(|(c, _)| c.clone()).unwrap_or_default() } else { String::new() };
+            let id = ui.id().with(("enc_condition", map));
+            let mut cond: String = ui.ctx().data(|d| d.get_temp::<String>(id)).unwrap_or_else(|| default_cond.clone());
+            if (!cond.is_empty() || seasonal) && !present.iter().any(|(c, _)| *c == cond) {
+                cond = default_cond.clone();
+            }
+            if !present.is_empty() {
+                let plain = if present.iter().any(|(c, _)| c == "morning" || c == "night") { "Day" } else { "Normal" };
+                let mut chips: Vec<(String, String)> = Vec::new();
+                if !seasonal {
+                    chips.push((String::new(), plain.to_string()));
+                }
+                chips.extend(present.iter().cloned());
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(4.0, 4.0);
+                    for (c, label) in &chips {
+                        if widgets::StyledButton::new(theme, label).checked(*c == cond).show(ui).clicked() {
+                            cond = c.clone();
+                        }
+                    }
+                });
+                ui.ctx().data_mut(|d| d.insert_temp(id, cond.clone()));
+                ui.add_space(4.0);
+            }
+            let cond_label = img.encounter_conditions.iter().find(|(c, _)| *c == cond).map(|(_, l)| l.clone());
+            for (base, base_label) in &img.encounter_methods {
+                let pick = parts.iter().find(|(b, c, _)| b == base && !cond.is_empty() && c.as_deref() == Some(cond.as_str())).or_else(|| parts.iter().find(|(b, c, _)| b == base && c.is_none()));
+                if let Some((_, c, m)) = pick {
+                    let title = match (c, &cond_label) {
+                        (Some(_), Some(l)) => format!("{} · {}", base_label, l),
+                        _ => base_label.clone(),
+                    };
+                    chosen.push((m.name.clone(), title, m.base_rate));
+                }
+            }
+        }
+        _ => {
+            for m in &relevant {
+                chosen.push((m.name.clone(), m.name.replace('_', " ").to_uppercase(), m.base_rate));
+            }
+        }
+    }
+    let sections: Vec<(String, String, Option<i64>, &[EncounterSlot])> =
+        chosen.into_iter().filter_map(|(name, title, rate)| table.slots_for(&name, &version).filter(|s| !s.is_empty()).map(|s| (name, title, rate, s))).collect();
     if sections.is_empty() {
-        let msg = if pack.encounters.contains_key(&map) { "No wild Pokémon for this terrain" } else { "No wild Pokémon here" };
-        widgets::label_font(ui, msg.to_string(), theme.caption_font(), theme.secondary);
+        widgets::label_font(ui, "No wild Pokémon for this terrain".to_string(), theme.caption_font(), theme.secondary);
         return;
     }
     encounter_header(ui, theme, show_ev);
     let scroll = widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("enc_scroll").max_height(max_h).min_scrolled_height(max_h).auto_shrink([false, true]), |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
-        for (name, base_rate, slots) in sections {
+        for (name, title, base_rate, slots) in sections {
             ui.add_space(6.0);
-            let title = name.replace('_', " ").to_uppercase();
-            let rate = base_rate.map(|r| format!("  ·  rate {}", r)).unwrap_or_default();
+            // headbutt trees and the like have no step rate (0)
+            let rate = base_rate.filter(|r| *r > 0).map(|r| format!("  ·  rate {}", r)).unwrap_or_default();
             widgets::label_font(ui, format!("{}{}", title, rate), theme.body_bold(), theme.secondary);
             ui.add_space(2.0);
-            encounter_rows(ui, name, slots, show_ev, cx, out);
+            encounter_rows(ui, &name, slots, show_ev, cx, out);
         }
     });
     out.table_h = scroll.inner_rect.height();
@@ -636,14 +720,16 @@ fn map_card(ui: &mut Ui, map: MapId, max_h: f32, cx: &mut CardCtx, out: &mut Car
     let Some(m) = cx.pack.map(map) else { return };
     let base = cx.pack.object_range(map).start;
     let objs = cx.pack.objects_of(map);
+    let version = cx.version.clone();
+    let here = |o: &&xpr_map::MapObject| o.in_version(version.as_deref());
     let trainer_objs: Vec<(u32, &[String])> = objs
         .iter()
         .enumerate()
-        .filter(|(_, o)| o.effective_kind() == ObjectKind::Trainer && !o.trainer_names().is_empty())
+        .filter(|(_, o)| here(o) && o.effective_kind() == ObjectKind::Trainer && !o.trainer_names().is_empty())
         .map(|(i, o)| (base + i as u32, o.trainer_names()))
         .collect();
-    let trainers: Vec<&String> = objs.iter().filter(|o| o.effective_kind() == ObjectKind::Trainer).flat_map(|o| o.trainer_names().iter()).collect();
-    let items = objs.iter().filter(|o| matches!(o.kind, ObjectKind::Item | ObjectKind::HiddenItem | ObjectKind::Berry) && o.item_name().is_some()).count();
+    let trainers: Vec<&String> = objs.iter().filter(here).filter(|o| o.effective_kind() == ObjectKind::Trainer).flat_map(|o| o.trainer_names().iter()).collect();
+    let items = objs.iter().filter(here).filter(|o| matches!(o.kind, ObjectKind::Item | ObjectKind::HiddenItem | ObjectKind::Berry) && o.item_name().is_some()).count();
     let remaining = trainers.iter().filter(|n| !cx.state.is_defeated(n)).count();
     header(ui, theme, &m.display, Some(&format!("{} trainers ({} not yet fought) · {} items", trainers.len(), remaining, items)), out);
     if trainer_objs.is_empty() {

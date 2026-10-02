@@ -8,6 +8,48 @@ use serde_json::Value;
 use crate::consts;
 use crate::pyjson;
 
+/// The game font glyphs older gen 5 data used in trainer names and
+/// classes, and their plain spellings (the gen 3/4 style: "Swimmer M",
+/// "Pokemon Trainer"): ⑭ is ♂, ⑮ is ♀, ⒆⒇ is the "PKMN" ligature.
+pub const LEGACY_NAME_GLYPHS: [(&str, &str); 3] = [("\u{2486}\u{2487}", "Pokemon"), ("\u{246d}", "M"), ("\u{246e}", "F")];
+
+/// A trainer name / class with the old font glyphs spelled out
+/// (`"⒆⒇ Trainer Bianca (4)"` -> `"Pokemon Trainer Bianca (4)"`,
+/// `"Clerk ⑭ Chaz (19)"` -> `"Clerk M Chaz (19)"`). Routes saved before the
+/// rename name their trainers this way, so loading one goes through here;
+/// names without the glyphs come back unchanged.
+pub fn fix_legacy_name_glyphs(s: &str) -> std::borrow::Cow<'_, str> {
+    if !s.chars().any(|c| matches!(c, '\u{246d}' | '\u{246e}' | '\u{2486}' | '\u{2487}')) {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    let mut out = s.to_string();
+    for (from, to) in LEGACY_NAME_GLYPHS {
+        out = out.replace(from, to);
+    }
+    std::borrow::Cow::Owned(out)
+}
+
+/// [`fix_legacy_name_glyphs`] on every string in a JSON document.
+pub fn fix_legacy_name_glyphs_in(v: &mut Value) {
+    match v {
+        Value::String(s) => {
+            if let std::borrow::Cow::Owned(f) = fix_legacy_name_glyphs(s) {
+                *s = f;
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(fix_legacy_name_glyphs_in),
+        Value::Object(o) => {
+            let keys: Vec<String> = o.keys().cloned().collect();
+            for k in keys {
+                let mut val = o.remove(&k).unwrap_or(Value::Null);
+                fix_legacy_name_glyphs_in(&mut val);
+                o.insert(fix_legacy_name_glyphs(&k).into_owned(), val);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// `sanitize_string`: keep alphanumerics, lowercase.
 pub fn sanitize_string(s: &str) -> String {
     s.chars()

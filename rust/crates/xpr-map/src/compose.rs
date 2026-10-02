@@ -6,11 +6,19 @@
 //!
 //! Output is a `Pixmap` for a region of a map, or a 512x512 world/indoor
 //! chunk at a LOD level (level L covers 512·2^L world px).
+//!
+//! Image-world packs (gens 4/5) are not composited from tiles: their world
+//! chunks are the imagery's pyramid tiles as they are (the same 512 px grid
+//! and level maths), interiors are cut from the interior image's mip chain,
+//! and the pack's masks dim the unreachable scenery. Without the imagery
+//! they draw a schematic of the terrain classes, so the map still works.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::geom::{map_px_size, scope_rect, IRect, Scope};
+use crate::image_world::{ImageWorld, Mask, TILE_PX};
+use crate::imagery::Imagery;
 use crate::lod::Pixmap;
 use crate::model::*;
 use crate::pack::MapPack;
@@ -24,6 +32,79 @@ pub const BACKGROUND: [u8; 4] = [10, 10, 24, 255];
 pub struct RenderOpts {
     /// gen 2: use the night palettes for outdoor maps
     pub night: bool,
+    /// image worlds: dim what the pack's masks hide
+    pub mask: bool,
+}
+
+/// How strongly a mask dims the hidden scenery (pokemap's default opacity).
+pub const MASK_ALPHA: f32 = 0.9;
+
+/// Schematic colours of the terrain classes (image worlds without imagery).
+fn class_color(c: u8) -> Option<[u8; 4]> {
+    Some(match c {
+        b'.' => [92, 98, 116, 255],
+        b'#' => [38, 42, 58, 255],
+        b'g' => [62, 128, 74, 255],
+        b'w' => [52, 96, 160, 255],
+        _ => return None,
+    })
+}
+
+/// Draw `src` over `dst` at (x, y) with alpha blending (straight alpha).
+fn composite_over(dst: &mut Pixmap, x: i32, y: i32, src: &Pixmap) {
+    for sy in 0..src.h as i32 {
+        let dy = y + sy;
+        if dy < 0 || dy >= dst.h as i32 {
+            continue;
+        }
+        for sx in 0..src.w as i32 {
+            let dx = x + sx;
+            if dx < 0 || dx >= dst.w as i32 {
+                continue;
+            }
+            let si = (sy as usize * src.w + sx as usize) * 4;
+            let sa = src.data[si + 3] as u32;
+            if sa == 0 {
+                continue;
+            }
+            let di = (dy as usize * dst.w + dx as usize) * 4;
+            if sa == 255 {
+                dst.data[di..di + 4].copy_from_slice(&src.data[si..si + 4]);
+                continue;
+            }
+            let da = dst.data[di + 3] as u32;
+            let out_a = sa * 255 + da * (255 - sa); // x255
+            if out_a == 0 {
+                continue;
+            }
+            for c in 0..3 {
+                let v = (src.data[si + c] as u32 * sa * 255 + dst.data[di + c] as u32 * da * (255 - sa)) / out_a;
+                dst.data[di + c] = v as u8;
+            }
+            dst.data[di + 3] = (out_a / 255) as u8;
+        }
+    }
+}
+
+/// Dim the pixels a mask hides: blend toward `toward` by `MASK_ALPHA` × the
+/// hidden share. Pixel (px, py) of `dst` is at mask-surface px
+/// `(ox + px·f + f/2, oy + py·f + f/2)`.
+fn apply_mask(dst: &mut Pixmap, mask: &Mask, ox: i32, oy: i32, f: i32, toward: [u8; 4]) {
+    for py in 0..dst.h as i32 {
+        let my = (oy + py * f) as f32 + f as f32 / 2.0;
+        for px in 0..dst.w as i32 {
+            let mx = (ox + px * f) as f32 + f as f32 / 2.0;
+            let hidden = (1.0 - mask.coverage(mx, my)) * MASK_ALPHA;
+            if hidden <= 0.0 {
+                continue;
+            }
+            let i = (py as usize * dst.w + px as usize) * 4;
+            for (d, t) in dst.data[i..i + 4].iter_mut().zip(toward) {
+                let v = *d as f32;
+                *d = (v + (t as f32 - v) * hidden).round() as u8;
+            }
+        }
+    }
 }
 
 /// A tileset recoloured with a concrete palette set (gen 1/2), RGBA.
@@ -42,15 +123,117 @@ pub struct Compositor {
     pack: Arc<MapPack>,
     sheets: Mutex<HashMap<String, Arc<RgbaSheet>>>,
     metatiles: Mutex<HashMap<String, Arc<MetatileCache>>>,
+    /// image worlds: the pictures, when installed
+    imagery: Option<Arc<Imagery>>,
 }
 
 impl Compositor {
     pub fn new(pack: Arc<MapPack>) -> Compositor {
-        Compositor { pack, sheets: Mutex::new(HashMap::new()), metatiles: Mutex::new(HashMap::new()) }
+        Self::with_imagery(pack, None)
+    }
+
+    /// An image world's compositor drawing from its imagery (`None`: the schematic).
+    pub fn with_imagery(pack: Arc<MapPack>, imagery: Option<Arc<Imagery>>) -> Compositor {
+        Compositor { pack, sheets: Mutex::new(HashMap::new()), metatiles: Mutex::new(HashMap::new()), imagery }
     }
 
     pub fn pack(&self) -> &Arc<MapPack> {
         &self.pack
+    }
+
+    pub fn imagery(&self) -> Option<&Arc<Imagery>> {
+        self.imagery.as_ref()
+    }
+
+    // ---- image worlds ----------------------------------------------------------------
+
+    /// A scope region of an image world at level `level` (output pixel = 2^level scope px),
+    /// over `fill`: the imagery (or the schematic), then the mask.
+    #[allow(clippy::too_many_arguments)]
+    fn image_region(&self, img: &ImageWorld, scope: Scope, origin: (i32, i32), level: u8, dst: &mut Pixmap, fill: [u8; 4], opts: RenderOpts) {
+        let f = 1i32 << level;
+        match scope {
+            Scope::World => {
+                match &self.imagery {
+                    Some(im) => {
+                        // pyramid tiles of this level covering the region
+                        let span = CHUNK_PX * f;
+                        let (x1, y1) = (origin.0 + dst.w as i32 * f, origin.1 + dst.h as i32 * f);
+                        if level < img.levels {
+                            for ty in origin.1.div_euclid(span)..=(y1 - 1).div_euclid(span) {
+                                for tx in origin.0.div_euclid(span)..=(x1 - 1).div_euclid(span) {
+                                    if tx < 0 || ty < 0 {
+                                        continue;
+                                    }
+                                    if let Some(tile) = im.world_tile(level, tx as u32, ty as u32) {
+                                        composite_over(dst, (tx * span - origin.0) / f, (ty * span - origin.1) / f, &tile);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    None => self.schematic(img, scope, origin, f, dst),
+                }
+                if opts.mask {
+                    if let Some(m) = &img.world_mask {
+                        apply_mask(dst, m, origin.0, origin.1, f, fill);
+                    }
+                }
+            }
+            Scope::Map(id) => {
+                let Some(m) = self.pack.map(id) else { return };
+                if let (None, Some((px, py))) = (&m.image, m.world_pos) {
+                    // an overworld map on its own: its part of the world picture
+                    let (ox, oy) = (origin.0 - m.frame.origin.0 + px * TILE_PX, origin.1 - m.frame.origin.1 + py * TILE_PX);
+                    self.image_region(img, Scope::World, (ox, oy), level, dst, fill, opts);
+                    return;
+                }
+                let at = m.frame.image_at;
+                let mips = match (&self.imagery, &m.image) {
+                    (Some(im), Some(path)) => im.interior(path, 6),
+                    _ => None,
+                };
+                match mips {
+                    Some(mips) => {
+                        // mip level L: one px covers 2^L image px, like an output px at this level
+                        let src = &mips[(level as usize).min(mips.len() - 1)];
+                        composite_over(dst, (at.0 - origin.0).div_euclid(f), (at.1 - origin.1).div_euclid(f), src);
+                    }
+                    None => self.schematic(img, scope, origin, f, dst),
+                }
+                if opts.mask {
+                    if let Some(mask) = m.image.as_ref().and_then(|p| img.interior_masks.get(p)) {
+                        apply_mask(dst, mask, origin.0 - at.0, origin.1 - at.1, f, fill);
+                    }
+                }
+            }
+        }
+    }
+
+    /// The terrain classes as flat colours (no imagery installed).
+    fn schematic(&self, img: &ImageWorld, scope: Scope, origin: (i32, i32), f: i32, dst: &mut Pixmap) {
+        for py in 0..dst.h as i32 {
+            let sy = origin.1 + py * f + f / 2;
+            for px in 0..dst.w as i32 {
+                let sx = origin.0 + px * f + f / 2;
+                let (id, lx, ly) = match scope {
+                    Scope::World => {
+                        let (tx, ty) = (sx.div_euclid(TILE_PX), sy.div_euclid(TILE_PX));
+                        let Some(id) = img.ownership.owner(tx, ty) else { continue };
+                        let Some((mx, my)) = self.pack.map(id).and_then(|m| m.world_pos) else { continue };
+                        (id, tx - mx, ty - my)
+                    }
+                    Scope::Map(id) => {
+                        let Some(m) = self.pack.map(id) else { return };
+                        (id, (sx - m.frame.origin.0).div_euclid(TILE_PX), (sy - m.frame.origin.1).div_euclid(TILE_PX))
+                    }
+                };
+                let Some(m) = self.pack.map(id) else { continue };
+                if let Some(c) = img.class_at(id, m.w, m.h, lx, ly).and_then(class_color) {
+                    dst.put(px as usize, py as usize, c);
+                }
+            }
+        }
     }
 
     // ---- gen 1 / 2 sheets ----------------------------------------------------------
@@ -271,6 +454,10 @@ impl Compositor {
     /// §3.4 "A": alpha-0 outside every map instead of the world background).
     pub fn render_region_with_fill(&self, scope: Scope, rect: IRect, opts: RenderOpts, fill: [u8; 4]) -> Pixmap {
         let mut dst = Pixmap::filled(rect.width().max(0) as usize, rect.height().max(0) as usize, fill);
+        if let Some(img) = &self.pack.image {
+            self.image_region(img, scope, (rect.x0, rect.y0), 0, &mut dst, fill, opts);
+            return dst;
+        }
         self.render_region_into(scope, rect, opts, &mut dst, 0, 0);
         dst
     }
@@ -299,6 +486,9 @@ impl Compositor {
 
     /// Does any map of the scope intersect the world rectangle?
     pub fn covers(&self, scope: Scope, rect: &IRect) -> bool {
+        if self.pack.image.is_some() {
+            return scope_rect(&self.pack, scope).intersects(rect);
+        }
         match scope {
             Scope::World => self.pack.layout.placed_rects.iter().any(|(r, _)| r.intersects(rect)),
             Scope::Map(_) => scope_rect(&self.pack, scope).intersects(rect),
@@ -312,6 +502,10 @@ impl Compositor {
         let span = CHUNK_PX * f;
         let origin = (cx as i32 * span, cy as i32 * span);
         let mut out = Pixmap::filled(CHUNK_PX as usize, CHUNK_PX as usize, BACKGROUND);
+        if let Some(img) = &self.pack.image {
+            self.image_region(img, scope, origin, level, &mut out, BACKGROUND, opts);
+            return out;
+        }
         if level == 0 {
             self.render_region_into(scope, IRect::from_size(origin.0, origin.1, CHUNK_PX, CHUNK_PX), opts, &mut out, 0, 0);
             return out;

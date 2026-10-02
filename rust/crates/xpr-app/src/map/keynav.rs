@@ -62,6 +62,7 @@ fn step_selection(view: &mut MapView, vp: Rect, forward: bool) {
     let Some(pack) = view.pack().cloned() else { return };
     let scope = view.scope();
     let toggles = view.toggles;
+    let version = view.state.version.clone();
     let vis = view.camera.visible_world(vp);
     let cx = (vis.x0 + vis.x1) / 2;
     let cy = (vis.y0 + vis.y1) / 2;
@@ -69,7 +70,7 @@ fn step_selection(view: &mut MapView, vp: Rect, forward: bool) {
     let mut ordered: Vec<(u32, i64)> = Vec::new();
     for idx in 0..pack.objects.len() as u32 {
         let o = &pack.objects[idx as usize];
-        if !toggles.visible(o.effective_kind()) {
+        if !toggles.visible(o.effective_kind()) || !o.in_version(version.as_deref()) {
             continue;
         }
         // `object_center_px` is `None` when the object's map is not part of

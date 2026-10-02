@@ -346,7 +346,7 @@ impl MapView {
         let mut names: Vec<String> = Vec::new();
         if let Some(pack) = self.pack() {
             for (idx, o) in pack.objects.iter().enumerate() {
-                if o.effective_kind() != ObjectKind::Trainer {
+                if o.effective_kind() != ObjectKind::Trainer || !o.in_version(self.state.version.as_deref()) {
                     continue;
                 }
                 let Some((wx, wy)) = geom::object_center_px(pack, self.scope, idx as u32) else { continue };

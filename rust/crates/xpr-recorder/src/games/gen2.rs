@@ -10,6 +10,7 @@ use serde_json::Value;
 use xpr_core::consts;
 use xpr_core::io_utils::sanitize_string;
 use xpr_data::model::{CustomMoveData, Trainer};
+use xpr_data::stats::calc_stat_gen12;
 use xpr_data::GenData;
 use xpr_engine::{EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
 
@@ -93,8 +94,13 @@ pub struct Gen2Keys {
     pub battle_player_mon_species: String,
     pub battle_player_mon_hp: String,
     pub battle_enemy_species: String,
+    /// The mappers point this at `wTempMonLevel`, a HUD scratch byte, not
+    /// `wEnemyMonLevel`; see `enemy_level_from_max_hp`.
     pub battle_enemy_level: String,
     pub battle_enemy_hp: String,
+    pub battle_enemy_max_hp: String,
+    /// attack, defense, speed, special; empty for the deprecated mapper, which has none
+    pub battle_enemy_dvs: Vec<String>,
     pub battle_enemy_mon_party_pos: String,
     pub item_count: String,
     pub item_type: Vec<String>,
@@ -161,6 +167,12 @@ impl Gen2Keys {
             battle_enemy_species: d("battle.enemyPokemon.species", "battle.opponent.active_pokemon.species"),
             battle_enemy_level: d("battle.enemyPokemon.level", "battle.opponent.active_pokemon.level"),
             battle_enemy_hp: d("battle.enemyPokemon.hp", "battle.opponent.active_pokemon.stats.hp"),
+            battle_enemy_max_hp: d("battle.enemyPokemon.maxHp", "battle.opponent.active_pokemon.stats.hp_max"),
+            battle_enemy_dvs: if deprecated {
+                Vec::new()
+            } else {
+                ["attack", "defense", "speed", "special"].iter().map(|s| format!("battle.opponent.active_pokemon.ivs.{}", s)).collect()
+            },
             battle_enemy_mon_party_pos: d("battle.enemyPokemon.partyPos", "battle.opponent.party_position"),
             item_count: d("player.itemCount", "bag.item_count"),
             item_type: (0..item_slots).map(|i| if deprecated { format!("player.items.{}.item", i) } else { format!("bag.items.{}.item", i) }).collect(),
@@ -260,6 +272,7 @@ impl Gen2Keys {
             &mut self.battle_enemy_species,
             &mut self.battle_enemy_level,
             &mut self.battle_enemy_hp,
+            &mut self.battle_enemy_max_hp,
             &mut self.battle_enemy_mon_party_pos,
             &mut self.item_count,
             &mut self.ball_count,
@@ -276,6 +289,7 @@ impl Gen2Keys {
             &mut self.team_dv_special,
             &mut self.player_moves,
             &mut self.stat_exp,
+            &mut self.battle_enemy_dvs,
             &mut self.item_type,
             &mut self.item_quantity,
             &mut self.ball_type,
@@ -741,6 +755,34 @@ impl Gen2Machine {
         self.money_cache_update(store);
         let area = self.area_name(store);
         self.controller.entered_new_area(&area);
+    }
+
+    /// The defeated enemy's level, worked out from its max HP rather than read
+    /// from `battle_enemy_level` (see `enemy_level_from_max_hp`).
+    fn enemy_level(&self, store: &PropertyStore, species: &str) -> i64 {
+        let reported = store_i64(store, &self.keys.battle_enemy_level);
+        let base_hp = self.gen.pkmn_db().get_pkmn(species).map(|p| p.stats.hp);
+        let (Some(base_hp), Some(max_hp)) = (base_hp, store.i64_of(&self.keys.battle_enemy_max_hp)) else {
+            return reported;
+        };
+        let hp_dv = if self.keys.battle_enemy_dvs.len() == 4 {
+            let dvs: Option<Vec<i64>> = self.keys.battle_enemy_dvs.iter().map(|k| store.i64_of(k)).collect();
+            dvs.map(|d| d.iter().fold(0, |acc, dv| (acc << 1) | (dv & 1)))
+        } else {
+            None
+        };
+        match enemy_level_from_max_hp(base_hp, max_hp, hp_dv, reported) {
+            Some(level) => {
+                if level != reported {
+                    log::info!("{} with {} max HP is level {}, not the mapper's {}", species, max_hp, level, reported);
+                }
+                level
+            }
+            None => {
+                log::warn!("No level of {} has {} max HP, falling back to the mapper's level {}", species, max_hp, reported);
+                reported
+            }
+        }
     }
 
     fn solo_mon_levelup(&mut self, new_level: i64) {
@@ -1301,7 +1343,7 @@ impl Gen2Machine {
         } else if new.path == self.keys.battle_enemy_hp {
             if new.eq_i64(0) {
                 self.battle.cached_mon_species = self.conv.pkmn_name_convert(store.str_of(&self.keys.battle_enemy_species).as_deref()).unwrap_or_default();
-                self.battle.cached_mon_level = store_i64(store, &self.keys.battle_enemy_level);
+                self.battle.cached_mon_level = self.enemy_level(store, &self.battle.cached_mon_species);
                 self.battle.friendship_data.push(store_i64(store, &self.keys.mon_friendship));
             }
         } else if new.path == self.keys.battle_text_buffer {
@@ -1517,6 +1559,32 @@ fn get_trainer_obj(gen: &GenData, converted_trainer_name: &str) -> Option<Arc<Tr
         }
     }
     None
+}
+
+/// The level of an enemy mon with `max_hp`. Crystal's mappers read the enemy
+/// level from `wTempMonLevel` (0xD12D), a scratch byte the battle HUD fills with
+/// whichever side's level it drew last, so it is often the player's level. The
+/// real `wEnemyMonLevel` (0xD213) isn't mapped, but max HP is, and wild and
+/// trainer mons in Crystal both have zero stat exp, so max HP pins the level.
+/// With the HP DV known the answer is exact (HP rises with every level); without
+/// it (the deprecated mapper) several levels can fit, so prefer `reported` when
+/// it is one of them, then the lowest.
+pub fn enemy_level_from_max_hp(base_hp: i64, max_hp: i64, hp_dv: Option<i64>, reported: i64) -> Option<i64> {
+    let fits = |dvs: &[i64]| -> Vec<i64> {
+        (1..=100).filter(|&lv| dvs.iter().any(|&dv| calc_stat_gen12(base_hp, lv, dv, 0, true, false) == max_hp)).collect()
+    };
+    if let Some(dv) = hp_dv {
+        if let Some(&level) = fits(&[dv]).first() {
+            return Some(level);
+        }
+        // e.g. a transformed mon: fall back to any DV
+    }
+    let all_dvs: Vec<i64> = (0..16).collect();
+    let levels = fits(&all_dvs);
+    if levels.contains(&reported) {
+        return Some(reported);
+    }
+    levels.first().copied()
 }
 
 /// `_validate_trainer_pkmn`

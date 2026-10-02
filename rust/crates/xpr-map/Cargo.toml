@@ -9,8 +9,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
+indexmap = { workspace = true }
 flate2 = "1"
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "webp"] }
+sha2 = "0.10"
 
 [build-dependencies]
 flate2 = "1"

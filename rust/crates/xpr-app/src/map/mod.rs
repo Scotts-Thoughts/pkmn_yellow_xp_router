@@ -9,6 +9,7 @@ pub mod cards;
 pub mod chunks;
 pub mod export;
 pub mod finder;
+pub mod imagery;
 pub mod item_search;
 pub mod keynav;
 pub mod layers;
@@ -90,11 +91,15 @@ pub struct Toggles {
     pub navigator: bool,
     /// the camera follows the selected route event (`keynav::on_route_synced`)
     pub follow: bool,
+    /// gens 4/5: Cut trees, Rock Smash rocks and Strength boulders
+    pub obstacles: bool,
+    /// gens 4/5: dim the scenery the player can't reach (the pack's masks)
+    pub mask: bool,
 }
 
 impl Default for Toggles {
     fn default() -> Self {
-        Toggles { trainers: true, items: true, hidden: true, warps: true, signs: false, berries: true, npcs: false, sprites: true, grid: false, labels: true, path: false, navigator: true, follow: false }
+        Toggles { trainers: true, items: true, hidden: true, warps: true, signs: false, berries: true, npcs: false, sprites: true, grid: false, labels: true, path: false, navigator: true, follow: false, obstacles: false, mask: true }
     }
 }
 
@@ -108,15 +113,16 @@ impl Toggles {
             ObjectKind::Sign => self.signs,
             ObjectKind::Berry => self.berries,
             ObjectKind::Npc => self.npcs,
+            ObjectKind::Obstacle => self.obstacles,
         }
     }
     fn to_json(self) -> Value {
-        serde_json::json!({"trainers": self.trainers, "items": self.items, "hidden": self.hidden, "warps": self.warps, "signs": self.signs, "berries": self.berries, "npcs": self.npcs, "sprites": self.sprites, "grid": self.grid, "labels": self.labels, "path": self.path, "navigator": self.navigator, "follow": self.follow})
+        serde_json::json!({"trainers": self.trainers, "items": self.items, "hidden": self.hidden, "warps": self.warps, "signs": self.signs, "berries": self.berries, "npcs": self.npcs, "sprites": self.sprites, "grid": self.grid, "labels": self.labels, "path": self.path, "navigator": self.navigator, "follow": self.follow, "obstacles": self.obstacles, "mask": self.mask})
     }
     fn from_json(v: &Value) -> Toggles {
         let d = Toggles::default();
         let g = |k: &str, def: bool| v.get(k).and_then(|x| x.as_bool()).unwrap_or(def);
-        Toggles { trainers: g("trainers", d.trainers), items: g("items", d.items), hidden: g("hidden", d.hidden), warps: g("warps", d.warps), signs: g("signs", d.signs), berries: g("berries", d.berries), npcs: g("npcs", d.npcs), sprites: g("sprites", d.sprites), grid: g("grid", d.grid), labels: g("labels", d.labels), path: g("path", d.path), navigator: g("navigator", d.navigator), follow: g("follow", d.follow) }
+        Toggles { trainers: g("trainers", d.trainers), items: g("items", d.items), hidden: g("hidden", d.hidden), warps: g("warps", d.warps), signs: g("signs", d.signs), berries: g("berries", d.berries), npcs: g("npcs", d.npcs), sprites: g("sprites", d.sprites), grid: g("grid", d.grid), labels: g("labels", d.labels), path: g("path", d.path), navigator: g("navigator", d.navigator), follow: g("follow", d.follow), obstacles: g("obstacles", d.obstacles), mask: g("mask", d.mask) }
     }
 }
 
@@ -131,6 +137,12 @@ struct Loaded {
     pack: Arc<MapPack>,
     comp: Arc<Compositor>,
     grid: Arc<ObjectGrid>,
+}
+
+/// The compositor for a pack: an image world's draws from its imagery when installed.
+fn compositor_for(pack: &Arc<MapPack>, source: &PackSource) -> Arc<Compositor> {
+    let imagery = if pack.is_image() { imagery::find_local(pack, source.dir.as_deref()) } else { None };
+    Arc::new(Compositor::with_imagery(pack.clone(), imagery))
 }
 
 pub struct MapView {
@@ -247,7 +259,7 @@ impl MapView {
     }
 
     /// The game to show for a gen (custom gens use their base); `None` when
-    /// there is no map pack for it (gens 1-3 only), which hides the Map tab.
+    /// there is no map pack for it, which hides the Map tab.
     pub fn game_of_gen(gen: &GenData) -> Option<&'static str> {
         game_for_version(gen.base_version_name().unwrap_or(gen.version_name()))
     }
@@ -280,7 +292,7 @@ impl MapView {
         std::thread::spawn(move || {
             let r = MapPack::load(&game_s, &source).map(|p| {
                 let pack = Arc::new(p);
-                let comp = Arc::new(Compositor::new(pack.clone()));
+                let comp = compositor_for(&pack, &source);
                 let grid = Arc::new(ObjectGrid::build(&pack));
                 Loaded { pack, comp, grid }
             });
@@ -303,7 +315,7 @@ impl MapView {
                 self.state.sync(ctrl, pack.as_deref());
                 // warm the overview levels so zooming out never shows holes
                 if let Some(p) = self.pack() {
-                    let keys = layers::overview_keys(p, Scope::World, self.night, 3);
+                    let keys = layers::overview_keys(p, Scope::World, self.night, self.toggles.mask, 3);
                     self.chunks.request(keys);
                 }
                 if let Some((q, label)) = self.pending_focus.take() {
@@ -319,6 +331,11 @@ impl MapView {
                 self.loading = None;
             }
         }
+    }
+
+    /// Whether the current pack draws from its pictures (always true for gens 1–3).
+    pub fn has_imagery(&self) -> bool {
+        self.loaded.as_ref().map(|l| !l.pack.is_image() || l.comp.imagery().is_some()).unwrap_or(false)
     }
 
     /// Route / selection changed: refresh the routed-state overlay.
@@ -366,7 +383,7 @@ impl MapView {
                 let r = geom::scope_rect(&pack, scope);
                 if vp.width() > 0.0 {
                     self.camera.set_min_zoom_for(vp, r);
-                    self.camera.fit(vp, r, false);
+                    self.camera.fit(vp, geom::fit_rect(&pack, scope), false);
                     if self.camera.zoom > 3.0 {
                         let c = self.camera.center;
                         self.camera.go_to(c, 3.0, false);
@@ -538,7 +555,7 @@ impl MapView {
                 ui.painter().text(vp.center(), egui::Align2::CENTER_CENTER, msg, theme.body(), theme.secondary);
             }
             (None, None, None) => {
-                let msg = if ctrl.get_version().is_none() { "Open a route to see its map" } else { "No map data for this game (gens 1–3 only)" };
+                let msg = if ctrl.get_version().is_none() { "Open a route to see its map" } else { "No map data for this game" };
                 ui.painter().text(vp.center(), egui::Align2::CENTER_CENTER, msg, theme.body(), theme.secondary);
             }
         }
@@ -583,8 +600,10 @@ impl MapView {
             (Some(p), Scope::Map(id)) => p.map(id).map(|m| m.display.clone()).unwrap_or_default(),
             (Some(p), Scope::World) => match (p.gen, p.game.as_str()) {
                 (1, _) => "Kanto".to_string(),
-                (2, _) => "Johto & Kanto".to_string(),
+                (2, _) | (_, "heartgold_soulsilver") => "Johto & Kanto".to_string(),
                 (_, "firered_leafgreen") => "Kanto & Sevii Islands".to_string(),
+                (4, _) => "Sinnoh".to_string(),
+                (5, _) => "Unova".to_string(),
                 _ => "Hoenn".to_string(),
             },
             _ => String::new(),
@@ -638,7 +657,7 @@ impl MapView {
         // navigator / follow panel toggles, consolidated into one popup
         // (`layers_menu.rs`): the chip row (8 object chips + 5 more for the
         // WP-C overlays) no longer fits the docked pane.
-        layers_menu::show(ui, theme, &mut self.toggles, cfg);
+        layers_menu::show(ui, theme, &mut self.toggles, cfg, pack.as_ref().map(|p| p.is_image()).unwrap_or(false));
         if pack.as_ref().map(|p| p.gen == 2).unwrap_or(false) {
             let r = widgets::StyledButton::new(theme, "Night").checked(self.night).show(ui);
             if r.clicked() {
@@ -738,10 +757,11 @@ impl MapView {
         if self.pending_fit {
             self.pending_fit = false;
             if !self.restore_view_state(vp) {
-                self.camera.fit(vp, scope_rect, false);
+                self.camera.fit(vp, geom::fit_rect(&pack, scope), false);
                 if scope == Scope::World {
                     // start on the game's first town at a readable zoom
-                    if let Some(&first) = pack.layout.draw_order.iter().find(|id| pack.map(**id).map(|m| m.const_name.contains("TOWN")).unwrap_or(false)) {
+                    let start = pack.image.as_ref().and_then(|i| i.default_map).or_else(|| pack.layout.draw_order.iter().copied().find(|id| pack.map(*id).map(|m| m.const_name.contains("TOWN")).unwrap_or(false)));
+                    if let Some(first) = start {
                         if let Some(r) = geom::map_world_rect(&pack, first) {
                             self.camera.go_to(Vec2::new((r.x0 + r.x1) as f32 / 2.0, (r.y0 + r.y1) as f32 / 2.0), 2.0, false);
                         }
@@ -827,7 +847,7 @@ impl MapView {
                     self.camera.zoom_at(vp, vp.center(), 1.0 / 1.3);
                 }
                 if ctx.input(|i| i.key_pressed(egui::Key::Num0)) {
-                    self.camera.fit(vp, scope_rect, true);
+                    self.camera.fit(vp, geom::fit_rect(&pack, scope), true);
                 }
                 if ctx.input(|i| i.key_pressed(egui::Key::Backspace)) && matches!(scope, Scope::Map(_)) {
                     self.back_to_world();
@@ -849,14 +869,21 @@ impl MapView {
         self.hover = None;
         if let Some(w) = pointer {
             let (wx, wy) = (w.x.floor() as i32, w.y.floor() as i32);
-            if let Some((map, lx, ly)) = geom::map_at_world_px(&pack, scope, wx, wy) {
+            if pack.is_image() {
+                // the tilted render lifts tiles: pick the tile drawn under the pointer
+                if let Some((map, x, y)) = geom::pick_step(&pack, scope, wx, wy) {
+                    let (grass, water) = pack.terrain_at(map, x.max(0) as u32, y.max(0) as u32);
+                    self.pointer_world = Some((map, x, y, grass, water));
+                }
+            } else if let Some((map, lx, ly)) = geom::map_at_world_px(&pack, scope, wx, wy) {
                 let bp = pack.geom.block_px as i32;
                 let (grass, water) = pack.terrain_at(map, (lx / bp).max(0) as u32, (ly / bp).max(0) as u32);
                 let s = pack.geom.step_px as i32;
                 self.pointer_world = Some((map, lx / s, ly / s, grass, water));
             }
             let toggles = self.toggles;
-            self.hover = grid.hit(&pack, scope, wx, wy, |o| toggles.visible(o.effective_kind()));
+            let version = self.state.version.clone();
+            self.hover = grid.hit(&pack, scope, wx, wy, |o| toggles.visible(o.effective_kind()) && o.in_version(version.as_deref()));
         }
         if self.hover.is_some() {
             ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -916,7 +943,7 @@ impl MapView {
 
         // ---- draw ----
         let painter = ui.painter_at(vp);
-        let wanted = layers::draw_base(&painter, vp, &self.camera, &pack, scope, self.night, &mut self.chunks);
+        let wanted = layers::draw_base(&painter, vp, &self.camera, &pack, scope, self.night, self.toggles.mask, &mut self.chunks);
         self.chunks.request(wanted);
         // overlays under the markers: the grid (`overlay.rs`)
         let oc = overlay::OverlayCtx { theme, pack: &pack, scope, cam: &self.camera, vp, ppp: ctx.pixels_per_point() };
@@ -959,7 +986,8 @@ impl MapView {
                 Card::Object { idx } => cards::routed_event_for(ctrl, &pack, *idx),
                 _ => None,
             };
-            let mut ccx = CardCtx { theme, pack: &pack, gen: ctrl.gen(), version: ctrl.get_version().map(|s| s.to_string()), state: &self.state, ctrl, assets, routed_event };
+            // the base version for a custom gen, so its encounter columns match the pack's
+            let mut ccx = CardCtx { theme, pack: &pack, gen: ctrl.gen(), version: self.state.version.clone(), state: &self.state, ctrl, assets, routed_event };
             // kept off the navigator minimap (last frame's rect; it is drawn below)
             let avoid = self.navigator_rect();
             let out = cards::draw_card(ui, &card, anchor, vp, avoid, &mut ccx);
@@ -1067,6 +1095,10 @@ impl MapView {
         painter.text(Pos2::new(rect.min.x + 8.0, rect.center().y), egui::Align2::LEFT_CENTER, left, font.clone(), theme.secondary);
         let pending = self.chunks.pending_count();
         let mut right = format!("{} chunks · {} sprites", self.chunks.cached_count(), self.atlas.frame_count());
+        if self.loaded.is_some() && !self.has_imagery() {
+            // a gen 4/5 build without its pictures (`imagery.rs`): the terrain sketch
+            right = format!("map pictures missing from this build · {}", right);
+        }
         if pending > 0 {
             right = format!("rendering {} · {}", pending, right);
         }
@@ -1142,6 +1174,12 @@ impl MapView {
         Some(self.camera.world_to_screen(self.last_vp, Vec2::new(wx as f32, wy as f32)))
     }
 
+    /// The world pixel under a screen position (after a frame).
+    pub fn camera_world(&self, p: Pos2) -> (i32, i32) {
+        let w = self.camera.screen_to_world(self.last_vp, p);
+        (w.x.floor() as i32, w.y.floor() as i32)
+    }
+
     /// Where a step of a map is on screen with the current camera.
     pub fn step_screen_pos(&self, map: MapId, x: i32, y: i32) -> Option<Pos2> {
         let pack = self.pack()?;
@@ -1154,7 +1192,7 @@ impl MapView {
         let Some(pack) = self.pack() else { return Vec::new() };
         let mut out = Vec::new();
         for o in pack.objects_of(map) {
-            if o.effective_kind() != ObjectKind::Trainer {
+            if o.effective_kind() != ObjectKind::Trainer || !o.in_version(self.state.version.as_deref()) {
                 continue;
             }
             if let Some(n) = o.trainer_names().first() {

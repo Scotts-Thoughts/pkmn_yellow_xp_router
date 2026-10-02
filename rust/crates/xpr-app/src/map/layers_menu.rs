@@ -29,7 +29,9 @@ fn popup_open_id(ui: &Ui) -> egui::Id {
 
 /// The "Layers" button and, while open, its popup. Persists through `cfg`
 /// on any change, exactly like the chip row it replaces did.
-pub fn show(ui: &mut Ui, theme: &Theme, toggles: &mut Toggles, cfg: &mut Config) {
+/// `image_world`: the pack is a pre-rendered gen 4/5 world, which adds the
+/// obstacle and mask toggles.
+pub fn show(ui: &mut Ui, theme: &Theme, toggles: &mut Toggles, cfg: &mut Config, image_world: bool) {
     let open_id = popup_open_id(ui);
     let mut open = ui.ctx().data_mut(|d| *d.get_temp_mut_or_default::<bool>(open_id));
     // the label reserves room for a painted chevron: the "▾" / "▼" glyphs are
@@ -60,12 +62,18 @@ pub fn show(ui: &mut Ui, theme: &Theme, toggles: &mut Toggles, cfg: &mut Config)
                 row(ui, theme, &mut toggles.signs, "Signs", changed);
                 row(ui, theme, &mut toggles.berries, "Berry trees", changed);
                 row(ui, theme, &mut toggles.npcs, "Other NPCs", changed);
+                if image_world {
+                    row(ui, theme, &mut toggles.obstacles, "Obstacles", changed);
+                }
                 row(ui, theme, &mut toggles.sprites, "Overworld sprites", changed);
             });
             section(ui, theme, "Overlays", &mut changed, |ui, changed| {
                 row(ui, theme, &mut toggles.grid, "Grid", changed);
                 row(ui, theme, &mut toggles.labels, "Map names", changed);
                 row(ui, theme, &mut toggles.path, "Route path", changed);
+                if image_world {
+                    row(ui, theme, &mut toggles.mask, "Dim unreachable areas", changed);
+                }
             });
             section(ui, theme, "Panels", &mut changed, |ui, changed| {
                 row(ui, theme, &mut toggles.navigator, "Navigator", changed);

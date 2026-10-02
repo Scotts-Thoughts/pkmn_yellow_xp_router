@@ -10,7 +10,11 @@ use xpr_app::app::{initial_viewport, ExitState, StartupWork, XprApp};
 use xpr_core::{Config, Paths};
 use xpr_data::Registry;
 
+// the gen 4/5 map pictures (`build.rs`: `write_map_imagery`)
+include!(concat!(env!("OUT_DIR"), "/embedded_imagery.rs"));
+
 fn main() {
+    register_map_imagery();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let debug = args.iter().any(|a| a == "--debug");
     let source_root = xpr_core::consts::find_source_root().unwrap_or_else(|| {

@@ -9,10 +9,14 @@ use xpr_core::consts;
 use xpr_core::io_utils::sanitize_string;
 
 use crate::geom::IRect;
+use crate::image_world::{ImageWorld, Mask, Ownership, TILE_PX};
 use crate::links::Links;
 use crate::model::*;
 
+/// The tileset packs of gens 1–3.
 pub const PACK_FORMAT: u32 = 1;
+/// The pre-rendered "image world" packs of gens 4/5.
+pub const IMAGE_PACK_FORMAT: u32 = 2;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MapError {
@@ -22,7 +26,7 @@ pub enum MapError {
     Missing(String),
     #[error("{0}: {1}")]
     Parse(String, String),
-    #[error("map pack format {0} is not supported (expected {PACK_FORMAT})")]
+    #[error("map pack format {0} is not supported (expected {PACK_FORMAT} or {IMAGE_PACK_FORMAT})")]
     Format(u32),
     #[error("{0}")]
     Other(String),
@@ -84,6 +88,11 @@ pub fn game_for_version(version: &str) -> Option<&'static str> {
         consts::RUBY_VERSION | consts::SAPPHIRE_VERSION => "ruby_sapphire",
         consts::EMERALD_VERSION => "emerald",
         consts::FIRE_RED_VERSION | consts::LEAF_GREEN_VERSION => "firered_leafgreen",
+        consts::DIAMOND_VERSION | consts::PEARL_VERSION => "diamond_pearl",
+        consts::PLATINUM_VERSION => "platinum",
+        consts::HEART_GOLD_VERSION | consts::SOUL_SILVER_VERSION => "heartgold_soulsilver",
+        consts::BLACK_VERSION | consts::WHITE_VERSION => "black_white",
+        consts::BLACK_2_VERSION | consts::WHITE_2_VERSION => "black2_white2",
         _ => return None,
     })
 }
@@ -113,6 +122,8 @@ pub struct MapPack {
     pub sprites: HashMap<String, SpriteMeta>,
     /// raw PNG bytes by sprite file stem (decoded by the viewer on demand)
     pub sprite_png: HashMap<String, Vec<u8>>,
+    /// format 2 only: the pre-rendered world's ownership, terrain and masks
+    pub image: Option<ImageWorld>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -154,6 +165,7 @@ fn kind_of(s: &str) -> Option<ObjectKind> {
         "sign" => ObjectKind::Sign,
         "warp" => ObjectKind::Warp,
         "npc" => ObjectKind::Npc,
+        "obstacle" => ObjectKind::Obstacle,
         _ => return None,
     })
 }
@@ -185,10 +197,17 @@ fn payload_of(kind: ObjectKind, v: &serde_json::Value) -> Payload {
             item: s("item"),
             raw: s("raw"),
             fake: v.get("fake").and_then(|x| x.as_bool()).unwrap_or(false),
+            count: v.get("count").and_then(|x| x.as_u64()).unwrap_or(1).max(1) as u32,
         },
         ObjectKind::Sign => Payload::Sign { text_key: s("text_key").unwrap_or_default() },
-        ObjectKind::Warp => Payload::Warp { dest_map: s("dest_map"), dest_warp: v.get("dest_warp").and_then(|x| x.as_i64()) },
-        ObjectKind::Npc => Payload::Npc { label: s("label"), battles: str_list(v.get("battles")) },
+        ObjectKind::Warp => Payload::Warp {
+            dest_map: s("dest_map"),
+            dest_warp: v.get("dest_warp").and_then(|x| x.as_i64()),
+            dynamic: v.get("dynamic").and_then(|x| x.as_bool()).unwrap_or(false),
+            candidates: str_list(v.get("candidates")),
+        },
+        ObjectKind::Npc => Payload::Npc { label: s("label"), battles: str_list(v.get("battles")), text_key: s("text_key") },
+        ObjectKind::Obstacle => Payload::Obstacle { obstacle: s("obstacle").unwrap_or_default(), label: s("label") },
     }
 }
 
@@ -232,6 +251,13 @@ impl MapPack {
     /// Is the block cell tall grass / surfable water (for the encounter card).
     pub fn terrain_at(&self, id: MapId, bx: u32, by: u32) -> (bool, bool) {
         let Some(m) = self.map(id) else { return (false, false) };
+        if let Some(img) = &self.image {
+            return match img.class_at(id, m.w, m.h, bx as i32, by as i32) {
+                Some(b'g') => (true, false),
+                Some(b'w') => (false, true),
+                _ => (false, false),
+            };
+        }
         let Some(v) = self.block_at(id, bx, by) else { return (false, false) };
         match &m.tileset {
             TilesetRef::Gen12 { file } => (
@@ -256,10 +282,15 @@ impl MapPack {
         if !source.has_game(game) {
             return Err(MapError::NoGame(game.to_string()));
         }
-        let manifest: Manifest = parse("manifest.json", &source.read(game, "manifest.json")?)?;
-        if manifest.format != PACK_FORMAT {
-            return Err(MapError::Format(manifest.format));
+        let manifest_bytes = source.read(game, "manifest.json")?;
+        let header: ManifestHeader = parse("manifest.json", &manifest_bytes)?;
+        if header.format == IMAGE_PACK_FORMAT {
+            return Self::load_image(game, source, &manifest_bytes);
         }
+        if header.format != PACK_FORMAT {
+            return Err(MapError::Format(header.format));
+        }
+        let manifest: Manifest = parse("manifest.json", &manifest_bytes)?;
         let gen = manifest.gen;
         let geom = MapGeom { block_px: manifest.block_px, step_px: manifest.step_px.max(1) };
         let raw_maps: Vec<RawMap> = parse("maps.json", &source.read(game, "maps.json")?)?;
@@ -330,6 +361,10 @@ impl MapPack {
                 const_name: r.const_name.clone(),
                 name: r.name.clone(),
                 display: r.display.clone().unwrap_or_else(|| r.name.clone()),
+                category: None,
+                location: None,
+                image: None,
+                frame: MapFrame { origin: (0, 0), size: ((r.w * geom.block_px) as i32, (r.h * geom.block_px) as i32), image_at: (0, 0) },
                 w: r.w,
                 h: r.h,
                 kind: if r.kind == "outdoor" && world_pos.is_some() { MapKind::Outdoor } else { MapKind::Indoor },
@@ -378,104 +413,7 @@ impl MapPack {
         let grass = terrain.grass.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect();
         let water = terrain.water.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect();
 
-        // --- objects ---
-        let raw_objects: Vec<RawObject> = parse("objects.json", &source.read(game, "objects.json")?)?;
-        let mut objects: Vec<MapObject> = Vec::with_capacity(raw_objects.len());
-        for o in &raw_objects {
-            let (Some(&map), Some(kind)) = (map_index.get(&o.map), kind_of(&o.kind)) else { continue };
-            objects.push(MapObject {
-                map,
-                x: o.x.max(0) as u16,
-                y: o.y.max(0) as u16,
-                kind,
-                sprite: o.sprite.clone(),
-                facing: facing_of(o.facing.as_deref()),
-                pal: o.pal.clone(),
-                payload: payload_of(kind, &o.payload),
-            });
-        }
-        // objects.json is grouped by map in map order; index the ranges
-        let mut objects_by_map: Vec<Range<u32>> = vec![0..0; maps.len()];
-        let mut i = 0usize;
-        while i < objects.len() {
-            let m = objects[i].map;
-            let mut j = i;
-            while j < objects.len() && objects[j].map == m {
-                j += 1;
-            }
-            let r = &mut objects_by_map[m as usize];
-            if r.start == r.end {
-                *r = i as u32..j as u32;
-            } else {
-                log::warn!("objects of map {} are not contiguous", m);
-            }
-            i = j;
-        }
-
-        // --- links / encounters / text / sprites ---
-        let raw_links: RawLinks = parse("links.json", &source.read(game, "links.json")?)?;
-        let conv = |a: &RawAnchor| -> Option<Anchor> {
-            let map = *map_index.get(&a.map)?;
-            Some(Anchor {
-                map,
-                x: a.x.max(0) as u16,
-                y: a.y.max(0) as u16,
-                precision: match a.precision.as_str() {
-                    "object" => Precision::Object,
-                    "script" => Precision::Script,
-                    _ => Precision::Map,
-                },
-                object: a.object,
-                source: a.source.clone().unwrap_or_default(),
-            })
-        };
-        let mut links = Links { stats: raw_links.stats.clone(), ..Default::default() };
-        for (k, v) in &raw_links.trainers {
-            links.trainers.insert(sanitize_string(k), v.iter().filter_map(conv).collect());
-        }
-        for (k, v) in &raw_links.items {
-            links.items.insert(sanitize_string(k), v.iter().filter_map(conv).collect());
-        }
-        let raw_enc: HashMap<String, HashMap<String, RawMethod>> = parse("encounters.json", &source.read(game, "encounters.json")?)?;
-        let mut encounters: HashMap<MapId, EncounterTable> = HashMap::new();
-        for (c, methods) in raw_enc {
-            let Some(&id) = map_index.get(&c) else { continue };
-            let mut table = EncounterTable::default();
-            let mut names: Vec<&String> = methods.keys().collect();
-            names.sort_by_key(|n| method_order(n));
-            for n in names {
-                let m = &methods[n];
-                let mut slots: Vec<(String, Vec<EncounterSlot>)> = m.slots.iter().map(|(v, s)| (v.clone(), s.clone())).collect();
-                slots.sort_by(|a, b| a.0.cmp(&b.0));
-                table.methods.push(EncounterMethod { name: n.clone(), base_rate: m.base_rate, slots });
-            }
-            encounters.insert(id, table);
-        }
-        let sign_text: HashMap<String, String> = source.read(game, "sign_text.json").ok().and_then(|b| parse("sign_text.json", &b).ok()).unwrap_or_default();
-        let sprites_raw: serde_json::Value = source.read(game, "sprites.json").ok().and_then(|b| parse("sprites.json", &b).ok()).unwrap_or(serde_json::Value::Null);
-        let mut sprites = HashMap::new();
-        if let Some(obj) = sprites_raw.as_object() {
-            for (k, v) in obj {
-                let meta = match v {
-                    serde_json::Value::String(f) => SpriteMeta { file: f.clone(), w: 16, h: 16 },
-                    serde_json::Value::Object(o) => SpriteMeta {
-                        file: o.get("file").and_then(|x| x.as_str()).unwrap_or("").to_string(),
-                        w: o.get("width").and_then(|x| x.as_u64()).unwrap_or(16) as u32,
-                        h: o.get("height").and_then(|x| x.as_u64()).unwrap_or(16) as u32,
-                    },
-                    _ => continue,
-                };
-                sprites.insert(k.clone(), meta);
-            }
-        }
-        let mut sprite_png = HashMap::new();
-        for f in source.list(game, "sprites") {
-            if f.ends_with(".png") {
-                if let Ok(b) = source.read(game, &format!("sprites/{}", f)) {
-                    sprite_png.insert(f.trim_end_matches(".png").to_string(), b);
-                }
-            }
-        }
+        let common = load_common(game, source, &map_index, maps.len())?;
 
         Ok(MapPack {
             game: game.to_string(),
@@ -492,20 +430,292 @@ impl MapPack {
             palettes,
             grass,
             water,
-            objects,
-            objects_by_map,
-            links,
-            encounters,
-            sign_text,
-            sprites,
-            sprite_png,
+            objects: common.objects,
+            objects_by_map: common.objects_by_map,
+            links: common.links,
+            encounters: common.encounters,
+            sign_text: common.sign_text,
+            sprites: common.sprites,
+            sprite_png: common.sprite_png,
+            image: None,
         })
+    }
+
+    /// Load a format 2 pack (GEN45_REQUIREMENTS §4): the maps placed by the
+    /// pre-rendered world, the ownership grid, per-tile classes and lift,
+    /// and the masks. Tiles are 16 px and are also the step grid.
+    fn load_image(game: &str, source: &PackSource, manifest_bytes: &[u8]) -> Result<MapPack, MapError> {
+        let manifest: ImageManifest = parse("manifest.json", manifest_bytes)?;
+        let tile = manifest.tile_px.max(1);
+        if tile as i32 != TILE_PX {
+            return Err(MapError::Other(format!("image pack tile size {} is not supported", tile)));
+        }
+        let geom = MapGeom { block_px: tile, step_px: tile };
+        let raw_maps: Vec<RawImageMap> = parse("maps.json", &source.read(game, "maps.json")?)?;
+        let layout_raw: RawImageLayout = parse("layout.json", &source.read(game, "layout.json")?)?;
+        let mut map_index: HashMap<String, MapId> = HashMap::new();
+        for (i, r) in raw_maps.iter().enumerate() {
+            map_index.insert(r.const_name.clone(), i as MapId);
+        }
+        let mut maps: Vec<MapDef> = Vec::with_capacity(raw_maps.len());
+        for (i, r) in raw_maps.iter().enumerate() {
+            let world_pos = if r.kind == "outdoor" { r.pos.map(|p| (p[0], p[1])).or_else(|| layout_raw.positions.get(&r.const_name).map(|p| (p[0], p[1]))) } else { None };
+            let (mw, mh) = ((r.w * tile) as i32, (r.h * tile) as i32);
+            // the scope of an interior is the union of the map and its image
+            let frame = match (&r.image, r.image_origin) {
+                (Some(_), Some(o)) => {
+                    let (iw, ih) = r.image_size.map(|s| (s[0], s[1])).unwrap_or((mw, mh));
+                    let (ux0, uy0) = (o[0].min(0), o[1].min(0));
+                    let (ux1, uy1) = ((o[0] + iw).max(mw), (o[1] + ih).max(mh));
+                    MapFrame { origin: (-ux0, -uy0), size: (ux1 - ux0, uy1 - uy0), image_at: (o[0] - ux0, o[1] - uy0) }
+                }
+                _ => MapFrame { origin: (0, 0), size: (mw, mh), image_at: (0, 0) },
+            };
+            maps.push(MapDef {
+                id: i as MapId,
+                const_name: r.const_name.clone(),
+                name: r.display.clone(),
+                display: r.display.clone(),
+                category: r.category.clone(),
+                location: r.location.clone(),
+                image: r.image.clone(),
+                frame,
+                w: r.w,
+                h: r.h,
+                kind: if world_pos.is_some() { MapKind::Outdoor } else { MapKind::Indoor },
+                tileset: TilesetRef::Gen12 { file: String::new() },
+                palette: PaletteRef::None,
+                connections: Vec::new(),
+                blocks: None,
+                world_pos,
+            });
+        }
+        let mut draw_order = Vec::new();
+        let mut placed_rects = Vec::new();
+        for m in &maps {
+            if let Some((px, py)) = m.world_pos {
+                draw_order.push(m.id);
+                placed_rects.push((IRect::from_size(px * TILE_PX, py * TILE_PX, m.w as i32 * TILE_PX, m.h as i32 * TILE_PX), m.id));
+            }
+        }
+        let layout = WorldLayout { w_blocks: manifest.world.w_px / tile, h_blocks: manifest.world.h_px / tile, draw_order, placed_rects };
+
+        // terrain blobs: classes (u8 per tile) and lift (i16 LE per tile), same map order
+        let classes = source.read(game, "classes.bin")?;
+        let lift_bytes = source.read(game, "lift.bin")?;
+        if lift_bytes.len() != classes.len() * 2 {
+            return Err(MapError::Other("lift.bin does not match classes.bin".into()));
+        }
+        let lift: Vec<i16> = lift_bytes.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect();
+        let mut tiles: Vec<Option<Range<usize>>> = vec![None; maps.len()];
+        let mut max_lift = vec![0i16; maps.len()];
+        for e in &manifest.blobs.classes {
+            let Some(&id) = map_index.get(&e.map) else { continue };
+            let m = &maps[id as usize];
+            if e.len != (m.w * m.h) as usize || e.offset + e.len > classes.len() {
+                return Err(MapError::Other(format!("classes.bin entry of {} has the wrong size", e.map)));
+            }
+            tiles[id as usize] = Some(e.offset..e.offset + e.len);
+            max_lift[id as usize] = lift[e.offset..e.offset + e.len].iter().copied().max().unwrap_or(0).max(0);
+        }
+        let own = &layout_raw.ownership;
+        let ownership = Ownership { origin: (own.origin[0], own.origin[1]), cell: own.cell.max(1), cols: own.cols, rows: own.rows, cells: own.cells.clone() };
+        let masks: RawMasks = source.read(game, "masks.json").ok().and_then(|b| parse("masks.json", &b).ok()).unwrap_or(RawMasks { world: None, interiors: HashMap::new() });
+        let world_mask = masks.world.as_ref().and_then(Mask::decode);
+        let interior_masks = masks.interiors.iter().filter_map(|(k, v)| Mask::decode(v).map(|m| (k.clone(), m))).collect();
+        let image = ImageWorld {
+            w_px: manifest.world.w_px,
+            h_px: manifest.world.h_px,
+            top_px: manifest.world.top_px,
+            levels: manifest.world.levels,
+            tile_size: manifest.world.tile_size,
+            default_map: manifest.world.default_map.as_ref().and_then(|c| map_index.get(c).copied()),
+            ownership,
+            tiles,
+            classes,
+            lift,
+            max_lift,
+            world_mask,
+            interior_masks,
+            imagery: manifest.imagery.clone(),
+            encounter_methods: manifest.encounter_methods.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            encounter_conditions: manifest.encounter_conditions.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+        };
+
+        let mut common = load_common(game, source, &map_index, maps.len())?;
+        // order each table's methods as the manifest lists them (land, then water), conditions after their base
+        let order: Vec<&str> = image.encounter_methods.iter().map(|(k, _)| k.as_str()).collect();
+        for t in common.encounters.values_mut() {
+            t.methods.sort_by_key(|m| {
+                let base = order.iter().enumerate().filter(|(_, b)| m.name == **b || m.name.starts_with(&format!("{}_", b))).max_by_key(|(_, b)| b.len()).map(|(i, _)| i).unwrap_or(order.len());
+                (base, m.name != order.get(base).copied().unwrap_or(""), m.name.clone())
+            });
+        }
+        Ok(MapPack {
+            game: game.to_string(),
+            gen: manifest.gen,
+            versions: manifest.versions.clone(),
+            geom,
+            gen3: None,
+            maps,
+            map_index,
+            layout,
+            blockdata: Vec::new(),
+            blocksets: HashMap::new(),
+            tilesets: HashMap::new(),
+            palettes: Palettes::Gen3(HashMap::new()),
+            grass: HashMap::new(),
+            water: HashMap::new(),
+            objects: common.objects,
+            objects_by_map: common.objects_by_map,
+            links: common.links,
+            encounters: common.encounters,
+            sign_text: common.sign_text,
+            sprites: common.sprites,
+            sprite_png: common.sprite_png,
+            image: Some(image),
+        })
+    }
+
+    /// Whether the pack is a pre-rendered (gen 4/5) world.
+    pub fn is_image(&self) -> bool {
+        self.image.is_some()
+    }
+
+    /// Whether the viewer can show the map on its own (it has tiles, or an image world draws it).
+    pub fn has_view(&self, id: MapId) -> bool {
+        self.map(id).map(|m| m.blocks.is_some() || m.kind == MapKind::Outdoor || (self.image.is_some() && m.image.is_some())).unwrap_or(false)
+    }
+
+    /// px a tile is drawn above its grid position (image worlds; 0 otherwise).
+    pub fn tile_lift(&self, id: MapId, x: i32, y: i32) -> i32 {
+        match (&self.image, self.map(id)) {
+            (Some(img), Some(m)) => img.lift_at(id, m.w, m.h, x, y) as i32,
+            _ => 0,
+        }
     }
 
     /// Default on-disk location next to `raw_pkmn_data`.
     pub fn default_dir(raw_pkmn_data: &Path) -> Option<PathBuf> {
         raw_pkmn_data.parent().map(|p| p.join("map_data"))
     }
+}
+
+/// What both pack formats share: objects, links, encounters, text, sprites.
+struct Common {
+    objects: Vec<MapObject>,
+    objects_by_map: Vec<Range<u32>>,
+    links: Links,
+    encounters: HashMap<MapId, EncounterTable>,
+    sign_text: HashMap<String, String>,
+    sprites: HashMap<String, SpriteMeta>,
+    sprite_png: HashMap<String, Vec<u8>>,
+}
+
+fn load_common(game: &str, source: &PackSource, map_index: &HashMap<String, MapId>, map_count: usize) -> Result<Common, MapError> {
+    // --- objects ---
+    let raw_objects: Vec<RawObject> = parse("objects.json", &source.read(game, "objects.json")?)?;
+    let mut objects: Vec<MapObject> = Vec::with_capacity(raw_objects.len());
+    for o in &raw_objects {
+        let (Some(&map), Some(kind)) = (map_index.get(&o.map), kind_of(&o.kind)) else { continue };
+        objects.push(MapObject {
+            map,
+            x: o.x.max(0) as u16,
+            y: o.y.max(0) as u16,
+            kind,
+            sprite: o.sprite.clone(),
+            facing: facing_of(o.facing.as_deref()),
+            pal: o.pal.clone(),
+            payload: payload_of(kind, &o.payload),
+            lift: o.lift.clamp(i16::MIN as i32, i16::MAX as i32) as i16,
+            version: o.version.clone(),
+        });
+    }
+    // objects.json is grouped by map in map order; index the ranges
+    let mut objects_by_map: Vec<Range<u32>> = vec![0..0; map_count];
+    let mut i = 0usize;
+    while i < objects.len() {
+        let m = objects[i].map;
+        let mut j = i;
+        while j < objects.len() && objects[j].map == m {
+            j += 1;
+        }
+        let r = &mut objects_by_map[m as usize];
+        if r.start == r.end {
+            *r = i as u32..j as u32;
+        } else {
+            log::warn!("objects of map {} are not contiguous", m);
+        }
+        i = j;
+    }
+
+    // --- links / encounters / text / sprites ---
+    let raw_links: RawLinks = parse("links.json", &source.read(game, "links.json")?)?;
+    let conv = |a: &RawAnchor| -> Option<Anchor> {
+        let map = *map_index.get(&a.map)?;
+        Some(Anchor {
+            map,
+            x: a.x.max(0) as u16,
+            y: a.y.max(0) as u16,
+            precision: match a.precision.as_str() {
+                "object" => Precision::Object,
+                "script" => Precision::Script,
+                _ => Precision::Map,
+            },
+            object: a.object,
+            source: a.source.clone().unwrap_or_default(),
+        })
+    };
+    let mut links = Links { stats: raw_links.stats.clone(), ..Default::default() };
+    for (k, v) in &raw_links.trainers {
+        links.trainers.insert(sanitize_string(k), v.iter().filter_map(conv).collect());
+    }
+    for (k, v) in &raw_links.items {
+        links.items.insert(sanitize_string(k), v.iter().filter_map(conv).collect());
+    }
+    let raw_enc: HashMap<String, HashMap<String, RawMethod>> = parse("encounters.json", &source.read(game, "encounters.json")?)?;
+    let mut encounters: HashMap<MapId, EncounterTable> = HashMap::new();
+    for (c, methods) in raw_enc {
+        let Some(&id) = map_index.get(&c) else { continue };
+        let mut table = EncounterTable::default();
+        let mut names: Vec<&String> = methods.keys().collect();
+        names.sort_by_key(|n| method_order(n));
+        for n in names {
+            let m = &methods[n];
+            let mut slots: Vec<(String, Vec<EncounterSlot>)> = m.slots.iter().map(|(v, s)| (v.clone(), s.clone())).collect();
+            slots.sort_by(|a, b| a.0.cmp(&b.0));
+            table.methods.push(EncounterMethod { name: n.clone(), base_rate: m.base_rate, slots });
+        }
+        encounters.insert(id, table);
+    }
+    let sign_text: HashMap<String, String> = source.read(game, "sign_text.json").ok().and_then(|b| parse("sign_text.json", &b).ok()).unwrap_or_default();
+    let sprites_raw: serde_json::Value = source.read(game, "sprites.json").ok().and_then(|b| parse("sprites.json", &b).ok()).unwrap_or(serde_json::Value::Null);
+    let mut sprites = HashMap::new();
+    if let Some(obj) = sprites_raw.as_object() {
+        for (k, v) in obj {
+            let num = |o: &serde_json::Map<String, serde_json::Value>, a: &str, b: &str| o.get(a).or_else(|| o.get(b)).and_then(|x| x.as_u64());
+            let meta = match v {
+                serde_json::Value::String(f) => SpriteMeta { file: f.clone(), w: 16, h: 16, frames: 0 },
+                serde_json::Value::Object(o) => SpriteMeta {
+                    file: o.get("file").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+                    w: num(o, "width", "w").unwrap_or(16) as u32,
+                    h: num(o, "height", "h").unwrap_or(16) as u32,
+                    frames: o.get("frames").and_then(|x| x.as_u64()).unwrap_or(0) as u32,
+                },
+                _ => continue,
+            };
+            sprites.insert(k.clone(), meta);
+        }
+    }
+    let mut sprite_png = HashMap::new();
+    for f in source.list(game, "sprites") {
+        if f.ends_with(".png") {
+            if let Ok(b) = source.read(game, &format!("sprites/{}", f)) {
+                sprite_png.insert(f.trim_end_matches(".png").to_string(), b);
+            }
+        }
+    }
+    Ok(Common { objects, objects_by_map, links, encounters, sign_text, sprites, sprite_png })
 }
 
 fn method_order(name: &str) -> (usize, String) {

@@ -10,6 +10,7 @@ use indexmap::IndexMap;
 use serde_json::Value;
 
 use xpr_core::consts;
+use xpr_core::io_utils;
 use xpr_core::pyjson;
 
 use crate::db::{ItemDB, MinBattlesDB, MoveDB, PkmnDB, TrainerDB};
@@ -375,12 +376,21 @@ fn gen5_move_alias(m: &str) -> String {
         .unwrap_or_else(|| m.to_string())
 }
 
+/// Gens 4/5: `trainer_location` is the in-game place (filled from the
+/// data_objects repo by `tools/data/import_gen45_trainer_locations.py`;
+/// several places are joined with " / "), or null where the trainer can't be
+/// placed, which reads as no location.
+fn optional_location(t: &Value) -> String {
+    match pyjson::get(t, consts::TRAINER_LOC) {
+        Some(Value::String(s)) => s.clone(),
+        _ => String::new(),
+    }
+}
+
 fn create_trainer(gen: Gen, t: &Value, pkmn_db: &PkmnDB, extract_trainer_id: bool) -> Result<Trainer, String> {
     let mut enemy_pkmn: Vec<EnemyPkmn> = Vec::new();
-    let trainer_name = match gen {
-        Gen::Four | Gen::Five => req_str(t, consts::TRAINER_NAME)?,
-        _ => req_str(t, consts::TRAINER_NAME)?,
-    };
+    // gen 5 data (and custom gens copied from it) may still spell ♂/♀/PKMN with font glyphs
+    let trainer_name = io_utils::fix_legacy_name_glyphs(&req_str(t, consts::TRAINER_NAME)?).into_owned();
     let mons = match req(t, consts::TRAINER_POKEMON)? {
         Value::Array(items) => items.clone(),
         _ => Vec::new(),
@@ -615,7 +625,7 @@ fn create_trainer(gen: Gen, t: &Value, pkmn_db: &PkmnDB, extract_trainer_id: boo
             let id = pyjson::get_i64(t, consts::ROM_ID).ok_or_else(|| format!("Issue with {}", pyjson::get_str(t, consts::NAME_KEY).unwrap_or("")))?;
             (
                 id,
-                String::new(),
+                optional_location(t),
                 req_i64(t, consts::MONEY)? * 4,
                 trainer_name.contains("Rematch"),
                 req_bool(t, consts::TRAINER_DOUBLE_BATTLE)?,
@@ -626,7 +636,7 @@ fn create_trainer(gen: Gen, t: &Value, pkmn_db: &PkmnDB, extract_trainer_id: boo
             let last_level = enemy_pkmn.last().map(|m| m.level).unwrap_or(0);
             (
                 id,
-                String::new(),
+                optional_location(t),
                 req_i64(t, consts::MONEY)? * 4 * last_level,
                 trainer_name.contains("Rematch"),
                 req_bool(t, consts::TRAINER_DOUBLE_BATTLE)?,
@@ -635,7 +645,7 @@ fn create_trainer(gen: Gen, t: &Value, pkmn_db: &PkmnDB, extract_trainer_id: boo
     };
 
     Ok(Trainer {
-        trainer_class: req_str(t, consts::TRAINER_CLASS)?,
+        trainer_class: io_utils::fix_legacy_name_glyphs(&req_str(t, consts::TRAINER_CLASS)?).into_owned(),
         name: trainer_name,
         location,
         money,
@@ -656,7 +666,7 @@ fn load_trainer_db(gen: Gen, raw: &Value, pkmn_db: &PkmnDB, extract_trainer_id: 
             unused_count += 1;
             continue;
         }
-        let name = req_str(raw_trainer, consts::TRAINER_NAME)?;
+        let name = io_utils::fix_legacy_name_glyphs(&req_str(raw_trainer, consts::TRAINER_NAME)?).into_owned();
         if matches!(gen, Gen::Three | Gen::Four | Gen::Five) && result.contains_key(&name) {
             return Err(format!(
                 "Multiple trainers with the same name ({}) from trainer file: {}",
@@ -861,6 +871,9 @@ struct FightInfo {
 }
 
 fn load_fight_info(raw: &Value) -> Result<FightInfo, String> {
+    let mut fixed = raw.clone();
+    io_utils::fix_legacy_name_glyphs_in(&mut fixed);
+    let raw = &fixed;
     let badge_rewards = str_map(req(raw, consts::BADGE_REWARDS_KEY)?);
     let raw_major = req(raw, consts::MAJOR_FIGHTS_KEY)?;
     let mut fight_categories = IndexMap::new();

@@ -34,11 +34,11 @@ fn main() {
     };
     let comp = Compositor::new(std::sync::Arc::new(pack));
     let t = Instant::now();
-    let img = comp.render_scope(scope, RenderOpts { night });
+    let img = comp.render_scope(scope, RenderOpts { night, mask: true });
     eprintln!("composited {}x{} in {:.1} ms", img.w, img.h, t.elapsed().as_secs_f64() * 1000.0);
     let t = Instant::now();
-    let chunk = comp.render_chunk(scope, 0, 0, 0, RenderOpts { night });
-    let c5 = comp.render_chunk(scope, 4, 0, 0, RenderOpts { night });
+    let chunk = comp.render_chunk(scope, 0, 0, 0, RenderOpts { night, mask: true });
+    let c5 = comp.render_chunk(scope, 4, 0, 0, RenderOpts { night, mask: true });
     eprintln!("chunk L0 + L4 in {:.1} ms ({}x{}, {}x{})", t.elapsed().as_secs_f64() * 1000.0, chunk.w, chunk.h, c5.w, c5.h);
     std::fs::write(&args[1], img.to_png().expect("png")).expect("write");
     let overview = PathBuf::from(&args[1]).with_extension("l4.png");

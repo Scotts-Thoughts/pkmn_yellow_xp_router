@@ -1007,11 +1007,12 @@ and a screenshot in the PR. Estimates assume one developer.
    pokemap).
 4. Release notes; update `README.md`.
 
-### Phase 7 — Gen 4/5 (deferred; own spec)
+### Phase 7 — Gen 4/5 (own spec)
 
-> 2026-09-26: pokemap now renders all five DS games (commit `9ff6859`), so the
-> image-source blocker below is gone. What pokemap must export for parity
-> (pack format 2, linking rules, gaps) is in `GEN45_REQUIREMENTS.md`.
+> 2026-10-01: built. Diamond/Pearl, Platinum, HeartGold/SoulSilver, Black/White
+> and Black 2/White 2 load as pack format 2 ("image world") and show in the Map
+> tab. `GEN45_REQUIREMENTS.md` has the export contract, the status, and §8 the
+> router side as built. The text below is the original plan.
 
 Blocked on an image source that can be shipped: run pokemap's apicula/trimesh
 renderer for Platinum (and write the missing Diamond/Pearl and HGSS pipelines)

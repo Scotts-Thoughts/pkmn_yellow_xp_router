@@ -37,6 +37,11 @@ opt-level = 3
 
 [profile.dev]
 opt-level = 1
+# Keep target/ small: line tables still give file:line backtraces, but drop
+# the full debug info and the incremental cache (the two biggest parts of
+# target/debug). The cost is a full rebuild of each changed crate.
+debug = "line-tables-only"
+incremental = false
 
 [profile.dev.package."*"]
 opt-level = 2

@@ -573,7 +573,7 @@ fn render_full(pack: &MapPack, comp: &Compositor, theme: &Theme, spec: &ExportSp
     // else to do, else the first 60%; the overlay bands get the rest
     let base_weight = if needs_overlay { 0.6 } else { 1.0 };
 
-    let req = mexport::ExportRequest { scope: spec.scope, rect: spec.rect, scale: spec.scale, opts: RenderOpts { night: spec.night }, transparent: spec.transparent };
+    let req = mexport::ExportRequest { scope: spec.scope, rect: spec.rect, scale: spec.scale, opts: RenderOpts { night: spec.night, mask: spec.toggles.mask }, transparent: spec.transparent };
     let mut out = mexport::render(comp, &req, &mut |f| progress(f * base_weight)).map_err(|e| e.to_string())?;
     if !needs_overlay {
         if !progress(1.0) {

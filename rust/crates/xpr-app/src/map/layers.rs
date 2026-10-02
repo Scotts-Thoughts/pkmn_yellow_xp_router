@@ -24,6 +24,7 @@ pub const COLOR_NPC: Color32 = Color32::from_rgb(0x88, 0x88, 0xff);
 pub const COLOR_SIGN: Color32 = Color32::from_rgb(0xff, 0xff, 0xff);
 pub const COLOR_HIDDEN: Color32 = Color32::from_rgb(0xff, 0x66, 0xff);
 pub const COLOR_BERRY: Color32 = Color32::from_rgb(0x66, 0xdd, 0xcc);
+pub const COLOR_OBSTACLE: Color32 = Color32::from_rgb(0xc0, 0x96, 0x60);
 
 pub fn marker_style(kind: ObjectKind) -> (Color32, &'static str, bool) {
     match kind {
@@ -34,6 +35,7 @@ pub fn marker_style(kind: ObjectKind) -> (Color32, &'static str, bool) {
         ObjectKind::Sign => (COLOR_SIGN, "S", true),
         ObjectKind::Warp => (COLOR_WARP, "W", true),
         ObjectKind::Npc => (COLOR_NPC, "", true),
+        ObjectKind::Obstacle => (COLOR_OBSTACLE, "X", true),
     }
 }
 
@@ -46,7 +48,8 @@ pub fn max_level(pack: &MapPack, scope: Scope) -> u8 {
 
 /// Draw the base layer. Returns the chunk keys that should be requested
 /// (visible, not ready), nearest to the centre first.
-pub fn draw_base(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPack, scope: Scope, night: bool, cache: &mut ChunkCache) -> Vec<ChunkKey> {
+#[allow(clippy::too_many_arguments)]
+pub fn draw_base(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPack, scope: Scope, night: bool, mask: bool, cache: &mut ChunkCache) -> Vec<ChunkKey> {
     let max_lvl = max_level(pack, scope);
     let level = cam.lod_level(max_lvl);
     let span = CHUNK_PX << level;
@@ -70,7 +73,7 @@ pub fn draw_base(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPack
     let uv_full = Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0));
     for cy in cy0..=cy1 {
         for cx in cx0..=cx1 {
-            let key = ChunkKey { scope, level, cx: cx as u32, cy: cy as u32, night };
+            let key = ChunkKey { scope, level, cx: cx as u32, cy: cy as u32, night, mask };
             let wx0 = cx * span;
             let wy0 = cy * span;
             let rect = Rect::from_min_size(origin + Vec2::new(wx0 as f32 * scale, wy0 as f32 * scale), Vec2::splat(span as f32 * scale));
@@ -83,7 +86,7 @@ pub fn draw_base(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPack
             // fallback: the nearest coarser chunk that is ready
             let mut drawn = false;
             for k in 1..=(max_lvl.saturating_sub(level)) {
-                let pk = ChunkKey { scope, level: level + k, cx: (cx >> k) as u32, cy: (cy >> k) as u32, night };
+                let pk = ChunkKey { scope, level: level + k, cx: (cx >> k) as u32, cy: (cy >> k) as u32, night, mask };
                 if let Some(tex) = cache.get(&pk) {
                     let n = 1 << k;
                     let fx = (cx & (n - 1)) as f32 / n as f32;
@@ -114,7 +117,7 @@ pub fn draw_base(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPack
         let s = CHUNK_PX << l;
         for cy in (vis.y0 / s).max(0)..=((vis.y1 - 1) / s) {
             for cx in (vis.x0 / s).max(0)..=((vis.x1 - 1) / s) {
-                let key = ChunkKey { scope, level: l, cx: cx as u32, cy: cy as u32, night };
+                let key = ChunkKey { scope, level: l, cx: cx as u32, cy: cy as u32, night, mask };
                 if !cache.has(&key) {
                     out.push(key);
                 }
@@ -125,7 +128,7 @@ pub fn draw_base(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPack
 }
 
 /// Keys of every chunk of the coarse levels (>= `from_level`) of a scope.
-pub fn overview_keys(pack: &MapPack, scope: Scope, night: bool, from_level: u8) -> Vec<ChunkKey> {
+pub fn overview_keys(pack: &MapPack, scope: Scope, night: bool, mask: bool, from_level: u8) -> Vec<ChunkKey> {
     let max_lvl = max_level(pack, scope);
     let r = geom::scope_rect(pack, scope);
     let mut out = Vec::new();
@@ -133,7 +136,7 @@ pub fn overview_keys(pack: &MapPack, scope: Scope, night: bool, from_level: u8) 
         let span = CHUNK_PX << level;
         for cy in 0..=((r.y1 - 1).max(0) / span) {
             for cx in 0..=((r.x1 - 1).max(0) / span) {
-                out.push(ChunkKey { scope, level, cx: cx as u32, cy: cy as u32, night });
+                out.push(ChunkKey { scope, level, cx: cx as u32, cy: cy as u32, night, mask });
             }
         }
     }
@@ -168,9 +171,20 @@ pub fn draw_markers(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapP
     let use_sprites = mc.toggles.sprites && zoom >= SPRITE_MIN_ZOOM;
     let font = egui::FontId::monospace((9.0 * zoom).clamp(8.0, 13.0));
     let mut drawn = 0;
+    // image worlds draw markers raised by their lift, so a map's markers can stand above its rectangle
+    let lift_slack = |id: xpr_map::MapId| pack.image.as_ref().and_then(|i| i.max_lift.get(id as usize)).copied().unwrap_or(0) as i32;
     let maps: Vec<(xpr_map::MapId, i32, i32)> = match scope {
-        Scope::World => pack.layout.placed_rects.iter().filter(|(rect, _)| rect.intersects(&vis)).map(|(rect, id)| (*id, rect.x0, rect.y0)).collect(),
-        Scope::Map(id) => vec![(id, 0, 0)],
+        Scope::World => pack
+            .layout
+            .placed_rects
+            .iter()
+            .filter(|(rect, id)| xpr_map::IRect::new(rect.x0, rect.y0 - lift_slack(*id), rect.x1, rect.y1).intersects(&vis))
+            .map(|(rect, id)| (*id, rect.x0, rect.y0))
+            .collect(),
+        Scope::Map(id) => {
+            let (ox, oy) = geom::map_origin_px(pack, scope, id).unwrap_or((0, 0));
+            vec![(id, ox, oy)]
+        }
     };
     let s = pack.geom.step_px as f32;
     // the same rounded origin as the chunk layer, so sprites sit exactly on their tiles
@@ -185,11 +199,12 @@ pub fn draw_markers(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapP
         for idx in range {
             let o = &pack.objects[idx as usize];
             let kind = o.effective_kind();
-            if !mc.toggles.visible(kind) {
+            if !mc.toggles.visible(kind) || !o.in_version(mc.state.version.as_deref()) {
                 continue;
             }
+            let lift = o.lift as f32;
             let wx = ox as f32 + o.x as f32 * s + s / 2.0;
-            let wy = oy as f32 + o.y as f32 * s + s / 2.0;
+            let wy = oy as f32 + o.y as f32 * s + s / 2.0 - lift;
             if (wx as i32) < vis.x0 - 64 || (wx as i32) > vis.x1 + 64 || (wy as i32) < vis.y0 - 64 || (wy as i32) > vis.y1 + 64 {
                 continue;
             }
@@ -202,12 +217,12 @@ pub fn draw_markers(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapP
                 _ => false,
             };
             let highlighted = mc.hover == Some(idx) || mc.selected == Some(idx);
-            let sprite_kind = matches!(kind, ObjectKind::Trainer | ObjectKind::Npc | ObjectKind::Item | ObjectKind::Berry);
+            let sprite_kind = matches!(kind, ObjectKind::Trainer | ObjectKind::Npc | ObjectKind::Item | ObjectKind::Berry | ObjectKind::Obstacle);
             if use_sprites && sprite_kind {
                 if let Some(f) = atlas.frame(mc.ctx, pack, o, mc.night) {
                     // 16 px of sprite = one step; taller frames rise above their step, wider ones centre on it
                     let step_left = origin.x + (ox as f32 + o.x as f32 * s) * zoom;
-                    let step_bottom = origin.y + (oy as f32 + (o.y as f32 + 1.0) * s) * zoom;
+                    let step_bottom = origin.y + (oy as f32 + (o.y as f32 + 1.0) * s - lift) * zoom;
                     let w = f.w as f32 * zoom;
                     let h = f.h as f32 * zoom;
                     let x0 = step_left - (w - s * zoom) / 2.0;

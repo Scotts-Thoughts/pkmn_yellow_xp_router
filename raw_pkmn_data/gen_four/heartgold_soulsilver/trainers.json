@@ -103,7 +103,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Azalea Town",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -327,7 +327,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 31",
             "ai_flags": [
                 "Basic"
             ],
@@ -436,7 +436,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -483,7 +483,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -618,7 +618,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -664,7 +664,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 30",
             "ai_flags": [
                 "Basic"
             ],
@@ -711,7 +711,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 40",
             "ai_flags": [
                 "Basic"
             ],
@@ -788,7 +788,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Azalea Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -1004,7 +1004,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "SLOWPOKE Well",
             "ai_flags": [
                 "Basic"
             ],
@@ -1081,7 +1081,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "SLOWPOKE Well",
             "ai_flags": [
                 "Basic"
             ],
@@ -1190,7 +1190,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -1299,7 +1299,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic"
             ],
@@ -1377,7 +1377,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 40",
             "ai_flags": [
                 "Basic"
             ],
@@ -1424,7 +1424,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -1554,7 +1554,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -1738,7 +1738,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Violet City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack"
@@ -1844,7 +1844,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Azalea Town",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -1893,7 +1893,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -1941,7 +1941,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -1989,7 +1989,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 36",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -2097,7 +2097,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -2145,7 +2145,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -2193,7 +2193,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -2302,7 +2302,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -2378,7 +2378,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Violet City",
             "ai_flags": [
                 "Basic"
             ],
@@ -2459,7 +2459,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -2604,7 +2604,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -2718,7 +2718,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mahogany Town",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -2833,7 +2833,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Olivine City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -2916,7 +2916,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cianwood City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -3060,7 +3060,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Blackthorn City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -3140,7 +3140,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -3222,7 +3222,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -3269,7 +3269,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -3380,7 +3380,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 39",
             "ai_flags": [
                 "Basic"
             ],
@@ -3475,7 +3475,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -3522,7 +3522,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ruins of Alph",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -3624,7 +3624,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Sprout Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -3673,7 +3673,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 39",
             "ai_flags": [
                 "Basic"
             ],
@@ -3720,7 +3720,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 39",
             "ai_flags": [
                 "Basic"
             ],
@@ -3829,7 +3829,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -3904,7 +3904,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 30",
             "ai_flags": [
                 "Basic"
             ],
@@ -3982,7 +3982,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -4057,7 +4057,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -4104,7 +4104,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Violet City",
             "ai_flags": [
                 "Basic"
             ],
@@ -4204,7 +4204,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Sprout Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -4306,7 +4306,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Sprout Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -4352,7 +4352,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Sprout Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -4430,7 +4430,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Sprout Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -4476,7 +4476,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Sprout Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -4525,7 +4525,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -4572,7 +4572,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -4619,7 +4619,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -4728,7 +4728,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -4804,7 +4804,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -4882,7 +4882,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 33",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -5021,7 +5021,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -5146,7 +5146,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -5253,7 +5253,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -5300,7 +5300,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -5403,7 +5403,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Azalea Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -5477,7 +5477,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Azalea Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -5524,7 +5524,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Azalea Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -5602,7 +5602,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -5711,7 +5711,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -5789,7 +5789,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -5960,7 +5960,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -6068,7 +6068,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -6148,7 +6148,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -6197,7 +6197,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -6244,7 +6244,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -6291,7 +6291,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -6369,7 +6369,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -6447,7 +6447,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -6526,7 +6526,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 37",
             "ai_flags": [
                 "Basic"
             ],
@@ -6635,7 +6635,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic"
             ],
@@ -6682,7 +6682,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Fuchsia City",
             "ai_flags": [
                 "Basic"
             ],
@@ -6729,7 +6729,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Fuchsia City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -6809,7 +6809,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 40",
             "ai_flags": [
                 "Basic"
             ],
@@ -6918,7 +6918,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 40",
             "ai_flags": [
                 "Basic"
             ],
@@ -7216,7 +7216,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -7326,7 +7326,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -7404,7 +7404,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -7451,7 +7451,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -7529,7 +7529,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -7607,7 +7607,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -7716,7 +7716,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -7918,7 +7918,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -7965,7 +7965,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -8039,7 +8039,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -8086,7 +8086,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 41",
             "ai_flags": [
                 "Basic"
             ],
@@ -8164,7 +8164,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 33",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -8243,7 +8243,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "SLOWPOKE Well",
             "ai_flags": [
                 "Basic"
             ],
@@ -8352,7 +8352,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -8463,7 +8463,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -8512,7 +8512,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -8925,7 +8925,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9036,7 +9036,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lake of Rage",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9147,7 +9147,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Blackthorn City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9196,7 +9196,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Blackthorn City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9276,7 +9276,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Blackthorn City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9356,7 +9356,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9467,7 +9467,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9578,7 +9578,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9658,7 +9658,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lake of Rage",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9738,7 +9738,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Blackthorn City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9818,7 +9818,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9867,7 +9867,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Blackthorn City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -9947,7 +9947,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -10058,7 +10058,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -10163,7 +10163,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic"
             ],
@@ -10210,7 +10210,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 42",
             "ai_flags": [
                 "Basic"
             ],
@@ -10319,7 +10319,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -10397,7 +10397,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -10444,7 +10444,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lake of Rage",
             "ai_flags": [
                 "Basic"
             ],
@@ -10576,7 +10576,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lake of Rage",
             "ai_flags": [
                 "Basic"
             ],
@@ -10716,7 +10716,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -10794,7 +10794,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 42",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -10842,7 +10842,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -10921,7 +10921,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -10969,7 +10969,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -11048,7 +11048,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -11158,7 +11158,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 42",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -11268,7 +11268,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -11378,7 +11378,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Fuchsia City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -11457,7 +11457,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -11553,7 +11553,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -11631,7 +11631,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -11789,7 +11789,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -11898,7 +11898,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -12008,7 +12008,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -12056,7 +12056,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -12135,7 +12135,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -12183,7 +12183,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 46",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -12232,7 +12232,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 25",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -12312,7 +12312,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -12423,7 +12423,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -12503,7 +12503,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 46",
             "ai_flags": [
                 "Basic"
             ],
@@ -12550,7 +12550,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [
                 "Basic"
             ],
@@ -12628,7 +12628,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [
                 "Basic"
             ],
@@ -12799,7 +12799,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 46",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -12909,7 +12909,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 33",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -12957,7 +12957,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cianwood City",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -13005,7 +13005,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cianwood City",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -13084,7 +13084,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mt. Mortar",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -13194,7 +13194,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cianwood City",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -13243,7 +13243,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -13293,7 +13293,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -13343,7 +13343,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -13393,7 +13393,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -13443,7 +13443,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -14100,7 +14100,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -14241,7 +14241,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -14572,7 +14572,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -14713,7 +14713,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -14808,7 +14808,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic"
             ],
@@ -14855,7 +14855,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic"
             ],
@@ -14964,7 +14964,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Fuchsia City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -15043,7 +15043,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -15122,7 +15122,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -15231,7 +15231,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -15402,7 +15402,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -15480,7 +15480,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -15620,7 +15620,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -15667,7 +15667,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -15745,7 +15745,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -15854,7 +15854,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -15963,7 +15963,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -16059,7 +16059,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -16137,7 +16137,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -16215,7 +16215,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -16262,7 +16262,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -16340,7 +16340,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -16480,7 +16480,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -16558,7 +16558,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -16606,7 +16606,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -16685,7 +16685,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -16764,7 +16764,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -16874,7 +16874,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -17016,7 +17016,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -17190,7 +17190,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -17377,7 +17377,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -17424,7 +17424,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -17502,7 +17502,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -17611,7 +17611,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -17658,7 +17658,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -17799,7 +17799,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -17908,7 +17908,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -17955,7 +17955,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -18064,7 +18064,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -18142,7 +18142,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -18238,7 +18238,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -18316,7 +18316,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -18425,7 +18425,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -18601,7 +18601,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -18679,7 +18679,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -18835,7 +18835,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack"
@@ -18885,7 +18885,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -18994,7 +18994,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Vermilion City",
             "ai_flags": [
                 "Basic"
             ],
@@ -19072,7 +19072,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod Tunnel",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -19182,7 +19182,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -19261,7 +19261,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -19371,7 +19371,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -19482,7 +19482,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -19593,7 +19593,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -19671,7 +19671,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -19718,7 +19718,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -19858,7 +19858,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -19967,7 +19967,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -20222,7 +20222,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -20399,7 +20399,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -20576,7 +20576,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -20753,7 +20753,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -20864,7 +20864,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -20938,7 +20938,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 30",
             "ai_flags": [
                 "Basic"
             ],
@@ -21078,7 +21078,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -21157,7 +21157,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cianwood City",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -21236,7 +21236,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 19",
             "ai_flags": [
                 "Basic"
             ],
@@ -21411,7 +21411,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pewter City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -21557,7 +21557,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cerulean City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -21734,7 +21734,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Vermilion City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -21880,7 +21880,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celadon City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -22058,7 +22058,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Fuchsia City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -22173,7 +22173,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -22288,7 +22288,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -22498,7 +22498,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mt. Silver Cave",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -22707,7 +22707,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -22958,7 +22958,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Burned Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -23162,7 +23162,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -23318,7 +23318,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Azalea Town",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -23460,7 +23460,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Burned Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -23664,7 +23664,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -23775,7 +23775,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Azalea Town",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -23917,7 +23917,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Burned Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -24090,7 +24090,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -24294,7 +24294,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -24514,7 +24514,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -24656,7 +24656,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -24736,7 +24736,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -24845,7 +24845,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -24985,7 +24985,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -25033,7 +25033,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 30",
             "ai_flags": [
                 "Basic"
             ],
@@ -25080,7 +25080,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 30",
             "ai_flags": [
                 "Basic"
             ],
@@ -25127,7 +25127,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Burned Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -25236,7 +25236,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Burned Tower",
             "ai_flags": [
                 "Basic"
             ],
@@ -25314,7 +25314,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic"
             ],
@@ -25454,7 +25454,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -25656,7 +25656,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mt. Moon",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -25860,7 +25860,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mt. Moon",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -26064,7 +26064,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mt. Moon",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -26237,7 +26237,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -26410,7 +26410,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -26517,7 +26517,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Sprout Tower",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -26565,7 +26565,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 19",
             "ai_flags": [
                 "Basic"
             ],
@@ -26721,7 +26721,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -26830,7 +26830,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -26955,7 +26955,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -27002,7 +27002,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cerulean City",
             "ai_flags": [
                 "Basic"
             ],
@@ -27080,7 +27080,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cerulean City",
             "ai_flags": [
                 "Basic"
             ],
@@ -27158,7 +27158,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [
                 "Basic"
             ],
@@ -27236,7 +27236,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic"
             ],
@@ -27345,7 +27345,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 18",
             "ai_flags": [
                 "Basic"
             ],
@@ -27392,7 +27392,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 18",
             "ai_flags": [
                 "Basic"
             ],
@@ -27439,7 +27439,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic"
             ],
@@ -28054,7 +28054,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pewter City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -28196,7 +28196,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [
                 "Basic"
             ],
@@ -28243,7 +28243,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [
                 "Basic"
             ],
@@ -28321,7 +28321,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [
                 "Basic"
             ],
@@ -28430,7 +28430,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 18",
             "ai_flags": [
                 "Basic"
             ],
@@ -28477,7 +28477,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -28555,7 +28555,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -28664,7 +28664,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -28773,7 +28773,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 11",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -28822,7 +28822,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 11",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -28902,7 +28902,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic"
             ],
@@ -28978,7 +28978,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic"
             ],
@@ -29056,7 +29056,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -29165,7 +29165,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -29274,7 +29274,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -29321,7 +29321,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 42",
             "ai_flags": [
                 "Basic"
             ],
@@ -29430,7 +29430,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 42",
             "ai_flags": [
                 "Basic"
             ],
@@ -29539,7 +29539,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -29617,7 +29617,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celadon City",
             "ai_flags": [
                 "Basic"
             ],
@@ -29726,7 +29726,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 1",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -29805,7 +29805,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -29853,7 +29853,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 25",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -29933,7 +29933,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 25",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -30041,7 +30041,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -30120,7 +30120,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [
                 "Basic"
             ],
@@ -30198,7 +30198,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [
                 "Basic"
             ],
@@ -30307,7 +30307,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -30385,7 +30385,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 46",
             "ai_flags": [
                 "Basic"
             ],
@@ -30432,7 +30432,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celadon City",
             "ai_flags": [
                 "Basic"
             ],
@@ -30543,7 +30543,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Vermilion City",
             "ai_flags": [
                 "Basic"
             ],
@@ -30701,7 +30701,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -31093,7 +31093,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celadon City",
             "ai_flags": [
                 "Basic"
             ],
@@ -31187,7 +31187,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [
                 "Basic"
             ],
@@ -31389,7 +31389,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -31498,7 +31498,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic"
             ],
@@ -31545,7 +31545,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic"
             ],
@@ -31716,7 +31716,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -31763,7 +31763,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 24",
             "ai_flags": [
                 "Basic"
             ],
@@ -31872,7 +31872,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 25",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -31983,7 +31983,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 25",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -32093,7 +32093,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celadon City",
             "ai_flags": [
                 "Basic",
                 "Expert",
@@ -32173,7 +32173,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -32283,7 +32283,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -32331,7 +32331,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -32379,7 +32379,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -32488,7 +32488,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 25",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -32568,7 +32568,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 1",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -32618,7 +32618,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -32698,7 +32698,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -32808,7 +32808,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -32856,7 +32856,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 25",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -32966,7 +32966,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -33045,7 +33045,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack"
@@ -33124,7 +33124,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -33265,7 +33265,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 19",
             "ai_flags": [
                 "Basic"
             ],
@@ -33343,7 +33343,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 19",
             "ai_flags": [
                 "Basic"
             ],
@@ -33499,7 +33499,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -33577,7 +33577,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -33951,7 +33951,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic"
             ],
@@ -34060,7 +34060,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic"
             ],
@@ -34107,7 +34107,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 11",
             "ai_flags": [
                 "Basic"
             ],
@@ -34185,7 +34185,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 11",
             "ai_flags": [
                 "Basic"
             ],
@@ -34263,7 +34263,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -34369,7 +34369,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -34416,7 +34416,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -34541,7 +34541,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 37",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -34698,7 +34698,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -34775,7 +34775,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 39",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -34823,7 +34823,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Union Cave",
             "ai_flags": [
                 "Basic"
             ],
@@ -34869,7 +34869,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod Tunnel",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -34948,7 +34948,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod Tunnel",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -35085,7 +35085,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Goldenrod Tunnel",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -35301,7 +35301,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 36",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -35412,7 +35412,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Vermilion City",
             "ai_flags": [
                 "Basic"
             ],
@@ -35459,7 +35459,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -35538,7 +35538,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic"
             ],
@@ -35647,7 +35647,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -35727,7 +35727,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -35777,7 +35777,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -35824,7 +35824,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic"
             ],
@@ -35933,7 +35933,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -36013,7 +36013,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -36091,7 +36091,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -36140,7 +36140,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -36219,7 +36219,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -36299,7 +36299,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -36378,7 +36378,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -36425,7 +36425,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic"
             ],
@@ -36472,7 +36472,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -36583,7 +36583,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -36694,7 +36694,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic"
             ],
@@ -36741,7 +36741,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic"
             ],
@@ -36850,7 +36850,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -37008,7 +37008,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -37185,7 +37185,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -37265,7 +37265,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 25",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -37313,7 +37313,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -37391,7 +37391,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -37469,7 +37469,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -37580,7 +37580,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -37626,7 +37626,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -37704,7 +37704,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic"
             ],
@@ -37860,7 +37860,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -37940,7 +37940,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Expert",
@@ -38017,7 +38017,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "S.S. Aqua",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -38096,7 +38096,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -38175,7 +38175,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -38254,7 +38254,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 36",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -38395,7 +38395,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 36",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -38474,7 +38474,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -38553,7 +38553,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -38601,7 +38601,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic"
             ],
@@ -38648,7 +38648,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic"
             ],
@@ -38726,7 +38726,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 39",
             "ai_flags": [
                 "Basic"
             ],
@@ -38866,7 +38866,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 39",
             "ai_flags": [
                 "Basic"
             ],
@@ -38944,7 +38944,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -39022,7 +39022,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -39227,7 +39227,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -39338,7 +39338,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -39418,7 +39418,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic"
             ],
@@ -39496,7 +39496,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -39605,7 +39605,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -39652,7 +39652,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -39761,7 +39761,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -39839,7 +39839,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -39918,7 +39918,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -40028,7 +40028,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 46",
             "ai_flags": [
                 "Basic"
             ],
@@ -40168,7 +40168,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -40308,7 +40308,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -40417,7 +40417,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -40528,7 +40528,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -40608,7 +40608,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -40688,7 +40688,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -40830,7 +40830,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 31",
             "ai_flags": [
                 "Basic"
             ],
@@ -40965,7 +40965,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 31",
             "ai_flags": [
                 "Basic"
             ],
@@ -41012,7 +41012,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -41090,7 +41090,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -41170,7 +41170,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -41251,7 +41251,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -41299,7 +41299,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic"
             ],
@@ -41346,7 +41346,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic"
             ],
@@ -41424,7 +41424,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -41469,7 +41469,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -41579,7 +41579,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -41689,7 +41689,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -41737,7 +41737,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -42239,7 +42239,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -42350,7 +42350,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -42399,7 +42399,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mahogany Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -42446,7 +42446,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mahogany Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -42555,7 +42555,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mahogany Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -42633,7 +42633,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mahogany Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -42742,7 +42742,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mahogany Town",
             "ai_flags": [
                 "Basic"
             ],
@@ -42851,7 +42851,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -42929,7 +42929,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "SLOWPOKE Well",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -43133,7 +43133,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -43244,7 +43244,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -43451,7 +43451,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -43658,7 +43658,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -43865,7 +43865,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -43975,7 +43975,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -44022,7 +44022,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -44194,7 +44194,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -44240,7 +44240,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cherrygrove City",
             "ai_flags": [
                 "Basic"
             ],
@@ -44285,7 +44285,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cherrygrove City",
             "ai_flags": [
                 "Basic"
             ],
@@ -44330,7 +44330,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cherrygrove City",
             "ai_flags": [
                 "Basic"
             ],
@@ -44439,7 +44439,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cianwood City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -44519,7 +44519,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic"
             ],
@@ -44566,7 +44566,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragon’s Den",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -44677,7 +44677,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragon’s Den",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -44757,7 +44757,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragon’s Den",
             "ai_flags": [
                 "Basic"
             ],
@@ -44868,7 +44868,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -45119,7 +45119,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 36",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -45339,7 +45339,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic",
                 "Expert",
@@ -45498,7 +45498,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -45545,7 +45545,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 30",
             "ai_flags": [
                 "Basic"
             ],
@@ -45732,7 +45732,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 31",
             "ai_flags": [
                 "Basic"
             ],
@@ -45810,7 +45810,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -45935,7 +45935,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -46122,7 +46122,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 42",
             "ai_flags": [
                 "Basic"
             ],
@@ -46231,7 +46231,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 32",
             "ai_flags": [
                 "Basic"
             ],
@@ -46449,7 +46449,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -46605,7 +46605,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic"
             ],
@@ -46714,7 +46714,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 33",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -46965,7 +46965,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -47249,7 +47249,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -47329,7 +47329,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 38",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -47549,7 +47549,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 43",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -48126,7 +48126,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mt. Mortar",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -48174,7 +48174,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mt. Mortar",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -48222,7 +48222,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mt. Mortar",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -48634,7 +48634,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 1",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -48714,7 +48714,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 1",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -48826,7 +48826,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -48874,7 +48874,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -48953,7 +48953,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -49064,7 +49064,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -49143,7 +49143,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -49222,7 +49222,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [
                 "Basic"
             ],
@@ -49300,7 +49300,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [
                 "Basic"
             ],
@@ -49349,7 +49349,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [
                 "Basic"
             ],
@@ -49427,7 +49427,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -49505,7 +49505,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -49583,7 +49583,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic",
                 "Weather"
@@ -49687,7 +49687,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -49765,7 +49765,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -49812,7 +49812,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -49861,7 +49861,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -49910,7 +49910,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -49957,7 +49957,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -50035,7 +50035,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -50084,7 +50084,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic"
             ],
@@ -50131,7 +50131,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -50210,7 +50210,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -50258,7 +50258,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -50335,7 +50335,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic"
             ],
@@ -50413,7 +50413,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic"
             ],
@@ -50491,7 +50491,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic"
             ],
@@ -50538,7 +50538,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -50616,7 +50616,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -50663,7 +50663,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -50772,7 +50772,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -50819,7 +50819,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -50866,7 +50866,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -50913,7 +50913,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -50991,7 +50991,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -51038,7 +51038,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -51087,7 +51087,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -51134,7 +51134,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -51212,7 +51212,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -51259,7 +51259,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -51337,7 +51337,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -51415,7 +51415,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -51462,7 +51462,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -51571,7 +51571,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 20",
             "ai_flags": [
                 "Basic"
             ],
@@ -51711,7 +51711,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -51758,7 +51758,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -51836,7 +51836,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -51883,7 +51883,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -51930,7 +51930,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -52008,7 +52008,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -52086,7 +52086,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -52195,7 +52195,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -52335,7 +52335,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 21",
             "ai_flags": [
                 "Basic"
             ],
@@ -52413,7 +52413,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [
                 "Basic"
             ],
@@ -52460,7 +52460,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -52509,7 +52509,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [
                 "Basic"
             ],
@@ -52556,7 +52556,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Ecruteak City",
             "ai_flags": [
                 "Basic"
             ],
@@ -52667,7 +52667,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic"
             ],
@@ -52807,7 +52807,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 46",
             "ai_flags": [
                 "Basic"
             ],
@@ -52916,7 +52916,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -53058,7 +53058,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -53137,7 +53137,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 45",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -53247,7 +53247,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 27",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -53358,7 +53358,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -53436,7 +53436,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 26",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -53578,7 +53578,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 39",
             "ai_flags": [
                 "Basic"
             ],
@@ -53625,7 +53625,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic"
             ],
@@ -53734,7 +53734,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 44",
             "ai_flags": [
                 "Basic"
             ],
@@ -53812,7 +53812,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -53891,7 +53891,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -53970,7 +53970,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "National Park",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -54049,7 +54049,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -54127,7 +54127,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -54205,7 +54205,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 34",
             "ai_flags": [
                 "Basic"
             ],
@@ -54283,7 +54283,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -54361,7 +54361,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -54470,7 +54470,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 35",
             "ai_flags": [
                 "Basic"
             ],
@@ -54548,7 +54548,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -54626,7 +54626,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -54704,7 +54704,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -54782,7 +54782,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -54860,7 +54860,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -54938,7 +54938,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [
                 "Basic"
             ],
@@ -55016,7 +55016,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55094,7 +55094,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55172,7 +55172,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55250,7 +55250,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55328,7 +55328,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55437,7 +55437,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55515,7 +55515,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55593,7 +55593,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55671,7 +55671,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [
                 "Basic"
             ],
@@ -55749,7 +55749,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -55829,7 +55829,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -55909,7 +55909,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -56017,7 +56017,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -56124,7 +56124,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -56261,7 +56261,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -56338,7 +56338,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic"
             ],
@@ -56416,7 +56416,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic"
             ],
@@ -56494,7 +56494,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [
                 "Basic"
             ],
@@ -56572,7 +56572,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic"
             ],
@@ -56650,7 +56650,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic"
             ],
@@ -56728,7 +56728,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic"
             ],
@@ -56837,7 +56837,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -56947,7 +56947,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -57057,7 +57057,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -57136,7 +57136,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -57214,7 +57214,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -57292,7 +57292,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic"
             ],
@@ -57432,7 +57432,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -57573,7 +57573,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -57714,7 +57714,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -57793,7 +57793,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -57904,7 +57904,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -58015,7 +58015,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -58126,7 +58126,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -58266,7 +58266,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -58406,7 +58406,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -58538,7 +58538,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -58699,7 +58699,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -58889,7 +58889,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [
                 "Basic"
             ],
@@ -59818,7 +59818,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -59867,7 +59867,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -59916,7 +59916,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Lighthouse",
             "ai_flags": [
                 "Basic"
             ],
@@ -59963,7 +59963,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Team Rocket HQ",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -60043,7 +60043,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cerulean City",
             "ai_flags": [
                 "Basic"
             ],
@@ -60090,7 +60090,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cerulean City",
             "ai_flags": [
                 "Basic"
             ],
@@ -60137,7 +60137,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cerulean City",
             "ai_flags": [
                 "Basic"
             ],
@@ -60215,7 +60215,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 37",
             "ai_flags": [
                 "Basic"
             ],
@@ -60293,7 +60293,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 37",
             "ai_flags": [
                 "Basic"
             ],
@@ -60371,7 +60371,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -60451,7 +60451,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -60531,7 +60531,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -60611,7 +60611,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -60660,7 +60660,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pewter City",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -60739,7 +60739,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic"
             ],
@@ -60817,7 +60817,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic"
             ],
@@ -60861,7 +60861,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic"
             ],
@@ -60908,7 +60908,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -60956,7 +60956,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -61004,7 +61004,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -61052,7 +61052,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -61100,7 +61100,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -61148,7 +61148,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Seafoam Islands",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -61227,7 +61227,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian Forest",
             "ai_flags": [
                 "Basic"
             ],
@@ -61274,7 +61274,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian Forest",
             "ai_flags": [
                 "Basic"
             ],
@@ -61374,7 +61374,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian Forest",
             "ai_flags": [
                 "Basic"
             ],
@@ -61479,7 +61479,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian Forest",
             "ai_flags": [
                 "Basic"
             ],
@@ -61588,7 +61588,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Viridian Forest",
             "ai_flags": [
                 "Basic"
             ],
@@ -61730,7 +61730,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Tohjo Falls",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -61940,7 +61940,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -62148,7 +62148,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -62356,7 +62356,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -62564,7 +62564,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -62772,7 +62772,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -62852,7 +62852,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Radio Tower",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -63300,7 +63300,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -63508,7 +63508,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -63716,7 +63716,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -63925,7 +63925,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -64133,7 +64133,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -64342,7 +64342,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -64550,7 +64550,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Expert"
@@ -64757,7 +64757,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -64965,7 +64965,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -65173,7 +65173,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -65381,7 +65381,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -65589,7 +65589,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -65798,7 +65798,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -66006,7 +66006,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -66215,7 +66215,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -66424,7 +66424,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Saffron City",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -66473,7 +66473,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Olivine City",
             "ai_flags": [
                 "Basic"
             ],
@@ -66551,7 +66551,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 47",
             "ai_flags": [
                 "Basic"
             ],
@@ -66629,7 +66629,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 47",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -66740,7 +66740,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 47",
             "ai_flags": [
                 "Basic",
                 "Damage Priority"
@@ -66819,7 +66819,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 47",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -66934,7 +66934,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragon’s Den",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -67048,7 +67048,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragon’s Den",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -67162,7 +67162,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragon’s Den",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -67276,7 +67276,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragon’s Den",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",
@@ -67390,7 +67390,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragon’s Den",
             "ai_flags": [
                 "Basic",
                 "Evaluate Attack",

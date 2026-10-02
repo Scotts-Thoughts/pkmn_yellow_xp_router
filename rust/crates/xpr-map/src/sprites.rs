@@ -10,6 +10,9 @@
 //! Gen 3 sheets are full-colour rows of `w × h` frames (0 down, 1 up, 2
 //! left, right mirrored; berry trees use the last, grown frame) with an
 //! opaque key colour in Ruby/Sapphire/Emerald that is removed.
+//!
+//! Gen 4/5 sheets (format 2 packs) are RGBA rows of four `w × h` frames,
+//! down, up, left, right, already transparent.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -63,7 +66,7 @@ pub fn decode_sheet(gen: u8, bytes: &[u8]) -> Result<SpriteSheet, String> {
     let img = image::load_from_memory(bytes).map_err(|e| e.to_string())?.to_rgba8();
     let (w, h) = img.dimensions();
     let (w, h) = (w as usize, h as usize);
-    if gen == 3 {
+    if gen >= 3 {
         Ok(SpriteSheet { w, h, px: SheetPixels::Rgba(img.into_raw()) })
     } else {
         let shades = img.pixels().map(|p| { let r = p.0[0]; if r >= 192 { 0 } else if r >= 128 { 1 } else if r >= 64 { 2 } else { 3 } }).collect();
@@ -74,7 +77,7 @@ pub fn decode_sheet(gen: u8, bytes: &[u8]) -> Result<SpriteSheet, String> {
 const GRAY_FALLBACK: Pal4 = [[255, 255, 255], [192, 192, 192], [96, 96, 96], [0, 0, 0]];
 
 /// A frame with transparency (gen 1/2: 16x16; gen 3: the sprite's `w x h`).
-pub fn extract_frame(_gen: u8, sheet: &SpriteSheet, meta: &SpriteMeta, dir: Dir, palette: Option<&Pal4>, berry: bool) -> Option<Pixmap> {
+pub fn extract_frame(gen: u8, sheet: &SpriteSheet, meta: &SpriteMeta, dir: Dir, palette: Option<&Pal4>, berry: bool) -> Option<Pixmap> {
     match &sheet.px {
         SheetPixels::Shades(shades) => {
             let size = 16usize;
@@ -99,6 +102,21 @@ pub fn extract_frame(_gen: u8, sheet: &SpriteSheet, meta: &SpriteMeta, dir: Dir,
                     let c = pal[shade.min(3)];
                     out.put(x, y, [c[0], c[1], c[2], 255]);
                 }
+            }
+            Some(out)
+        }
+        SheetPixels::Rgba(rgba) if gen >= 4 => {
+            let (fw, fh) = (meta.w.max(1) as usize, meta.h.max(1) as usize);
+            if sheet.w < fw || sheet.h < fh {
+                return None;
+            }
+            let frames = sheet.w / fw;
+            let idx = match dir { Dir::Down => 0, Dir::Up => 1, Dir::Left => 2, Dir::Right => 3 };
+            let idx = if idx < frames { idx } else { 0 };
+            let mut out = Pixmap::new(fw, fh);
+            for y in 0..fh {
+                let i = (y * sheet.w + idx * fw) * 4;
+                out.data[y * fw * 4..(y + 1) * fw * 4].copy_from_slice(&rgba[i..i + fw * 4]);
             }
             Some(out)
         }

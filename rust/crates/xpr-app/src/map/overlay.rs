@@ -61,7 +61,17 @@ pub fn draw_grid(painter: &egui::Painter, oc: &OverlayCtx, toggles: &Toggles) {
                 }
             }
         }
-        Scope::Map(_) => draw_rect_outline(painter, oc, scope_rect, 0x55),
+        Scope::Map(id) => {
+            // the map itself (an image-world interior's scope also holds its picture's padding)
+            let rect = match (oc.pack.map(id), geom::map_origin_px(oc.pack, oc.scope, id)) {
+                (Some(m), Some((ox, oy))) => {
+                    let (w, h) = geom::map_px_size(&oc.pack.geom, m);
+                    IRect::from_size(ox, oy, w, h)
+                }
+                _ => scope_rect,
+            };
+            draw_rect_outline(painter, oc, rect, 0x55)
+        }
     }
 }
 

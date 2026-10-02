@@ -78,7 +78,7 @@ fn main() {
         if transparent { ", transparent" } else { "" }
     );
 
-    let req = ExportRequest { scope, rect, scale, opts: RenderOpts { night }, transparent };
+    let req = ExportRequest { scope, rect, scale, opts: RenderOpts { night, mask: true }, transparent };
     let t = Instant::now();
     let mut last_pct = -1i32;
     let img = export::render(&comp, &req, &mut |f| {

@@ -28,24 +28,24 @@ fn every_listed_fight_is_a_real_trainer() {
 fn story_fights_have_their_category() {
     let reg = registry();
     let cases: &[(&str, &str, &str)] = &[
-        ("Black", "⒆⒇ Trainer Cheren (54)", "rival"),
-        ("White", "⒆⒇ Trainer Bianca (499)", "rival"),
+        ("Black", "Pokemon Trainer Cheren (54)", "rival"),
+        ("White", "Pokemon Trainer Bianca (499)", "rival"),
         ("Black", "Leader Cress", "gym_leader"),
         ("White", "Leader Iris", "gym_leader"),
         ("Black", "Elite Four Grimsley (230)", "elite_four"),
         ("Black", "Champion Alder", "champion"),
         ("Black", "Team Plasma N (587)", "team_leader"),
         ("Black", "Team Plasma Ghetsis", "boss"),
-        ("White 2", "⒆⒇ Trainer Rival (163)", "rival"),
+        ("White 2", "Pokemon Trainer Rival (163)", "rival"),
         ("White 2", "Leader Cheren (156)", "gym_leader"),
         ("Black 2", "Leader Marlon (771)", "gym_leader"),
         ("White 2", "Elite Four Caitlin (41)", "elite_four"),
         ("White 2", "Champion Iris (341)", "champion"),
         ("White 2", "Team Plasma Zinzolin (584)", "team_leader"),
         ("White 2", "Team Plasma Shadow (583)", "team_leader"),
-        ("White 2", "⒆⒇ Trainer Colress (358)", "team_leader"),
+        ("White 2", "Pokemon Trainer Colress (358)", "team_leader"),
         ("Black 2", "Team Plasma Ghetsis", "boss"),
-        ("Black 2", "⒆⒇ Trainer N (5)", "post_game"),
+        ("Black 2", "Pokemon Trainer N (5)", "post_game"),
     ];
     for (version, name, category) in cases {
         let gen = reg.get_version(version).unwrap();

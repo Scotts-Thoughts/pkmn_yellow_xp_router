@@ -76,6 +76,7 @@ fn main() {
     src.push_str("];\n");
 
     std::fs::write(out_dir.join("embedded_assets.rs"), src).unwrap();
+    write_map_imagery(&root, &out_dir);
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let ico_path = out_dir.join("app_icon.ico");
@@ -117,6 +118,37 @@ fn write_ico(src: &Path, dst: &Path) {
         .collect();
     let file = std::io::BufWriter::new(std::fs::File::create(dst).unwrap_or_else(|e| panic!("{}: {}", dst.display(), e)));
     image::codecs::ico::IcoEncoder::new(file).encode_images(&frames).unwrap_or_else(|e| panic!("{}: {}", dst.display(), e));
+}
+
+/// The gen 4/5 map pictures (`map_data/<game>/imagery.zip`, written by
+/// pokemap's exporter) go into the executable as they are (stored webp, so
+/// nothing to compress): `embedded_imagery.rs` is a function `main` calls to
+/// register them with `xpr_map::imagery`. Only `main.rs` includes it, so the
+/// library and the test binaries don't carry ~365 MB each.
+/// `XPR_NO_EMBED_MAP_IMAGERY=1` leaves them out (the map then draws a
+/// terrain sketch, or reads them from `map_data/` when run from source).
+fn write_map_imagery(root: &Path, out_dir: &Path) {
+    println!("cargo:rerun-if-env-changed=XPR_NO_EMBED_MAP_IMAGERY");
+    let map_data = root.join("map_data");
+    println!("cargo:rerun-if-changed={}", map_data.display());
+    let mut src = String::from("/// Register the gen 4/5 map pictures embedded in this executable.
+pub fn register_map_imagery() {
+");
+    let skip = std::env::var_os("XPR_NO_EMBED_MAP_IMAGERY").is_some_and(|v| v != "0" && !v.is_empty());
+    if !skip {
+        let mut games: Vec<(String, PathBuf)> = std::fs::read_dir(&map_data)
+            .map(|rd| rd.flatten().map(|e| (e.file_name().to_string_lossy().to_string(), e.path().join("imagery.zip"))).filter(|(_, p)| p.is_file()).collect())
+            .unwrap_or_default();
+        games.sort();
+        for (game, zip) in games {
+            println!("cargo:rerun-if-changed={}", zip.display());
+            src.push_str(&format!("    xpr_map::imagery::register_embedded({:?}, include_bytes!({:?}));
+", game, lit(&zip)));
+        }
+    }
+    src.push_str("}
+");
+    std::fs::write(out_dir.join("embedded_imagery.rs"), src).unwrap();
 }
 
 fn lit(p: &Path) -> String {

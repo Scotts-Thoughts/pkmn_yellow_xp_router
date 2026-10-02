@@ -20,6 +20,119 @@ implement its side only after pokemap delivers this export.
 
 ---
 
+## Status 2026-10-01 (read this first; it replaces the gap table in §0 and the order in §7)
+
+**Everything is done: P1–P6 in pokemap, and the router side (§8). Gens 4/5
+show in the Map tab.** P6 (imagery) is done for all five games. The work is on pokemap branch `router-export` (not yet merged or pushed).
+
+| step | status |
+|---|---|
+| P1: commit the exporter | ✅ `export-router.js` + `pipeline/router/` committed. The Emerald Route 103 fix is ported into `src/render/world-map.js` (`LAYOUT_HEIGHTS`, `DRAW_ABOVE`; the Route 114 nudge is gone). `--check` is byte-identical for all seven gen 1–3 packs apart from `manifest.json`. |
+| P2: residuals | ✅ No builder changes were needed. Every DS map with grass/water but no table has `ENCOUNTERS_NONE` / `ENCDATA_NA` in its decomp header (HGSS's Safari Zone gate has an all-Rattata placeholder that pokemap skips on purpose). They are listed in `coverage.md`. Dynamic warps already had `candidates`. The Oreburgh sign outside its map is dropped and listed. Rematch records, and gen 5 id-suffixed copies (`"Smasher Elena (1)"`, Challenge/Easy Mode and second-round ids), inherit their namesakes' anchors. |
+| P3: format 2 exporter | ✅ `pipeline/router/ds.js`, dispatched from `export-router.js`. It does all §6 validation (including the §5.1 party guard) and `--check` for all twelve games. |
+| P4: masks | ✅ The resolved auto-mask, with the hand edits from `public/data/<game>/masks.json` composed over it, goes into each pack's `masks.json`. The user's world-mask edits are in (pokemap `c9a8301`, 2026-10-02) for Pt, HGSS, BW and B2W2. DP has none, so it uses the automatic mask. No interior was hand-edited. |
+| P5: metadata export | ✅ `map_data/{diamond_pearl,platinum,heartgold_soulsilver,black_white,black2_white2}/`, ≈ 0.45–0.7 MB deflated each (≈ 2.7 MB in total). |
+| P6: imagery | ✅ All five games were re-rendered on the Mac (M1, moderngl over OpenGL 4.1, apicula built from source). Gen 5 used the retail US ROMs from `~/Dropbox/stp-projects/programs/roms/originals/`. The exporter writes each game's pictures to `map_data/<game>/imagery.zip` at quality 92: DP 87 MB, Pt 91 MB, HGSS 72 MB, BW 47 MB, B2W2 68 MB. The app executable embeds them (§8), so every user has them. |
+
+Coverage, per `coverage.md`:
+
+| | DP | Pt | HGSS | BW | B2W2 |
+|---|---|---|---|---|---|
+| eligible trainers anchored | 447/447 | 448/448 | 438/438 | 454/454 | 622/622 |
+| key trainers missing | 0 | 0 | 0 | 0 | 0 |
+| item objects resolved | 610/610 | 699/699 | 523/523 | 429/429 | 595/595 |
+| maps with an encounter table | 156 | 156 | 138 | 112 | 134 |
+
+The B2W2 Lass Helia mismatch was not a real mismatch. The router's gen 5
+data writes ♂/♀ as the font glyphs `⑭`/`⑮` (and "PKMN" as `⒆⒇`). The
+exporter folds them for matching only. Router trainer names are untouched,
+because saved routes refer to them. Cleaning the raw data (§8) is still
+worthwhile for display, but it renames trainers, so it needs a route
+migration.
+
+Regenerate with `cd ~/Documents/pokemap && node pipeline/export-router.js
+--router ../pkmn_yellow_xp_router [--games platinum,…] [--check]`. It reads
+only pokemap's committed `public/data/<game>/*.json`, so it runs on any
+machine. `python3 pipeline/ds/router_audit.py --router
+../pkmn_yellow_xp_router -v` is the independent cross-check.
+
+### Rendering on the Mac (P6)
+
+- **Decomp commits.** The gen 4 builders were written against pret clones
+  made on 2026-03-07; newer upstream renamed files they read. Pin
+  `pokemap/repos` to the same upstream commits: pokediamond `038ccca`,
+  pokeplatinum `007a26c`, pokeheartgold `d11b7ef`. Each is the last commit
+  before 2026-03-08 03:21 UTC (`git fetch --depth 1 origin <sha> && git checkout <sha>`).
+- **apicula.** `git clone https://github.com/scurest/apicula repos/apicula &&
+  cargo build --release`. `pipeline/ds/apicula.py` finds `target/release/apicula`.
+- **Gen 5 ROMs.** Use the unmodified `originals/` (header codes IRBO/IRAO/IREO/IRDO). The
+  top-level `5-* v1.nds` files in that folder are edited builds.
+- **Python.** Use a venv with `numpy pillow moderngl ndspy`, then run
+  `python pipeline/gen4/build.py <game> [--world-quality N]` (or `gen5/build.py`).
+  Each game takes 1.5–3 min.
+- **Output.** The maps, world layout, trainers, encounters and sprite lists
+  are identical to the Windows build. Per-tile `lift` differs on chunk seams,
+  where the GPU breaks depth ties differently (a few hundred tiles per game,
+  plus single outliers). So `tiles.json`/`events.json` were re-committed
+  from the same run as the images, and the packs were re-exported. Imagery
+  and lift always have to come from the same render.
+- **Imagery zip.** It is stored (uncompressed; webp doesn't deflate), with
+  `imagery.json` first, then `world/<L>/<x>_<y>.webp` and
+  `interiors/*.webp`. `imagery.json` is `{game, version, tile_size, levels,
+  w_px, h_px, top_px, world: {level: ["x_y", …]}, interiors: [...], bytes:
+  {path: n}}`. `version` is a content hash, not a counter.
+
+### Format 2 as built: details §4 left open, or where it differs
+
+The router loader should follow these; they win over §4 where they disagree.
+
+- **`manifest.json`**
+  - `encounter_methods` and `encounter_conditions` are `{id: label}`
+    objects, taken from pokemap's `_methods`/`_conditions`, e.g.
+    `"walk_spots": "Rustling Grass"`, `"dual_firered": "FireRed (slot 2)"`.
+  - `blobs.classes` / `blobs.lift` entries are `{map, offset, len}`, with
+    offset and len in **bytes**.
+  - `imagery` is `{version, zip, bytes, sha256, files}`, or `null` while a game has no renders.
+  - `sources.repo` is the decomp head for gen 4 and `null` for gen 5 (built
+    from ROMs).
+- **`maps.json`** fields:
+  - `id`, `const`, `display`, `location`, `category`, `kind` (`outdoor` | `indoor`), `w`, `h`, `can_fly`
+  - outdoor maps: `pos`
+  - indoor maps: `image` and `image_origin`
+  - There is no `name` field: `display` is the name.
+- **`layout.json`** is `{positions, ownership}` and has no `draw_order`. An
+  ownership cell is 32 tiles, and `cells` is row-major, holding a MapId or -1.
+- **`objects.json`** additions:
+  - `lift` (px, omitted when 0)
+  - `version` (B2W2's version-exclusive objects, e.g. `"Black 2"`; absent means both)
+  - payload `flag` (the visibility flag, a number or a `FLAG_*` string, as the source has it)
+  - warp payload: `dynamic`, plus `candidates` (list of map consts)
+  - item payload: `count`
+  - `kind: "obstacle"`, with payload `{obstacle: "cut" | "rock_smash" | "strength", label}`
+  - NPC payload `label` is always `null`; DS NPCs carry `text_key` instead
+  - `sprite` is `null` when there is no sheet (signposts, which are part of the imagery)
+- **`links.json`**:
+  - Map-level anchors (`precision: "map"`) use the map's centre tile.
+  - `source` is one of `trainer`, `script:coord`, `script:level`,
+    `trainer-outside-map`, `inherit:<name>`, `override`; for items it is
+    the object kind.
+- **`encounters.json`** has the format 1 shape. Method keys are
+  `<method>[_<condition>]` from the manifest. Time of day: the unsuffixed
+  table is day. A condition table exists only where it changes some slot. BW
+  seasons: `_spring` … `_winter`.
+- **`sign_text.json`** holds signs and NPCs. The keys are `<map const>#<n>`.
+- **`masks.json`** is
+  `{cell_px: 16, world: {w, h, rle}, interiors: {<image path>: {w, h, rle}}}`.
+  `rle` is `[value, count, …]` and 1 = visible. **Cells outside a surface's
+  `w × h` are hidden.** Without the interior images, an interior surface is
+  sized to its maps' extent plus a margin wider than any growth step. So it
+  can be smaller or larger than the image, and the visible result is the
+  same. A surface hand-edited in pokemap's mask editor uses the image's real size.
+
+---
+
+---
+
 ## 0. Summary
 
 **Parity target.** For gen 1–3 the router ships a Rust/egui port of the
@@ -617,9 +730,9 @@ Same as format 1:
     where they battle.
 
   Do **not** use `raw_pkmn_data/gen_four/fights_info.json` `major_fights` as
-  the list. It is stale: 41 of its 129 names exist in no gen 4 `trainers.json`,
-  and it contains gen 3 names such as `Rival Brendan 1 Treecko`. That is a
-  router data bug, noted in §8.
+  the list. 41 of its 129 names exist in no gen 4 `trainers.json`, including
+  gen 3 names such as `Rival Brendan 1 Treecko`. They are deliberately left
+  in the file, unlinked (§8).
 
 ### 5.2 Items
 
@@ -690,40 +803,141 @@ router repo, or put imagery into `map_data/`.
 
 ---
 
-## 8. Router-side work afterwards (context only; not for the pokemap agent)
+## 8. Router side (built 2026-10-01)
 
-- `xpr-map`:
-  - A format 2 loader: `MapPack` gains an image-world variant. Today
-    `pack.rs:260-262` refuses `format != 1`, and `Manifest` (`pack.rs:17-29`)
-    / `MapDef` (`model.rs:274-290`) are tileset-shaped.
-  - A `ChunkSource` abstraction over `Compositor` (`compose.rs:41-54`, used
-    concretely by `xpr-app/src/map/chunks.rs`) plus a webp tile source. That
-    needs `image`'s `webp` feature: the pure-Rust `image-webp` crate, absent
-    from `Cargo.lock` today.
-  - `terrain_at` from `classes.bin`.
-  - Tile picking with `lift`, and the map at a pixel from the ownership grid.
-  - A gen 4/5 arm in `sprites.rs` (`frame_key`/`render_frame` match on gen
-    1/2/3 today).
-  - `game_for_version` (`pack.rs:78-89`) for the nine DS versions; invert
-    `xpr-app/tests/embedded_map_data.rs:21-34`.
-- `xpr-app/src/map/`:
-  - Draw markers raised by `lift`.
-  - The `obstacle` kind and its toggle.
-  - A time-of-day / season / modifier picker on encounter cards.
-  - Mask dimming.
-  - Map-list grouping from `category` (`list.rs:38-51` has gen 1 string rules).
-  - Export from the image source (no night toggle).
-  - The "no imagery yet" state and the imagery download/cache (reuse
-    `xpr-update`'s `reqwest` + zip code).
-- `xpr-data`: `loaders.rs:614-634` sets `location` to `""` for gen 4/5. The raw
-  `trainer_location` is itself mostly null (DP 770/849, HGSS 737/737,
-  BW 615/616), so derive `Trainer.location` from the anchors' map display
-  names, and "add area" then works for gen 4/5.
-  Separately, fix `raw_pkmn_data/gen_four/fights_info.json` `major_fights`
-  (stale names, §5.1).
-- Tests: add the five games to `xpr-map/tests/pack.rs` with coverage
-  baselines; add image-source chunk tests; add modal-input cases for any new
-  raw input.
+The router loads all five DS packs, shows them in the Map tab, and does
+everything it does for gens 1–3, plus encounter conditions and masks.
+
+**`xpr-map`**
+- `pack.rs`: `MapPack::load` reads the manifest's `format` first; format 2
+  goes to `load_image`. Objects, links, encounters, text and sprites share
+  `load_common` with format 1. `MapPack::image: Option<ImageWorld>` holds the
+  format 2 data. The geometry is `block_px == step_px == 16` (one tile = one
+  step). `game_for_version` maps the nine DS versions.
+- `image_world.rs`: `ImageWorld` holds the ownership grid, per-tile classes
+  and lift, the per-map max lift, the decoded masks, the imagery entry and
+  the encounter method/condition labels. `pick_local` is pokemap's
+  `pickTileLocal`.
+- `model.rs`: `MapFrame` places a map in its own scope. An interior's scope
+  is the union of the map and its picture. Objects gain `lift`, `version`,
+  `ObjectKind::Obstacle`, and the new payload fields: item `count`, warp
+  `dynamic`/`candidates`, NPC `text_key`.
+- `geom.rs`:
+  - `map_origin_px` / `scope_rect` follow the frame.
+  - `map_at_world_px` asks the ownership grid in an image world.
+  - New `pick_step` finds the lifted tile under a pixel (front-most row,
+    ownership-checked).
+  - `step_center_px` / `object_center_px` are raised by lift.
+  - New `fit_rect` fits an interior to its mask's visible cells.
+- `spatial.rs`: objects are filed and hit-tested where their marker is drawn
+  (raised by lift), across every overworld map near the pointer.
+- `imagery.rs`:
+  - `DirFiles` reads `world/` + `interiors/` folders.
+  - `ZipFiles` reads a zip in place, from a file or from bytes embedded in
+    the executable (`from_static`).
+  - `register_embedded` / `embedded` hold the zips the executable carries.
+  - `Imagery` decodes webp and caches interior mip chains.
+  - `verify_zip` checks the size and sha256 against the manifest.
+  - `xpr-map/build.rs` leaves `imagery.zip` out of its own (deflated) table.
+- `compose.rs`: image packs draw:
+  - world chunks straight from the pyramid tiles;
+  - interiors from the mip chain;
+  - an overworld map on its own, cropped from the world;
+  - the masks dimmed toward the background at pokemap's 0.9 (`RenderOpts::mask`);
+  - a terrain-class schematic when no imagery is installed.
+  Export goes through the same path.
+- `sprites.rs`: gen 4/5 sheets are four RGBA frames (down, up, left, right).
+
+**`xpr-app/src/map/`**
+- **The pictures are built into the executable, like the gen 1–3 maps
+  (decided 2026-10-01).**
+  - `xpr-app/build.rs` (`write_map_imagery`) `include_bytes!`s every
+    `map_data/<game>/imagery.zip` into code that only `main.rs` includes,
+    and `main` registers the zips at startup. The library and the test
+    binaries don't carry them.
+  - The executable is ≈ 414 MB in release; the build takes ≈ 3 min with fat
+    LTO.
+  - `XPR_NO_EMBED_MAP_IMAGERY=1` builds without them.
+  - `map/imagery.rs` finds the pictures in this order: the embedded zip;
+    `<map_data dir>/<game>/imagery.zip` (run from source, or
+    `XPR_MAP_DATA_DIR`); loose `world/` + `interiors/` folders. A zip whose
+    size doesn't match the manifest is ignored.
+  - Without the pictures the map draws the terrain sketch, and the status
+    line says "map pictures missing from this build".
+  - **Committing the zips puts ≈ 365 MB into git.** Each file is under
+    GitHub's 100 MB limit but over its 50 MB warning; consider Git LFS for
+    `map_data/*/imagery.zip`.
+- Markers and sprites are raised by lift. Objects of the other version are
+  hidden: in markers, hover, keyboard navigation, map cards, "add all" and
+  the marquee. The version is the route's, or the base version for a
+  custom gen (`RouteMapState::version`).
+- Layers gain "Obstacles" and "Dim unreachable areas" (image worlds only).
+- Encounter cards show condition chips per map:
+  - gen 4: Day / Morning / Night / Swarm / Poké Radar / the dual-slot games;
+  - HGSS: also the radio;
+  - gen 5: seasons, defaulting to Spring in seasonal zones.
+  Each method shows the chosen condition's table. Labels come from the
+  manifest.
+- Cards: NPC text, item counts, obstacles, and elevator warps listing every
+  floor.
+- The map list groups by `category` and sorts by name. The world titles are
+  Sinnoh, Johto & Kanto, and Unova.
+
+**Tests**
+- `xpr-map/tests/image_pack.rs`: all five packs load and are framed and
+  owned; lifted tiles and raised objects are picked where they are drawn;
+  the encounter order; gen 4/5 sprite frames; the schematic; imagery from a
+  folder and from a zip; masks; `verify_zip`.
+- `xpr-app/tests/map_image_world.rs`: a Platinum route opens Sinnoh drawn
+  from `map_data/platinum/imagery.zip`, a grass card's Night chip switches
+  tables, a build without pictures shows the sketch and the note, and loose
+  picture folders work.
+- `xpr-app/tests/legacy_glyph_names.rs`: the gen 5 glyph rename and the route
+  migration (below).
+- `xpr-app/tests/embedded_map_data.rs`: every built-in version has a map.
+- No new raw input: the chips are widgets.
+
+**Not done (decide separately)**
+- **Gen 4/5 trainer locations: done (2026-10-02).** The source is the
+  data_objects repo (`~/Documents/data_objects/trainers/<game>.js`), whose
+  `generate_gen4_5_trainer_locations.py` fills each record's in-game place
+  (several joined with " / ") from pokemap, the Vs. Seeker and phone rematch
+  tables, Platinum's daily Pokémon Center trainers, the B2W2 research and the
+  BW stadium roster.
+  - `tools/data/import_gen45_trainer_locations.py` copies the locations into
+    the router's `trainers.json` by `rom_id`, keeping "Unused". `--check`
+    reports whether the router is out of date.
+  - The loader reads `trainer_location` for gens 4/5, as for gen 3. A null
+    location reads as none.
+  - Located trainers: DP 659/849, Pt 720/927, HGSS 638/737, BW 538/616,
+    B2W2 797/814.
+  - The map export follows the same data:
+    - A trainer with a location but no object or script on the map gets a
+      map-level anchor on its place's outdoor map(s): DP 3, Pt 38, BW 54,
+      B2W2 103. B2W2's 18 "Funfest Mission" trainers name no map.
+    - Rematch and namesake inheritance happens only for trainers the data
+      places, and keeps only the namesakes' spots inside that place.
+  - Result: every anchor of every game lies in its trainer's location, and
+    every linked trainer has one.
+- **Gen 5 glyph names: fixed (2026-10-01).** The data spelled ♂/♀ and
+  "PKMN" with the game's font glyphs (`⑭⑮⒆⒇`), which no font draws.
+  - `raw_pkmn_data/gen_five/{black_white,black2_white2}/trainers.json` and
+    `gen_five/fights_info.json` now spell them out: `⒆⒇` → `Pokemon`,
+    `⑭` → `M`, `⑮` → `F` (the gen 3/4 style, e.g. "Pokemon Trainer Bianca
+    (4)", "Clerk M Chaz (19)"). Party species are `Nidoran♂` / `Nidoran♀`, as
+    in `pokemon.json`. No renamed trainer clashes with an existing name.
+  - `xpr_core::io_utils::fix_legacy_name_glyphs` does the same at runtime:
+    - Route migration: trainer events (`trainer_name`,
+      `second_trainer_name`) are renamed as they load, so routes saved with
+      the old names open in a new build.
+    - The trainer loader and fights info apply it too, so a custom gen
+      copied from the old data still works.
+- **`fights_info.json` stays as it is (decided 2026-10-01).**
+  `raw_pkmn_data/gen_four/fights_info.json` `major_fights` names 41 trainers
+  that no gen 4 `trainers.json` has, such as `Rival Brendan 1 Treecko`. They
+  stay in the file, unlinked. The loader keeps them in a set that nothing
+  matches, so they have no effect. Don't use `major_fights` as a list of
+  trainers to link or to check coverage against (§5.1).
 
 ---
 
@@ -731,7 +945,8 @@ router repo, or put imagery into `map_data/`.
 
 The export above is designed so that none of these block pokemap work.
 
-- **D-A: how imagery reaches users.** The recommended option is (1).
+- **D-A: how imagery reaches users.** **Decided 2026-10-01: embed it in the
+  executable, like the gen 1–3 maps (§8).** The options were:
   1. On-demand per-game download from a GitHub release asset of the router
      repo. It is cached in the app data dir and checked against the manifest's
      sha256, and the map works without it until it arrives.

@@ -3,8 +3,8 @@
         {
             "rom_id": 0,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer -- (0)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer -- (0)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -53,7 +53,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [],
             "money": 4
         },
@@ -97,7 +97,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [],
             "money": 4
         },
@@ -142,7 +142,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 5
         },
@@ -187,7 +187,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 5
         },
@@ -232,7 +232,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -308,7 +308,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -412,7 +412,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 4
         },
@@ -486,7 +486,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 4
         },
@@ -531,7 +531,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Striaton City",
             "ai_flags": [],
             "money": 10
         },
@@ -607,7 +607,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Striaton City",
             "ai_flags": [],
             "money": 10
         },
@@ -681,7 +681,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Striaton City",
             "ai_flags": [],
             "money": 30
         },
@@ -755,7 +755,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Striaton City",
             "ai_flags": [],
             "money": 30
         },
@@ -829,7 +829,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Striaton City",
             "ai_flags": [],
             "money": 30
         },
@@ -905,7 +905,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 10
         },
@@ -950,7 +950,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 1
         },
@@ -995,7 +995,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 1
         },
@@ -1040,7 +1040,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 1
         },
@@ -1116,15 +1116,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 4
         },
         {
             "rom_id": 19,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Breeder",
-            "trainer_name": "⒆⒇ Breeder Galen",
+            "trainer_class": "Pokemon Breeder",
+            "trainer_name": "Pokemon Breeder Galen",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -1223,15 +1223,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 12
         },
         {
             "rom_id": 20,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Breeder",
-            "trainer_name": "⒆⒇ Breeder Adelaide",
+            "trainer_class": "Pokemon Breeder",
+            "trainer_name": "Pokemon Breeder Adelaide",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -1329,7 +1329,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 12
         },
@@ -1407,7 +1407,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nacrene City",
             "ai_flags": [],
             "money": 30
         },
@@ -1517,7 +1517,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 30
         },
@@ -1627,7 +1627,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 30
         },
@@ -1737,7 +1737,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 30
         },
@@ -1847,15 +1847,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mistralton City",
             "ai_flags": [],
             "money": 30
         },
         {
             "rom_id": 26,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Forrest",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Forrest",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -1892,15 +1892,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 27,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Irene",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Irene",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -1937,15 +1937,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 28,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Miguel",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Miguel",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -1982,15 +1982,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 29,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Audra",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Audra",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -2027,7 +2027,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 15
         },
@@ -2072,7 +2072,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City / Pinwheel Forest",
             "ai_flags": [],
             "money": 5
         },
@@ -2148,7 +2148,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 5
         },
@@ -2224,7 +2224,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 4
         },
@@ -2300,7 +2300,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 4
         },
@@ -2407,7 +2407,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 4
         },
@@ -2483,7 +2483,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 10
         },
@@ -2528,7 +2528,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 10
         },
@@ -2573,7 +2573,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 10
         },
@@ -2618,7 +2618,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 10
         },
@@ -2663,7 +2663,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 6
         },
@@ -2708,7 +2708,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 6
         },
@@ -2784,7 +2784,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 8
         },
@@ -2922,7 +2922,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 8
         },
@@ -2998,7 +2998,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -3043,7 +3043,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 6
         },
@@ -3088,7 +3088,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 6
         },
@@ -3164,7 +3164,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 8
         },
@@ -3240,7 +3240,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 8
         },
@@ -3316,7 +3316,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 8
         },
@@ -3361,7 +3361,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 12
         },
@@ -3468,7 +3468,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 10
         },
@@ -3513,7 +3513,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 8
         },
@@ -3589,15 +3589,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 8
         },
         {
             "rom_id": 53,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (53)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (53)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -3632,15 +3632,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 54,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (54)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (54)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -3675,15 +3675,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 55,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (55)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (55)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -3718,15 +3718,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 56,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (56)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (56)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -3794,15 +3794,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3 / Wellspring Cave",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 57,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (57)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (57)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -3870,15 +3870,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3 / Wellspring Cave",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 58,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (58)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (58)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -3946,15 +3946,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3 / Wellspring Cave",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 59,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (59)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (59)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -3989,15 +3989,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 60,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (60)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (60)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -4032,15 +4032,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 61,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (61)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (61)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -4075,7 +4075,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
@@ -4120,7 +4120,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Wellspring Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -4165,15 +4165,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Wellspring Cave",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 64,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer N (64)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer N (64)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -4208,15 +4208,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Accumula Town",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 65,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer N (65)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer N (65)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -4315,7 +4315,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nacrene City",
             "ai_flags": [],
             "money": 25
         },
@@ -4360,7 +4360,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 40
         },
@@ -4436,7 +4436,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 40
         },
@@ -4512,7 +4512,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 40
         },
@@ -4557,7 +4557,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 40
         },
@@ -4633,7 +4633,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mistralton City",
             "ai_flags": [],
             "money": 15
         },
@@ -4678,7 +4678,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mistralton City",
             "ai_flags": [],
             "money": 15
         },
@@ -4754,7 +4754,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -4799,7 +4799,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -4875,7 +4875,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -4982,7 +4982,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -5058,7 +5058,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -5134,7 +5134,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -5210,7 +5210,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -5376,7 +5376,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -5421,7 +5421,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -5497,7 +5497,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -5573,7 +5573,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 5
         },
@@ -5617,7 +5617,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [],
             "money": 4
         },
@@ -5662,7 +5662,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nacrene City",
             "ai_flags": [],
             "money": 5
         },
@@ -5766,7 +5766,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nacrene City",
             "ai_flags": [],
             "money": 5
         },
@@ -5812,7 +5812,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nacrene City",
             "ai_flags": [],
             "money": 12
         },
@@ -5950,15 +5950,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 90,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (90)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (90)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -6088,15 +6088,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 91,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (91)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (91)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -6226,15 +6226,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 92,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (92)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (92)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -6364,15 +6364,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 93,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑮",
-            "trainer_name": "Clerk ⑮ Ingrid",
+            "trainer_class": "Clerk F",
+            "trainer_name": "Clerk F Ingrid",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -6409,15 +6409,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 94,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑮",
-            "trainer_name": "Clerk ⑮ Alberta",
+            "trainer_class": "Clerk F",
+            "trainer_name": "Clerk F Alberta",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -6485,15 +6485,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 95,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑮",
-            "trainer_name": "Clerk ⑮ Katie",
+            "trainer_class": "Clerk F",
+            "trainer_name": "Clerk F Katie",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -6530,15 +6530,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 96,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑮",
-            "trainer_name": "Clerk ⑮ Trisha",
+            "trainer_class": "Clerk F",
+            "trainer_name": "Clerk F Trisha",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -6651,7 +6651,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Shopping Mall",
             "ai_flags": [],
             "money": 10
         },
@@ -6727,7 +6727,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Shopping Mall",
             "ai_flags": [],
             "money": 10
         },
@@ -6803,7 +6803,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 15
         },
@@ -6910,7 +6910,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 15
         },
@@ -6986,7 +6986,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 15
         },
@@ -7093,7 +7093,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 15
         },
@@ -7200,7 +7200,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 15
         },
@@ -7276,7 +7276,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 15
         },
@@ -7321,7 +7321,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 15
         },
@@ -7397,7 +7397,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 15
         },
@@ -7442,7 +7442,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Shopping Mall",
             "ai_flags": [],
             "money": 40
         },
@@ -7487,7 +7487,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Shopping Mall",
             "ai_flags": [],
             "money": 40
         },
@@ -7532,7 +7532,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 8
         },
@@ -7577,7 +7577,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 8
         },
@@ -7622,7 +7622,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 8
         },
@@ -7669,7 +7669,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [],
             "money": 12
         },
@@ -7716,7 +7716,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 12
         },
@@ -7763,7 +7763,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 12
         },
@@ -7810,7 +7810,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 12
         },
@@ -7857,7 +7857,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 12
         },
@@ -7904,7 +7904,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 12
         },
@@ -7980,7 +7980,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 8
         },
@@ -8025,7 +8025,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 8
         },
@@ -8132,7 +8132,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 8
         },
@@ -8208,7 +8208,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 8
         },
@@ -8315,7 +8315,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 10
         },
@@ -8391,7 +8391,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 10
         },
@@ -8436,7 +8436,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 10
         },
@@ -8512,7 +8512,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mistralton City",
             "ai_flags": [],
             "money": 10
         },
@@ -8633,7 +8633,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mistralton City",
             "ai_flags": [],
             "money": 10
         },
@@ -8678,7 +8678,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mistralton City",
             "ai_flags": [],
             "money": 10
         },
@@ -8723,7 +8723,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -8768,7 +8768,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -8878,7 +8878,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Icirrus City",
             "ai_flags": [],
             "money": 30
         },
@@ -8988,7 +8988,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 30
         },
@@ -9098,7 +9098,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 30
         },
@@ -9143,7 +9143,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [],
             "money": 6
         },
@@ -9219,7 +9219,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [],
             "money": 6
         },
@@ -9326,7 +9326,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 6
         },
@@ -9402,7 +9402,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 50
         },
@@ -9480,7 +9480,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 16
         },
@@ -9527,7 +9527,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 16
         },
@@ -9603,7 +9603,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 4
         },
@@ -9679,7 +9679,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 4
         },
@@ -9755,7 +9755,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 4
         },
@@ -9862,7 +9862,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 4
         },
@@ -9938,7 +9938,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 4
         },
@@ -10045,7 +10045,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 4
         },
@@ -10259,7 +10259,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 4
         },
@@ -10335,7 +10335,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [],
             "money": 8
         },
@@ -10473,7 +10473,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -10521,7 +10521,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 15
         },
@@ -10600,7 +10600,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 15
         },
@@ -10679,7 +10679,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -10724,7 +10724,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 6
         },
@@ -10769,7 +10769,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 6
         },
@@ -10814,7 +10814,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 6
         },
@@ -10859,7 +10859,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 6
         },
@@ -10935,7 +10935,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [],
             "money": 16
         },
@@ -11011,7 +11011,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 8
         },
@@ -11056,7 +11056,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 8
         },
@@ -11101,7 +11101,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 8
         },
@@ -11227,7 +11227,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [],
             "money": 8
         },
@@ -11303,7 +11303,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [],
             "money": 8
         },
@@ -11379,7 +11379,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [],
             "money": 8
         },
@@ -11424,15 +11424,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [],
             "money": 8
         },
         {
             "rom_id": 165,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Clemens",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Clemens",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -11469,15 +11469,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 166,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Warren",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Warren",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -11576,15 +11576,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 167,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Ivan",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Ivan",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -11621,15 +11621,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 168,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Isaac",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Isaac",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -11728,15 +11728,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 169,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Chaz",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Chaz",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -11811,8 +11811,8 @@
         {
             "rom_id": 170,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Wade",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Wade",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -11911,15 +11911,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 20
         },
         {
             "rom_id": 171,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Fredric",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Fredric",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -11987,7 +11987,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 20
         },
@@ -12063,7 +12063,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -12139,7 +12139,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -12215,7 +12215,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -12291,7 +12291,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -12367,7 +12367,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -12443,7 +12443,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -12550,7 +12550,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 20
         },
@@ -12657,7 +12657,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 20
         },
@@ -12733,7 +12733,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [],
             "money": 8
         },
@@ -12778,15 +12778,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 9",
             "ai_flags": [],
             "money": 8
         },
         {
             "rom_id": 182,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Richard",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Richard",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -12854,15 +12854,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 183,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Pedro",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Pedro",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -12930,15 +12930,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 184,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Lewis",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Lewis",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -13037,15 +13037,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 185,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Alain",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Alain",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -13144,15 +13144,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 186,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Shanti",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Shanti",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -13220,15 +13220,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 187,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Mary",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Mary",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -13327,15 +13327,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 188,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Annie",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Annie",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -13372,15 +13372,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 189,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Heidi",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Heidi",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -13479,7 +13479,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 15
         },
@@ -13555,7 +13555,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 4
         },
@@ -13662,7 +13662,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -13738,7 +13738,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -13814,7 +13814,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 8
         },
@@ -13890,7 +13890,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 8
         },
@@ -13966,7 +13966,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 8
         },
@@ -14042,7 +14042,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 8
         },
@@ -14163,7 +14163,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 8
         },
@@ -14238,7 +14238,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 8
         },
@@ -14283,7 +14283,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 8
         },
@@ -14359,7 +14359,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 10
         },
@@ -14435,7 +14435,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 10
         },
@@ -14480,7 +14480,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 10
         },
@@ -15230,7 +15230,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Icirrus City",
             "ai_flags": [],
             "money": 8
         },
@@ -15306,7 +15306,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Icirrus City",
             "ai_flags": [],
             "money": 8
         },
@@ -15382,7 +15382,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Icirrus City",
             "ai_flags": [],
             "money": 8
         },
@@ -15489,7 +15489,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Icirrus City",
             "ai_flags": [],
             "money": 8
         },
@@ -15534,7 +15534,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Icirrus City",
             "ai_flags": [],
             "money": 8
         },
@@ -15610,7 +15610,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Icirrus City",
             "ai_flags": [],
             "money": 8
         },
@@ -15748,15 +15748,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 219,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer  (219)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer  (219)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -15945,7 +15945,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 10
         },
@@ -16021,7 +16021,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 10
         },
@@ -16066,7 +16066,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 10
         },
@@ -16142,7 +16142,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 10
         },
@@ -16187,7 +16187,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 10
         },
@@ -16294,7 +16294,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 10
         },
@@ -16370,7 +16370,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 10
         },
@@ -16511,7 +16511,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 30
         },
@@ -16652,7 +16652,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 30
         },
@@ -16793,7 +16793,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 30
         },
@@ -16934,7 +16934,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 30
         },
@@ -17139,7 +17139,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "N's Castle",
             "ai_flags": [],
             "money": 45
         },
@@ -17215,7 +17215,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 8
         },
@@ -17291,7 +17291,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 8
         },
@@ -17336,7 +17336,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 8
         },
@@ -17381,7 +17381,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 6
         },
@@ -17426,7 +17426,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 6
         },
@@ -17471,7 +17471,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 6
         },
@@ -17516,7 +17516,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 6
         },
@@ -17563,7 +17563,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 12
         },
@@ -17639,7 +17639,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 10
         },
@@ -17746,7 +17746,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 8
         },
@@ -17822,7 +17822,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 8
         },
@@ -17898,7 +17898,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 15
         },
@@ -18005,7 +18005,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 15
         },
@@ -18081,7 +18081,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 15
         },
@@ -18188,7 +18188,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 15
         },
@@ -18295,7 +18295,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 8
         },
@@ -18374,7 +18374,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 15
         },
@@ -18450,7 +18450,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 20
         },
@@ -18557,7 +18557,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 20
         },
@@ -18664,7 +18664,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Wellspring Cave",
             "ai_flags": [],
             "money": 8
         },
@@ -18740,7 +18740,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Wellspring Cave",
             "ai_flags": [],
             "money": 8
         },
@@ -18816,7 +18816,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Wellspring Cave",
             "ai_flags": [],
             "money": 8
         },
@@ -18892,7 +18892,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mistralton Cave",
             "ai_flags": [],
             "money": 8
         },
@@ -18937,7 +18937,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Mistralton Cave",
             "ai_flags": [],
             "money": 8
         },
@@ -18984,7 +18984,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [],
             "money": 12
         },
@@ -19031,7 +19031,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 6",
             "ai_flags": [],
             "money": 12
         },
@@ -19231,7 +19231,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Challenger's Cave",
             "ai_flags": [],
             "money": 20
         },
@@ -19369,7 +19369,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Challenger's Cave",
             "ai_flags": [],
             "money": 20
         },
@@ -19476,7 +19476,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Challenger's Cave",
             "ai_flags": [],
             "money": 15
         },
@@ -19614,7 +19614,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Challenger's Cave",
             "ai_flags": [],
             "money": 15
         },
@@ -19659,7 +19659,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 8
         },
@@ -19735,7 +19735,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 15
         },
@@ -19780,7 +19780,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -19825,7 +19825,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -19901,7 +19901,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -19991,7 +19991,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Celestial Tower",
             "ai_flags": [],
             "money": 15
         },
@@ -20036,7 +20036,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -20112,7 +20112,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -20219,7 +20219,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -20309,7 +20309,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 20
         },
@@ -20385,7 +20385,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 20
         },
@@ -20461,7 +20461,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -20551,7 +20551,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -20627,7 +20627,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -20724,8 +20724,8 @@
         {
             "rom_id": 282,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ ",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M ",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -20949,8 +20949,8 @@
         {
             "rom_id": 287,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (287)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (287)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -21016,15 +21016,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Striaton City",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 288,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (288)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (288)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -21090,15 +21090,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Striaton City",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 289,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (289)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (289)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -21164,7 +21164,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Striaton City",
             "ai_flags": [],
             "money": 25
         },
@@ -21209,7 +21209,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 6
         },
@@ -21316,7 +21316,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 10
         },
@@ -21392,7 +21392,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 3",
             "ai_flags": [],
             "money": 5
         },
@@ -21437,7 +21437,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 10
         },
@@ -21482,7 +21482,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Wellspring Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -21527,7 +21527,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 10
         },
@@ -21572,7 +21572,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 10
         },
@@ -21679,7 +21679,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 10
         },
@@ -21786,7 +21786,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -21831,7 +21831,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -21907,7 +21907,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -21983,7 +21983,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -22090,7 +22090,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -22135,7 +22135,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -22180,7 +22180,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -22256,7 +22256,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -22301,7 +22301,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -22346,7 +22346,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -22391,7 +22391,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 10
         },
@@ -22436,7 +22436,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 10
         },
@@ -22512,7 +22512,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -22557,7 +22557,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -22633,7 +22633,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -22709,7 +22709,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -22785,7 +22785,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -22830,7 +22830,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -22875,7 +22875,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -22951,7 +22951,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23027,7 +23027,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23103,7 +23103,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23210,7 +23210,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23317,7 +23317,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23424,7 +23424,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23500,7 +23500,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23576,7 +23576,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23621,7 +23621,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23666,7 +23666,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23742,7 +23742,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23849,7 +23849,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23894,7 +23894,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -23970,7 +23970,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24046,7 +24046,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24153,7 +24153,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24260,7 +24260,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24336,7 +24336,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24381,7 +24381,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24426,7 +24426,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24502,7 +24502,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24578,7 +24578,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 25
         },
@@ -24654,7 +24654,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -24730,7 +24730,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -24806,7 +24806,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -24882,7 +24882,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -24958,7 +24958,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25034,7 +25034,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25110,7 +25110,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25186,7 +25186,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25262,7 +25262,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25338,7 +25338,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25414,7 +25414,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25490,7 +25490,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25566,7 +25566,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25642,7 +25642,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25718,7 +25718,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -25825,7 +25825,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 4
         },
@@ -25932,7 +25932,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 5
         },
@@ -26036,7 +26036,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 5
         },
@@ -26143,7 +26143,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 15
         },
@@ -26250,7 +26250,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 15
         },
@@ -26388,7 +26388,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 20
         },
@@ -26526,15 +26526,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 20
         },
         {
             "rom_id": 361,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Breeder",
-            "trainer_name": "⒆⒇ Breeder Owen",
+            "trainer_class": "Pokemon Breeder",
+            "trainer_name": "Pokemon Breeder Owen",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -26726,15 +26726,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
         {
             "rom_id": 362,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Breeder",
-            "trainer_name": "⒆⒇ Breeder Brooke",
+            "trainer_class": "Pokemon Breeder",
+            "trainer_name": "Pokemon Breeder Brooke",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -26926,7 +26926,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -27033,7 +27033,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -27109,7 +27109,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -27187,7 +27187,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -27265,7 +27265,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -27310,7 +27310,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 40
         },
@@ -27355,7 +27355,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 40
         },
@@ -27433,7 +27433,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 50
         },
@@ -27480,7 +27480,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 50
         },
@@ -27587,7 +27587,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -27632,7 +27632,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -27710,7 +27710,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 16
         },
@@ -27881,7 +27881,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 16
         },
@@ -27988,7 +27988,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 15
         },
@@ -28064,7 +28064,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -28140,7 +28140,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -28216,15 +28216,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 379,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Nelson",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Nelson",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -28385,15 +28385,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 380,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑮",
-            "trainer_name": "Clerk ⑮ Wren",
+            "trainer_class": "Clerk F",
+            "trainer_name": "Clerk F Wren",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -28492,7 +28492,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -28568,7 +28568,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -28613,7 +28613,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 6
         },
@@ -28658,7 +28658,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 6
         },
@@ -28706,7 +28706,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 15
         },
@@ -28751,7 +28751,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -28858,7 +28858,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -28934,7 +28934,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -29010,15 +29010,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 389,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑭",
-            "trainer_name": "Swimmer ⑭ Wright",
+            "trainer_class": "Swimmer M",
+            "trainer_name": "Swimmer M Wright",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -29148,15 +29148,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [],
             "money": 4
         },
         {
             "rom_id": 390,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑮",
-            "trainer_name": "Swimmer ⑮ Joyce",
+            "trainer_class": "Swimmer F",
+            "trainer_name": "Swimmer F Joyce",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -29193,7 +29193,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [],
             "money": 4
         },
@@ -29269,7 +29269,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -29345,7 +29345,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -29421,7 +29421,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -29466,7 +29466,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 12
         },
@@ -29542,7 +29542,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -29618,7 +29618,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 10
         },
@@ -29663,7 +29663,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -29770,7 +29770,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 8
         },
@@ -29815,7 +29815,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 1
         },
@@ -29860,7 +29860,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nimbasa City",
             "ai_flags": [],
             "money": 1
         },
@@ -29905,7 +29905,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 1
         },
@@ -29950,15 +29950,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 5",
             "ai_flags": [],
             "money": 1
         },
         {
             "rom_id": 403,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (403)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (403)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -30088,15 +30088,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 404,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (404)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (404)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -30226,15 +30226,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 405,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (405)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (405)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -30364,7 +30364,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 25
         },
@@ -30614,7 +30614,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 50
         },
@@ -30690,7 +30690,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 16",
             "ai_flags": [],
             "money": 8
         },
@@ -30766,7 +30766,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 16",
             "ai_flags": [],
             "money": 8
         },
@@ -30873,7 +30873,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [],
             "money": 15
         },
@@ -30980,7 +30980,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [],
             "money": 15
         },
@@ -31025,15 +31025,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 16",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 413,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑭",
-            "trainer_name": "Swimmer ⑭ Berke",
+            "trainer_class": "Swimmer M",
+            "trainer_name": "Swimmer M Berke",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -31101,7 +31101,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [],
             "money": 4
         },
@@ -31177,7 +31177,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 8
         },
@@ -31284,7 +31284,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [],
             "money": 8
         },
@@ -31329,7 +31329,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 12
         },
@@ -31407,7 +31407,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 12
         },
@@ -31516,7 +31516,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 12
         },
@@ -31625,7 +31625,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 12
         },
@@ -31703,7 +31703,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 12
         },
@@ -31750,7 +31750,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "P2 Laboratory",
             "ai_flags": [],
             "money": 12
         },
@@ -31857,7 +31857,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 8
         },
@@ -31933,7 +31933,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 8
         },
@@ -32068,7 +32068,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dreamyard",
             "ai_flags": [],
             "money": 8
         },
@@ -32146,7 +32146,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 50
         },
@@ -32224,7 +32224,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 50
         },
@@ -32328,7 +32328,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [],
             "money": 5
         },
@@ -32404,7 +32404,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [],
             "money": 5
         },
@@ -32544,7 +32544,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [],
             "money": 16
         },
@@ -32649,7 +32649,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 4
         },
@@ -32787,7 +32787,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [],
             "money": 8
         },
@@ -32863,7 +32863,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [],
             "money": 8
         },
@@ -32970,7 +32970,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 8
         },
@@ -33164,7 +33164,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 8
         },
@@ -33270,7 +33270,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 8
         },
@@ -33346,7 +33346,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 8
         },
@@ -33391,7 +33391,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 11",
             "ai_flags": [],
             "money": 6
         },
@@ -33436,7 +33436,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 16",
             "ai_flags": [],
             "money": 6
         },
@@ -33481,7 +33481,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 18",
             "ai_flags": [],
             "money": 6
         },
@@ -33526,7 +33526,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 11",
             "ai_flags": [],
             "money": 6
         },
@@ -33571,7 +33571,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 18",
             "ai_flags": [],
             "money": 6
         },
@@ -33616,7 +33616,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 16",
             "ai_flags": [],
             "money": 6
         },
@@ -33661,7 +33661,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 16",
             "ai_flags": [],
             "money": 6
         },
@@ -33768,7 +33768,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [],
             "money": 8
         },
@@ -33844,7 +33844,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 18",
             "ai_flags": [],
             "money": 8
         },
@@ -33951,15 +33951,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 8
         },
         {
             "rom_id": 447,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑮",
-            "trainer_name": "Swimmer ⑮ Caroline",
+            "trainer_class": "Swimmer F",
+            "trainer_name": "Swimmer F Caroline",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -34027,7 +34027,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 17",
             "ai_flags": [],
             "money": 4
         },
@@ -34103,7 +34103,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [],
             "money": 12
         },
@@ -34179,7 +34179,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 4
         },
@@ -34286,15 +34286,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 18",
             "ai_flags": [],
             "money": 20
         },
         {
             "rom_id": 451,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Breeder",
-            "trainer_name": "⒆⒇ Breeder Eustace",
+            "trainer_class": "Pokemon Breeder",
+            "trainer_name": "Pokemon Breeder Eustace",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -34393,15 +34393,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [],
             "money": 12
         },
         {
             "rom_id": 452,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Breeder",
-            "trainer_name": "⒆⒇ Breeder Ethel",
+            "trainer_class": "Pokemon Breeder",
+            "trainer_name": "Pokemon Breeder Ethel",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -34562,15 +34562,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 12",
             "ai_flags": [],
             "money": 12
         },
         {
             "rom_id": 453,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Thalia",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Thalia",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -34669,15 +34669,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 11",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 454,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Shelly",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Shelly",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -34745,15 +34745,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 455,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Crofton",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Crofton",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -34852,15 +34852,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 11",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 456,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Keith",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Keith",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -34928,7 +34928,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [],
             "money": 15
         },
@@ -35035,7 +35035,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 13",
             "ai_flags": [],
             "money": 4
         },
@@ -35142,7 +35142,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [],
             "money": 8
         },
@@ -35249,7 +35249,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 15",
             "ai_flags": [],
             "money": 8
         },
@@ -35325,15 +35325,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 18",
             "ai_flags": [],
             "money": 8
         },
         {
             "rom_id": 461,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑮",
-            "trainer_name": "Clerk ⑮ Britney",
+            "trainer_class": "Clerk F",
+            "trainer_name": "Clerk F Britney",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -35377,8 +35377,8 @@
         {
             "rom_id": 462,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑮",
-            "trainer_name": "Clerk ⑮ Piper",
+            "trainer_class": "Clerk F",
+            "trainer_name": "Clerk F Piper",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -35803,8 +35803,8 @@
         {
             "rom_id": 470,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Doug",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Doug",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -35848,8 +35848,8 @@
         {
             "rom_id": 471,
             "is_double_battle": false,
-            "trainer_class": "Clerk ⑭",
-            "trainer_name": "Clerk ⑭ Collin",
+            "trainer_class": "Clerk M",
+            "trainer_name": "Clerk M Collin",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -36556,8 +36556,8 @@
         {
             "rom_id": 486,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Eliza",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Eliza",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -36601,8 +36601,8 @@
         {
             "rom_id": 487,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Ralph",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Ralph",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -36783,8 +36783,8 @@
         {
             "rom_id": 491,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (491)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (491)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -36917,15 +36917,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 492,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (492)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (492)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -37058,15 +37058,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 493,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (493)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (493)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -37199,15 +37199,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 494,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (494)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (494)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -37340,15 +37340,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 495,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (495)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (495)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -37481,15 +37481,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 496,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (496)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (496)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -37622,7 +37622,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 8",
             "ai_flags": [],
             "money": 25
         },
@@ -37679,8 +37679,8 @@
         {
             "rom_id": 498,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (498)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (498)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -37748,15 +37748,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 499,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (499)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (499)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -37824,15 +37824,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 500,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (500)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (500)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -37900,7 +37900,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 2",
             "ai_flags": [],
             "money": 25
         },
@@ -37976,7 +37976,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 1
         },
@@ -38021,7 +38021,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 1
         },
@@ -38097,7 +38097,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 8
         },
@@ -38204,7 +38204,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 8
         },
@@ -38280,7 +38280,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 4",
             "ai_flags": [],
             "money": 8
         },
@@ -38387,15 +38387,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 8
         },
         {
             "rom_id": 507,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (507)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (507)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -38528,15 +38528,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia Gate",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 508,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (508)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (508)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -38669,15 +38669,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia Gate",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 509,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (509)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (509)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -38810,15 +38810,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia Gate",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 510,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer  (510)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer  (510)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -38862,8 +38862,8 @@
         {
             "rom_id": 511,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer  (511)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer  (511)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -38907,8 +38907,8 @@
         {
             "rom_id": 512,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer  (512)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer  (512)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -39052,7 +39052,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -39159,7 +39159,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -39204,7 +39204,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 4
         },
@@ -39249,7 +39249,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nacrene City",
             "ai_flags": [],
             "money": 4
         },
@@ -39294,7 +39294,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nacrene City",
             "ai_flags": [],
             "money": 4
         },
@@ -39401,7 +39401,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 15
         },
@@ -39508,7 +39508,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 15
         },
@@ -39553,7 +39553,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Town",
             "ai_flags": [],
             "money": 50
         },
@@ -39812,7 +39812,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Town",
             "ai_flags": [],
             "money": 50
         },
@@ -39919,7 +39919,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Town",
             "ai_flags": [],
             "money": 50
         },
@@ -40057,7 +40057,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Town",
             "ai_flags": [],
             "money": 50
         },
@@ -40135,7 +40135,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "P2 Laboratory",
             "ai_flags": [],
             "money": 12
         },
@@ -40287,7 +40287,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Black City",
             "ai_flags": [],
             "money": 6
         },
@@ -40394,7 +40394,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City / White Forest",
             "ai_flags": [],
             "money": 5
         },
@@ -40501,15 +40501,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "White Forest",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 531,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Brenda",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Brenda",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -40577,15 +40577,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 1",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 532,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Claude",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Claude",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -40653,7 +40653,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 1",
             "ai_flags": [],
             "money": 15
         },
@@ -40729,7 +40729,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 1",
             "ai_flags": [],
             "money": 8
         },
@@ -40961,8 +40961,8 @@
         {
             "rom_id": 539,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (539)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (539)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -41092,15 +41092,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 540,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (540)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (540)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -41230,15 +41230,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 541,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (541)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (541)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -41368,7 +41368,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Twist Mountain",
             "ai_flags": [],
             "money": 25
         },
@@ -41573,7 +41573,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 20
         },
@@ -41663,7 +41663,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Tubeline Bridge",
             "ai_flags": [],
             "money": 8
         },
@@ -41770,7 +41770,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Tubeline Bridge",
             "ai_flags": [],
             "money": 8
         },
@@ -41815,7 +41815,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pinwheel Forest",
             "ai_flags": [],
             "money": 10
         },
@@ -41891,7 +41891,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Town",
             "ai_flags": [],
             "money": 50
         },
@@ -42091,15 +42091,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Town",
             "ai_flags": [],
             "money": 50
         },
         {
             "rom_id": 549,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Mylene",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Mylene",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -42136,15 +42136,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 550,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Jaden",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Jaden",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -42212,7 +42212,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 15
         },
@@ -42287,7 +42287,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Village Bridge",
             "ai_flags": [],
             "money": 10
         },
@@ -42363,7 +42363,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 10
         },
@@ -42408,7 +42408,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Liberty Garden",
             "ai_flags": [],
             "money": 10
         },
@@ -42484,7 +42484,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Liberty Garden",
             "ai_flags": [],
             "money": 10
         },
@@ -42529,7 +42529,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Liberty Garden",
             "ai_flags": [],
             "money": 10
         },
@@ -42605,7 +42605,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Liberty Garden",
             "ai_flags": [],
             "money": 10
         },
@@ -42650,15 +42650,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Liberty Garden",
             "ai_flags": [],
             "money": 10
         },
         {
             "rom_id": 558,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer  (558)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer  (558)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -42702,8 +42702,8 @@
         {
             "rom_id": 559,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer  (559)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer  (559)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -42747,8 +42747,8 @@
         {
             "rom_id": 560,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer  (560)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer  (560)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -42792,8 +42792,8 @@
         {
             "rom_id": 561,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer  (561)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer  (561)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -43080,7 +43080,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 30
         },
@@ -43285,7 +43285,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 30
         },
@@ -43490,7 +43490,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 30
         },
@@ -43695,15 +43695,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Pokémon League",
             "ai_flags": [],
             "money": 30
         },
         {
             "rom_id": 567,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cynthia",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cynthia",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -43900,15 +43900,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Town",
             "ai_flags": [],
             "money": 50
         },
         {
             "rom_id": 568,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑭",
-            "trainer_name": "Swimmer ⑭ Matt",
+            "trainer_class": "Swimmer M",
+            "trainer_name": "Swimmer M Matt",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -43976,15 +43976,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Bay",
             "ai_flags": [],
             "money": 4
         },
         {
             "rom_id": 569,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑭",
-            "trainer_name": "Swimmer ⑭ Bart",
+            "trainer_class": "Swimmer M",
+            "trainer_name": "Swimmer M Bart",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -44083,15 +44083,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Bay",
             "ai_flags": [],
             "money": 4
         },
         {
             "rom_id": 570,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑭",
-            "trainer_name": "Swimmer ⑭ Tim",
+            "trainer_class": "Swimmer M",
+            "trainer_name": "Swimmer M Tim",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -44159,15 +44159,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Bay",
             "ai_flags": [],
             "money": 4
         },
         {
             "rom_id": 571,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑮",
-            "trainer_name": "Swimmer ⑮ Rebecca",
+            "trainer_class": "Swimmer F",
+            "trainer_name": "Swimmer F Rebecca",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -44266,15 +44266,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Bay",
             "ai_flags": [],
             "money": 4
         },
         {
             "rom_id": 572,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑮",
-            "trainer_name": "Swimmer ⑮ Tyra",
+            "trainer_class": "Swimmer F",
+            "trainer_name": "Swimmer F Tyra",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -44342,15 +44342,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Bay",
             "ai_flags": [],
             "money": 4
         },
         {
             "rom_id": 573,
             "is_double_battle": false,
-            "trainer_class": "Swimmer ⑮",
-            "trainer_name": "Swimmer ⑮ Larissa",
+            "trainer_class": "Swimmer F",
+            "trainer_name": "Swimmer F Larissa",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -44387,7 +44387,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Undella Bay",
             "ai_flags": [],
             "money": 4
         },
@@ -44494,7 +44494,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Abundant Shrine",
             "ai_flags": [],
             "money": 4
         },
@@ -44662,7 +44662,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Abundant Shrine",
             "ai_flags": [],
             "money": 4
         },
@@ -44769,7 +44769,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Abundant Shrine",
             "ai_flags": [],
             "money": 4
         },
@@ -44814,7 +44814,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 14",
             "ai_flags": [],
             "money": 6
         },
@@ -44859,7 +44859,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Challenger's Cave",
             "ai_flags": [],
             "money": 6
         },
@@ -45059,7 +45059,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Village Bridge",
             "ai_flags": [],
             "money": 5
         },
@@ -45199,7 +45199,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Village Bridge",
             "ai_flags": [],
             "money": 12
         },
@@ -45306,15 +45306,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Abundant Shrine",
             "ai_flags": [],
             "money": 4
         },
         {
             "rom_id": 582,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Chloris",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Chloris",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -45413,15 +45413,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Moor of Icirrus",
             "ai_flags": [],
             "money": 15
         },
         {
             "rom_id": 583,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Ranger",
-            "trainer_name": "⒆⒇ Ranger Harry",
+            "trainer_class": "Pokemon Ranger",
+            "trainer_name": "Pokemon Ranger Harry",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -45489,7 +45489,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Moor of Icirrus",
             "ai_flags": [],
             "money": 15
         },
@@ -45565,7 +45565,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Moor of Icirrus",
             "ai_flags": [],
             "money": 8
         },
@@ -45641,7 +45641,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Moor of Icirrus",
             "ai_flags": [],
             "money": 8
         },
@@ -45846,7 +45846,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "N's Castle",
             "ai_flags": [],
             "money": 50
         },
@@ -46051,15 +46051,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "N's Castle",
             "ai_flags": [],
             "money": 50
         },
         {
             "rom_id": 588,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (588)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (588)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -46189,15 +46189,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 589,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (589)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (589)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -46327,15 +46327,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 590,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (590)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (590)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -46465,15 +46465,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 10",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 591,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (591)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (591)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -46665,15 +46665,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 592,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (592)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (592)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -46865,15 +46865,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 593,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Cheren (593)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Cheren (593)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [],
@@ -47065,15 +47065,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Victory Road",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 594,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (594)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (594)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -47268,15 +47268,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 595,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (595)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (595)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -47471,15 +47471,15 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
         {
             "rom_id": 596,
             "is_double_battle": false,
-            "trainer_class": "⒆⒇ Trainer",
-            "trainer_name": "⒆⒇ Trainer Bianca (596)",
+            "trainer_class": "Pokemon Trainer",
+            "trainer_name": "Pokemon Trainer Bianca (596)",
             "trainer_gender": null,
             "battle_type": "Singles",
             "items": [
@@ -47676,7 +47676,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Nuvema Town",
             "ai_flags": [],
             "money": 25
         },
@@ -47783,7 +47783,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -47828,7 +47828,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Relic Castle",
             "ai_flags": [],
             "money": 10
         },
@@ -47904,7 +47904,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -47949,7 +47949,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 8
         },
@@ -47994,7 +47994,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 8
         },
@@ -48039,7 +48039,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Castelia City",
             "ai_flags": [],
             "money": 8
         },
@@ -48146,7 +48146,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Driftveil City",
             "ai_flags": [],
             "money": 8
         },
@@ -48253,7 +48253,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -48360,7 +48360,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Opelucid City",
             "ai_flags": [],
             "money": 15
         },
@@ -48467,7 +48467,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 15
         },
@@ -48574,7 +48574,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Route 7",
             "ai_flags": [],
             "money": 15
         },
@@ -48681,7 +48681,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Bridge Gate",
             "ai_flags": [],
             "money": 15
         },
@@ -48788,7 +48788,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Bridge Gate",
             "ai_flags": [],
             "money": 15
         },
@@ -48833,7 +48833,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Cold Storage",
             "ai_flags": [],
             "money": 10
         },
@@ -48940,7 +48940,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Chargestone Cave",
             "ai_flags": [],
             "money": 10
         },
@@ -48985,7 +48985,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Dragonspiral Tower",
             "ai_flags": [],
             "money": 10
         },
@@ -49033,7 +49033,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Desert Resort",
             "ai_flags": [],
             "money": 15
         },
@@ -49185,7 +49185,7 @@
                     "forme": null
                 }
             ],
-            "trainer_location": null,
+            "trainer_location": "Black City",
             "ai_flags": [],
             "money": 8
         }

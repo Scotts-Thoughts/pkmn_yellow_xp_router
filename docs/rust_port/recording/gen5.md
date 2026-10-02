@@ -75,7 +75,7 @@ Resets, with the patched mappers (September 2026):
   exceed the route's (lower) money.
 * `raw_pkmn_data/gen_five/fights_info.json` is shared by both games and names
   trainers exactly as the trainer data does (`Leader Cheren (156)`,
-  `⒆⒇ Trainer Rival (163)`): the major-fight categories (highlight colours, run
+  `Pokemon Trainer Rival (163)`): the major-fight categories (highlight colours, run
   summary, Major Battles filter), the badges and the gym TMs. It used to list bare
   names ("Cheren", "Hugh"), so no gen 5 fight was highlighted and no badge was
   awarded. Black 2 / White 2's Challenge Mode leaders and league are listed too; the

@@ -2,6 +2,8 @@
 //! store and checks the `mon_order` the ROAR update writes: 1-based, one entry
 //! per enemy mon, whether or not the game's -1 (255) "no mon" party position
 //! was seen as a change before the lead came out (KNOWN_ISSUES KI-2).
+//! Also checks wild mons are recorded at their real level, not the mapper's
+//! `wTempMonLevel` (which is often the player's level).
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -120,9 +122,12 @@ impl RecorderHost for FakeHost {
     }
 }
 
-/// A deprecated-mapper property list with every key the machine reads.
-fn mapper() -> Value {
-    let k = Gen2Keys::configure_for_mapper(Some("Pokemon Crystal - Deprecated Mapper"));
+const DEPRECATED: &str = "Pokemon Crystal - Deprecated Mapper";
+const STANDARD: &str = "Pokemon Crystal";
+
+/// A property list for `game_name`'s mapper with every key the machine reads.
+fn mapper(game_name: &str) -> Value {
+    let k = Gen2Keys::configure_for_mapper(Some(game_name));
     let mut props: Vec<Value> = Vec::new();
     let mut add = |path: &str, value: Value| props.push(json!({"path": path, "value": value}));
     for (path, value) in [
@@ -155,6 +160,7 @@ fn mapper() -> Value {
         (&k.battle_enemy_species, Value::Null),
         (&k.battle_enemy_level, json!(0)),
         (&k.battle_enemy_hp, json!(0)),
+        (&k.battle_enemy_max_hp, json!(0)),
         (&k.battle_enemy_mon_party_pos, json!(0)),
         (&k.item_count, json!(1)),
         (&k.ball_count, json!(0)),
@@ -172,7 +178,7 @@ fn mapper() -> Value {
     for (i, m) in [json!("SCRATCH"), json!("LEER"), Value::Null, Value::Null].iter().enumerate() {
         add(&k.player_moves[i], m.clone());
     }
-    for path in &k.stat_exp {
+    for path in k.stat_exp.iter().chain(k.battle_enemy_dvs.iter()) {
         add(path, json!(0));
     }
     for (i, path) in k.item_type.iter().enumerate() {
@@ -189,7 +195,7 @@ fn mapper() -> Value {
     for path in k.tm_keys.iter().chain(k.hm_keys.iter()) {
         add(path, json!(0));
     }
-    json!({"meta": {"gameName": "Pokemon Crystal - Deprecated Mapper"}, "glossary": {}, "properties": props})
+    json!({"meta": {"gameName": game_name}, "glossary": {}, "properties": props})
 }
 
 struct Sim {
@@ -255,6 +261,39 @@ impl Sim {
         self.set(&k.battle_text_buffer, json!(""));
         self.tick(2);
     }
+
+    /// A wild battle the player wins. `dvs` (attack, defense, speed, special)
+    /// are only set when the mapper has them. The mapper's level reads
+    /// `reported_level` throughout, like `wTempMonLevel` after the player's HUD
+    /// was drawn last.
+    fn wild_battle(&mut self, species: &str, max_hp: i64, dvs: [i64; 4], reported_level: i64) {
+        let k = self.keys.clone();
+        self.set(&k.battle_start, json!(1));
+        self.set(&k.battle_mode, json!("Wild"));
+        self.set(&k.battle_enemy_species, json!(species));
+        self.set(&k.battle_enemy_max_hp, json!(max_hp));
+        for (path, dv) in k.battle_enemy_dvs.iter().zip(dvs) {
+            self.set(path, json!(dv));
+        }
+        self.set(&k.battle_enemy_level, json!(reported_level));
+        self.set(&k.battle_enemy_hp, json!(max_hp));
+        self.tick(1);
+        self.set(&k.battle_text_buffer, json!(format!("Wild {} appeared!", species)));
+        self.set(&k.battle_player_mon_party_pos, json!(0));
+        self.set(&k.battle_player_mon_species, json!("Totodile"));
+        self.set(&k.battle_player_mon_hp, json!(30));
+        self.set(&k.battle_start, json!(0));
+        self.tick(2);
+        self.set(&k.battle_enemy_hp, json!(0));
+        self.tick(1);
+        self.exp += 10;
+        self.set(&k.mon_exppoints, json!(self.exp));
+        self.tick(1);
+        self.set(&k.battle_mode, Value::Null);
+        self.set(&k.battle_enemy_species, Value::Null);
+        self.set(&k.battle_text_buffer, json!(""));
+        self.tick(2);
+    }
 }
 
 fn wait_for_events(log: &Arc<Mutex<Log>>, n: usize) -> Vec<EventDefinition> {
@@ -271,8 +310,7 @@ fn wait_for_events(log: &Arc<Mutex<Log>>, n: usize) -> Vec<EventDefinition> {
     }
 }
 
-#[test]
-fn crystal_mon_order_is_one_based_with_or_without_the_sentinel() {
+fn start(game_name: &str) -> (Sim, Arc<Mutex<Log>>, Arc<GenData>, Arc<RecorderController>) {
     let root = xpr_core::consts::find_source_root().expect("source root");
     let reg = Arc::new(Registry::new(root.join("raw_pkmn_data"), PathBuf::new()));
     let gen = reg.get_version("Crystal").expect("crystal");
@@ -288,14 +326,20 @@ fn crystal_mon_order_is_one_based_with_or_without_the_sentinel() {
         solo_species: Some("Totodile".into()),
     };
     let mut machine = Gen2Machine::new(controller.clone(), &info);
-    let store = PropertyStore::from_mapper(&mapper()).unwrap();
+    let store = PropertyStore::from_mapper(&mapper(game_name)).unwrap();
     let (_watch, invalid) = machine.on_mapper_loaded(&store);
     assert!(invalid.is_empty(), "invalid keys: {:?}", invalid);
     machine.startup(&store);
-    let keys = Gen2Keys::configure_for_mapper(Some("Pokemon Crystal - Deprecated Mapper"));
+    let keys = Gen2Keys::configure_for_mapper(Some(game_name));
     let mut sim = Sim { store, machine, keys, seconds: 0, exp: 135 };
     sim.tick(4); // UNINITIALIZED -> OVERWORLD
     assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Overworld));
+    (sim, log, gen, controller)
+}
+
+#[test]
+fn crystal_mon_order_is_one_based_with_or_without_the_sentinel() {
+    let (mut sim, log, gen, _controller) = start(DEPRECATED);
 
     // the game writes -1 while setting up, then 0 for the lead: Youngster Mikey (Pidgey, Rattata)
     sim.trainer_battle("YOUNGSTER", 2, &[("Pidgey", 2), ("Rattata", 4)], true, &[Some(0), Some(1)]);
@@ -327,4 +371,38 @@ fn crystal_mon_order_is_one_based_with_or_without_the_sentinel() {
         assert_eq!(names, expect);
     }
     sim.machine.shutdown();
+}
+
+#[test]
+fn crystal_wild_mons_are_recorded_at_their_real_level() {
+    for game_name in [STANDARD, DEPRECATED] {
+        let (mut sim, log, _gen, _controller) = start(game_name);
+        // the mapper reports the level-5 Totodile's level for all of these.
+        // Pidgey L3 with HP DV 10 (attack 9, defense 6, speed 11, special 4):
+        // (40 + 10) * 2 * 3 / 100 + 3 + 10 = 16
+        sim.wild_battle("Pidgey", 16, [9, 6, 11, 4], 5);
+        // Sentret L2, HP DV 15: (35 + 15) * 2 * 2 / 100 + 2 + 10 = 14
+        sim.wild_battle("Sentret", 14, [15, 15, 15, 15], 5);
+        let events = wait_for_events(&log, 2);
+        let wilds: Vec<(String, i64)> = events.iter().filter_map(|d| d.wild_pkmn_info.as_ref().map(|w| (w.name.clone(), w.level))).collect();
+        assert_eq!(wilds, vec![("Pidgey".to_string(), 3), ("Sentret".to_string(), 2)], "{}", game_name);
+        sim.machine.shutdown();
+    }
+}
+
+#[test]
+fn enemy_level_from_max_hp_picks_the_level_that_fits() {
+    use xpr_recorder::games::gen2::enemy_level_from_max_hp;
+    // Chikorita-like base 45 HP at level 10, HP DV 7: (45 + 7) * 2 * 10 / 100 + 20 = 30
+    assert_eq!(enemy_level_from_max_hp(45, 30, Some(7), 12), Some(10));
+    // without the DV, 30 also fits level 11 (DV 0: 90 * 11 / 100 + 21), so the
+    // reported level breaks the tie ...
+    assert_eq!(enemy_level_from_max_hp(45, 30, None, 11), Some(11));
+    assert_eq!(enemy_level_from_max_hp(45, 30, None, 10), Some(10));
+    // ... and the lowest fit wins when the reported level doesn't fit at all
+    assert_eq!(enemy_level_from_max_hp(45, 30, None, 5), Some(10));
+    // a DV that doesn't fit (a transformed mon) falls back to any DV
+    assert_eq!(enemy_level_from_max_hp(45, 30, Some(12), 10), Some(10));
+    // nothing fits
+    assert_eq!(enemy_level_from_max_hp(45, 2, None, 5), None);
 }

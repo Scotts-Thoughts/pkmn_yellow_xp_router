@@ -1,6 +1,7 @@
-//! Serde shapes of the pack files (format v1, see
-//! `docs/rust_port/design/world_map/SPEC.md` §3.2) and the processed
-//! runtime types built from them.
+//! Serde shapes of the pack files (format 1, see
+//! `docs/rust_port/design/world_map/SPEC.md` §3.2; format 2, the gen 4/5
+//! "image world" packs, see `GEN45_REQUIREMENTS.md` §4 and its "as built"
+//! notes) and the processed runtime types built from them.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -26,6 +27,112 @@ pub struct Manifest {
     pub gen3: Option<Gen3Consts>,
     pub blockdata: Vec<BlobEntry>,
     pub blocksets: Vec<BlocksetEntry>,
+}
+
+/// The fields every pack format shares, read first to pick the loader.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ManifestHeader {
+    pub format: u32,
+    #[serde(default)]
+    pub kind: Option<String>,
+}
+
+/// Format 2 (gen 4/5): a pre-rendered world instead of tilesets.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ImageManifest {
+    pub format: u32,
+    pub game: String,
+    pub gen: u8,
+    pub versions: Vec<String>,
+    pub tile_px: u32,
+    pub world: ImageWorldSize,
+    #[serde(default)]
+    pub encounter_methods: indexmap::IndexMap<String, String>,
+    #[serde(default)]
+    pub encounter_conditions: indexmap::IndexMap<String, String>,
+    pub blobs: ImageBlobs,
+    #[serde(default)]
+    pub imagery: Option<ImageryInfo>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ImageWorldSize {
+    pub w_px: u32,
+    pub h_px: u32,
+    #[serde(default)]
+    pub top_px: u32,
+    pub levels: u8,
+    pub tile_size: u32,
+    #[serde(default)]
+    pub default_map: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ImageBlobs {
+    pub classes: Vec<BlobEntry>,
+    pub lift: Vec<BlobEntry>,
+}
+
+/// The pack's separately delivered imagery zip (`dist/router-imagery/`).
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct ImageryInfo {
+    pub version: String,
+    pub zip: String,
+    pub bytes: u64,
+    pub sha256: String,
+    pub files: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawImageMap {
+    #[serde(rename = "const")]
+    pub const_name: String,
+    pub display: String,
+    #[serde(default)]
+    pub location: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>,
+    pub kind: String,
+    pub w: u32,
+    pub h: u32,
+    #[serde(default)]
+    pub pos: Option<[i32; 2]>,
+    #[serde(default)]
+    pub image: Option<String>,
+    #[serde(default)]
+    pub image_origin: Option<[i32; 2]>,
+    #[serde(default)]
+    pub image_size: Option<[i32; 2]>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawOwnership {
+    pub origin: [i32; 2],
+    pub cell: i32,
+    pub cols: i32,
+    pub rows: i32,
+    pub cells: Vec<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawImageLayout {
+    pub positions: HashMap<String, [i32; 2]>,
+    pub ownership: RawOwnership,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawMaskSurface {
+    pub w: usize,
+    pub h: usize,
+    pub rle: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawMasks {
+    #[serde(default)]
+    pub world: Option<RawMaskSurface>,
+    #[serde(default)]
+    pub interiors: HashMap<String, RawMaskSurface>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -127,6 +234,12 @@ pub struct RawObject {
     pub pal: Option<String>,
     #[serde(default)]
     pub payload: serde_json::Value,
+    /// format 2: px above the tile
+    #[serde(default)]
+    pub lift: i32,
+    /// format 2: version-exclusive objects
+    #[serde(default)]
+    pub version: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -270,12 +383,32 @@ pub struct Connection {
     pub offset: i32,
 }
 
+/// Where a map sits in its own scope (`Scope::Map`). Tile maps fill their
+/// scope (`origin` (0, 0), `size` the map's). An image-world interior's
+/// picture usually reaches past the map's rectangle (it is rendered with
+/// padding and terrain lift), so its scope is the union of the two, and the
+/// map's (0, 0) sits at `origin` inside it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MapFrame {
+    pub origin: (i32, i32),
+    pub size: (i32, i32),
+    /// where the interior image's top-left pixel is, in scope px
+    pub image_at: (i32, i32),
+}
+
 #[derive(Debug, Clone)]
 pub struct MapDef {
     pub id: MapId,
     pub const_name: String,
     pub name: String,
     pub display: String,
+    /// format 2: city / route / area / building / dungeon
+    pub category: Option<String>,
+    /// format 2: the game's location name ("Route 201", "Mystery Zone")
+    pub location: Option<String>,
+    /// format 2 interiors: the image path in the imagery (`interiors/….webp`)
+    pub image: Option<String>,
+    pub frame: MapFrame,
     /// size in blocks (gen 1/2: 32 px; gen 3: 16 px metatiles)
     pub w: u32,
     pub h: u32,
@@ -298,6 +431,8 @@ pub enum ObjectKind {
     Sign,
     Warp,
     Npc,
+    /// format 2: a Cut tree, Rock Smash rock or Strength boulder
+    Obstacle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -311,10 +446,14 @@ pub enum Facing {
 #[derive(Debug, Clone)]
 pub enum Payload {
     Trainer { trainer: Option<String>, variants: Vec<String>, double: bool, raw: Option<String> },
-    Item { item: Option<String>, raw: Option<String>, fake: bool },
+    Item { item: Option<String>, raw: Option<String>, fake: bool, count: u32 },
     Sign { text_key: String },
-    Warp { dest_map: Option<String>, dest_warp: Option<i64> },
-    Npc { label: Option<String>, battles: Vec<String> },
+    /// `dynamic`: the game picks the destination at runtime (elevators);
+    /// `candidates` lists the maps it can be
+    Warp { dest_map: Option<String>, dest_warp: Option<i64>, dynamic: bool, candidates: Vec<String> },
+    Npc { label: Option<String>, battles: Vec<String>, text_key: Option<String> },
+    /// `obstacle`: "cut" / "rock_smash" / "strength"; `label` for display
+    Obstacle { obstacle: String, label: Option<String> },
     None,
 }
 
@@ -330,6 +469,11 @@ pub struct MapObject {
     /// gen 2: the object's `PAL_NPC_*` palette
     pub pal: Option<String>,
     pub payload: Payload,
+    /// format 2: how many px the tilted render draws the object above its
+    /// tile (terrain height); 0 elsewhere
+    pub lift: i16,
+    /// format 2: only in this version (B2W2's version-exclusive objects)
+    pub version: Option<String>,
 }
 
 impl MapObject {
@@ -354,6 +498,15 @@ impl MapObject {
         match &self.payload {
             Payload::Item { item, .. } => item.as_deref(),
             _ => None,
+        }
+    }
+
+    /// Whether the object exists in `version` (objects without a version
+    /// exist in every one; no version known shows everything).
+    pub fn in_version(&self, version: Option<&str>) -> bool {
+        match (&self.version, version) {
+            (Some(v), Some(cur)) => v == cur,
+            _ => true,
         }
     }
 }
@@ -401,6 +554,8 @@ pub struct SpriteMeta {
     pub file: String,
     pub w: u32,
     pub h: u32,
+    /// format 2: frames in the strip (down, up, left, right); 0 = unknown
+    pub frames: u32,
 }
 
 /// A decoded tileset sheet: one palette/shade index per pixel.

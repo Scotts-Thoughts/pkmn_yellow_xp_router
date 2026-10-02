@@ -37,6 +37,14 @@ pub enum Chosen {
 
 fn group_of(pack: &MapPack, id: MapId) -> Group {
     let m = &pack.maps[id as usize];
+    // gens 4/5: the pack says what each map is
+    if let Some(cat) = m.category.as_deref() {
+        return match (cat, m.kind) {
+            ("city", MapKind::Outdoor) => Group::Cities,
+            ("route", _) | (_, MapKind::Outdoor) => Group::Routes,
+            _ => Group::Indoors,
+        };
+    }
     let c = m.const_name.as_str();
     let lower = m.display.to_lowercase();
     if c.contains("ROUTE") || lower.contains("route ") {
@@ -49,6 +57,25 @@ fn group_of(pack: &MapPack, id: MapId) -> Group {
         return Group::Cities;
     }
     Group::Indoors
+}
+
+/// A sort key comparing digit runs as numbers.
+fn natural_key(s: &str) -> Vec<(String, u64)> {
+    let mut out = Vec::new();
+    let mut text = String::new();
+    let mut num: Option<u64> = None;
+    for ch in s.chars() {
+        if let Some(d) = ch.to_digit(10) {
+            num = Some(num.unwrap_or(0).saturating_mul(10) + d as u64);
+        } else {
+            if let Some(n) = num.take() {
+                out.push((std::mem::take(&mut text), n));
+            }
+            text.extend(ch.to_lowercase());
+        }
+    }
+    out.push((text, num.unwrap_or(0)));
+    out
 }
 
 impl MapList {
@@ -68,11 +95,12 @@ impl MapList {
                 let body = theme.body();
                 let caption = theme.caption_font_bold();
                 widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("map_list_scroll").max_height(max_h).auto_shrink([false, true]), |ui| {
-                    for (group, title) in [(Group::Cities, "Cities & Towns"), (Group::Routes, "Routes"), (Group::Indoors, "Indoors & Dungeons")] {
+                    let routes = if pack.is_image() { "Routes & Areas" } else { "Routes" };
+                    for (group, title) in [(Group::Cities, "Cities & Towns"), (Group::Routes, routes), (Group::Indoors, "Indoors & Dungeons")] {
                         let mut items: Vec<MapId> = pack
                             .maps
                             .iter()
-                            .filter(|m| m.blocks.is_some() || m.kind == MapKind::Outdoor)
+                            .filter(|m| pack.has_view(m.id))
                             .filter(|m| group_of(pack, m.id) == group)
                             .filter(|m| filter.is_empty() || m.display.to_lowercase().contains(&filter) || m.const_name.to_lowercase().contains(&filter))
                             .map(|m| m.id)
@@ -80,7 +108,10 @@ impl MapList {
                         if items.is_empty() {
                             continue;
                         }
-                        if group != Group::Indoors {
+                        if pack.is_image() {
+                            // by name, numbers in order ("Route 2" before "Route 10")
+                            items.sort_by_key(|id| natural_key(&pack.maps[*id as usize].display));
+                        } else if group != Group::Indoors {
                             items.sort_by_key(|id| id.to_string());
                         }
                         ui.add_space(4.0);

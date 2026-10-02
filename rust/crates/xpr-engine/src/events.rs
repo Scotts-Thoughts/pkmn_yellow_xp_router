@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use serde_json::Value;
 
 use xpr_core::consts;
-use xpr_core::io_utils::sanitize_string;
+use xpr_core::io_utils::{fix_legacy_name_glyphs, sanitize_string};
 use xpr_core::pyjson::{self, get, truthy};
 use xpr_data::exp;
 use xpr_data::model::{CustomMoveData, EnemyPkmn, Trainer};
@@ -739,7 +739,8 @@ impl TrainerEventDefinition {
                 let req = |key: &str| -> Result<&Value, String> {
                     get(raw, key).ok_or_else(|| pyjson::python_repr_str(key))
                 };
-                let mut result = TrainerEventDefinition::new(&str_of(req(consts::TRAINER_NAME)?));
+                // routes saved before gen 5's names were spelled out still use the font glyphs
+                let mut result = TrainerEventDefinition::new(&fix_legacy_name_glyphs(&str_of(req(consts::TRAINER_NAME)?)));
                 result.verbose_export = req(consts::VERBOSE_KEY)?.clone();
                 result.setup_moves = str_list(Some(req(consts::SETUP_MOVES_KEY)?));
                 result.mimic_selection = str_of(req(consts::MIMIC_SELECTION)?);
@@ -784,9 +785,11 @@ impl TrainerEventDefinition {
                     Some(other) => pyjson::value_as_i64(other),
                 };
                 result.mon_order = i64_list(get(raw, consts::MON_ORDER));
-                result.second_trainer_name = get(raw, consts::SECOND_TRAINER_NAME)
-                    .cloned()
-                    .unwrap_or(Value::String(String::new()));
+                result.second_trainer_name = match get(raw, consts::SECOND_TRAINER_NAME) {
+                    Some(Value::String(n)) => Value::String(fix_legacy_name_glyphs(n).into_owned()),
+                    Some(other) => other.clone(),
+                    None => Value::String(String::new()),
+                };
                 result.transformed = get(raw, consts::TRANSFORMED).cloned().unwrap_or(Value::Bool(false));
                 result.stat_stage_setup = match get(raw, consts::STAT_STAGE_SETUP_KEY) {
                     Some(Value::Array(items)) => items.iter().map(|x| CustomMoveData::from_json(Some(x))).collect(),

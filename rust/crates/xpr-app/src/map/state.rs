@@ -44,6 +44,9 @@ pub struct RouteMapState {
     /// selected" apart from "this folder has nothing to show", which both
     /// leave `trip` at `None`.
     pub trip_folder_name: Option<String>,
+    /// The route's game version ("Black 2"): image worlds hide the objects
+    /// that only exist in the other version.
+    pub version: Option<String>,
 }
 
 /// One folder's route-path: its anchored trainer fights / item pickups, in
@@ -77,6 +80,11 @@ impl RouteMapState {
 
     /// Rebuild from the controller (cheap: one walk over the groups).
     pub fn sync(&mut self, ctrl: &MainController, pack: Option<&MapPack>) {
+        // a custom gen shows its base game's map, so it takes the base version's objects
+        self.version = match ctrl.gen() {
+            Some(g) => Some(g.base_version_name().unwrap_or(g.version_name()).to_string()),
+            None => ctrl.get_version().map(|v| v.to_string()),
+        };
         self.defeated = ctrl.router.defeated_trainers.iter().map(|n| sanitize_string(n)).collect();
         let mut acquired = HashSet::new();
         for g in ctrl.router.all_groups() {

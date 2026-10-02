@@ -19,7 +19,7 @@ fn compositor(game: &str) -> Arc<Compositor> {
 }
 
 fn key(cx: u32, cy: u32) -> ChunkKey {
-    ChunkKey { scope: Scope::World, level: 0, cx, cy, night: false }
+    ChunkKey { scope: Scope::World, level: 0, cx, cy, night: false, mask: false }
 }
 
 /// Keep asking for `wanted` (as the view does every frame) and uploading
