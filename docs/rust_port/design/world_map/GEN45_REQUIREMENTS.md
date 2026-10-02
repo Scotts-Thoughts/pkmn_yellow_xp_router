@@ -843,7 +843,8 @@ everything it does for gens 1–3, plus encounter conditions and masks.
   - world chunks straight from the pyramid tiles;
   - interiors from the mip chain;
   - an overworld map on its own, cropped from the world;
-  - the masks dimmed toward the background at pokemap's 0.9 (`RenderOpts::mask`);
+  - the masks fading hidden scenery out into the background entirely
+    (`MASK_ALPHA` 1.0, soft edges; `RenderOpts::mask`);
   - a terrain-class schematic when no imagery is installed.
   Export goes through the same path.
 - `sprites.rs`: gen 4/5 sheets are four RGBA frames (down, up, left, right).
@@ -871,7 +872,7 @@ everything it does for gens 1–3, plus encounter conditions and masks.
   hidden: in markers, hover, keyboard navigation, map cards, "add all" and
   the marquee. The version is the route's, or the base version for a
   custom gen (`RouteMapState::version`).
-- Layers gain "Obstacles" and "Dim unreachable areas" (image worlds only).
+- Layers gain "Obstacles" and "Hide unreachable areas" (image worlds only).
 - Encounter cards show condition chips per map:
   - gen 4: Day / Morning / Night / Swarm / Poké Radar / the dual-slot games;
   - HGSS: also the radio;

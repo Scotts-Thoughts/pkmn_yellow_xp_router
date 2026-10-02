@@ -36,8 +36,10 @@ pub struct RenderOpts {
     pub mask: bool,
 }
 
-/// How strongly a mask dims the hidden scenery (pokemap's default opacity).
-pub const MASK_ALPHA: f32 = 0.9;
+/// How strongly a mask covers the hidden scenery: fully, so the map fades out
+/// into the background (pokemap's viewer defaults to 0.9). Mask edges stay
+/// soft (`Mask::coverage` is smoothed across a cell).
+pub const MASK_ALPHA: f32 = 1.0;
 
 /// Schematic colours of the terrain classes (image worlds without imagery).
 fn class_color(c: u8) -> Option<[u8; 4]> {
@@ -86,7 +88,7 @@ fn composite_over(dst: &mut Pixmap, x: i32, y: i32, src: &Pixmap) {
     }
 }
 
-/// Dim the pixels a mask hides: blend toward `toward` by `MASK_ALPHA` × the
+/// Fade out the pixels a mask hides: blend toward `toward` by `MASK_ALPHA` × the
 /// hidden share. Pixel (px, py) of `dst` is at mask-surface px
 /// `(ox + px·f + f/2, oy + py·f + f/2)`.
 fn apply_mask(dst: &mut Pixmap, mask: &Mask, ox: i32, oy: i32, f: i32, toward: [u8; 4]) {

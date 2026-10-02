@@ -72,7 +72,7 @@ pub fn show(ui: &mut Ui, theme: &Theme, toggles: &mut Toggles, cfg: &mut Config,
                 row(ui, theme, &mut toggles.labels, "Map names", changed);
                 row(ui, theme, &mut toggles.path, "Route path", changed);
                 if image_world {
-                    row(ui, theme, &mut toggles.mask, "Dim unreachable areas", changed);
+                    row(ui, theme, &mut toggles.mask, "Hide unreachable areas", changed);
                 }
             });
             section(ui, theme, "Panels", &mut changed, |ui, changed| {
