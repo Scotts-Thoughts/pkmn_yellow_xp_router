@@ -4307,6 +4307,8 @@ dependencies = [
  "xpr-calc",
  "xpr-core",
  "xpr-data",
+ "xpr-dex",
+ "xpr-dex-ui",
  "xpr-engine",
  "xpr-map",
  "xpr-recorder",
@@ -4355,6 +4357,33 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "xpr-core",
+]
+
+[[package]]
+name = "xpr-dex"
+version = "6.0.0"
+dependencies = [
+ "flate2",
+ "indexmap",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "xpr-dex-ui"
+version = "6.0.0"
+dependencies = [
+ "egui",
+ "image",
+ "indexmap",
+ "log",
+ "serde",
+ "serde_json",
+ "xpr-core",
+ "xpr-data",
+ "xpr-dex",
+ "xpr-ui-kit",
 ]
 
 [[package]]
@@ -4421,6 +4450,7 @@ name = "xpr-ui-kit"
 version = "6.0.0"
 dependencies = [
  "egui",
+ "image",
  "log",
  "xpr-core",
 ]

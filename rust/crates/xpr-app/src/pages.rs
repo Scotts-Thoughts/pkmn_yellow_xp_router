@@ -20,7 +20,9 @@ use xpr_ui_kit::widgets::{self, Entry, StyledButton};
 
 use crate::assets::Assets;
 use crate::custom_dvs::CustomDvsFrame;
+use crate::controller::MainController;
 use crate::editors::OptionMenu;
+use crate::map::{MapAction, MapView};
 use crate::route_index::RouteIndex;
 
 pub const SORT_MOST_RECENT: &str = "most_recent";
@@ -35,6 +37,10 @@ pub struct LandingActions {
     /// "Start Recording": connect to GameHook and build the route from the
     /// game (version from the mapper, solo mon from the first Pokémon).
     pub start_recording: bool,
+    /// "View Map": browse a game's world map without a route open.
+    pub view_map: bool,
+    /// "Pokédex": the Dex page (Pokédex, trainers, damage, movedex ...).
+    pub open_dex: bool,
     pub load_route: Option<PathBuf>,
     /// "Compare Routes": `Some(Some(path))` seeds slot A with the selected
     /// route, `Some(None)` opens the page empty.
@@ -121,6 +127,22 @@ impl LandingPage {
                 .on_hover_text("Connect to GameHook now: the game comes from the loaded mapper and the route is set up from your first Pokémon (species, DVs/IVs, nature, ability) the moment you receive it.");
             if record.clicked() {
                 actions.start_recording = true;
+            }
+            ui.add_space(10.0);
+            let map = StyledButton::new(theme, egui::RichText::new("View Map").font(theme.font_bold(14.0)))
+                .min_size(Vec2::new(350.0, 50.0))
+                .show(ui)
+                .on_hover_text("Browse a game's world map (trainers, items, encounters) without opening a route.");
+            if map.clicked() {
+                actions.view_map = true;
+            }
+            ui.add_space(10.0);
+            let dex = StyledButton::new(theme, egui::RichText::new("Pok\u{e9}dex").font(theme.font_bold(14.0)))
+                .min_size(Vec2::new(350.0, 50.0))
+                .show(ui)
+                .on_hover_text("Look up Pok\u{e9}mon, movesets, trainers, damage ranges, EV yields and moves (Ctrl+K).");
+            if dex.clicked() {
+                actions.open_dex = true;
             }
             ui.add_space(10.0);
             let create = StyledButton::new(theme, egui::RichText::new("Create New Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
@@ -280,6 +302,68 @@ impl LandingPage {
                 }
             });
         });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Map viewer ("View Map" on the landing page)
+// ---------------------------------------------------------------------------
+
+/// What the map viewer page asks for.
+#[derive(Debug, Default)]
+pub struct MapViewerActions {
+    pub back: bool,
+    /// the map's own actions (exports; "add to route" is hidden while browsing)
+    pub map: Vec<MapAction>,
+}
+
+/// The landing page's "View Map": the world map of a game picked here, with
+/// no route open. A route-less controller holds the game's data so the
+/// map's cards can show trainer teams and encounters.
+pub struct MapViewerPage {
+    pub ctrl: MainController,
+    game: OptionMenu,
+}
+
+impl MapViewerPage {
+    /// Opens on `preferred` when it has a map pack, else the first game that
+    /// does; `None` when no game has one.
+    pub fn new(registry: &Arc<Registry>, paths: &Paths, map: &MapView, preferred: Option<&str>) -> Option<MapViewerPage> {
+        let versions: Vec<String> = registry.get_gen_names(true, false).into_iter().filter(|v| xpr_map::game_for_version(v).map(|g| map.has_pack(g)).unwrap_or(false)).collect();
+        let first = preferred.filter(|p| versions.iter().any(|v| v == p)).map(str::to_string).or_else(|| versions.first().cloned())?;
+        let mut page = MapViewerPage { ctrl: MainController::new(registry.clone(), paths.clone()), game: OptionMenu::new(versions, Some(&first)) };
+        page.set_version(&first);
+        Some(page)
+    }
+
+    fn set_version(&mut self, version: &str) {
+        if let Err(e) = self.ctrl.router.change_version(version) {
+            log::error!("Map viewer could not load {}: {}", version, e);
+        }
+    }
+
+    pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, map: &mut MapView, assets: &mut Assets) -> MapViewerActions {
+        let mut actions = MapViewerActions::default();
+        ui.horizontal(|ui| {
+            ui.set_height(36.0);
+            ui.spacing_mut().item_spacing.x = 8.0;
+            ui.add_space(6.0);
+            if StyledButton::new(theme, "◀ Back").show(ui).clicked() {
+                actions.back = true;
+            }
+            ui.add_space(8.0);
+            widgets::label(ui, theme, "Game:");
+            if self.game.ui(ui, theme, ui.id().with("map_viewer_game"), Some(160.0), true) {
+                let v = self.game.get().to_string();
+                self.set_version(&v);
+                map.sync_route(&self.ctrl);
+            }
+        });
+        actions.map = map.ui(ui, theme, cfg, &self.ctrl, assets);
+        if actions.map.contains(&MapAction::Close) {
+            actions.back = true;
+        }
+        actions
     }
 }
 

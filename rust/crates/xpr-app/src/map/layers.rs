@@ -154,8 +154,8 @@ pub struct MarkerCtx<'a> {
 }
 
 fn check_mark(painter: &egui::Painter, center: Pos2, radius: f32, c: Color32) {
-    painter.line_segment([center + Vec2::new(-radius * 0.5, 0.0), center + Vec2::new(-radius * 0.1, radius * 0.45)], Stroke::new(2.0, c));
-    painter.line_segment([center + Vec2::new(-radius * 0.1, radius * 0.45), center + Vec2::new(radius * 0.6, -radius * 0.5)], Stroke::new(2.0, c));
+    painter.line_segment([center + Vec2::new(-radius * 0.5, 0.0), center + Vec2::new(-radius * 0.1, radius * 0.45)], Stroke::new(2.0_f32, c));
+    painter.line_segment([center + Vec2::new(-radius * 0.1, radius * 0.45), center + Vec2::new(radius * 0.6, -radius * 0.5)], Stroke::new(2.0_f32, c));
 }
 
 /// Draw the markers of every map intersecting the viewport: sprites for
@@ -237,12 +237,12 @@ pub fn draw_markers(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapP
             let fill_a: u8 = if routed { 0x30 } else { 0x88 };
             let stroke_c = if routed { theme::with_alpha(color, 0x70) } else { color };
             if kind == ObjectKind::HiddenItem {
-                painter.circle(center, radius, theme::with_alpha(color, 0x44), Stroke::new(1.0, stroke_c));
+                painter.circle(center, radius, theme::with_alpha(color, 0x44), Stroke::new(1.0_f32, stroke_c));
             } else {
-                painter.circle(center, radius, theme::with_alpha(color, fill_a), Stroke::new(1.5, stroke_c));
+                painter.circle(center, radius, theme::with_alpha(color, fill_a), Stroke::new(1.5_f32, stroke_c));
             }
             if highlighted {
-                painter.circle_stroke(center, radius + 3.0, Stroke::new(2.0, mc.theme.accent));
+                painter.circle_stroke(center, radius + 3.0, Stroke::new(2.0_f32, mc.theme.accent));
             }
             if routed {
                 check_mark(painter, center, radius, mc.theme.success);
@@ -257,11 +257,11 @@ pub fn draw_markers(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapP
     }
     for (center, radius, highlighted, routed) in overlays {
         if highlighted {
-            painter.circle_stroke(center, radius + 3.0, Stroke::new(2.0, mc.theme.accent));
+            painter.circle_stroke(center, radius + 3.0, Stroke::new(2.0_f32, mc.theme.accent));
         }
         if routed {
             let badge = center + Vec2::new(radius * 0.9, -radius * 0.9);
-            painter.circle(badge, radius * 0.55, mc.theme.bg, Stroke::new(1.0, mc.theme.success));
+            painter.circle(badge, radius * 0.55, mc.theme.bg, Stroke::new(1.0_f32, mc.theme.success));
             check_mark(painter, badge, radius * 0.5, mc.theme.success);
         }
     }
@@ -284,7 +284,7 @@ pub fn draw_focus(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPac
                     let (w, h) = geom::map_px_size(&pack.geom, m);
                     let a = cam.world_to_screen(vp, Vec2::new(ox as f32, oy as f32));
                     let b = cam.world_to_screen(vp, Vec2::new((ox + w) as f32, (oy + h) as f32));
-                    painter.rect_stroke(Rect::from_min_max(a, b), 0.0, Stroke::new(2.0, theme.accent), egui::StrokeKind::Outside);
+                    painter.rect_stroke(Rect::from_min_max(a, b), 0.0, Stroke::new(2.0_f32, theme.accent), egui::StrokeKind::Outside);
                 }
             }
             continue;
@@ -292,8 +292,8 @@ pub fn draw_focus(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPac
         let phase = (t % 1.2) / 1.2;
         let radius = 8.0 + phase * 16.0;
         let alpha = ((1.0 - phase) * 220.0) as u8;
-        painter.circle_stroke(center, radius, Stroke::new(2.5, theme::with_alpha(theme.accent, alpha)));
-        painter.circle_stroke(center, 9.0, Stroke::new(2.0, theme.accent));
+        painter.circle_stroke(center, radius, Stroke::new(2.5_f32, theme::with_alpha(theme.accent, alpha)));
+        painter.circle_stroke(center, 9.0, Stroke::new(2.0_f32, theme.accent));
         animating = true;
     }
     animating

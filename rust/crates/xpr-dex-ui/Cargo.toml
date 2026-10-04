@@ -1,0 +1,36 @@
+[package]
+name = "xpr-dex-ui"
+version.workspace = true
+edition.workspace = true
+
+# The Dex page (Solodex's reference views, ported to egui): Pokédex with
+# movepools and comparisons, EV tables, trainers, stats, movedex, natures and
+# the misc calculators. The Damage tab's body is drawn by the host (xpr-app),
+# which owns the router's battle summary. Each tab is a feature so the tabs
+# can be built and tested on their own; `default` enables them all.
+
+[dependencies]
+xpr-core = { path = "../xpr-core" }
+xpr-data = { path = "../xpr-data" }
+xpr-dex = { path = "../xpr-dex" }
+xpr-ui-kit = { path = "../xpr-ui-kit" }
+egui = "0.33.3"
+image = { version = "0.25", default-features = false, features = ["png", "webp"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+xpr-dex = { path = "../xpr-dex" }
+
+[features]
+default = ["pokedex", "movepool", "compare", "trainers", "evs", "movedex", "stats", "misc"]
+pokedex = []
+movepool = []
+compare = ["pokedex", "movepool"]
+trainers = []
+evs = []
+movedex = []
+stats = []
+misc = []

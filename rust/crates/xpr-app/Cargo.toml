@@ -17,6 +17,9 @@ xpr-map = { path = "../xpr-map", features = ["embed-map-data"] }
 xpr-recorder = { path = "../xpr-recorder" }
 xpr-update = { path = "../xpr-update" }
 xpr-ui-kit = { path = "../xpr-ui-kit" }
+xpr-dex = { path = "../xpr-dex", features = ["embed-dex-data"] }
+# the Dex page (every tab: its default features)
+xpr-dex-ui = { path = "../xpr-dex-ui" }
 egui = "0.33.3"
 eframe = { version = "0.33.3", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
 image = { version = "0.25", default-features = false, features = ["png"] }

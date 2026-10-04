@@ -65,6 +65,9 @@ struct SetupMovesState {
 }
 
 pub struct BattleSummaryUi {
+    /// The Dex page's Damage tab: the player is configured there, not by
+    /// route events, so the candy / vitamin / held-item controls are hidden.
+    pub free_form: bool,
     pub should_render: bool,
     legacy_expanded: bool,
 
@@ -119,6 +122,7 @@ fn hex(s: &str) -> Color32 {
 impl BattleSummaryUi {
     pub fn new() -> BattleSummaryUi {
         BattleSummaryUi {
+            free_form: false,
             should_render: false,
             legacy_expanded: false,
             candy_displayed_count: 0,
@@ -335,6 +339,7 @@ impl BattleSummaryUi {
             let row_size = Vec2::new(ui.available_width(), widgets::STEPPER_H);
             ui.allocate_ui_with_layout(row_size, egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 10.0;
+                if !self.free_form {
                 // candy stepper
                 let minus_ok = can_candies && self.candy_displayed_count > 0;
                 let count = self.candy_displayed_count;
@@ -387,6 +392,7 @@ impl BattleSummaryUi {
                         self.held_item_text = bc.get_player_held_item();
                     }
                     self.held_item_apply_in_flight = false;
+                }
                 }
                 let chip = |ui: &mut Ui, text: String, tip: &str| {
                     let galley = ui.fonts_mut(|f| f.layout_no_wrap(text, theme.body(), Color32::PLACEHOLDER));

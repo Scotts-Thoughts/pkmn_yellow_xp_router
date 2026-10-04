@@ -70,3 +70,42 @@ impl egui::Plugin for PopupTracker {
         ctx.data_mut(|d| d.insert_temp(popup_open_id(), open));
     }
 }
+
+/// Horizontal padding of a dialog's title strip and body.
+pub const DIALOG_PAD_X: f32 = 20.0;
+
+/// Draw a modal dialog `width` points wide with `title` in its title strip;
+/// `content` draws the body. Every dialog of the app (`xpr-app`'s
+/// `dialogs::modal`) and of the Dex page goes through this, so they share
+/// one look and egui's modal input blocking.
+pub fn modal<R>(ctx: &Context, theme: &crate::theme::Theme, id: &str, title: &str, width: f32, content: impl FnOnce(&mut Ui) -> R) -> R {
+    use egui::{Color32, CornerRadius, Stroke, Vec2};
+    let frame = egui::Frame::new()
+        .fill(theme.section_bg())
+        .stroke(Stroke::new(1.0_f32, crate::theme::lighten(theme.bg, 0.14)))
+        .corner_radius(CornerRadius::same(10))
+        .shadow(egui::Shadow { offset: [0, 12], blur: 40, spread: 0, color: Color32::from_black_alpha(150) });
+    let m = egui::Modal::new(Id::new(id)).frame(frame).backdrop_color(Color32::from_black_alpha(150));
+    m.show(ctx, |ui| {
+        ui.set_width(width);
+        ui.spacing_mut().item_spacing = Vec2::ZERO;
+        let pad = DIALOG_PAD_X as i8;
+        egui::Frame::new().inner_margin(egui::Margin { left: pad, right: pad, top: 15, bottom: 13 }).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(egui::Label::new(egui::RichText::new(title).font(theme.font_bold(12.0)).color(theme.text_strong())).wrap());
+        });
+        let r = ui.max_rect();
+        let y = ui.cursor().min.y;
+        ui.painter().hline(r.x_range(), y + 0.5, Stroke::new(1.0_f32, theme.pane_divider()));
+        ui.add_space(1.0);
+        egui::Frame::new()
+            .inner_margin(egui::Margin { left: pad, right: pad, top: 16, bottom: 16 })
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
+                content(ui)
+            })
+            .inner
+    })
+    .inner
+}

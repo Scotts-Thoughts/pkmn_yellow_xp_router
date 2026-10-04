@@ -131,6 +131,11 @@ impl BadgeList {
         &self.rewards
     }
 
+    /// Every badge slot of the generation, in badge order.
+    pub fn slot_names(&self) -> &'static [&'static str] {
+        slots(self.gen)
+    }
+
     fn slot_index(&self, slot: &str) -> Option<usize> {
         slots(self.gen).iter().position(|s| *s == slot)
     }

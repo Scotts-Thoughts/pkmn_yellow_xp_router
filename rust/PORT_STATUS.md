@@ -34,8 +34,52 @@ Test plan: `TESTING.md`. Divergences: `docs/rust_port/KNOWN_ISSUES.md`.
 | `xpr-golden` | done | `verify` replays Python golden records (routes, events, states, saves, notes, battle summaries) in parallel and diffs; `dump`; `bench` |
 | `xpr-update` | done | GitHub release check, download + extract, swap with backup, `restart`, `auto_cleanup_old_version` |
 | `xpr-recorder` | done | GameHook SignalR + REST client (auto-reconnect with backoff), Super Shuckie poller, recorder controller with a `RecorderHost` trait + host queue, per-game FSMs for gen 1 / 2 / 3 / 4–5 |
-| `xpr-ui-kit` | done | egui theme (Python colour math, system font lookup), widget kit (styled buttons, entries, option menus, searchable dropdowns, amount entries, checkbox labels, group boxes, tab bar, menus, steppers, chips), Qt key-sequence ↔ egui shortcuts, tkinter geometry strings, toast + auto-clearing label |
+| `xpr-ui-kit` | done | egui theme (Python colour math, system font lookup), widget kit (styled buttons, entries, option menus, searchable dropdowns, amount entries, checkbox labels, group boxes, tab bar, menus, steppers, chips), Qt key-sequence ↔ egui shortcuts, tkinter geometry strings, toast + auto-clearing label, the dialog frame (`modal::modal`) and the headless renderer (`offscreen`, moved from `xpr-app/src/screenshot.rs`) |
+| `xpr-dex` | new (2026-10-03) | the Dex page's data: Solodex's data layer ported (21 games, gens 1-9: Pokédex, moves, type charts, TM/HM, natures, unobtainable moves, encounters, HOME sprites), from `dex_data/` (`node tools/dex_data/sync.mjs` regenerates it from Solodex), embedded with feature `embed-dex-data` |
+| `xpr-dex-ui` | new (2026-10-03) | the Dex page (Solodex's views in egui): shell, shared widgets, one feature-gated module per tab; `testkit` + `examples/dex_png.rs` render it headless; see `docs/rust_port/design/dex/PORTING.md` |
 | `xpr-app` | done | the egui/eframe application: landing + new-route pages, editor (virtualised route list with drag/drop, inline creator, filter bar, quick-add popover), event details (state viewer, per-type editors, notes), battle summary UI, run/setup summaries (docked panel or secondary viewports), route compare page (Overview / Checkpoints / Event diff), all menus/shortcuts/dialogs, screenshots, recorder glue, update flow, config persistence; `build.rs` embeds `icons/**` and the prescaled box art / Pokémon icons |
+
+## Dex page (2026-10-03)
+
+Solodex (`A:\Dropbox\stp-projects\programs\solodex`, the Electron
+Pokémon reference app) is folded into the router as the **Dex** page, so a
+route can be planned, recorded and refined in one program. Open it from the
+landing page ("Pokédex"), the **Dex** menu, or Ctrl+K (`toggle_dex`); Back /
+Ctrl+K return to the page it was opened from. The Dex menu can move it into
+a window of its own (beside the editor on a second monitor) and holds
+Solodex's View-menu toggles (cross out banned / postgame / conditional
+moves, the banned-moves editor, movepool differences, Bulk / WBST / UBST)
+and the Dex's key list. Settings persist in the config's `dex_settings`.
+
+Tabs (Solodex's, F1-F9 as there): Pokédex (filterable species list, detail
+with stats / rankings / matchups / evolutions, movepool with TM / tutor
+popovers, test-set coverage, two- and three-species and cross-game
+comparisons), EVs, Trainers (list, party cards, speed rankings, team-order
+calculator, "Add to Route", "Calc Damage"), Stats (outspeed scouting),
+Damage, Movedex, Natures, Misc (hit probability, effective accuracy,
+multi-hit). Space / Shift+Space / Ctrl+Shift+Space open the Pokémon, trainer
+and move searches. Solodex's Route tab and map are not ported (the router
+has its own); neither are its graphic exports, Bulbapedia article popovers
+(replaced by links that open the browser) or issue reporter.
+
+Data: the Pokédex-side tabs use Solodex's data (`dex_data/`, 21 games, gens
+1-9; `node tools/dex_data/sync.mjs [<solodex>]` regenerates it; ~7.7 MB in
+the binary). Trainers, Stats' major battles and Damage use the router's own
+trainer tables and engine, so names and numbers match the route editor and
+custom gens work. The Damage tab is the editor's battle summary
+(`BattleSummaryUi` in a free-form mode) for a player built in its side panel
+or copied from the open route (the state entering the selected event); it
+starts on the route's Pokémon, or on the Pokédex's selection and right-clicked
+test set.
+
+Code: `xpr-dex` (data), `xpr-dex-ui` (the page; one cargo feature per tab),
+`xpr-app/src/dex_damage.rs` (Damage tab), `Page::Dex` / the Dex menu in
+`app.rs`. Porting notes: `docs/rust_port/design/dex/PORTING.md`. Headless
+pictures: `cargo run -p xpr-dex-ui --example dex_png -- --tab trainers --version Crystal --trainer "Leader Falkner" --out x.png`
+and `cargo run -p xpr-app --example dex_damage_png -- out.png Emerald Mudkip "Leader Roxanne"`;
+smoke: `XPR_SMOKE_ACTION=dex XPR_SMOKE_DEX_TAB=<tab>`. Tests:
+`xpr-dex/tests/data.rs`, `xpr-dex-ui/tests/*.rs` (a file per tab),
+`xpr-app/tests/dex_page.rs`, and the Dex cases in `modal_input.rs`.
 
 ## World map (2026-09-24)
 

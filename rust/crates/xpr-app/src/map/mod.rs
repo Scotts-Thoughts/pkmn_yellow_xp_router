@@ -149,6 +149,9 @@ pub struct MapView {
     /// the map is shown (tab or window)
     pub open: bool,
     pub docked: bool,
+    /// the landing page's map viewer: no route to add to, so the cards and
+    /// the marquee hide their "add" buttons and the toolbar its dock toggle
+    pub browse: bool,
     game: Option<String>,
     loaded: Option<Loaded>,
     loading: Option<(String, Receiver<Result<Loaded, String>>)>,
@@ -202,6 +205,7 @@ impl MapView {
         MapView {
             open: cfg.get_map_open(),
             docked: cfg.get_map_docked(),
+            browse: false,
             game: None,
             loaded: None,
             loading: None,
@@ -243,6 +247,11 @@ impl MapView {
 
     pub fn is_ready(&self) -> bool {
         self.loaded.is_some()
+    }
+
+    /// Whether `game`'s map pack is installed (embedded or on disk).
+    pub fn has_pack(&self, game: &str) -> bool {
+        self.source.has_game(game)
     }
 
     pub fn source_dir(&self) -> Option<&PathBuf> {
@@ -676,7 +685,7 @@ impl MapView {
                 actions.push(MapAction::Close);
             }
             let (glyph, tip) = if self.docked { ("⤢", "Open the map in its own window") } else { ("⤡", "Dock the map back into the editor") };
-            if widgets::StyledButton::new(theme, glyph).min_size(Vec2::new(22.0, 22.0)).show(ui).on_hover_text(tip).clicked() {
+            if !self.browse && widgets::StyledButton::new(theme, glyph).min_size(Vec2::new(22.0, 22.0)).show(ui).on_hover_text(tip).clicked() {
                 actions.push(if self.docked { MapAction::Undock } else { MapAction::Dock });
             }
             ui.add_space(6.0);
@@ -987,7 +996,7 @@ impl MapView {
                 _ => None,
             };
             // the base version for a custom gen, so its encounter columns match the pack's
-            let mut ccx = CardCtx { theme, pack: &pack, gen: ctrl.gen(), version: self.state.version.clone(), state: &self.state, ctrl, assets, routed_event };
+            let mut ccx = CardCtx { theme, pack: &pack, gen: ctrl.gen(), version: self.state.version.clone(), state: &self.state, ctrl, assets, routed_event, can_add: !self.browse };
             // kept off the navigator minimap (last frame's rect; it is drawn below)
             let avoid = self.navigator_rect();
             let out = cards::draw_card(ui, &card, anchor, vp, avoid, &mut ccx);

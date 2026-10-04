@@ -8,6 +8,7 @@ pub mod compare;
 pub mod battle_ui;
 pub mod controller;
 pub mod custom_dvs;
+pub mod dex_damage;
 pub mod dialogs;
 pub mod editors;
 pub mod event_details;

@@ -299,6 +299,7 @@ fn floating_toolbar(view: &mut MapView, ui: &Ui, vp: Rect, sel: Selection) {
     let below = screen.max.y + 6.0;
     let y = if below + est.y <= vp.max.y { below } else { (screen.min.y - est.y - 6.0).max(vp.min.y + 4.0) };
 
+    let browse = view.browse;
     let (mut zoom, mut export, mut copy, mut add, mut clear) = (false, false, false, false, false);
     egui::Area::new(egui::Id::new("xpr_map_tools_selection_bar")).order(egui::Order::Foreground).fixed_pos(Pos2::new(x, y)).show(&ctx, |ui| {
         egui::Frame::popup(ui.style()).corner_radius(6.0).inner_margin(egui::Margin::symmetric(8, 4)).show(ui, |ui| {
@@ -307,7 +308,7 @@ fn floating_toolbar(view: &mut MapView, ui: &Ui, vp: Rect, sel: Selection) {
                 zoom = ui.button("Zoom").on_hover_text("Zoom to the selection").clicked();
                 export = ui.button("Export").on_hover_text("Export the selection as a PNG").clicked();
                 copy = ui.button("Copy").on_hover_text("Copy the selection to the clipboard").clicked();
-                add = ui.button("Add trainers").on_hover_text("Add the selection's undefeated trainers to the route").clicked();
+                add = !browse && ui.button("Add trainers").on_hover_text("Add the selection's undefeated trainers to the route").clicked();
                 clear = ui.button("×").on_hover_text("Clear the selection").clicked();
             });
         });
@@ -432,7 +433,7 @@ fn paint_selection(painter: &egui::Painter, oc: &OverlayCtx, rect: IRect, live: 
     let accent = oc.theme.accent;
     painter.rect_filled(r, 0.0, theme::with_alpha(accent, if live { 0x14 } else { 0x26 }));
     let pts = vec![r.left_top(), r.right_top(), r.right_bottom(), r.left_bottom(), r.left_top()];
-    painter.extend(egui::Shape::dashed_line(&pts, egui::Stroke::new(1.5, accent), 6.0, 4.0));
+    painter.extend(egui::Shape::dashed_line(&pts, egui::Stroke::new(1.5_f32, accent), 6.0, 4.0));
 }
 
 /// The ruler as a line with end caps and a "Δ 12 × 5 · 17 steps" badge at
@@ -441,10 +442,10 @@ fn paint_measurement(painter: &egui::Painter, oc: &OverlayCtx, a: (i32, i32), b:
     let pa = oc.cam.world_to_screen(oc.vp, Vec2::new(a.0 as f32, a.1 as f32));
     let pb = oc.cam.world_to_screen(oc.vp, Vec2::new(b.0 as f32, b.1 as f32));
     let accent = oc.theme.accent;
-    painter.line_segment([pa, pb], egui::Stroke::new(2.0, accent));
+    painter.line_segment([pa, pb], egui::Stroke::new(2.0_f32, accent));
     for p in [pa, pb] {
         painter.circle_filled(p, 3.5, accent);
-        painter.circle_stroke(p, 3.5, egui::Stroke::new(1.0, egui::Color32::WHITE));
+        painter.circle_stroke(p, 3.5, egui::Stroke::new(1.0_f32, egui::Color32::WHITE));
     }
     let step = oc.pack.geom.step_px.max(1) as i32;
     let label = measurement_text(a, b, step);
@@ -453,6 +454,6 @@ fn paint_measurement(painter: &egui::Painter, oc: &OverlayCtx, a: (i32, i32), b:
     let pad = Vec2::new(6.0, 3.0);
     let badge = Rect::from_center_size(mid, galley.size() + pad * 2.0);
     painter.rect_filled(badge, 4.0, theme::with_alpha(egui::Color32::BLACK, 0xC0));
-    painter.rect_stroke(badge, 4.0, egui::Stroke::new(1.0, accent), egui::StrokeKind::Outside);
+    painter.rect_stroke(badge, 4.0, egui::Stroke::new(1.0_f32, accent), egui::StrokeKind::Outside);
     painter.galley(badge.min + pad, galley, egui::Color32::WHITE);
 }

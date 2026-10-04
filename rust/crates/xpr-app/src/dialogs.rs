@@ -155,34 +155,7 @@ fn surface(theme: &Theme) -> Color32 {
 /// Draw a dialog `width` points wide with `title` in its title strip;
 /// `content` draws the body (and usually ends with a [`footer`]).
 pub(crate) fn modal<R>(ctx: &egui::Context, theme: &Theme, id: &str, title: &str, width: f32, content: impl FnOnce(&mut Ui) -> R) -> R {
-    let frame = egui::Frame::new()
-        .fill(surface(theme))
-        .stroke(Stroke::new(1.0_f32, theme::lighten(theme.bg, 0.14)))
-        .corner_radius(CornerRadius::same(10))
-        .shadow(egui::Shadow { offset: [0, 12], blur: 40, spread: 0, color: Color32::from_black_alpha(150) });
-    let m = egui::Modal::new(egui::Id::new(id)).frame(frame).backdrop_color(Color32::from_black_alpha(150));
-    m.show(ctx, |ui| {
-        ui.set_width(width);
-        ui.spacing_mut().item_spacing = Vec2::ZERO;
-        let pad = PAD_X as i8;
-        egui::Frame::new().inner_margin(egui::Margin { left: pad, right: pad, top: 15, bottom: 13 }).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.add(egui::Label::new(egui::RichText::new(title).font(theme.font_bold(12.0)).color(theme.text_strong())).wrap());
-        });
-        let r = ui.max_rect();
-        let y = ui.cursor().min.y;
-        ui.painter().hline(r.x_range(), y + 0.5, Stroke::new(1.0_f32, theme.pane_divider()));
-        ui.add_space(1.0);
-        egui::Frame::new()
-            .inner_margin(egui::Margin { left: pad, right: pad, top: 16, bottom: 16 })
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
-                content(ui)
-            })
-            .inner
-    })
-    .inner
+    xpr_ui_kit::modal::modal(ctx, theme, id, title, width, content)
 }
 
 /// The button row that ends a dialog body: a hairline across the whole

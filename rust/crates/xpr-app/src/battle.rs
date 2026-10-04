@@ -106,6 +106,18 @@ impl BattleController {
         self.on_refresh();
     }
 
+    /// [`BattleController::load_from_state`] against a named trainer (its
+    /// double-battle flag applies): the Dex page's Damage tab.
+    pub fn load_from_state_named(&mut self, cfg: &Config, ctrl: &mut MainController, init_state: &RouteState, enemy_mons: &[EnemyPkmn], trainer_name: Option<&str>, is_wild: bool) {
+        let sc = BattleController::summary_config(cfg, ctrl);
+        let Some(gen) = ctrl.gen() else { return };
+        if let Err(e) = self.summary.load_from_state(&gen, Some(init_state), enemy_mons, trainer_name, is_wild, &sc) {
+            log::error!("Failed to load battle summary from state: {}", e);
+            ctrl.trigger_exception(format!("Failed to load battle summary: {}", e));
+        }
+        self.on_refresh();
+    }
+
     /// `_full_refresh(is_load=False)`
     pub fn full_refresh(&mut self, cfg: &Config, ctrl: &MainController) {
         if self.summary.suppress_refresh {

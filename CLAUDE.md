@@ -9,8 +9,10 @@ unless the user explicitly says otherwise for a specific task.
 
 ## Rust app: raw input must respect modal dialogs
 
-Every dialog goes through `dialogs::modal()` (an `egui::Modal`). An egui modal
-only blocks *widgets* under it: hover/click/drag responses and keyboard focus.
+Every dialog goes through `xpr_ui_kit::modal::modal()` (an `egui::Modal`;
+`xpr-app`'s `dialogs::modal()` and the Dex page's `widgets::modal()` wrap it).
+An egui modal only blocks *widgets* under it: hover/click/drag responses and
+keyboard focus.
 Code that reads raw input still sees every click and key while a dialog is
 open. That includes `ui.input(|i| i.pointer…)`, hand-rolled hit-testing against
 `interact_pos()`, `key_pressed`, `consume_key` and `i.events`. Pages also draw
@@ -37,6 +39,25 @@ which changed where the move event was inserted.
   set, call `dialogs::block_secondary_window` inside them.
 - Cover new raw-input code with a case in
   `rust/crates/xpr-app/tests/modal_input.rs`.
+
+## Rust app: the Dex page
+
+The Dex page (`Page::Dex`, Ctrl+K) is Solodex folded into the router:
+Pokédex, EVs, Trainers, Stats, Damage, Movedex, Natures and Misc tabs.
+Solodex itself (`A:\Dropbox\stp-projects\programs\solodex`) is the
+reference for its behaviour.
+
+- `rust/crates/xpr-dex`: the data (Solodex's data layer, gens 1-9) from
+  `dex_data/`. Regenerate `dex_data/` with `node tools/dex_data/sync.mjs`;
+  never edit it by hand.
+- `rust/crates/xpr-dex-ui`: the page. Each tab is a module and a cargo
+  feature. Trainers, Stats and Damage read the router's own trainer data
+  (`xpr-data`), not Solodex's.
+- The Damage tab (`xpr-app/src/dex_damage.rs`) is the router's battle summary
+  for a free-form player. Don't add a second damage engine.
+- Read `docs/rust_port/design/dex/PORTING.md` before changing the page. It
+  covers the data APIs, shared widgets, headless PNGs (`examples/dex_png.rs`)
+  and tests.
 
 ## Game decompilation repos (reference)
 

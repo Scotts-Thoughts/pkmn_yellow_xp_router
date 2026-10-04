@@ -68,7 +68,7 @@ pub fn draw(painter: &egui::Painter, oc: &OverlayCtx, state: &RouteMapState, tog
 
     // segments: straight lines between consecutive on-screen nodes only
     // (phase 1, §13.2/§13.3: no warp projection, no pathfinding)
-    let line_stroke = Stroke::new(2.0, theme::with_alpha(oc.theme.accent, 153)); // ~60% alpha
+    let line_stroke = Stroke::new(2.0_f32, theme::with_alpha(oc.theme.accent, 153)); // ~60% alpha
     for pair in points.windows(2) {
         painter.line_segment([pair[0].1, pair[1].1], line_stroke);
     }
@@ -79,7 +79,7 @@ pub fn draw(painter: &egui::Painter, oc: &OverlayCtx, state: &RouteMapState, tog
         let selected = state.selected_id.map(|id| node.ids.contains(&id)).unwrap_or(false);
         let fill = if selected { oc.theme.accent } else { theme::with_alpha(oc.theme.bg_darker, 235) };
         let stroke_c = if selected { oc.theme.text_strong() } else { oc.theme.accent };
-        painter.circle(*center, radius, fill, Stroke::new(if selected { 2.5 } else { 1.5 }, stroke_c));
+        painter.circle(*center, radius, fill, Stroke::new(if selected { 2.5_f32 } else { 1.5 }, stroke_c));
         let label = if node.first == node.last { node.first.to_string() } else { format!("{}\u{2013}{}", node.first, node.last) };
         let text_c = if selected { oc.theme.bg } else { oc.theme.text_strong() };
         painter.text(*center, Align2::CENTER_CENTER, label, font.clone(), text_c);

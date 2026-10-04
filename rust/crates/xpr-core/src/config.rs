@@ -65,6 +65,7 @@ pub const DEFAULT_SHORTCUTS: &[(&str, &str)] = &[
     ("toggle_tabs", "`"),
     ("toggle_summary", "Ctrl+`"),
     ("toggle_map", "Ctrl+M"),
+    ("toggle_dex", "Ctrl+K"),
     ("show_on_map", "Ctrl+Shift+M"),
     ("export_map", "Ctrl+Shift+P"),
     ("gym_1", "1"),
@@ -159,6 +160,7 @@ pub const SHORTCUT_LABELS: &[(&str, &str)] = &[
     ("toggle_tabs", "Toggle Event Tabs"),
     ("toggle_summary", "Toggle Summary Window"),
     ("toggle_map", "Toggle Map"),
+    ("toggle_dex", "Open / Close the Dex"),
     ("show_on_map", "Show Selected Event on Map"),
     ("export_map", "Export Map Image"),
     ("gym_1", "Select Gym Leader 1"),
@@ -273,6 +275,7 @@ pub const SHORTCUT_CATEGORIES: &[(&str, &[&str])] = &[
             "toggle_tabs",
             "toggle_summary",
             "toggle_map",
+            "toggle_dex",
             "show_on_map",
             "export_map",
             "gym_1",
@@ -477,6 +480,8 @@ pub struct Config {
     map_toggles: Value,
     map_view_state: Value,
     map_texture_budget_mb: Value,
+    /// the Dex page's own settings (tab, selections, list width, move bans ...), owned by `xpr-dex-ui`
+    dex_settings: Value,
 
     highlight_colors: IndexMap<i64, Value>,
     fight_category_colors: IndexMap<String, Value>,
@@ -609,6 +614,7 @@ impl Config {
             map_toggles: gv("map_toggles", Value::Null),
             map_view_state: gv("map_view_state", Value::Null),
             map_texture_budget_mb: gv("map_texture_budget_mb", Value::from(256)),
+            dex_settings: gv("dex_settings", Value::Null),
             highlight_colors,
             fight_category_colors,
             shortcut_overrides,
@@ -672,6 +678,7 @@ impl Config {
             ("map_toggles".into(), self.map_toggles.clone()),
             ("map_view_state".into(), self.map_view_state.clone()),
             ("map_texture_budget_mb".into(), self.map_texture_budget_mb.clone()),
+            ("dex_settings".into(), self.dex_settings.clone()),
         ];
         for i in 1..=9 {
             if let Some(v) = self.highlight_colors.get(&i) {
@@ -888,6 +895,13 @@ impl Config {
     pub fn set_map_night(&mut self, v: bool) { self.map_night = Value::Bool(v); self.save(); }
     pub fn get_map_toggles(&self) -> Value { self.map_toggles.clone() }
     pub fn set_map_toggles(&mut self, v: Value) { self.map_toggles = v; self.save(); }
+    pub fn get_dex_settings(&self) -> Value { self.dex_settings.clone() }
+    pub fn set_dex_settings(&mut self, v: Value) {
+        if self.dex_settings != v {
+            self.dex_settings = v;
+            self.save();
+        }
+    }
     pub fn get_map_view_state(&self) -> Value { self.map_view_state.clone() }
     pub fn set_map_view_state(&mut self, v: Value) { self.map_view_state = v; self.save(); }
     pub fn get_map_texture_budget_mb(&self) -> usize { self.map_texture_budget_mb.as_u64().unwrap_or(256).clamp(32, 4096) as usize }

@@ -54,6 +54,8 @@ pub struct CardCtx<'a> {
     pub ctrl: &'a MainController,
     pub assets: &'a mut Assets,
     pub routed_event: Option<xpr_engine::NodeId>,
+    /// a route is open to add to (false in the landing page's map viewer)
+    pub can_add: bool,
 }
 
 pub struct CardOut {
@@ -282,7 +284,7 @@ fn object_card(ui: &mut Ui, idx: u32, cx: &mut CardCtx, out: &mut CardOut) {
                     }
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
-                        if widgets::StyledButton::new(theme, "Add to route").show(ui).clicked() {
+                        if cx.can_add && widgets::StyledButton::new(theme, "Add to route").show(ui).clicked() {
                             out.actions.push(MapAction::AddItem { name: name.clone() });
                         }
                         if let Some(id) = cx.routed_event {
@@ -361,6 +363,9 @@ fn trainer_card(ui: &mut Ui, names: &[String], double: bool, map_name: &str, cx:
         widgets::label_font(ui, "Already fought in this route".to_string(), theme.caption_font(), theme.success);
     }
     ui.add_space(4.0);
+    if !cx.can_add {
+        return;
+    }
     if names.len() > 1 {
         widgets::label_font(ui, "This fight depends on the run (starter / version):".to_string(), theme.caption_font(), theme.secondary);
         for n in names {
@@ -599,6 +604,9 @@ fn encounter_rows(ui: &mut Ui, method: &str, slots: &[EncounterSlot], show_ev: b
             ui.painter().with_clip_rect(cell).galley(pos, galley, theme.text);
         }
         // add button
+        if !cx.can_add {
+            continue;
+        }
         let brect = Rect::from_center_size(c.add.center(), Vec2::new(26.0, 24.0));
         let mut child = ui.new_child(UiBuilder::new().max_rect(brect).layout(Layout::left_to_right(Align::Center)).id_salt(("enc_add", method, i)));
         let resp = widgets::StyledButton::new(theme, "+").min_size(Vec2::new(26.0, 24.0)).show(&mut child);
@@ -744,6 +752,9 @@ fn map_card(ui: &mut Ui, map: MapId, max_h: f32, cx: &mut CardCtx, out: &mut Car
     });
     out.table_h = scroll.inner_rect.height();
     ui.add_space(4.0);
+    if !cx.can_add {
+        return;
+    }
     ui.horizontal(|ui| {
         if widgets::StyledButton::new(theme, "Add all trainers here").enabled(remaining > 0).show(ui).clicked() {
             out.actions.push(MapAction::AddAllTrainers { map });
@@ -852,7 +863,7 @@ fn map_trainer_row(ui: &mut Ui, i: usize, idx: u32, names: &[String], cx: &mut C
 
     // the add button draws after the row, so it takes the click over it
     let mut added = false;
-    if names.len() == 1 {
+    if names.len() == 1 && cx.can_add {
         let brect = Rect::from_center_size(Pos2::new(r.max.x - ENC_COL_ADD / 2.0, r.center().y), Vec2::new(26.0, 24.0));
         let mut child = ui.new_child(UiBuilder::new().max_rect(brect).layout(Layout::left_to_right(Align::Center)).id_salt(("map_trainer_add", idx)));
         // greyed out once fought: a beaten trainer can't be fought again

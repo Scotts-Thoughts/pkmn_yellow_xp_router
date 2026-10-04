@@ -7,3 +7,4 @@ edition.workspace = true
 xpr-core = { path = "../xpr-core" }
 egui = "0.33.3"
 log = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png"] }

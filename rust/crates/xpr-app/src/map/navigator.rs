@@ -164,7 +164,7 @@ impl Navigator {
                 };
                 let outline = Rect::from_min_max(to_panel(visible.x0, visible.y0), to_panel(visible.x1, visible.y1)).intersect(content);
                 painter.rect_filled(outline, 0.0, theme::with_alpha(theme.accent, 40));
-                painter.rect_stroke(outline, 0.0, Stroke::new(1.5, theme.accent), egui::StrokeKind::Inside);
+                painter.rect_stroke(outline, 0.0, Stroke::new(1.5_f32, theme.accent), egui::StrokeKind::Inside);
             }
         });
     }

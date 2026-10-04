@@ -1,0 +1,24 @@
+[package]
+name = "xpr-dex"
+version.workspace = true
+edition.workspace = true
+
+# The Pokédex reference data behind the Dex page (ported from Solodex's
+# data layer): every game's Pokédex (gens 1-9), moves, type charts, TM/HM
+# lists, natures, unobtainable moves, wild encounters and the HOME sprites.
+# The data lives in `dex_data/` at the repo root (`tools/dex_data/sync.mjs`
+# regenerates it from Solodex); feature `embed-dex-data` compiles it in.
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+log = { workspace = true }
+flate2 = "1"
+
+[build-dependencies]
+flate2 = "1"
+
+[features]
+default = []
+embed-dex-data = []
