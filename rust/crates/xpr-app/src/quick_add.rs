@@ -195,6 +195,25 @@ impl QuickTrainerAdd {
                     }
                 }
             });
+            // the league in one folder, for routes that grind it repeatedly
+            let lineup = gen.as_ref().and_then(|g| g.get_league_lineup());
+            let e4_ok = can_insert && !self.multi_setup_mode && lineup.is_some();
+            let champ_ok = e4_ok && lineup.as_ref().map(|(_, c)| c.is_some()).unwrap_or(false);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                for (label, with_champ, ok) in [("Elite4", false, e4_ok), ("Elite4 + Champ", true, champ_ok)] {
+                    let resp = widgets::button_enabled(ui, theme, label, ok);
+                    if resp.clicked() && ok {
+                        ctrl.add_league_folder(with_champ);
+                    }
+                    if ok {
+                        resp.on_hover_ui(|ui| {
+                            let names = ctrl.league_lineup(with_champ).unwrap_or_default();
+                            ui.label(format!("New folder: {}", names.join(", ")));
+                        });
+                    }
+                }
+            });
         });
         preview
     }

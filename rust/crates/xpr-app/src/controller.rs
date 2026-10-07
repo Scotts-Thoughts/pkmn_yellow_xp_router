@@ -11,7 +11,7 @@ use xpr_core::consts;
 use xpr_core::io_utils::sanitize_string;
 use xpr_core::{Config, Paths};
 use xpr_data::model::{Nature, StatBlock};
-use xpr_data::{GenData, Registry};
+use xpr_data::{E4Entry, GenData, Registry};
 use xpr_engine::{
     EvOverrideEventDefinition, EventDefinition, InsertSpec, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, NodeId, ObjKind, Router,
     RouteState, TrainerEventDefinition, UndoManager, WildPkmnEventDefinition,
@@ -841,12 +841,36 @@ impl MainController {
         self.finalize_new_folder(&folder, None, after);
         let mut last = None;
         for def in defs {
+            // one undo step for the folder and its fights
+            self.coalesce_next_undo_step();
             last = self.new_event(def, None, None, Some(&folder), false);
         }
         if let Some(id) = last {
             self.select_new_events(vec![id]);
         }
         last
+    }
+
+    /// The Elite Four (and the champion) in battle order, for the quick-add
+    /// popover's "Elite4" buttons. A fight that can be one of several
+    /// trainers (Red/Blue's champion follows your starter) is the one the
+    /// route already fights, else the first. `None` when the version has no
+    /// Elite Four, or no champion was asked for and found.
+    pub fn league_lineup(&self, with_champion: bool) -> Option<Vec<String>> {
+        let (e4, champ) = self.gen()?.get_league_lineup()?;
+        let champ = if with_champion { Some(champ?) } else { None };
+        let pick = |e: &E4Entry| {
+            let names = e.names();
+            names.iter().find(|n| self.find_first_event_by_trainer_name(n).is_some()).unwrap_or(&names[0]).clone()
+        };
+        Some(e4.iter().chain(champ.as_ref()).map(pick).collect())
+    }
+
+    /// A new folder of the Elite Four (and the champion) after the
+    /// selection; see `league_lineup`.
+    pub fn add_league_folder(&mut self, with_champion: bool) -> Option<NodeId> {
+        let names = self.league_lineup(with_champion)?;
+        self.add_trainers_in_new_folder(if with_champion { "Elite Four + Champion" } else { "Elite Four" }, &names)
     }
 
     /// Pre-Event State's "click a move to replace it": insert a Tutor move

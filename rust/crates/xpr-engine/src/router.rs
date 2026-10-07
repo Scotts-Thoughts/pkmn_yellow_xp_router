@@ -384,9 +384,10 @@ impl Router {
     pub fn add_area(&mut self, area_name: &str, insert_after: Option<NodeId>, dest_folder_name: &str, include_rematches: bool) -> Result<(), String> {
         let gen = self.gen_data()?.clone();
         let defeated = self.get_effective_defeated_trainers();
-        let trainers = gen
-            .trainer_db()
-            .get_valid_trainers(None, Some(area_name), &defeated, include_rematches, false);
+        let trainers = gen.order_area_trainers(
+            gen.trainer_db()
+                .get_valid_trainers(None, Some(area_name), &defeated, include_rematches, false),
+        );
         if trainers.is_empty() {
             return Ok(());
         }

@@ -393,6 +393,66 @@ impl GenData {
         }
     }
 
+    /// The Elite Four in battle order, then the champion, holding this
+    /// version's trainers only (the fight lists cover every game of a
+    /// generation). An entry with alternatives is one fight that can be any
+    /// of them (starter-dependent champions, gen 5 rematch teams). The
+    /// champion falls back to the league's "Champion" class trainer when the
+    /// fight lists don't name one (Ruby/Sapphire's Steven). `None` when the
+    /// version has no full Elite Four.
+    pub fn get_league_lineup(&self) -> Option<(Vec<E4Entry>, Option<E4Entry>)> {
+        let champs = self.category(consts::FIGHT_CATEGORY_CHAMPION);
+        let mut entries = self.get_elite_four_and_champion_names().into_iter().filter_map(|e| self.entry_of(e.names().iter()));
+        let e4: Vec<E4Entry> = entries.by_ref().take(4).collect();
+        if e4.len() < 4 {
+            return None;
+        }
+        let champ = entries.next().filter(|e| e.names().iter().all(|n| champs.contains(n))).or_else(|| {
+            let loc = &self.trainer_db.get_trainer(&e4[0].names()[0])?.location;
+            self.entry_of(self.trainer_db.iter().filter(|t| t.trainer_class == "Champion" && t.location == *loc && !t.rematch).map(|t| &t.name))
+        });
+        Some((e4, champ))
+    }
+
+    /// An area's trainers (`names`, in data order) in the order they're
+    /// fought: the league's Elite Four and champion go last, in battle order
+    /// and first runs before rematches, after everyone else there (the
+    /// rivals met on the way in). The data lists trainers by class, so
+    /// Crystal's Indigo Plateau reads Will, Bruno, Karen, Koga, Lance, rivals.
+    /// Areas without league trainers, or with one outside the lineup, keep
+    /// their data order.
+    pub fn order_area_trainers(&self, names: Vec<String>) -> Vec<String> {
+        let Some((e4, champ)) = self.get_league_lineup() else { return names };
+        let slots: Vec<Vec<String>> = e4.iter().chain(champ.as_ref()).map(|e| e.names()).collect();
+        // only the league itself (not, say, Dragon's Den with a Lance rematch)
+        if !names.iter().any(|n| slots.iter().flatten().any(|s| s == n)) {
+            return names;
+        }
+        let league = [self.category(consts::FIGHT_CATEGORY_ELITE_FOUR), self.category(consts::FIGHT_CATEGORY_CHAMPION)].concat();
+        // (run, slot): an alternative's index is its run (gen 5's rematch
+        // teams); a name extending a slot's ("Elite Four Lance 2",
+        // "Champion Lance Rematch 2") is a rematch, after every first run
+        let rank = |n: &String| -> Option<(usize, usize)> {
+            slots.iter().enumerate().find_map(|(slot, alts)| alts.iter().position(|a| a == n).map(|run| (run, slot)))
+                .or_else(|| slots.iter().position(|alts| alts.iter().any(|a| n.starts_with(a.as_str()))).map(|slot| (usize::MAX, slot)))
+        };
+        let is_league = |n: &String| league.contains(n) || rank(n).is_some();
+        let mut keyed = Vec::with_capacity(names.len());
+        for n in names.iter() {
+            let key = if is_league(n) {
+                match rank(n) {
+                    Some((run, slot)) => (1, run, slot),
+                    None => return names,
+                }
+            } else {
+                (0, 0, 0)
+            };
+            keyed.push((key, n.clone()));
+        }
+        keyed.sort_by_key(|(k, _)| *k);
+        keyed.into_iter().map(|(_, n)| n).collect()
+    }
+
     pub fn get_move_custom_data(&self, move_name: &str) -> Option<&'static Vec<String>> {
         gen_consts::custom_move_data_table(self.gen).get(move_name)
     }
