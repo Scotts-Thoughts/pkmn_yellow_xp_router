@@ -487,10 +487,7 @@ impl Worker {
         if propagate_event {
             log::info!("[GameHook Client] Mapper loaded successfully!");
             // clear_callbacks_on_load=True: the session re-registers what it wants
-            self.watched.clear();
-            for key in self.session.on_mapper_loaded(&self.store) {
-                *self.watched.entry(key).or_insert(0) += 1;
-            }
+            self.watched = register_watched(self.session.as_mut(), &self.store);
         }
         Ok(())
     }
@@ -572,14 +569,7 @@ impl Worker {
                     "PropertiesChanged" => {
                         if let Some(list) = args.first().and_then(|a| a.as_array()) {
                             for change in list {
-                                let positional = json!([
-                                    change.get("path").cloned().unwrap_or(Value::Null),
-                                    change.get("address").cloned().unwrap_or(Value::Null),
-                                    change.get("value").cloned().unwrap_or(Value::Null),
-                                    change.get("bytes").cloned().unwrap_or(Value::Null),
-                                    change.get("is_frozen").or_else(|| change.get("frozen")).cloned().unwrap_or(Value::Bool(false)),
-                                    change.get("fieldsChanged").cloned().unwrap_or(json!([])),
-                                ]);
+                                let positional = positional_change(change);
                                 if let Err(e) = self.on_single_property_changed(&positional) {
                                     log::error!("Exception generated handling property change: {}", e);
                                     self.session.on_game_hook_error(&e);
@@ -637,61 +627,90 @@ impl Worker {
 
     /// `_on_single_property_changed(args)` with the positional list.
     fn on_single_property_changed(&mut self, args: &Value) -> Result<(), String> {
-        let items = args.as_array().ok_or("property change args are not a list")?;
-        if items.len() < 6 {
-            return Err(format!("property change args have {} elements, expected 6", items.len()));
-        }
-        let path = items[0].as_str().ok_or("property change without a path")?.to_string();
-        let address = items[1].clone();
-        let value = items[2].clone();
-        let bytes_value = items[3].clone();
-        let frozen = items[4].clone();
-        let fields_changed: Vec<String> = items[5]
-            .as_array()
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect())
-            .unwrap_or_default();
-        if !self.store.is_loaded() {
-            log::debug!("[GameHook Client] Mapper is not loaded, ignoring PropertyUpdated event for: {}: {}", path, value);
-            return Ok(());
-        }
-        if !self.store.contains(&path) {
-            log::debug!("[GameHook Client] Could not find a related propery in PropertyUpdated event for: {}: {}", path, value);
-            return Ok(());
-        }
-        if self.ignore_properties.contains(&path) {
-            self.ignored_updates.insert(path, args.clone());
-            return Ok(());
-        }
-        let old_property = self.store.props.get(&path).cloned().unwrap();
-        if value == old_property.value && bytes_value == old_property.bytes_value {
-            return Ok(());
-        }
-        let new_property = {
-            let p = self.store.props.get_mut(&path).unwrap();
-            p.address = address;
-            p.value = value;
-            p.bytes_value = bytes_value;
-            p.frozen = frozen;
-            p.clone()
-        };
-        if fields_changed.iter().any(|f| f == "value") && new_property.value != old_property.value {
-            // one delivery per registration (see `watched`)
-            let deliveries = self.watched.get(&path).copied().unwrap_or(0);
-            for _ in 0..deliveries {
-                // the FSM must never take the client down: a panic becomes a game hook error
-                let store = &self.store;
-                let session = &mut self.session;
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    session.on_property_changed(store, &new_property, &old_property);
-                }));
-                if let Err(panic) = result {
-                    let msg = panic_message(&panic);
-                    log::error!("error encountered running callback_fn for {}: {}", path, msg);
-                }
+        if let Some(path) = args.as_array().and_then(|a| a.first()).and_then(|p| p.as_str()) {
+            if self.ignore_properties.contains(path) {
+                self.ignored_updates.insert(path.to_string(), args.clone());
+                return Ok(());
             }
         }
-        Ok(())
+        apply_property_change(&mut self.store, &self.watched, self.session.as_mut(), args)
     }
+}
+
+/// A `PropertiesChanged` item as the positional argument list of `PropertyChanged`.
+pub(crate) fn positional_change(change: &Value) -> Value {
+    json!([
+        change.get("path").cloned().unwrap_or(Value::Null),
+        change.get("address").cloned().unwrap_or(Value::Null),
+        change.get("value").cloned().unwrap_or(Value::Null),
+        change.get("bytes").cloned().unwrap_or(Value::Null),
+        change.get("is_frozen").or_else(|| change.get("frozen")).cloned().unwrap_or(Value::Bool(false)),
+        change.get("fieldsChanged").cloned().unwrap_or(json!([])),
+    ])
+}
+
+/// The paths `session` wants changes of, with how many times each was
+/// registered (`clear_callbacks_on_load=True`: the session re-registers what it wants).
+pub(crate) fn register_watched(session: &mut dyn SessionEvents, store: &PropertyStore) -> HashMap<String, usize> {
+    let mut watched = HashMap::new();
+    for key in session.on_mapper_loaded(store) {
+        *watched.entry(key).or_insert(0) += 1;
+    }
+    watched
+}
+
+/// Apply one property change (the positional list) to `store` and hand it to
+/// `session`, once per registration in `watched`, when its value changed.
+pub(crate) fn apply_property_change(store: &mut PropertyStore, watched: &HashMap<String, usize>, session: &mut dyn SessionEvents, args: &Value) -> Result<(), String> {
+    let items = args.as_array().ok_or("property change args are not a list")?;
+    if items.len() < 6 {
+        return Err(format!("property change args have {} elements, expected 6", items.len()));
+    }
+    let path = items[0].as_str().ok_or("property change without a path")?.to_string();
+    let address = items[1].clone();
+    let value = items[2].clone();
+    let bytes_value = items[3].clone();
+    let frozen = items[4].clone();
+    let fields_changed: Vec<String> = items[5]
+        .as_array()
+        .map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect())
+        .unwrap_or_default();
+    if !store.is_loaded() {
+        log::debug!("[GameHook Client] Mapper is not loaded, ignoring PropertyUpdated event for: {}: {}", path, value);
+        return Ok(());
+    }
+    if !store.contains(&path) {
+        log::debug!("[GameHook Client] Could not find a related propery in PropertyUpdated event for: {}: {}", path, value);
+        return Ok(());
+    }
+    let old_property = store.props.get(&path).cloned().unwrap();
+    if value == old_property.value && bytes_value == old_property.bytes_value {
+        return Ok(());
+    }
+    let new_property = {
+        let p = store.props.get_mut(&path).unwrap();
+        p.address = address;
+        p.value = value;
+        p.bytes_value = bytes_value;
+        p.frozen = frozen;
+        p.clone()
+    };
+    if fields_changed.iter().any(|f| f == "value") && new_property.value != old_property.value {
+        // one delivery per registration (see `watched`)
+        let deliveries = watched.get(&path).copied().unwrap_or(0);
+        for _ in 0..deliveries {
+            // the FSM must never take the client down: a panic becomes a game hook error
+            let store = &*store;
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                session.on_property_changed(store, &new_property, &old_property);
+            }));
+            if let Err(panic) = result {
+                let msg = panic_message(&panic);
+                log::error!("error encountered running callback_fn for {}: {}", path, msg);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn panic_message(panic: &Box<dyn std::any::Any + Send>) -> String {

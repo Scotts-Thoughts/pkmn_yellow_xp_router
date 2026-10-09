@@ -757,7 +757,15 @@ impl RouteState {
             None => self.badges.clone(),
         };
         // _defeat_pkmn
-        let gained_xp = if exp_split != 1 {
+        let gained_xp = if gen.get_generation() == 5 {
+            // gen 5 scales by the levels: the trainer data holds the base yield
+            let species = gen
+                .pkmn_db()
+                .get_pkmn(&enemy_pkmn.name)
+                .ok_or_else(|| "'NoneType' object has no attribute 'base_xp'".to_string())?;
+            let lucky_egg = self.solo_pkmn.held_item.as_deref() == Some("Lucky Egg");
+            exp::calc_xp_yield_gen5(species.base_xp, enemy_pkmn.level, self.solo_pkmn.cur_level, enemy_pkmn.is_trainer_mon, exp_split, lucky_egg)
+        } else if exp_split != 1 {
             let species = gen
                 .pkmn_db()
                 .get_pkmn(&enemy_pkmn.name)

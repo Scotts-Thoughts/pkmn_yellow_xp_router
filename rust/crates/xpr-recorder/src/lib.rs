@@ -1,10 +1,12 @@
 //! Route recording: GameHook client, Super Shuckie poller, the recorder
 //! controller and the per-game FSMs (`route_recording/**`).
 
+pub mod clock;
 pub mod controller;
 pub mod gamehook;
 pub mod games;
 pub mod host;
+pub mod offline;
 pub mod shuckie;
 pub mod starter;
 
@@ -12,4 +14,4 @@ pub use controller::{GameState, RecorderController, RecorderStatus};
 pub use gamehook::{GameHookClient, GameHookProperty, PropertyStore};
 pub use host::{host_channel, HostHandle, HostQueue, PrevEvent, RecorderHost};
 pub use shuckie::{format_time_ms, supershuckie, SuperShuckieClient};
-pub use starter::{QuickStart, QuickStartPhase, StarterInfo};
+pub use starter::{QuickStart, QuickStartPhase, StarterInfo, StarterWatch};

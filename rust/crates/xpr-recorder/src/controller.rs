@@ -188,10 +188,8 @@ impl RecorderController {
                 return;
             }
             match start {
-                Some(info) => match crate::games::create_recorder(&info, self.clone()) {
-                    Some((expected_names, game)) => {
-                        *self.machine_active.lock().unwrap() = Some(game.active_flag());
-                        let session = Session { controller: self.clone(), expected_names, game };
+                Some(info) => match self.create_session(&info) {
+                    Some(session) => {
                         let client = GameHookClient::connect(&info.url, Box::new(session));
                         *self.client.lock().unwrap() = Some(client);
                     }
@@ -219,6 +217,22 @@ impl RecorderController {
             if let Some(flag) = self.machine_active.lock().unwrap().take() {
                 deactivate(&flag);
             }
+        }
+    }
+
+    /// The recorder for the route `info` describes, not yet connected to
+    /// anything: `on_recording_mode_changed` hands it to a GameHook client,
+    /// `replay_to_route` drives it offline (see `crate::offline`).
+    pub fn create_session(self: &Arc<Self>, info: &StartInfo) -> Option<Session> {
+        let (expected_names, game) = crate::games::create_recorder(info, self.clone())?;
+        *self.machine_active.lock().unwrap() = Some(game.active_flag());
+        Some(Session { controller: self.clone(), expected_names, game })
+    }
+
+    /// Offline: stop the machine `create_session` started.
+    pub fn stop_offline_session(&self) {
+        if let Some(flag) = self.machine_active.lock().unwrap().take() {
+            deactivate(&flag);
         }
     }
 
@@ -526,6 +540,8 @@ pub trait GameRecorder: Send {
     /// as new as the changes `handle_event` just saw, which is not true while
     /// a batch is still being walked property by property.
     fn on_idle(&mut self, _store: &PropertyStore) {}
+    /// Offline only (see `crate::clock`): process the events queued so far.
+    fn pump_events(&mut self) {}
     fn shutdown(&mut self);
 }
 
@@ -547,6 +563,18 @@ pub struct Session {
     controller: Arc<RecorderController>,
     expected_names: Vec<String>,
     game: Box<dyn GameRecorder>,
+}
+
+impl Session {
+    /// Offline only (see `crate::clock`): process the events queued so far.
+    pub fn pump_events(&mut self) {
+        self.game.pump_events();
+    }
+
+    /// Whether the machine is running (it stops itself, e.g. after the final trainer).
+    pub fn is_active(&self) -> bool {
+        self.game.is_active()
+    }
 }
 
 impl SessionEvents for Session {

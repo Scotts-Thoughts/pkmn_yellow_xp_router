@@ -22,6 +22,8 @@ fn main() {
     });
     let mut paths = Paths::new(source_root);
     xpr_core::logging::config_logging(&paths.global_config_dir);
+    #[cfg(windows)]
+    xpr_app::crash_dump::install(&paths.global_config_dir);
     if debug {
         log::info!("Debug mode requested");
     }

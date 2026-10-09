@@ -554,6 +554,8 @@ pub struct Gen2Machine {
     cur_state: GameState,
     active: ActiveFlag,
     queue: Arc<EventQueue>,
+    /// offline only: runs the queued events (see `ProcessCtx::start`)
+    processor: Option<Processor>,
     cached_lost_trainer: Arc<std::sync::Mutex<Option<String>>>,
 
     uninit: UninitData,
@@ -598,6 +600,7 @@ impl Gen2Machine {
             cur_state: GameState::Uninitialized,
             active: new_active_flag(),
             queue: EventQueue::new(),
+            processor: None,
             cached_lost_trainer: Arc::new(std::sync::Mutex::new(None)),
             uninit: UninitData::default(),
             resetting: ResettingData::default(),
@@ -1525,7 +1528,7 @@ impl Gen2Machine {
         state
     }
 
-    fn spawn_processing_thread(&self) {
+    fn spawn_processing_thread(&mut self) {
         let ctx = ProcessCtx {
             controller: self.controller.clone(),
             gen: self.gen.clone(),
@@ -1533,13 +1536,7 @@ impl Gen2Machine {
             active: self.active.clone(),
         };
         let cached_lost_trainer = self.cached_lost_trainer.clone();
-        std::thread::Builder::new()
-            .name("gen2-recorder-events".into())
-            .spawn(move || {
-                let lost = cached_lost_trainer;
-                ctx.run(|ctx, ev| process_one(ctx, ev, &lost));
-            })
-            .ok();
+        self.processor = ctx.start("gen2-recorder-events", move |ctx, ev| process_one(ctx, ev, &cached_lost_trainer));
     }
 }
 
@@ -1840,6 +1837,12 @@ impl GameRecorder for Gen2Machine {
 
     fn active_flag(&self) -> ActiveFlag {
         self.active.clone()
+    }
+
+    fn pump_events(&mut self) {
+        if let Some(p) = self.processor.as_mut() {
+            p();
+        }
     }
 
     fn shutdown(&mut self) {

@@ -325,8 +325,9 @@ impl SlotKeys {
     }
 }
 
-/// The `SessionEvents` side: runs on the GameHook connection thread.
-struct StarterWatch {
+/// The `SessionEvents` side: runs on the GameHook connection thread (or
+/// offline, see [`StarterWatch::offline`]).
+pub struct StarterWatch {
     phase: Arc<Mutex<QuickStartPhase>>,
     accept_current: Arc<AtomicBool>,
     /// set by `QuickStart::stop` (cancel or hand-off): the shutdown that
@@ -342,6 +343,33 @@ struct StarterWatch {
 }
 
 impl StarterWatch {
+    /// A watch for `replay_to_route` to drive with an `OfflineClient`.
+    /// `accept_current`: take the Pokémon already in slot 1 when the replay
+    /// starts with one (a replay that does not begin with a new game).
+    pub fn offline(accept_current: bool) -> StarterWatch {
+        StarterWatch {
+            phase: Arc::new(Mutex::new(QuickStartPhase::Connecting("offline".to_string()))),
+            accept_current: Arc::new(AtomicBool::new(accept_current)),
+            stopped: Arc::new(AtomicBool::new(false)),
+            wake: Arc::new(|| {}),
+            url: "offline".to_string(),
+            game: None,
+            keys: None,
+            settle: None,
+            done: false,
+        }
+    }
+
+    /// Where the watch is.
+    pub fn current_phase(&self) -> QuickStartPhase {
+        self.phase()
+    }
+
+    /// Stop expecting more (the hand-off to the recorder).
+    pub fn stop(&self) {
+        self.stopped.store(true, Ordering::SeqCst);
+    }
+
     fn set_phase(&self, phase: QuickStartPhase) {
         *self.phase.lock().unwrap() = phase;
         (self.wake)();
@@ -490,7 +518,7 @@ impl SessionEvents for StarterWatch {
     }
 
     fn on_property_changed(&mut self, store: &PropertyStore, _new: &GameHookProperty, _old: &GameHookProperty) {
-        self.evaluate(store, Instant::now());
+        self.evaluate(store, crate::clock::now());
     }
 
     fn on_shutdown(&mut self) {
@@ -507,7 +535,7 @@ impl SessionEvents for StarterWatch {
         if self.done {
             return;
         }
-        let now = Instant::now();
+        let now = crate::clock::now();
         if self.accept_current.swap(false, Ordering::SeqCst) && matches!(self.phase(), QuickStartPhase::WaitingForNewGame { .. }) && self.keys.as_ref().map(|k| k.filled(store)).unwrap_or(false) {
             log::info!("[Quick Start] using the Pokémon already in slot 1");
             self.finish(store);

@@ -2,6 +2,8 @@
 //! summary, dialogs, secondary windows, recorder wiring and the update flow.
 
 pub mod app;
+#[cfg(windows)]
+pub mod crash_dump;
 pub mod assets;
 pub mod battle;
 pub mod compare;
@@ -19,6 +21,7 @@ pub mod pages;
 pub mod pp_ledger;
 pub mod quick_add;
 pub mod recorder_glue;
+pub mod replay_import;
 pub mod route_index;
 pub mod route_list;
 pub mod screenshot;

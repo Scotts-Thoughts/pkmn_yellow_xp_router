@@ -696,6 +696,8 @@ pub struct Gen45Machine {
     cur_state: GameState,
     active: ActiveFlag,
     queue: Arc<EventQueue>,
+    /// offline only: runs the queued events (see `ProcessCtx::start`)
+    processor: Option<Processor>,
 
     uninit: UninitData,
     resetting: ResettingData,
@@ -750,6 +752,7 @@ impl Gen45Machine {
             cur_state: GameState::Uninitialized,
             active: new_active_flag(),
             queue: EventQueue::new(),
+            processor: None,
             uninit: UninitData::default(),
             resetting: ResettingData::default(),
             battle: BattleData::default(),
@@ -2364,7 +2367,7 @@ impl Gen45Machine {
         state
     }
 
-    fn spawn_processing_thread(&self) {
+    fn spawn_processing_thread(&mut self) {
         let ctx = ProcessCtx {
             controller: self.controller.clone(),
             gen: self.gen.clone(),
@@ -2372,12 +2375,7 @@ impl Gen45Machine {
             active: self.active.clone(),
         };
         let conv = self.conv.clone();
-        std::thread::Builder::new()
-            .name("gen45-recorder-events".into())
-            .spawn(move || {
-                ctx.run(|ctx, ev| process_one(ctx, ev, &conv));
-            })
-            .ok();
+        self.processor = ctx.start("gen45-recorder-events", move |ctx, ev| process_one(ctx, ev, &conv));
     }
 }
 
@@ -2652,6 +2650,12 @@ impl GameRecorder for Gen45Machine {
 
     fn active_flag(&self) -> ActiveFlag {
         self.active.clone()
+    }
+
+    fn pump_events(&mut self) {
+        if let Some(p) = self.processor.as_mut() {
+            p();
+        }
     }
 
     fn shutdown(&mut self) {

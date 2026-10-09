@@ -435,3 +435,39 @@ fn movedex_space_stands_down_under_a_dialog() {
     let texts = run(&mut dex, vec![], false);
     assert!(texts.iter().any(|t| t.contains("Jump to move")), "without a dialog Space opens the jump search");
 }
+
+/// The landing page's "Route from Replay" panel cancels on Escape, but not
+/// when Escape belongs to a dialog drawn over it.
+#[test]
+fn escape_under_a_dialog_does_not_cancel_the_replay_import() {
+    let cfg = Config::load(&xpr_app::scratch_config_path());
+    let ctx = egui::Context::default();
+    let mut theme = Theme::from_config(&cfg);
+    theme.install_fonts(&ctx);
+    theme.apply(&ctx);
+    let status = xpr_app::replay_import::ImportStatus { phase: "record".into(), frame: 50, total: 100, ..Default::default() };
+    let run = |with_dialog: bool, events: Vec<Event>| -> bool {
+        let mut cancel = false;
+        let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1000.0, 700.0))), events, ..Default::default() };
+        let _ = ctx.run(input, |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                xpr_app::pages::replay_import_ui(ui, &theme, &status, &mut cancel);
+            });
+            if with_dialog {
+                xpr_ui_kit::modal::modal(ctx, &theme, "xpr_test_dialog", "A dialog", 300.0, |ui| {
+                    ui.label("on top");
+                });
+            }
+        });
+        cancel
+    };
+    let escape = || vec![Event::Key { key: Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }];
+    for _ in 0..3 {
+        run(true, vec![]);
+    }
+    assert!(!run(true, escape()), "Escape belongs to the dialog");
+    for _ in 0..3 {
+        run(false, vec![]);
+    }
+    assert!(run(false, escape()), "without a dialog Escape cancels the import");
+}

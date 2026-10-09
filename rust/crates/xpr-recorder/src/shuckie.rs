@@ -52,6 +52,10 @@ impl SuperShuckieClient {
     }
 
     pub fn start(&self) {
+        // offline the timer is the replay's (see `crate::clock`)
+        if crate::clock::is_offline() {
+            return;
+        }
         if self.active.swap(true, Ordering::SeqCst) {
             return;
         }
@@ -87,6 +91,9 @@ impl SuperShuckieClient {
     /// `None` when Super Shuckie isn't running, the timer hasn't started, or
     /// the cached value has gone stale.
     pub fn get_current_time_ms(&self) -> Option<i64> {
+        if crate::clock::is_offline() {
+            return crate::clock::offline_timer_ms();
+        }
         let c = self.cached.lock().unwrap();
         let last = c.last_success?;
         if last.elapsed() > STALE_THRESHOLD {

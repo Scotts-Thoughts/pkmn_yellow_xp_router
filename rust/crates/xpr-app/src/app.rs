@@ -34,7 +34,7 @@ use crate::dialogs::{
 use crate::event_details::{DetailsActions, EventDetails, BATTLE_SUMMARY_TAB, MAP_TAB, PRE_STATE_TAB};
 use crate::filter_bar::FilterBar;
 use crate::map::{MapAction, MapView};
-use crate::pages::{quick_start_ui, LandingActions, LandingPage, MapViewerPage, NewRouteActions, NewRoutePage, QuickStartActions};
+use crate::pages::{quick_start_ui, replay_import_ui, LandingActions, LandingPage, MapViewerPage, NewRouteActions, NewRoutePage, QuickStartActions};
 use crate::quick_add::QuickAddPopover;
 use crate::recorder_glue::{gamehook_url, Recorder};
 use crate::route_index::RouteIndex;
@@ -185,6 +185,8 @@ pub struct XprApp {
     /// the landing page's "Start Recording": the GameHook session that
     /// detects the game and the first Pokémon before a route exists
     quick_start: Option<QuickStart>,
+    /// the landing page's "Route from Replay" while it runs
+    replay_import: Option<crate::replay_import::ImportJob>,
     route_name_text: String,
     image_path_text: String,
     route_loaded_before_new_route: bool,
@@ -294,6 +296,7 @@ impl XprApp {
             compare_return: Page::Landing,
             recorder,
             quick_start: None,
+            replay_import: None,
             route_name_text: String::new(),
             image_path_text: String::new(),
             route_loaded_before_new_route: false,
@@ -1380,6 +1383,50 @@ impl XprApp {
     fn record_button_clicked(&mut self) {
         let new_mode = !self.ctrl.is_record_mode_active();
         self.ctrl.set_record_mode(new_mode);
+    }
+
+    // ---- "Route from Replay" on the landing page ------------------------------------------
+
+    fn begin_replay_import(&mut self, ctx: &egui::Context) {
+        if self.replay_import.is_some() {
+            return;
+        }
+        let dialog = rfd::FileDialog::new().set_title("Select a Super Shuckie replay").add_filter("Super Shuckie replays", &["replay"]).add_filter("All Files", &["*"]);
+        let Some(replay) = dialog.pick_file() else { return };
+        let stem = replay.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "replay".into());
+        let _ = std::fs::create_dir_all(&self.paths.saved_routes_dir);
+        let out = xpr_core::io_utils::get_safe_path_no_collision(&self.paths.saved_routes_dir, &stem, ".json");
+        let opts = crate::replay_import::ImportOptions { replay, ..Default::default() };
+        let wake_ctx = ctx.clone();
+        let wake: Arc<dyn Fn() + Send + Sync> = Arc::new(move || wake_ctx.request_repaint());
+        log::info!("[Replay Import] {} -> {}", opts.replay.display(), out.display());
+        self.replay_import = Some(crate::replay_import::ImportJob::spawn(self.registry.clone(), self.paths.clone(), self.cfg.clone(), opts, out, wake));
+        self.page = Page::Landing;
+    }
+
+    /// Runs every frame: open the route when the import is done.
+    fn poll_replay_import(&mut self, ctx: &egui::Context) {
+        let Some(job) = &self.replay_import else { return };
+        let status = job.snapshot();
+        let Some(done) = status.done else {
+            ctx.request_repaint_after(Duration::from_millis(250));
+            return;
+        };
+        self.replay_import = None;
+        match done {
+            Ok((path, report)) => {
+                self.ctrl.load_route(&path);
+                self.show_route_controls();
+                let title = if report.check_passed { "Route from Replay" } else { "Route from Replay: check the route" };
+                self.show_message(title, &format!("{}
+
+Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::Info);
+            }
+            Err(e) if e == crate::replay_import::CANCELLED => {}
+            Err(e) => self.show_message("Route from Replay", &format!("The route could not be made from the replay:
+
+{}", e), MsgButtons::Ok, MsgTag::NewRouteError),
+        }
     }
 
     // ---- quick start ("Start Recording" on the landing page) --------------------------------
@@ -2952,6 +2999,7 @@ impl XprApp {
         self.recorder.pump(&mut self.ctrl, &self.cfg);
         self.recorder.refresh_status();
         self.poll_quick_start(ctx);
+        self.poll_replay_import(ctx);
         // timers, signals, shortcuts
         self.tick_timers(ctx);
         self.dispatch_signals(ctx);
@@ -3012,7 +3060,13 @@ impl XprApp {
         self.map.browse = self.page == Page::MapViewer;
         egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(ctx, |ui| match self.page {
             Page::Landing => {
-                if let Some(qs) = &self.quick_start {
+                if let Some(job) = &self.replay_import {
+                    let mut cancel = false;
+                    replay_import_ui(ui, &theme, &job.snapshot(), &mut cancel);
+                    if cancel {
+                        job.cancel();
+                    }
+                } else if let Some(qs) = &self.quick_start {
                     let mut actions = QuickStartActions::default();
                     quick_start_ui(ui, &theme, &qs.phase(), qs.url(), &mut actions);
                     if actions.use_current {
@@ -3039,6 +3093,9 @@ impl XprApp {
                     }
                     if actions.start_recording {
                         self.begin_quick_start(ctx);
+                    }
+                    if actions.import_replay {
+                        self.begin_replay_import(ctx);
                     }
                     if actions.view_map {
                         self.open_map_viewer();

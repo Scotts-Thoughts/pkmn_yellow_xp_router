@@ -1,0 +1,10 @@
+[package]
+name = "xpr-replay"
+version.workspace = true
+edition.workspace = true
+description = "Reads Poke-A-Byte property changes out of a Super Shuckie replay (replay_to_route)"
+
+[dependencies]
+xpr-core = { path = "../xpr-core" }
+serde_json = { workspace = true }
+log = { workspace = true }

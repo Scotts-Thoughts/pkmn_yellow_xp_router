@@ -56,7 +56,7 @@ fn main() {
             d.end.stats,
             d.ev_text(),
             d.end.evs,
-            d.end.ev_total(),
+            d.end.ev_total(d.generation),
             d.end.money,
             d.end.held_item
         );
@@ -126,8 +126,8 @@ fn main() {
             ea.label,
             ea.before.level,
             eb.before.level,
-            ea.before.ev_total(),
-            eb.before.ev_total(),
+            ea.before.ev_total(cmp.a.generation),
+            eb.before.ev_total(cmp.b.generation),
             ea.before.money,
             eb.before.money,
             ea.recorded_secs.map(format_time).unwrap_or_else(|| "—".into()),

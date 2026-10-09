@@ -190,8 +190,14 @@ impl Snapshot {
         }
     }
 
-    pub fn ev_total(&self) -> i64 {
-        self.evs.iter().sum()
+    /// Gens 1-2 have one Special stat exp held in both special slots; it
+    /// counts once.
+    pub fn ev_total(&self, generation: u8) -> i64 {
+        if generation <= 2 {
+            self.evs[0] + self.evs[1] + self.evs[2] + self.evs[3] + self.evs[5]
+        } else {
+            self.evs.iter().sum()
+        }
     }
 
     /// The non-empty moves, for set comparison (slot order ignored).

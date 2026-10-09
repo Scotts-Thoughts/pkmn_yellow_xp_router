@@ -304,7 +304,7 @@ fn stats_card(ui: &mut Ui, c: &Cmp, cmp: &RouteComparison) {
         }
         let rect = widgets::table_row(ui, ROW_H, Some(theme.pane_divider()));
         shared::name_cell(ui, theme, rect, &format!("Total {}", ev), false);
-        shared::value_pair_plain(ui, c, rect, &cols.evs, a.end.ev_total(), b.end.ev_total());
+        shared::value_pair_plain(ui, c, rect, &cols.evs, a.end.ev_total(a.generation), b.end.ev_total(b.generation));
     });
 }
 

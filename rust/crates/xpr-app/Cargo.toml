@@ -8,6 +8,10 @@ default-run = "xpr-app"
 name = "xpr-app"
 path = "src/main.rs"
 
+[[bin]]
+name = "replay_to_route"
+path = "src/bin/replay_to_route.rs"
+
 [dependencies]
 xpr-core = { path = "../xpr-core" }
 xpr-data = { path = "../xpr-data", features = ["embed-data"] }
@@ -15,6 +19,7 @@ xpr-engine = { path = "../xpr-engine" }
 xpr-calc = { path = "../xpr-calc" }
 xpr-map = { path = "../xpr-map", features = ["embed-map-data"] }
 xpr-recorder = { path = "../xpr-recorder" }
+xpr-replay = { path = "../xpr-replay" }
 xpr-update = { path = "../xpr-update" }
 xpr-ui-kit = { path = "../xpr-ui-kit" }
 xpr-dex = { path = "../xpr-dex", features = ["embed-dex-data"] }
@@ -32,7 +37,7 @@ chrono = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 raw-window-handle = "0.6"
-windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_Memory", "Win32_System_Threading"] }
 
 [build-dependencies]
 image = { version = "0.25", default-features = false, features = ["png", "ico"] }

@@ -73,6 +73,10 @@ pub trait RecorderHost {
     fn is_debug_mode(&self) -> bool;
     /// the GameHook base URL (default `http://localhost:8085`)
     fn gamehook_url(&self) -> String;
+    /// The host itself, for a driver that owns it (`replay_to_route`).
+    fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
+        None
+    }
 }
 
 type HostFn = Box<dyn FnOnce(&mut dyn RecorderHost) -> Box<dyn Any + Send> + Send>;

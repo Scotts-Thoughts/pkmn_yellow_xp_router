@@ -1,0 +1,26 @@
+[package]
+name = "xpr-replay-worker"
+version = "0.1.0"
+edition = "2024"
+description = "Reads game memory out of a Super Shuckie replay for replay_to_route"
+
+# Not part of the router's workspace: it links Super Shuckie's emulator cores, which are GNU
+# (MinGW) archives, so it is built with MSYS2's UCRT64 cargo (see ../README.md).
+[workspace]
+
+[dependencies]
+supershuckie-core = { path = "A:/Programs/supershuckie/supershuckie-core" }
+supershuckie-replay-recorder = { path = "A:/Programs/supershuckie/supershuckie-replay-recorder" }
+# `link-cores` makes the cores' build scripts link their static libraries (from
+# SUPERSHUCKIE_BUILD_DIR, default A:/Programs/supershuckie/build), as Super Shuckie's own examples do.
+melonds-rs = { path = "A:/Programs/supershuckie/melonds-rs", features = ["link-cores"] }
+mgba-rs = { path = "A:/Programs/supershuckie/mgba-rs", features = ["link-cores"] }
+azahar-rs = { path = "A:/Programs/supershuckie/azahar-rs", features = ["link-cores"] }
+memmap2 = "0.9"
+
+[patch.crates-io]
+safeboy = { path = "A:/Programs/supershuckie/third-party/safeboy" }
+
+[profile.release]
+opt-level = 3
+debug = false

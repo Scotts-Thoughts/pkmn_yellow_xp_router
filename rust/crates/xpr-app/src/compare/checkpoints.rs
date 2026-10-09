@@ -271,7 +271,7 @@ fn row(
     widgets::col_text(ui, Cols::cell(cols.money_a, W_MONEY, rect), &shared::money(ea.before.money), theme.body(), theme.text, Align::Max);
     widgets::col_text(ui, Cols::cell(cols.money_b, W_MONEY, rect), &shared::money(eb.before.money), theme.body(), theme.text, Align::Max);
 
-    let (va, vb) = (ea.before.ev_total(), eb.before.ev_total());
+    let (va, vb) = (ea.before.ev_total(cmp.a.generation), eb.before.ev_total(cmp.b.generation));
     let ev_color = if va == vb { theme.secondary } else { theme.text };
     widgets::col_text(ui, Cols::cell(cols.ev_a, W_EV, rect), &va.to_string(), theme.body(), ev_color, Align::Max);
     widgets::col_text(ui, Cols::cell(cols.ev_b, W_EV, rect), &vb.to_string(), theme.body(), ev_color, Align::Max);

@@ -14,130 +14,180 @@ use xpr_recorder::{host_channel, RecorderController};
 
 use crate::controller::MainController;
 
+/// What the recorder's host calls run against: the controller and the config.
+pub trait HostParts {
+    fn ctrl(&self) -> &MainController;
+    fn ctrl_mut(&mut self) -> &mut MainController;
+    fn cfg(&self) -> &Config;
+}
+
 /// A per-frame view the recorder's queued calls run against.
 pub struct HostBridge<'a> {
     pub ctrl: &'a mut MainController,
     pub cfg: &'a Config,
 }
 
-impl<'a> RecorderHost for HostBridge<'a> {
-    fn is_record_mode_active(&self) -> bool {
-        self.ctrl.is_record_mode_active()
+impl HostParts for HostBridge<'_> {
+    fn ctrl(&self) -> &MainController {
+        self.ctrl
     }
-
-    fn set_record_mode(&mut self, active: bool) {
-        self.ctrl.set_record_mode(active);
+    fn ctrl_mut(&mut self) -> &mut MainController {
+        self.ctrl
     }
-
-    fn is_empty(&self) -> bool {
-        self.ctrl.is_empty()
-    }
-
-    fn get_all_folder_names(&self) -> Vec<String> {
-        self.ctrl.get_all_folder_names()
-    }
-
-    fn get_previous_event(&self, cur_event_id: Option<NodeId>) -> Option<PrevEvent> {
-        let gid = self.ctrl.get_previous_event(cur_event_id)?;
-        let g = self.ctrl.router.group(gid)?;
-        let parent_name = self.ctrl.router.folder(g.parent).map(|f| f.name.clone()).unwrap_or_default();
-        Some(PrevEvent {
-            group_id: gid,
-            parent_name,
-            definition: g.event_definition.clone(),
-            final_held_item: g.final_state.as_ref().and_then(|s| s.solo_pkmn.held_item.clone()),
-            first_trainer_name: g.event_definition.trainer_def.as_ref().map(|t| t.trainer_name.clone()),
-        })
-    }
-
-    fn delete_events(&mut self, ids: &[NodeId]) {
-        self.ctrl.delete_events(ids);
-    }
-
-    fn purge_empty_folders(&mut self) {
-        self.ctrl.purge_empty_folders();
-    }
-
-    fn new_event(&mut self, def: EventDefinition, dest_folder_name: &str) {
-        self.ctrl.new_event(def, None, None, Some(dest_folder_name), true);
-    }
-
-    fn finalize_new_folder(&mut self, name: &str) {
-        self.ctrl.finalize_new_folder(name, None, None);
-    }
-
-    fn get_defeated_trainers(&self) -> Vec<String> {
-        self.ctrl.get_defeated_trainers()
-    }
-
-    fn get_move_idx(&self, move_name: &str) -> Option<i64> {
-        self.ctrl.get_move_idx(move_name, None)
-    }
-
-    fn update_levelup_move(&mut self, def: LearnMoveEventDefinition) {
-        self.ctrl.update_levelup_move(def);
-    }
-
-    fn update_existing_event(&mut self, id: NodeId, def: EventDefinition) {
-        self.ctrl.update_existing_event(id, def);
-    }
-
-    fn get_dvs(&self) -> Option<StatBlock> {
-        self.ctrl.get_dvs()
-    }
-
-    fn final_solo_species(&self) -> Option<String> {
-        self.ctrl.get_final_state().map(|s| s.solo_pkmn.species_def.name.clone())
-    }
-
-    fn final_held_item(&self) -> Option<String> {
-        self.ctrl.get_final_state().and_then(|s| s.solo_pkmn.held_item.clone())
-    }
-
-    fn final_inventory_has(&self, item_name: &str) -> bool {
-        self.ctrl.get_final_state().map(|s| s.inventory.has_item(item_name)).unwrap_or(false)
-    }
-
-    fn can_evolve_into(&self, species: &str) -> bool {
-        self.ctrl.can_evolve_into(species)
-    }
-
-    fn is_valid_levelup_move(&self, def: &LearnMoveEventDefinition) -> bool {
-        self.ctrl.is_valid_levelup_move(def)
-    }
-
-    fn get_version(&self) -> Option<String> {
-        self.ctrl.get_version().map(|s| s.to_string())
-    }
-
-    fn gen(&self) -> Option<Arc<GenData>> {
-        self.ctrl.gen()
-    }
-
-    fn trigger_exception(&mut self, msg: &str) {
-        self.ctrl.trigger_exception(msg);
-    }
-
-    fn send_message(&mut self, msg: &str) {
-        self.ctrl.send_message(msg);
-    }
-
-    fn final_trainers(&self, version: &str) -> Vec<String> {
-        self.cfg.get_final_trainers(version)
-    }
-
-    fn recording_auto_stop_enabled(&self) -> bool {
-        self.cfg.get_recording_auto_stop_enabled()
-    }
-
-    fn is_debug_mode(&self) -> bool {
-        self.cfg.is_debug_mode()
-    }
-
-    fn gamehook_url(&self) -> String {
-        gamehook_url()
+    fn cfg(&self) -> &Config {
+        self.cfg
     }
 }
+
+/// A host that owns its controller: the recorder driven offline from a
+/// replay (`replay_import`), where its calls run inline on the driving thread.
+pub struct OwnedHost {
+    pub ctrl: MainController,
+    pub cfg: Config,
+}
+
+impl HostParts for OwnedHost {
+    fn ctrl(&self) -> &MainController {
+        &self.ctrl
+    }
+    fn ctrl_mut(&mut self) -> &mut MainController {
+        &mut self.ctrl
+    }
+    fn cfg(&self) -> &Config {
+        &self.cfg
+    }
+}
+
+/// `RecorderHost` over any [`HostParts`] (one impl per host type: the trait is foreign).
+macro_rules! recorder_host {
+    ($t:ty $(, $extra:item)*) => {
+        impl RecorderHost for $t {
+            $($extra)*
+
+            fn is_record_mode_active(&self) -> bool {
+                self.ctrl().is_record_mode_active()
+            }
+
+            fn set_record_mode(&mut self, active: bool) {
+                self.ctrl_mut().set_record_mode(active);
+            }
+
+            fn is_empty(&self) -> bool {
+                self.ctrl().is_empty()
+            }
+
+            fn get_all_folder_names(&self) -> Vec<String> {
+                self.ctrl().get_all_folder_names()
+            }
+
+            fn get_previous_event(&self, cur_event_id: Option<NodeId>) -> Option<PrevEvent> {
+                let gid = self.ctrl().get_previous_event(cur_event_id)?;
+                let g = self.ctrl().router.group(gid)?;
+                let parent_name = self.ctrl().router.folder(g.parent).map(|f| f.name.clone()).unwrap_or_default();
+                Some(PrevEvent {
+                    group_id: gid,
+                    parent_name,
+                    definition: g.event_definition.clone(),
+                    final_held_item: g.final_state.as_ref().and_then(|s| s.solo_pkmn.held_item.clone()),
+                    first_trainer_name: g.event_definition.trainer_def.as_ref().map(|t| t.trainer_name.clone()),
+                })
+            }
+
+            fn delete_events(&mut self, ids: &[NodeId]) {
+                self.ctrl_mut().delete_events(ids);
+            }
+
+            fn purge_empty_folders(&mut self) {
+                self.ctrl_mut().purge_empty_folders();
+            }
+
+            fn new_event(&mut self, def: EventDefinition, dest_folder_name: &str) {
+                self.ctrl_mut().new_event(def, None, None, Some(dest_folder_name), true);
+            }
+
+            fn finalize_new_folder(&mut self, name: &str) {
+                self.ctrl_mut().finalize_new_folder(name, None, None);
+            }
+
+            fn get_defeated_trainers(&self) -> Vec<String> {
+                self.ctrl().get_defeated_trainers()
+            }
+
+            fn get_move_idx(&self, move_name: &str) -> Option<i64> {
+                self.ctrl().get_move_idx(move_name, None)
+            }
+
+            fn update_levelup_move(&mut self, def: LearnMoveEventDefinition) {
+                self.ctrl_mut().update_levelup_move(def);
+            }
+
+            fn update_existing_event(&mut self, id: NodeId, def: EventDefinition) {
+                self.ctrl_mut().update_existing_event(id, def);
+            }
+
+            fn get_dvs(&self) -> Option<StatBlock> {
+                self.ctrl().get_dvs()
+            }
+
+            fn final_solo_species(&self) -> Option<String> {
+                self.ctrl().get_final_state().map(|s| s.solo_pkmn.species_def.name.clone())
+            }
+
+            fn final_held_item(&self) -> Option<String> {
+                self.ctrl().get_final_state().and_then(|s| s.solo_pkmn.held_item.clone())
+            }
+
+            fn final_inventory_has(&self, item_name: &str) -> bool {
+                self.ctrl().get_final_state().map(|s| s.inventory.has_item(item_name)).unwrap_or(false)
+            }
+
+            fn can_evolve_into(&self, species: &str) -> bool {
+                self.ctrl().can_evolve_into(species)
+            }
+
+            fn is_valid_levelup_move(&self, def: &LearnMoveEventDefinition) -> bool {
+                self.ctrl().is_valid_levelup_move(def)
+            }
+
+            fn get_version(&self) -> Option<String> {
+                self.ctrl().get_version().map(|s| s.to_string())
+            }
+
+            fn gen(&self) -> Option<Arc<GenData>> {
+                self.ctrl().gen()
+            }
+
+            fn trigger_exception(&mut self, msg: &str) {
+                self.ctrl_mut().trigger_exception(msg);
+            }
+
+            fn send_message(&mut self, msg: &str) {
+                self.ctrl_mut().send_message(msg);
+            }
+
+            fn final_trainers(&self, version: &str) -> Vec<String> {
+                self.cfg().get_final_trainers(version)
+            }
+
+            fn recording_auto_stop_enabled(&self) -> bool {
+                self.cfg().get_recording_auto_stop_enabled()
+            }
+
+            fn is_debug_mode(&self) -> bool {
+                self.cfg().is_debug_mode()
+            }
+
+            fn gamehook_url(&self) -> String {
+                gamehook_url()
+            }
+}
+    };
+}
+
+recorder_host!(HostBridge<'_>);
+recorder_host!(OwnedHost, fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+    Some(self)
+});
 
 /// The GameHook base URL (`XPR_GAMEHOOK_URL` overrides the default).
 pub fn gamehook_url() -> String {

@@ -244,6 +244,9 @@ pub fn event_str(gen: &GenData, def: &EventDefinition) -> String {
     def.get_label(gen).unwrap_or_else(|e| format!("<{}>", e))
 }
 
+/// Runs the queued events of an offline recording (see [`ProcessCtx::start`]).
+pub type Processor = Box<dyn FnMut() + Send>;
+
 /// Everything the processing thread needs.
 pub struct ProcessCtx {
     pub controller: Arc<RecorderController>,
@@ -268,32 +271,47 @@ impl ProcessCtx {
             if !active && self.queue.is_empty() {
                 break;
             }
-            let next = self.queue.try_pop();
-            if next.is_none() {
-                std::thread::sleep(Duration::from_millis(100));
+            match self.queue.try_pop() {
+                Some(event) => self.process(event, &mut process_one),
+                None => std::thread::sleep(Duration::from_millis(100)),
             }
-            match next {
-                Some(event) => {
-                    let label = event_str(&self.gen, &event);
-                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| process_one(self, event)));
-                    if let Err(panic) = result {
-                        let msg = if let Some(s) = panic.downcast_ref::<&str>() {
-                            s.to_string()
-                        } else if let Some(s) = panic.downcast_ref::<String>() {
-                            s.clone()
-                        } else {
-                            "unknown".to_string()
-                        };
-                        log::error!("Exception occurred trying to process event: {}: {}", label, msg);
-                        self.controller.add_event(EventDefinition::notes_only(&format!(
-                            "{} Unexpected error: {}",
-                            consts::RECORDING_ERROR_FRAGMENT,
-                            msg
-                        )));
-                    }
-                }
-                None => {}
-            }
+        }
+    }
+
+    /// Offline (see `crate::clock`): process everything queued so far, now.
+    pub fn drain(&self, process_one: &mut impl FnMut(&ProcessCtx, EventDefinition)) {
+        while let Some(event) = self.queue.try_pop() {
+            self.process(event, process_one);
+        }
+    }
+
+    /// Start processing: on a thread named `name` live, or offline by the
+    /// returned [`Processor`], which the machine runs from `pump_events`.
+    pub fn start(self, name: &str, mut process_one: impl FnMut(&ProcessCtx, EventDefinition) + Send + 'static) -> Option<Processor> {
+        if crate::clock::is_offline() {
+            return Some(Box::new(move || self.drain(&mut process_one)));
+        }
+        std::thread::Builder::new().name(name.into()).spawn(move || self.run(process_one)).ok();
+        None
+    }
+
+    fn process(&self, event: EventDefinition, process_one: &mut impl FnMut(&ProcessCtx, EventDefinition)) {
+        let label = event_str(&self.gen, &event);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| process_one(self, event)));
+        if let Err(panic) = result {
+            let msg = if let Some(s) = panic.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown".to_string()
+            };
+            log::error!("Exception occurred trying to process event: {}: {}", label, msg);
+            self.controller.add_event(EventDefinition::notes_only(&format!(
+                "{} Unexpected error: {}",
+                consts::RECORDING_ERROR_FRAGMENT,
+                msg
+            )));
         }
     }
 

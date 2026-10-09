@@ -80,7 +80,8 @@ fn crystal_porygon_route() {
     let f = final_mon(&router);
     assert_eq!((f.cur_level, f.cur_xp, f.xp_to_next_level), (10, 613, 129));
     assert_eq!(stats(&f.cur_stats), (39, 25, 23, 30, 25, 28));
-    assert_eq!(stats(&f.realized_stat_xp), (325, 360, 320, 250, 276, 445));
+    // one Special stat exp: the Sp. Def slot mirrors Sp. Atk (pokecrystal CalcMonStatC)
+    assert_eq!(stats(&f.realized_stat_xp), (325, 360, 320, 250, 250, 445));
     assert_eq!(moves(&f.move_list), vec![Some("Scratch"), Some("Growl"), Some("Ember"), Some("Smokescreen")]);
     assert_eq!(router.get_final_state().unwrap().inventory.cur_money, 3796);
     let e4 = &router.final_state_of(events[4]).unwrap().solo_pkmn;

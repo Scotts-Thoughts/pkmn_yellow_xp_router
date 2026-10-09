@@ -343,6 +343,8 @@ pub struct Gen5Machine {
     settle_paths: HashSet<String>,
     active: ActiveFlag,
     queue: Arc<EventQueue>,
+    /// offline only: runs the queued events (see `ProcessCtx::start`)
+    processor: Option<Processor>,
 
     phase: Phase,
     player_id: Option<i64>,
@@ -407,6 +409,7 @@ impl Gen5Machine {
             settle_paths: HashSet::new(),
             active: new_active_flag(),
             queue: EventQueue::new(),
+            processor: None,
             phase: Phase::Uninitialized,
             player_id: None,
             route_species: info.solo_species.clone(),
@@ -414,7 +417,7 @@ impl Gen5Machine {
             solo_pid: None,
             baseline: None,
             dirty: false,
-            last_change: Instant::now(),
+            last_change: crate::clock::now(),
             invalid_since: None,
             battle: None,
             area: None,
@@ -980,13 +983,16 @@ impl Gen5Machine {
     fn finish_battle(&mut self, post: Snap) {
         let Some(b) = self.battle.take() else { return };
         let pre = b.pre.clone();
+        let solo_exp = |snap: &Snap| self.solo_pid.and_then(|p| snap.by_pid(p)).map(|m| format!("{} Lv{}", m.exp, m.level)).unwrap_or_else(|| "?".into());
         log::info!(
-            "[gen5] battle over: trainer {} / {}, fainted {:?}, participants {:?}, lost {}",
+            "[gen5] battle over: trainer {} / {}, fainted {:?}, participants {:?}, lost {}, solo exp {} -> {}",
             b.trainer_a,
             b.trainer_b,
             b.faints.iter().map(|(s, sp, l)| format!("{}:{} Lv{}", s + 1, sp, l)).collect::<Vec<_>>(),
             b.participants.iter().map(|p| p.len()).collect::<Vec<_>>(),
-            b.all_player_fainted
+            b.all_player_fainted,
+            solo_exp(&pre),
+            solo_exp(&post)
         );
         let (mut gained, lost) = diff_items(&pre.items, &post.items);
         let o = self.solo_pid.and_then(|p| pre.by_pid(p)).cloned();
@@ -1134,7 +1140,7 @@ impl Gen5Machine {
     }
 
     fn tick(&mut self, store: &PropertyStore) {
-        let now = Instant::now();
+        let now = crate::clock::now();
         let in_battle = self.in_battle(store);
         let player_id = Self::i64_of(store, &self.keys.player_id);
         // a soft reset empties the party (the recorder only follows a game with
@@ -1327,15 +1333,10 @@ impl Gen5Machine {
         }
     }
 
-    fn spawn_processing_thread(&self) {
+    fn spawn_processing_thread(&mut self) {
         let ctx = ProcessCtx { controller: self.controller.clone(), gen: self.gen.clone(), queue: self.queue.clone(), active: self.active.clone() };
         let conv = self.conv.clone();
-        std::thread::Builder::new()
-            .name("gen5-recorder-events".into())
-            .spawn(move || {
-                ctx.run(|ctx, ev| process_one(ctx, ev, &conv));
-            })
-            .ok();
+        self.processor = ctx.start("gen5-recorder-events", move |ctx, ev| process_one(ctx, ev, &conv));
     }
 }
 
@@ -1438,7 +1439,7 @@ impl GameRecorder for Gen5Machine {
     fn startup(&mut self, _store: &PropertyStore) {
         self.active.store(true, Ordering::SeqCst);
         self.phase = Phase::Uninitialized;
-        self.last_change = Instant::now();
+        self.last_change = crate::clock::now();
         self.controller.set_game_state(GameState::Uninitialized);
         crate::shuckie::supershuckie().start();
         self.spawn_processing_thread();
@@ -1449,7 +1450,7 @@ impl GameRecorder for Gen5Machine {
             log::info!("Change of {} from {} to {} ({:?})", new.path, py_str(&prev.value), py_str(&new.value), self.phase);
         }
         if self.settle_paths.contains(&new.path) {
-            self.last_change = Instant::now();
+            self.last_change = crate::clock::now();
             self.dirty = true;
         }
         if self.saves_detectable && new.path == self.keys.save_flag && self.phase == Phase::Overworld && prev.value.is_boolean() && new.value.is_boolean() {
@@ -1467,6 +1468,12 @@ impl GameRecorder for Gen5Machine {
 
     fn active_flag(&self) -> ActiveFlag {
         self.active.clone()
+    }
+
+    fn pump_events(&mut self) {
+        if let Some(p) = self.processor.as_mut() {
+            p();
+        }
     }
 
     fn shutdown(&mut self) {

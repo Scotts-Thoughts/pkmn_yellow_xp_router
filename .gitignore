@@ -133,3 +133,10 @@ outdated_routes/
 route_one_output/
 outputs/
 config.json
+
+# replay_to_route helper builds (tools/replay_to_route/build.sh)
+tools/replay_to_route/.vendor/
+tools/replay_to_route/.target/
+tools/replay_to_route/out/
+tools/replay_to_route/pab-host/bin/
+tools/replay_to_route/pab-host/obj/

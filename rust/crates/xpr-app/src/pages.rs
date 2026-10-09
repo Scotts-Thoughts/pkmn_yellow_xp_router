@@ -37,6 +37,8 @@ pub struct LandingActions {
     /// "Start Recording": connect to GameHook and build the route from the
     /// game (version from the mapper, solo mon from the first Pokémon).
     pub start_recording: bool,
+    /// "Route from Replay": record a route from a Super Shuckie replay file.
+    pub import_replay: bool,
     /// "View Map": browse a game's world map without a route open.
     pub view_map: bool,
     /// "Pokédex": the Dex page (Pokédex, trainers, damage, movedex ...).
@@ -127,6 +129,14 @@ impl LandingPage {
                 .on_hover_text("Connect to GameHook now: the game comes from the loaded mapper and the route is set up from your first Pokémon (species, DVs/IVs, nature, ability) the moment you receive it.");
             if record.clicked() {
                 actions.start_recording = true;
+            }
+            ui.add_space(10.0);
+            let replay = StyledButton::new(theme, egui::RichText::new("Route from Replay").font(theme.font_bold(14.0)))
+                .min_size(Vec2::new(350.0, 50.0))
+                .show(ui)
+                .on_hover_text("Record a route from a Super Shuckie replay: the run is replayed through the recorder (much faster than real time) and the route saved.");
+            if replay.clicked() {
+                actions.import_replay = true;
             }
             ui.add_space(10.0);
             let map = StyledButton::new(theme, egui::RichText::new("View Map").font(theme.font_bold(14.0)))
@@ -454,6 +464,52 @@ pub fn quick_start_ui(ui: &mut Ui, theme: &Theme, phase: &QuickStartPhase, url: 
                         actions.cancel = true;
                     }
                 });
+            });
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
+// "Route from Replay" panel
+// ---------------------------------------------------------------------------
+
+/// The landing page while a replay import runs: what it is doing and Cancel.
+pub fn replay_import_ui(ui: &mut Ui, theme: &Theme, status: &crate::replay_import::ImportStatus, cancel: &mut bool) {
+    if !behind_modal(ui) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        *cancel = true;
+    }
+    let accent = Color32::from_rgb(0x34, 0x98, 0xdb);
+    ui.vertical_centered(|ui| {
+        ui.add_space(50.0);
+        ui.label(egui::RichText::new("Pokemon Solo Challenge Router").font(theme.font_bold(24.0)).color(theme.text));
+        ui.add_space(30.0);
+        let width = 600.0;
+        let frame = egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border)).inner_margin(egui::Margin::same(20)).corner_radius(CornerRadius::same(4));
+        frame.show(ui, |ui| {
+            ui.set_width(width);
+            ui.vertical_centered(|ui| {
+                ui.horizontal(|ui| {
+                    ui.add_space((width - 220.0) / 2.0);
+                    ui.add(egui::Spinner::new().size(18.0).color(accent));
+                    ui.label(egui::RichText::new("Route from Replay").font(theme.font_bold(18.0)).color(accent));
+                });
+                ui.add_space(14.0);
+                let name = status.replay.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                widgets::label_colored(ui, theme, name, theme.text);
+                ui.add_space(10.0);
+                let (what, fraction) = match status.phase.as_str() {
+                    "scan" => ("Scanning the replay's keyframes", status.frame as f32 / status.total.max(1) as f32),
+                    "record" => ("Recording", status.frame as f32 / status.total.max(1) as f32),
+                    _ => ("Starting the replay readers", 0.0),
+                };
+                let elapsed = status.started.map(|t| t.elapsed().as_secs()).unwrap_or(0);
+                widgets::label_colored(ui, theme, format!("{}: {:.0}%   ({}:{:02})", what, fraction * 100.0, elapsed / 60, elapsed % 60), theme.secondary);
+                ui.add_space(6.0);
+                widgets::progress_bar(ui, width - 40.0, fraction.clamp(0.0, 1.0), accent, theme.border);
+                ui.add_space(14.0);
+                if StyledButton::new(theme, "Cancel").fixed_width(180.0).show(ui).clicked() {
+                    *cancel = true;
+                }
             });
         });
     });

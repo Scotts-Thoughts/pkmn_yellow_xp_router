@@ -549,6 +549,8 @@ pub struct Gen3Machine {
     cur_state: GameState,
     active: ActiveFlag,
     queue: Arc<EventQueue>,
+    /// offline only: runs the queued events (see `ProcessCtx::start`)
+    processor: Option<Processor>,
     /// the live value of the tutorial-battle flag, for the processing thread
     tutorial_flag_now: Arc<std::sync::atomic::AtomicBool>,
 
@@ -596,6 +598,7 @@ impl Gen3Machine {
             cur_state: GameState::Uninitialized,
             active: new_active_flag(),
             queue: EventQueue::new(),
+            processor: None,
             tutorial_flag_now: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             uninit: UninitData::default(),
             resetting: ResettingData::default(),
@@ -1697,7 +1700,7 @@ impl Gen3Machine {
         state
     }
 
-    fn spawn_processing_thread(&self) {
+    fn spawn_processing_thread(&mut self) {
         let ctx = ProcessCtx {
             controller: self.controller.clone(),
             gen: self.gen.clone(),
@@ -1706,12 +1709,7 @@ impl Gen3Machine {
         };
         let conv = self.conv.clone();
         let tutorial_now = self.tutorial_flag_now.clone();
-        std::thread::Builder::new()
-            .name("gen3-recorder-events".into())
-            .spawn(move || {
-                ctx.run(|ctx, ev| process_one(ctx, ev, &conv, &tutorial_now));
-            })
-            .ok();
+        self.processor = ctx.start("gen3-recorder-events", move |ctx, ev| process_one(ctx, ev, &conv, &tutorial_now));
     }
 }
 
@@ -1985,6 +1983,12 @@ impl GameRecorder for Gen3Machine {
 
     fn active_flag(&self) -> ActiveFlag {
         self.active.clone()
+    }
+
+    fn pump_events(&mut self) {
+        if let Some(p) = self.processor.as_mut() {
+            p();
+        }
     }
 
     fn shutdown(&mut self) {

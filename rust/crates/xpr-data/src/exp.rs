@@ -16,6 +16,39 @@ pub fn calc_xp_yield(base_yield: i64, level: i64, is_trainer_battle: bool, exp_s
     result
 }
 
+/// `floor(x^2.5)` exactly: `floor(sqrt(x^5))`.
+fn pow_2_5(x: i64) -> i64 {
+    let x5 = (x.max(0) as u128).pow(5);
+    let mut r = (x5 as f64).sqrt() as u128;
+    while r * r > x5 {
+        r -= 1;
+    }
+    while (r + 1) * (r + 1) <= x5 {
+        r += 1;
+    }
+    r as i64
+}
+
+/// Gen 5's experience for defeating a Pokémon: scaled by its level against
+/// the level of the Pokémon gaining it (Black/White and Black 2/White 2;
+/// earlier generations' trainer data holds the amount itself).
+///
+/// `((a * b * L) / (5 * s) * (2L + 10)^2.5 / (L + Lp + 10)^2.5 + 1) * e`
+/// with `a` 1.5 in trainer battles, `b` the base yield, `L` the defeated
+/// level, `s` the participants, `Lp` the gaining Pokémon's level and `e` 1.5
+/// with a Lucky Egg; each step rounds down, each power is `floor(x^2.5)`.
+/// Cress's Lillipup Lv12 and Panpour Lv14 give a Lv11 Pokémon 214 and 325.
+pub fn calc_xp_yield_gen5(base_yield: i64, level: i64, player_level: i64, is_trainer_battle: bool, participants: i64, lucky_egg: bool) -> i64 {
+    let s = participants.max(1);
+    let mut value = if is_trainer_battle { floor_div(3 * base_yield * level, 10 * s) } else { floor_div(base_yield * level, 5 * s) };
+    value = floor_div(value * pow_2_5(2 * level + 10), pow_2_5(level + player_level + 10).max(1));
+    value += 1;
+    if lucky_egg {
+        value = floor_div(value * 3, 2);
+    }
+    value
+}
+
 /// `calc_level_gain`
 pub fn calc_level_gain(init_level: i64, init_tnl: i64, final_level: i64, final_tnl: i64) -> String {
     if init_level == final_level {
@@ -174,5 +207,24 @@ mod tests {
         assert_eq!(calc_level_gain(5, 50, 5, 50), "");
         assert_eq!(calc_level_gain(5, 50, 5, 25), "0.2");
         assert_eq!(calc_level_gain(5, 50, 7, 80), "1.7");
+    }
+}
+
+#[cfg(test)]
+mod gen5_tests {
+    use super::*;
+
+    #[test]
+    fn gen5_experience_scales_with_both_levels() {
+        // a Black run (b-victini): the game's own gains
+        assert_eq!(calc_xp_yield_gen5(55, 12, 11, true, 1, false), 214);
+        assert_eq!(calc_xp_yield_gen5(63, 14, 11, true, 1, false), 325);
+        assert_eq!(calc_xp_yield_gen5(28, 5, 5, true, 1, false), 43);
+        // wild, two participants, Lucky Egg
+        assert_eq!(calc_xp_yield_gen5(51, 7, 7, false, 1, false), 72);
+        assert_eq!(calc_xp_yield_gen5(51, 7, 7, false, 2, false), 36);
+        assert_eq!(calc_xp_yield_gen5(51, 7, 7, false, 1, true), 108);
+        assert_eq!(pow_2_5(16), 1024);
+        assert_eq!(pow_2_5(20), 1788);
     }
 }

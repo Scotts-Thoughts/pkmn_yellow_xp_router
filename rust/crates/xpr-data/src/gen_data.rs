@@ -620,13 +620,18 @@ impl GenData {
         match self.gen {
             Gen::One | Gen::Two => {
                 let d = if exp_split == 0 { 1 } else { exp_split };
+                // One Special stat exp: gen 2 adds base HP/Atk/Def/Spe/SpA to
+                // five words (pokecrystal GiveExperiencePoints), and both
+                // special stats read that word (CalcMonStatC), so Sp. Def
+                // mirrors the Sp. Atk value instead of earning base Sp. Def.
+                let special = floor_div(y.special_attack, d);
                 Some(StatBlock::new(
                     self.gen,
                     floor_div(y.hp, d),
                     floor_div(y.attack, d),
                     floor_div(y.defense, d),
-                    floor_div(y.special_attack, d),
-                    floor_div(y.special_defense, d),
+                    special,
+                    special,
                     floor_div(y.speed, d),
                     true,
                 ))

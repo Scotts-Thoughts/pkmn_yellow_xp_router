@@ -9,6 +9,7 @@ members = [
     "crates/xpr-dex",
     "crates/xpr-dex-ui",
     "crates/xpr-recorder",
+    "crates/xpr-replay",
     "crates/xpr-update",
     "crates/xpr-golden",
     "crates/xpr-ui-kit",

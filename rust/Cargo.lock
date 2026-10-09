@@ -4312,6 +4312,7 @@ dependencies = [
  "xpr-engine",
  "xpr-map",
  "xpr-recorder",
+ "xpr-replay",
  "xpr-ui-kit",
  "xpr-update",
 ]
@@ -4443,6 +4444,15 @@ dependencies = [
  "xpr-core",
  "xpr-data",
  "xpr-engine",
+]
+
+[[package]]
+name = "xpr-replay"
+version = "6.0.0"
+dependencies = [
+ "log",
+ "serde_json",
+ "xpr-core",
 ]
 
 [[package]]
