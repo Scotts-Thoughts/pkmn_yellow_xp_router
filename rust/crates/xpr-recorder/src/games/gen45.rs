@@ -637,7 +637,11 @@ struct VitaminData {
 struct OverworldData {
     waiting_for_registration: bool,
     register_delay: i64,
+    /// the held item changed with no bag change yet: a bag change within
+    /// `held_item_delay` seconds is the item going on or off, otherwise the
+    /// change stands alone (an item used up or taken in battle)
     propagate_held_item_flag: bool,
+    held_item_delay: i64,
     validation_delay: i64,
     save_detected: bool,
     save_delay: i64,
@@ -687,6 +691,8 @@ pub struct Gen45Machine {
     cached_moves: [Option<String>; 4],
     cached_money: i64,
     cached_evs: HashMap<String, Value>,
+    /// the solo mon's held item as last recorded (raw game value)
+    cached_held_item: Value,
     blackout: BlackoutData,
     pending_evolution_level_check: Option<i64>,
     pre_evolution_moves: Option<HashSet<String>>,
@@ -744,6 +750,7 @@ impl Gen45Machine {
             cached_moves: [None, None, None, None],
             cached_money: 0,
             cached_evs: HashMap::new(),
+            cached_held_item: Value::Null,
             blackout: BlackoutData::default(),
             pending_evolution_level_check: None,
             pre_evolution_moves: None,
@@ -918,6 +925,7 @@ impl Gen45Machine {
     fn update_all_cached_info(&mut self, store: &PropertyStore) {
         self.update_team_cache(store, false, true);
         self.item_cache_update(store, false, false, false, None, false, false, false, false);
+        self.cached_held_item = store.get_value(Some(&self.keys.mon_held_item));
         self.money_cache_update(store);
         let area = py_str(&store.value(&self.keys.overworld_map));
         self.controller.entered_new_area(&area);
@@ -1068,8 +1076,20 @@ impl Gen45Machine {
             return false;
         }
         let mut expected_event_generated = false;
-        let (gained_items, lost_items) = item_diff(&old_cache, &new_cache);
+        let (mut gained_items, mut lost_items) = item_diff(&old_cache, &new_cache);
         log::info!("_item_cache_update: gained_items = {}, lost_items = {}", repr_items(&gained_items), repr_items(&lost_items));
+        // the held item went on, came off or was swapped: take its side of
+        // the bag diff out, so only the other items are recorded as gains
+        // and losses (a pickup next to a stale held change stays a pickup)
+        let cur_held = store.get_value(Some(&self.keys.mon_held_item));
+        let held_item_changed = held_item_changed && cur_held != self.cached_held_item;
+        if held_item_changed {
+            let old_held = self.cached_held_item.clone();
+            let back_in_bag = take_one(&mut gained_items, &old_held);
+            let from_bag = take_one(&mut lost_items, &cur_held);
+            self.held_item_events(&old_held, &cur_held, back_in_bag, from_bag);
+            expected_event_generated = true;
+        }
         if !gained_items.is_empty() && sale_expected {
             log::error!("Gained the following items when expecting to be losing items to selling... {}", repr_items(&gained_items));
         }
@@ -1084,61 +1104,48 @@ impl Gen45Machine {
                 }
             }
         }
-        if !held_item_changed {
-            for (cur_gained_item, cur_gain_num) in &gained_items {
-                let app_item_name = self.conv.item_name_convert(cur_gained_item.as_str()).unwrap_or_else(|| "None".into());
-                log::info!("trying to gain item: {}, converted from {}", app_item_name, py_str(cur_gained_item));
-                if *cur_gain_num > 100 {
-                    log::error!("{}", "#".repeat(50));
-                    log::error!("Ignoring attempt to gain the above item, due to excessive number. Assuming this is happening due to DMA issues");
-                    continue;
-                }
-                if app_item_name == "Premier Ball" && free_premier_ball_eligible && purchase_expected {
-                    log::info!("Skipping purchase event for Premier Ball (will be added as free acquire)");
-                    continue;
-                }
-                let mut custom_price = None;
-                if purchase_expected {
-                    let current_map = store.str_of(&self.keys.overworld_map).unwrap_or_default();
-                    if current_map == GOLDENROD_LOTTERY_MAP {
-                        let mut item_match_name = app_item_name.clone();
-                        if app_item_name.starts_with("TM") || app_item_name.starts_with("HM") {
-                            let mut item_obj = self.gen.item_db().get_item(&app_item_name).cloned();
-                            if item_obj.is_none() {
-                                if let Some(full) = resolve_tm_name(&self.gen, &app_item_name) {
-                                    item_obj = self.gen.item_db().get_item(&full).cloned();
-                                }
-                            }
-                            if let Some(mv) = item_obj.and_then(|i| i.move_name.clone()) {
-                                item_match_name = mv;
+        for (cur_gained_item, cur_gain_num) in &gained_items {
+            let app_item_name = self.conv.item_name_convert(cur_gained_item.as_str()).unwrap_or_else(|| "None".into());
+            log::info!("trying to gain item: {}, converted from {}", app_item_name, py_str(cur_gained_item));
+            if *cur_gain_num > 100 {
+                log::error!("{}", "#".repeat(50));
+                log::error!("Ignoring attempt to gain the above item, due to excessive number. Assuming this is happening due to DMA issues");
+                continue;
+            }
+            if app_item_name == "Premier Ball" && free_premier_ball_eligible && purchase_expected {
+                log::info!("Skipping purchase event for Premier Ball (will be added as free acquire)");
+                continue;
+            }
+            let mut custom_price = None;
+            if purchase_expected {
+                let current_map = store.str_of(&self.keys.overworld_map).unwrap_or_default();
+                if current_map == GOLDENROD_LOTTERY_MAP {
+                    let mut item_match_name = app_item_name.clone();
+                    if app_item_name.starts_with("TM") || app_item_name.starts_with("HM") {
+                        let mut item_obj = self.gen.item_db().get_item(&app_item_name).cloned();
+                        if item_obj.is_none() {
+                            if let Some(full) = resolve_tm_name(&self.gen, &app_item_name) {
+                                item_obj = self.gen.item_db().get_item(&full).cloned();
                             }
                         }
-                        if GOLDENROD_LOTTERY_ITEMS.contains(&item_match_name.as_str()) {
-                            custom_price = Some(GOLDENROD_LOTTERY_PRICE);
-                            log::info!("Lottery desk purchase detected: {} at ${}", app_item_name, GOLDENROD_LOTTERY_PRICE);
+                        if let Some(mv) = item_obj.and_then(|i| i.move_name.clone()) {
+                            item_match_name = mv;
                         }
                     }
-                }
-                self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_gain_num, true, purchase_expected, custom_price)));
-                if purchase_expected && *cur_gain_num >= 10 && ["Poke Ball", "Great Ball", "Ultra Ball"].contains(&app_item_name.as_str()) {
-                    log::info!("Adding free Premier Ball for purchasing {} {}", cur_gain_num, app_item_name);
-                    self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new("Premier Ball", 1, true, false, None)));
+                    if GOLDENROD_LOTTERY_ITEMS.contains(&item_match_name.as_str()) {
+                        custom_price = Some(GOLDENROD_LOTTERY_PRICE);
+                        log::info!("Lottery desk purchase detected: {} at ${}", app_item_name, GOLDENROD_LOTTERY_PRICE);
+                    }
                 }
             }
-        }
-        // taking the held item off: the bag gains it back and the mon holds
-        // nothing; the engine's "hold nothing" event returns the held item
-        // to the bag, so nothing else is recorded for the gain
-        if held_item_changed && lost_items.is_empty() && !gained_items.is_empty() && store.get_value(Some(&self.keys.mon_held_item)).is_null() {
-            log::info!("held item taken off: {}", repr_items(&gained_items));
-            self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, false)));
-            expected_event_generated = true;
+            self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_gain_num, true, purchase_expected, custom_price)));
+            if purchase_expected && *cur_gain_num >= 10 && ["Poke Ball", "Great Ball", "Ultra Ball"].contains(&app_item_name.as_str()) {
+                log::info!("Adding free Premier Ball for purchasing {} {}", cur_gain_num, app_item_name);
+                self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new("Premier Ball", 1, true, false, None)));
+            }
         }
         if !lost_items.is_empty() && purchase_expected {
             log::error!("Lost the following items when expecting to be gain items to purchasing... {}", repr_items(&lost_items));
-        }
-        if lost_items.len() > 1 && held_item_changed {
-            log::error!("Lost multiple items when trying to change the held item... {}", repr_items(&lost_items));
         }
         // a "sale" only counts when the money change matches the sell prices
         let mut actual_is_sale = sale_expected;
@@ -1154,9 +1161,6 @@ impl Gen45Machine {
                     continue;
                 }
                 if tm_flag && self.conv.is_game_tm(raw) {
-                    continue;
-                }
-                if held_item_changed {
                     continue;
                 }
                 let mut item = self.gen.item_db().get_item(&app_item_name).cloned();
@@ -1206,17 +1210,47 @@ impl Gen45Machine {
                 }
                 self.move_cache_update(store, true, Some(&app_item_name), false, false, false);
                 expected_event_generated = true;
-            } else if held_item_changed {
-                if *cur_lost_num > 1 {
-                    log::error!("Expected to lose multiple items while telling mon to hold item: {} x{}", app_item_name, cur_lost_num);
-                }
-                self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(Some(&app_item_name), false)));
-                expected_event_generated = true;
             } else {
                 self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_lost_num, false, actual_is_sale, None)));
             }
         }
         expected_event_generated
+    }
+
+    /// Records the solo mon's held item going from `old` to `cur`.
+    /// `back_in_bag`: the bag got `old` back; `from_bag`: `cur` came out of
+    /// the bag. Otherwise `old` was used up or taken (it never came back)
+    /// and `cur` came from outside the bag (stolen from a wild mon).
+    fn held_item_events(&mut self, old: &Value, cur: &Value, back_in_bag: bool, from_bag: bool) {
+        log::info!("held item changed: {} -> {} (back in bag: {}, from bag: {})", py_str(old), py_str(cur), back_in_bag, from_bag);
+        if !old.is_null() && !back_in_bag {
+            self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, true)));
+        }
+        if !cur.is_null() {
+            let app_item_name = self.conv.item_name_convert(cur.as_str()).unwrap_or_else(|| py_str(cur));
+            if !from_bag {
+                self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, 1, true, false, None)));
+            }
+            // the engine puts the item held before (if any) back in the bag
+            self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(Some(&app_item_name), false)));
+        } else if back_in_bag {
+            self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, false)));
+        }
+        self.cached_held_item = cur.clone();
+    }
+
+    /// A held item change in the overworld with no bag change after it: the
+    /// party's held item is written back after a battle, so this is an item
+    /// used up (a berry) or taken during the battle.
+    fn held_item_change_without_bag(&mut self, store: &PropertyStore) {
+        if self.overworld.waiting_for_registration || self.overworld.wrong_mon_in_slot_1 {
+            return;
+        }
+        let cur = store.get_value(Some(&self.keys.mon_held_item));
+        if cur != self.cached_held_item {
+            let old = self.cached_held_item.clone();
+            self.held_item_events(&old, &cur, false, false);
+        }
     }
 
     // ---- battle helpers ---------------------------------------------------------------
@@ -1399,6 +1433,7 @@ impl Gen45Machine {
     fn delayed_held_item_update(&mut self, store: &PropertyStore) {
         if store_i64(store, &self.keys.battle_player_mon_party_pos) == 0 {
             let held = store.get_value(Some(&self.keys.mon_held_item));
+            self.cached_held_item = held.clone();
             if held.is_null() {
                 self.queue_new_event(EventDefinition::with_hold_item(HoldItemEventDefinition::new(None, true)));
             } else if held != self.battle.init_held_item {
@@ -1783,6 +1818,8 @@ impl Gen45Machine {
             GameState::Overworld => {
                 if next == GameState::InventoryChange {
                     self.inventory.external_held_item_flag = self.overworld.propagate_held_item_flag;
+                } else if self.overworld.propagate_held_item_flag && next != GameState::Resetting {
+                    self.held_item_change_without_bag(store);
                 }
                 self.overworld.propagate_held_item_flag = false;
             }
@@ -2274,7 +2311,10 @@ impl Gen45Machine {
                 self.overworld.waiting_for_new_file = true;
             }
         } else if new.path == k.mon_held_item {
-            self.overworld.propagate_held_item_flag = true;
+            if !self.overworld.waiting_for_registration && !self.overworld.wrong_mon_in_slot_1 {
+                self.overworld.propagate_held_item_flag = true;
+                self.overworld.held_item_delay = BASE_DELAY;
+            }
         } else if k.all_item_fields.contains(&new.path) {
             return GameState::InventoryChange;
         } else if new.path == k.mon_species {
@@ -2354,6 +2394,14 @@ impl Gen45Machine {
                     self.overworld.heal_delay -= 1;
                 }
             }
+            if self.overworld.propagate_held_item_flag {
+                if self.overworld.held_item_delay <= 0 {
+                    self.overworld.propagate_held_item_flag = false;
+                    self.held_item_change_without_bag(store);
+                } else {
+                    self.overworld.held_item_delay -= 1;
+                }
+            }
             if self.overworld.validation_delay > 0 {
                 self.overworld.validation_delay -= 1;
             } else if self.overworld.validation_delay == 0 {
@@ -2376,6 +2424,23 @@ impl Gen45Machine {
         };
         let conv = self.conv.clone();
         self.processor = ctx.start("gen45-recorder-events", move |ctx, ev| process_one(ctx, ev, &conv));
+    }
+}
+
+/// Takes one of `item` out of a bag diff; false when it is not there.
+fn take_one(diff: &mut IndexMap<Value, i64>, item: &Value) -> bool {
+    if item.is_null() {
+        return false;
+    }
+    match diff.get_mut(item) {
+        Some(n) if *n > 0 => {
+            *n -= 1;
+            if *n == 0 {
+                diff.shift_remove(item);
+            }
+            true
+        }
+        _ => false,
     }
 }
 

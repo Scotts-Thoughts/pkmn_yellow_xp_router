@@ -2817,42 +2817,42 @@
         {
             "rom_id": 420,
             "purchase_price": 0,
-            "key_item": false,
+            "key_item": true,
             "pocket": "TMs and HMs",
             "name": "HM01 Cut"
         },
         {
             "rom_id": 421,
             "purchase_price": 0,
-            "key_item": false,
+            "key_item": true,
             "pocket": "TMs and HMs",
             "name": "HM02 Fly"
         },
         {
             "rom_id": 422,
             "purchase_price": 0,
-            "key_item": false,
+            "key_item": true,
             "pocket": "TMs and HMs",
             "name": "HM03 Surf"
         },
         {
             "rom_id": 423,
             "purchase_price": 0,
-            "key_item": false,
+            "key_item": true,
             "pocket": "TMs and HMs",
             "name": "HM04 Strength"
         },
         {
             "rom_id": 424,
             "purchase_price": 0,
-            "key_item": false,
+            "key_item": true,
             "pocket": "TMs and HMs",
             "name": "HM05 Waterfall"
         },
         {
             "rom_id": 425,
             "purchase_price": 0,
-            "key_item": false,
+            "key_item": true,
             "pocket": "TMs and HMs",
             "name": "HM06 Dive"
         },
