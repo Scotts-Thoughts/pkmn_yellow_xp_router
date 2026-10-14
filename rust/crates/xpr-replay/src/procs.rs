@@ -37,8 +37,9 @@ fn json_error(v: &Value) -> Option<String> {
 
 /// One answer of the worker.
 pub enum WorkerMsg {
-    /// memory at `frame`: the runs (u32 run count first) as pab-host's `S` command takes them
-    Snapshot { frame: u64, ms: u64, runs: Vec<u8> },
+    /// memory at `frame`: the runs (u32 run count first) as pab-host's `S` command takes them;
+    /// `sram`: a hash of the save memory there (after [`WorkerProc::send_sram_hashes`])
+    Snapshot { frame: u64, ms: u64, runs: Vec<u8>, sram: Option<u64> },
     /// a job finished (`ended`: the replay ran out first)
     End { ended: bool },
 }
@@ -86,17 +87,30 @@ impl WorkerProc {
         json_error(&v).map_or(Ok(()), Err)
     }
 
+    /// Ask for a hash of the save memory with every snapshot. `false`: the worker is older
+    /// and cannot.
+    pub fn send_sram_hashes(&mut self) -> Result<bool, String> {
+        self.command("sram on")?;
+        let v = self.json()?;
+        Ok(json_error(&v).is_none() && v.get("sram").and_then(|x| x.as_bool()) == Some(true))
+    }
+
     pub fn start_job(&mut self, id: u64, pieces: &str) -> Result<(), String> {
         self.command(&format!("job {id} {pieces}"))
     }
 
     pub fn next(&mut self) -> Result<WorkerMsg, String> {
-        let buf = read_frame(&mut self.stdout, "the replay worker")?;
+        let mut sram = None;
+        let mut buf = read_frame(&mut self.stdout, "the replay worker")?;
+        if buf.first() == Some(&b'H') && buf.len() >= 9 {
+            sram = Some(u64::from_le_bytes(buf[1..9].try_into().unwrap()));
+            buf = read_frame(&mut self.stdout, "the replay worker")?;
+        }
         match buf.first() {
             Some(b'D') if buf.len() >= 21 => {
                 let frame = u64::from_le_bytes(buf[1..9].try_into().unwrap());
                 let ms = u64::from_le_bytes(buf[9..17].try_into().unwrap());
-                Ok(WorkerMsg::Snapshot { frame, ms, runs: buf[17..].to_vec() })
+                Ok(WorkerMsg::Snapshot { frame, ms, runs: buf[17..].to_vec(), sram })
             }
             Some(b'E') if buf.len() >= 10 => Ok(WorkerMsg::End { ended: buf[9] != 0 }),
             Some(b'J') => {

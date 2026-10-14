@@ -7,7 +7,10 @@
 //! 1. **Coarse pass.** Every keyframe's memory goes through the mapper. An
 //!    interval between two keyframes is *active* when a property that is not
 //!    noise changed across it (noise: a property that changes in most
-//!    intervals, like the play-time clock).
+//!    intervals, like the play-time clock), or when the save memory did: the
+//!    game saved there. A save leaves no trace in the mapped memory, and the
+//!    sound the gen 1/2 recorders see it by plays for half a second, so
+//!    keyframes alone miss most saves.
 //! 2. **Final pass.** Active intervals (and `margin` around them) are emulated
 //!    frame by frame (every `stride` frames go through the mapper); quiet ones
 //!    are read at their keyframe only.
@@ -246,7 +249,7 @@ impl Slot {
         let mut seen = 0usize;
         loop {
             match self.worker.next()? {
-                WorkerMsg::Snapshot { frame, ms, runs } => {
+                WorkerMsg::Snapshot { frame, ms, runs, .. } => {
                     let changes = self.pab.step(&runs)?;
                     seen += 1;
                     if seen == job.skip.max(1) {
@@ -271,8 +274,8 @@ struct ReaderSlot {
     worker: WorkerProc,
 }
 
-/// Keyframe memory: (frame, ms, runs as pab-host's `S` takes them).
-type Snaps = Vec<(u64, u64, Vec<u8>)>;
+/// Keyframe memory: (frame, ms, runs as pab-host's `S` takes them, save memory hash).
+type Snaps = Vec<(u64, u64, Vec<u8>, Option<u64>)>;
 
 impl ReaderSlot {
     fn run(&mut self, job: &Job, stop: &AtomicBool) -> Result<Snaps, String> {
@@ -280,8 +283,8 @@ impl ReaderSlot {
         let mut out = Vec::new();
         loop {
             match self.worker.next()? {
-                WorkerMsg::Snapshot { frame, ms, runs } => {
-                    out.push((frame, ms, runs));
+                WorkerMsg::Snapshot { frame, ms, runs, sram } => {
+                    out.push((frame, ms, runs, sram));
                     if stop.load(Ordering::Relaxed) {
                         return Err("stopped".into());
                     }
@@ -465,6 +468,8 @@ fn path_ignored(path: &str, ignore: &[String]) -> bool {
 /// may start there.
 struct Coarse {
     changed: Vec<Vec<u32>>,
+    /// per interval: the save memory changed across it (the game saved)
+    saved: Vec<bool>,
     boundary_ok: Vec<bool>,
     paths: Vec<String>,
     /// per path: whether a change of it can matter (all, without a list)
@@ -539,7 +544,7 @@ pub fn run(
             let line: Vec<String> = top.iter().take(60).map(|(k, p)| format!("{p}={k}")).collect();
             log::info!("[replay] {} intervals; most changed of the relevant properties: {}", n - 1, line.join(", "));
         }
-        raw = c.changed.iter().map(|ch| ch.iter().any(|&p| !noise[p as usize])).collect();
+        raw = c.changed.iter().zip(&c.saved).map(|(ch, &saved)| saved || ch.iter().any(|&p| !noise[p as usize])).collect();
         for i in 1..n {
             if raw[i] {
                 let a = i.saturating_sub(opts.margin_before).max(1);
@@ -684,6 +689,8 @@ fn coarse_pass(ctx: &Ctx, kf: &[u64], opts: &Options, relevant_of: &dyn Fn(&Valu
     let mut relevant: Vec<bool> = Vec::new();
     let mut index: HashMap<String, u32> = HashMap::new();
     let mut changed: Vec<Vec<u32>> = vec![Vec::new(); n];
+    let mut saved = vec![false; n];
+    let mut last_sram: Option<u64> = None;
     let mut boundary_ok = vec![true; n];
     let mut seeds: HashMap<usize, Arc<Vec<u8>>> = HashMap::new();
     let mut values = Values::default();
@@ -698,12 +705,15 @@ fn coarse_pass(ctx: &Ctx, kf: &[u64], opts: &Options, relevant_of: &dyn Fn(&Valu
     let start_reader = || -> Result<ReaderSlot, String> {
         let mut worker = WorkerProc::start(&ctx.tools.worker, ctx.replay, ctx.rom)?;
         worker.set_blocks(&blocks)?;
+        if !worker.send_sram_hashes()? {
+            log::warn!("[replay] the replay worker cannot read the save memory (rebuild it): saves between two keyframes may be missed");
+        }
         Ok(ReaderSlot { worker })
     };
     let exec_reader = |slot: &mut ReaderSlot, job: &Job, stop: &AtomicBool| slot.run(job, stop);
     run_jobs(jobs, opts.slots, opts.slots * 2, &start_reader, &exec_reader, &mut |snaps: Snaps| {
         opts.check_cancel()?;
-        for (frame, _ms, runs) in snaps {
+        for (frame, _ms, runs, sram) in snaps {
             // the snapshots arrive in keyframe order
             while next_kf < n && kf[next_kf] < frame {
                 next_kf += 1;
@@ -713,6 +723,10 @@ fn coarse_pass(ctx: &Ctx, kf: &[u64], opts: &Options, relevant_of: &dyn Fn(&Valu
             }
             let i = next_kf;
             let changes = pab.step(&runs)?;
+            if let (Some(prev), Some(now)) = (last_sram, sram) {
+                saved[i] = prev != now;
+            }
+            last_sram = sram.or(last_sram);
             if i == 0 {
                 let model = pab.mapper()?;
                 values.load(&model);
@@ -750,7 +764,9 @@ fn coarse_pass(ctx: &Ctx, kf: &[u64], opts: &Options, relevant_of: &dyn Fn(&Valu
     }
     let seed_bytes: usize = seeds.values().map(|s| s.len()).sum();
     log::info!("[replay] scan: {} keyframes, {} chunk starts with script state ({} KB)", n, seeds.len(), seed_bytes / 1024);
-    Ok(Coarse { changed, boundary_ok, paths, relevant, seeds })
+    let saves: Vec<String> = (1..n).filter(|&i| saved[i]).map(|i| kf[i].to_string()).collect();
+    log::info!("[replay] the save memory changed in {} intervals (ending at frames {})", saves.len(), saves.join(", "));
+    Ok(Coarse { changed, saved, boundary_ok, paths, relevant, seeds })
 }
 
 /// Find a replay's ROM: in `dirs` (see `tools::rom_search_dirs`).

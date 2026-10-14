@@ -814,17 +814,6 @@ impl Gen1Machine {
         if !gained_items.is_empty() && sale_expected {
             log::error!("Gained the following items when expecting to be losing items to selling... {}", repr_items(&gained_items));
         }
-        for (cur_gained_item, cur_gain_num) in &gained_items {
-            let app_item_name = self.conv.item_name_convert(cur_gained_item.as_str()).unwrap_or_else(|| "None".into());
-            if app_item_name == OAKS_PARCEL {
-                continue;
-            } else if VENDING_MACHINE_DRINKS.contains(&app_item_name.as_str()) {
-                // vending machines give the item before the money is deducted: force a purchase
-                self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_gain_num, true, true, None)));
-            } else {
-                self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_gain_num, true, purchase_expected, None)));
-            }
-        }
         if !lost_items.is_empty() && purchase_expected {
             log::error!("Lost the following items when expecting to be gain items to purchasing... {}", repr_items(&lost_items));
         }
@@ -851,6 +840,19 @@ impl Gen1Machine {
                 self.move_cache_update(store, true, Some(&app_item_name), false, false);
             } else {
                 self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_lost_num, false, sale_expected, None)));
+            }
+        }
+        // Gains after losses: a toss and a pickup can land in one window, and
+        // with a full 20-item bag the game only had room because of the toss.
+        for (cur_gained_item, cur_gain_num) in &gained_items {
+            let app_item_name = self.conv.item_name_convert(cur_gained_item.as_str()).unwrap_or_else(|| "None".into());
+            if app_item_name == OAKS_PARCEL {
+                continue;
+            } else if VENDING_MACHINE_DRINKS.contains(&app_item_name.as_str()) {
+                // vending machines give the item before the money is deducted: force a purchase
+                self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_gain_num, true, true, None)));
+            } else {
+                self.queue_new_event(EventDefinition::with_item(InventoryEventDefinition::new(&app_item_name, *cur_gain_num, true, purchase_expected, None)));
             }
         }
         // after the quantity events, so the engine applies it to the bag they produce

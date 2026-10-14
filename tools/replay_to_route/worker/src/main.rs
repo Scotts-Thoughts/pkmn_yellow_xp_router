@@ -14,6 +14,8 @@
 //!
 //! ```text
 //! blocks <start>:<length>,...       the memory blocks to read (Poke-A-Byte's transfer blocks)
+//! sram on                           also send a hash of the cartridge save memory with
+//!                                   every snapshot ('H' before each 'D')
 //! job <id> <piece>;<piece>;...      read memory at the frames the pieces name, in order:
 //!     s <from> <to>                 at every keyframe in [from, to] (loaded, not emulated)
 //!     d <from> <to> <stride>        at from, from + stride, ... up to to (emulated)
@@ -27,6 +29,9 @@
 //! 'D' u64 frame, u64 replay ms, u32 run_count, { u32 block, u32 offset, u32 length, bytes }*
 //!                                   memory at a frame, as the runs that differ from the last
 //!                                   'D' of the same job (the first one of a job is complete)
+//! 'H' u64 hash                      the save memory (SRAM, flash) at the next 'D''s frame: it
+//!                                   only changes when the game saves, which the memory blocks
+//!                                   alone cannot show between two keyframes
 //! 'E' u64 job id, u8 reached_end    the job is done (reached_end: the replay ran out)
 //! ```
 
@@ -143,6 +148,7 @@ struct Worker {
     cur: Vec<Vec<u8>>,
     out: std::io::BufWriter<std::fs::File>,
     ended: bool,
+    sram_hash: bool,
 }
 
 impl Worker {
@@ -161,6 +167,15 @@ impl Worker {
 
     /// Read the blocks and send what changed since the last snapshot of this job.
     fn snapshot(&mut self) {
+        if self.sram_hash {
+            use std::hash::Hasher;
+            let mut h = std::hash::DefaultHasher::new();
+            h.write(&self.core.save_sram());
+            let mut p = Vec::with_capacity(9);
+            p.push(b'H');
+            p.extend_from_slice(&h.finish().to_le_bytes());
+            self.send(&p);
+        }
         for (i, (start, len)) in self.blocks.iter().enumerate() {
             let buf = &mut self.cur[i];
             buf.resize(*len, 0);
@@ -431,7 +446,7 @@ fn main() {
         fail(&mut out, format!("cannot attach the replay: {e:?}"));
     }
 
-    let mut w = Worker { core, keyframes, blocks: Vec::new(), last: Vec::new(), cur: Vec::new(), out, ended: false };
+    let mut w = Worker { core, keyframes, blocks: Vec::new(), last: Vec::new(), cur: Vec::new(), out, ended: false, sram_hash: false };
     w.send_json("{\"ready\":true}");
 
     let stdin = std::io::stdin();
@@ -458,6 +473,10 @@ fn main() {
                 w.cur = blocks.iter().map(|(_, l)| vec![0; *l]).collect();
                 w.blocks = blocks;
                 w.send_json("{\"blocks\":true}");
+            }
+            "sram" => {
+                w.sram_hash = rest.trim() == "on";
+                w.send_json(&format!("{{\"sram\":{}}}", w.sram_hash));
             }
             "job" => {
                 let (id, pieces) = rest.split_once(' ').unwrap_or((rest, ""));

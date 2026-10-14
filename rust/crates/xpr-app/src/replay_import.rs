@@ -130,6 +130,12 @@ pub fn import_replay(
     let total = info.total_frames;
     let mut fatal: Option<String> = None;
     const STOP: &str = "\u{0}stop";
+    // XPR_REPLAY_TRACE=path,path[@a-b]: log every change of a path containing one of those (frames a-b)
+    let trace_cfg: Option<(Vec<String>, u64, u64)> = std::env::var("XPR_REPLAY_TRACE").ok().map(|v| {
+        let (list, range) = v.split_once('@').unwrap_or((v.as_str(), ""));
+        let (lo, hi) = range.split_once('-').map(|(a, b)| (a.parse().unwrap_or(0), b.parse().unwrap_or(u64::MAX))).unwrap_or((0, u64::MAX));
+        (list.split(',').filter(|s| !s.is_empty()).map(String::from).collect(), lo, hi)
+    });
 
     let mut sink = |item: Item| -> Result<(), String> {
         match item {
@@ -160,6 +166,13 @@ pub fn import_replay(
                     }
                 }
                 last_ms = Some(ms);
+                if let Some((paths, lo, hi)) = &trace_cfg {
+                    if (*lo..=*hi).contains(&frame) {
+                        for c in changes.iter().filter(|c| paths.iter().any(|p| c.path.contains(p.as_str()))) {
+                            log::info!("[Replay Trace] frame {frame}: {} = {}", c.path, c.value);
+                        }
+                    }
+                }
                 clock::set_offline_ms(ms);
                 clock::set_offline_timer_ms(info.run_timer_ms(ms));
                 let json: Vec<serde_json::Value> = changes.iter().map(|c| c.to_json()).collect();

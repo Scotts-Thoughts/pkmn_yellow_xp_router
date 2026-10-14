@@ -39,7 +39,15 @@ replay ──► xpr-replay-worker ──memory──► pab-host ──property
 * **xpr-replay** (`rust/crates/xpr-replay`) runs the two:
   1. a *scan* reads every keyframe through one mapper instance and notes where
      a property the recorder watches changes (Quick Start's slot-1 fields and
-     the generation recorder's paths, `xpr_recorder::offline::watched_paths`);
+     the generation recorder's paths, `xpr_recorder::offline::watched_paths`)
+     or where the cartridge's save memory changed (the worker hashes it at each
+     keyframe): the game saved there. The gen 1/2 recorders see a save only by
+     its sound, which plays for about 30 frames, and nothing else the mapper
+     reads changes, so without this an import missed about half the saves and
+     a later reset undid everything back to the save before (a Red run lost 66
+     events and 5 levels). Gen 1/2 also use cartridge RAM as a scratch buffer
+     for pictures, so the save memory changes in more intervals than there are
+     saves; nearly all of those are emulated anyway;
   2. those stretches (and 1 keyframe before / 4 after: the gen 1-4 recorders
      count game-time seconds after an event) are read every frame, the rest
      only at keyframes;
@@ -65,11 +73,21 @@ tools/replay_to_route/build.sh          # pab-host and the worker into out/
 cd rust && cargo build --release --bin replay_to_route
 ```
 
+The worker answers `sram on` (save memory hashes); an older worker cannot, and
+the import then logs a warning and may miss saves: rebuild it.
+
 `build.sh` needs the .NET 10 SDK, MSYS2's UCRT64 Rust toolchain (the cores are
 MinGW archives) and a Super Shuckie checkout at `A:\Programs\supershuckie` that
 has been built once. It snapshots the committed tree of the Poke-A-Byte
 checkout (`A:\Programs\PokeAByte`, or `--pokeabyte <dir>`) into `.vendor/`:
 its sources are AGPL and are not part of this repository.
+
+The cores in Super Shuckie's `build/` are compiled with its melonDS patches
+(`melonds-rs/patches`), and `melonds-rs/interface.cpp` needs them: if the
+`melonds-rs/melonDS` submodule has been reset to upstream, the worker fails to
+compile (`'class melonDS::GPU' has no member named 'SkipDrawing'`). Apply them
+first (`git -C melonds-rs/melonDS apply --ignore-whitespace ../patches/*.patch`,
+as Super Shuckie's `scripts/build-melonds.sh` does).
 
 `replay_to_route` finds `out/` from the executable's or the working
 directory's folders (`--tools <dir>` or `XPR_REPLAY_TOOLS` otherwise) and the
@@ -107,6 +125,10 @@ py -3.14 route_summary.py <a.json> <b.json>
 file) and tabulates time, events and the check against the game; `--ref` also
 builds each reference and diffs the two routes. `route_summary.py` prints a
 route one event per line, or diffs two.
+
+`XPR_REPLAY_TRACE=audio.channels.4,meta.state@315000-334000` logs every change
+of a property whose path contains one of those, in that frame range (`@a-b` is
+optional), to the import's log, to see what the recorder was sent.
 
 Unit tests: `cargo test -p xpr-replay -p xpr-recorder` (`offline_client.rs`
 covers the offline client and clock).

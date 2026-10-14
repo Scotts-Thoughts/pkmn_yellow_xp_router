@@ -30,6 +30,12 @@ fn walk(router: &Router, id: NodeId, path: &mut Vec<String>, idx: &mut usize) {
                 let n: i64 = s.inventory.cur_items.iter().filter(|b| b.base_item.name == item).map(|b| b.num).sum();
                 println!("#{idx} {} {item}={n} bag={}", g.name, s.inventory.cur_items.len());
             }
+            if let (Ok(n), Some(s)) = (std::env::var("XPR_DUMP_BAG"), g.final_state.as_ref()) {
+                if n.split(',').any(|n| n.trim() == idx.to_string()) {
+                    let bag: Vec<String> = s.inventory.cur_items.iter().map(|b| format!("{} x{}", b.base_item.name, b.num)).collect();
+                    println!("#{idx} {} bag: {}", g.name, bag.join(", "));
+                }
+            }
             for m in &g.error_messages {
                 println!("#{idx} ERROR [{}] {} {lvl}: {m}", path[1..].join("/"), g.name);
             }
