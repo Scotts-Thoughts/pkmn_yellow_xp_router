@@ -219,6 +219,9 @@ pub struct BattleSummary {
     pub enemy_field_statuses: Vec<FieldStatus>,
     pub per_matchup_player_modifiers: Vec<StageModifiers>,
     pub per_matchup_enemy_modifiers: Vec<StageModifiers>,
+    /// How many uses each stat-stage stepper offers, per matchup (see
+    /// [`StageCaps`]).
+    pub per_matchup_stage_caps: Vec<StageCaps>,
 
     pub player_move_data: Vec<Vec<Option<MoveRenderInfo>>>,
     pub enemy_move_data: Vec<Vec<Option<MoveRenderInfo>>>,
@@ -271,6 +274,7 @@ impl Default for BattleSummary {
             enemy_field_statuses: Vec::new(),
             per_matchup_player_modifiers: Vec::new(),
             per_matchup_enemy_modifiers: Vec::new(),
+            per_matchup_stage_caps: Vec::new(),
             player_move_data: Vec::new(),
             enemy_move_data: Vec::new(),
             player_pkmn_matchup_data: Vec::new(),
@@ -614,10 +618,12 @@ impl BattleSummary {
 
         self.per_matchup_player_modifiers = Vec::new();
         self.per_matchup_enemy_modifiers = Vec::new();
+        self.per_matchup_stage_caps = Vec::new();
         if !self.using_global_setup {
-            let (p, e) = self.calc_per_matchup_stage_modifiers(gen);
+            let (p, e, caps) = self.calc_per_matchup_stage_modifiers(gen);
             self.per_matchup_player_modifiers = p;
             self.per_matchup_enemy_modifiers = e;
+            self.per_matchup_stage_caps = caps;
         }
 
         self.player_pkmn_matchup_data.clear();
@@ -1079,13 +1085,30 @@ impl BattleSummary {
         let (stat_stage_options, stat_stage_info, stat_stage_selection) = if self.using_global_setup || is_mimic_placeholder || metronome_selection.is_some() {
             (None, StatStageInfo::default(), "0".to_string())
         } else {
-            let opts = gen.move_db().get_stat_stage_dropdown_options(&mv.name, gen.gen);
+            let mut opts = gen.move_db().get_stat_stage_dropdown_options(&mv.name, gen.gen);
             let info = gen.move_db().get_stat_stage_info(&mv.name);
             let sel = if opts.is_some() {
                 self.get_stat_stage_selection(mon_idx, is_player, &mv.name)
             } else {
                 "0".to_string()
             };
+            // Uses the other side's stat moves undid can be made again, so
+            // the stepper goes past the usual 6 stages' worth.
+            // When the enemy can lower the stage again, `+` stays enabled
+            // past that (see `update_stat_stage_setup`).
+            if let Some(o) = opts.as_mut().filter(|_| !info.is_belly_drum) {
+                let caps = self.per_matchup_stage_caps.get(mon_idx);
+                let mut cap = caps
+                    .and_then(|c| c.side(is_player).get(&mv.name).copied())
+                    .unwrap_or(0)
+                    .max(damage::py_int(&sel).unwrap_or(0));
+                if is_player && caps.is_some_and(|c| c.player_counters.contains_key(&mv.name)) {
+                    cap = cap.max(o.len() as i64 - 1) + 1;
+                }
+                for uses in o.len() as i64..=cap {
+                    o.push(uses.to_string());
+                }
+            }
             (opts, info, sel)
         };
 
@@ -1186,16 +1209,6 @@ impl BattleSummary {
 
     pub fn update_player_setup_moves(&mut self, gen: &GenData, cfg: &SummaryConfig, moves: Vec<String>) {
         self.player_setup_move_list = moves;
-        self.full_refresh(Some(gen), cfg);
-    }
-
-    pub fn update_enemy_field_moves(&mut self, gen: &GenData, cfg: &SummaryConfig, moves: Vec<String>) {
-        self.enemy_field_move_list = moves;
-        self.full_refresh(Some(gen), cfg);
-    }
-
-    pub fn update_player_field_moves(&mut self, gen: &GenData, cfg: &SummaryConfig, moves: Vec<String>) {
-        self.player_field_move_list = moves;
         self.full_refresh(Some(gen), cfg);
     }
 
@@ -1628,12 +1641,20 @@ impl BattleSummary {
         result
     }
 
-    /// `_calc_per_matchup_stage_modifiers`
-    pub fn calc_per_matchup_stage_modifiers(&self, gen: &GenData) -> (Vec<StageModifiers>, Vec<StageModifiers>) {
+    /// `_calc_per_matchup_stage_modifiers`, plus each matchup's
+    /// [`StageCaps`].
+    ///
+    /// Each matchup applies the player's stepper uses, then the enemy's, then
+    /// the player's uses that changed nothing the first time round: a stage
+    /// already at +6 (say, after 6 Withdraws) has no room until the enemy's
+    /// Leers lower it, after which the player sets it up again. In gen 1 every
+    /// one of those uses re-applies the badge boosts.
+    pub fn calc_per_matchup_stage_modifiers(&self, gen: &GenData) -> (Vec<StageModifiers>, Vec<StageModifiers>, Vec<StageCaps>) {
         let num_matchups = self.original_player_mon_list.len();
         let mut player_modifiers = Vec::new();
         let mut enemy_modifiers = Vec::new();
-        let mut persistent_player = StageModifiers::default();
+        let mut stage_caps = Vec::new();
+        let mut cur_player = StageModifiers::default();
         let player_intimidate_active = self.resolve_intimidate(true);
         let enemy_intimidate_active = self.resolve_intimidate(false);
         let intimidate_drop = vec![(consts::ATK.to_string(), -1i64)];
@@ -1642,130 +1663,121 @@ impl BattleSummary {
         let mut prev_player_level: Option<i64> = None;
 
         for mon_idx in 0..num_matchups {
+            // The player's stages carry over to the next matchup.
             if is_gen1 {
                 let cur_level = self.original_player_mon_list[mon_idx].level;
                 if let Some(prev) = prev_player_level {
                     if cur_level > prev {
-                        persistent_player = persistent_player.clear_badge_boosts();
+                        cur_player = cur_player.clear_badge_boosts();
                     }
                 }
                 prev_player_level = Some(cur_level);
             }
-            let mut cur_player = persistent_player;
             let mut cur_enemy = StageModifiers::default();
 
             if player_intimidate_active.contains(&(mon_idx as i64)) {
                 cur_enemy = cur_enemy.apply_stat_mod(&intimidate_drop);
             }
             if enemy_intimidate_active.contains(&(mon_idx as i64)) {
-                persistent_player = persistent_player.apply_stat_mod(&intimidate_drop);
                 cur_player = cur_player.apply_stat_mod(&intimidate_drop);
             }
 
             let empty = CustomMoveData::default();
             let matchup_setup = self.stat_stage_setup.get(mon_idx).unwrap_or(&empty);
+            let player_moves: Vec<SetupEntry> = self
+                .original_player_mon_list
+                .get(mon_idx)
+                .map(|m| m.move_list.iter().flatten().filter_map(|slot_move| self.player_stepper(move_db, matchup_setup, slot_move)).collect())
+                .unwrap_or_default();
+            let enemy_moves: Vec<SetupEntry> = self
+                .original_enemy_mon_list
+                .get(mon_idx)
+                .map(|m| {
+                    m.move_list
+                        .iter()
+                        .flatten()
+                        .filter(|name| !name.is_empty())
+                        .filter_map(|name| {
+                            let info = stepper_info(move_db, name)?;
+                            let count = matchup_setup.enemy.get(name).and_then(|s| damage::py_int(s)).unwrap_or(0);
+                            Some(SetupEntry { move_name: name.clone(), count, info })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            let start = (cur_player, cur_enemy);
 
-            // Step 1: the player's moves
-            if let Some(player_mon) = self.original_player_mon_list.get(mon_idx) {
-                for slot_move in player_mon.move_list.iter().flatten() {
-                    let Some(entry) = self.player_setup_entry(move_db, matchup_setup, slot_move) else {
-                        continue;
-                    };
-                    let (move_name, count, info) = (entry.move_name.as_str(), entry.count, entry.info);
-                    if info.targets_self && !info.is_damaging {
-                        if info.is_belly_drum {
-                            persistent_player = persistent_player.set_attack_stage(count);
-                            cur_player = cur_player.set_attack_stage(count);
-                        } else {
-                            let mods = move_db.get_stat_mod_for_target(move_name, true);
-                            for _ in 0..count {
-                                persistent_player = persistent_player.apply_stat_mod(&mods);
-                                cur_player = cur_player.apply_stat_mod(&mods);
-                            }
-                        }
-                    } else if !info.targets_self && !info.is_damaging {
-                        let mods = move_db.get_stat_mod_for_target(move_name, false);
-                        for _ in 0..count {
-                            cur_enemy = cur_enemy.apply_stat_mod(&mods);
-                        }
-                    } else if info.is_damaging && info.targets_self {
-                        let mods = move_db.get_stat_mod_for_target(move_name, true);
-                        for _ in 0..count {
-                            persistent_player = persistent_player.apply_stat_mod(&mods);
-                            cur_player = cur_player.apply_stat_mod(&mods);
-                        }
-                    } else if info.is_damaging {
-                        let mods = move_db.get_stat_mod_for_target(move_name, false);
-                        for _ in 0..count {
-                            cur_enemy = cur_enemy.apply_stat_mod(&mods);
-                        }
-                    }
+            // Step 1: the player's moves, holding back the uses that would
+            // change nothing yet
+            let mut held_back: Vec<(&SetupEntry, i64)> = Vec::new();
+            for entry in player_moves.iter().filter(|e| e.count > 0) {
+                let used = apply_stepper_uses(move_db, entry, entry.count, &mut cur_player, &mut cur_enemy, true);
+                if used < entry.count {
+                    held_back.push((entry, entry.count - used));
                 }
             }
+            let after_player = (cur_player, cur_enemy);
 
             // Step 2: the enemy's moves
-            if let Some(enemy_mon) = self.original_enemy_mon_list.get(mon_idx) {
-                for move_name in enemy_mon.move_list.iter().flatten() {
-                    if move_name.is_empty() {
-                        continue;
-                    }
-                    let count = matchup_setup
-                        .enemy
-                        .get(move_name)
-                        .and_then(|s| damage::py_int(s))
-                        .unwrap_or(0);
-                    if count <= 0 {
-                        continue;
-                    }
-                    let info = move_db.get_stat_stage_info(move_name);
-                    if !info.has_stat_effect {
-                        continue;
-                    }
-                    if !info.is_guaranteed && !info.is_damaging {
-                        continue;
-                    }
-                    if info.targets_self && !info.is_damaging {
-                        if info.is_belly_drum {
-                            cur_enemy = cur_enemy.set_attack_stage(count);
-                        } else {
-                            let mods = move_db.get_stat_mod_for_target(move_name, true);
-                            for _ in 0..count {
-                                cur_enemy = cur_enemy.apply_stat_mod(&mods);
-                            }
-                        }
-                    } else if !info.targets_self && !info.is_damaging {
-                        let mods = move_db.get_stat_mod_for_target(move_name, false);
-                        for _ in 0..count {
-                            persistent_player = persistent_player.apply_stat_mod(&mods);
-                            cur_player = cur_player.apply_stat_mod(&mods);
-                        }
-                    } else if info.is_damaging && info.targets_self {
-                        let mods = move_db.get_stat_mod_for_target(move_name, true);
-                        for _ in 0..count {
-                            cur_enemy = cur_enemy.apply_stat_mod(&mods);
-                        }
-                    } else if info.is_damaging {
-                        let mods = move_db.get_stat_mod_for_target(move_name, false);
-                        for _ in 0..count {
-                            persistent_player = persistent_player.apply_stat_mod(&mods);
-                            cur_player = cur_player.apply_stat_mod(&mods);
-                        }
+            for entry in enemy_moves.iter().filter(|e| e.count > 0) {
+                apply_stepper_uses(move_db, entry, entry.count, &mut cur_enemy, &mut cur_player, false);
+            }
+
+            // Step 3: the player sets up again what the enemy undid
+            for (entry, count) in held_back {
+                apply_stepper_uses(move_db, entry, count, &mut cur_player, &mut cur_enemy, false);
+            }
+
+            // A player stepper reaches as far as it can go from the start of
+            // the matchup, plus whatever the enemy's moves (from that maxed
+            // out state) then give back. An enemy stepper starts after the
+            // player's first pass.
+            let mut caps = StageCaps::default();
+            for entry in player_moves.iter().filter(|e| !e.info.is_belly_drum) {
+                let (mut own, mut other) = start;
+                let before_enemy = apply_stepper_uses(move_db, entry, MAX_USEFUL_USES, &mut own, &mut other, true);
+                for enemy_entry in enemy_moves.iter().filter(|e| e.count > 0) {
+                    apply_stepper_uses(move_db, enemy_entry, enemy_entry.count, &mut other, &mut own, false);
+                }
+                let cap = before_enemy + useful_uses(move_db, entry, own, other);
+                if cap > entry.info.max_applications {
+                    caps.player.insert(entry.move_name.clone(), cap);
+                }
+                // An enemy move that can lower a stat this one raises (a
+                // status move over a damaging one's side effect), as long as
+                // one more use of it would still lower something.
+                if entry.info.targets_self {
+                    let raised: Vec<String> = move_db.get_stat_mod_for_target(&entry.move_name, true).into_iter().filter(|(_, d)| *d > 0).map(|(s, _)| s).collect();
+                    let counter = enemy_moves
+                        .iter()
+                        .filter(|e| !e.info.targets_self)
+                        .filter(|e| move_db.get_stat_mod_for_target(&e.move_name, false).iter().any(|(s, d)| *d < 0 && raised.contains(s)))
+                        .filter(|e| e.count.max(0) < useful_uses(move_db, e, after_player.1, after_player.0))
+                        .min_by_key(|e| e.info.is_damaging);
+                    if let Some(counter) = counter {
+                        caps.player_counters.insert(entry.move_name.clone(), PairedCounter { enemy_move: counter.move_name.clone(), useful: cap });
                     }
                 }
             }
+            for entry in enemy_moves.iter().filter(|e| !e.info.is_belly_drum) {
+                let cap = useful_uses(move_db, entry, after_player.1, after_player.0);
+                if cap > entry.info.max_applications {
+                    caps.enemy.insert(entry.move_name.clone(), cap);
+                }
+            }
+
             player_modifiers.push(cur_player);
             enemy_modifiers.push(cur_enemy);
+            stage_caps.push(caps);
         }
-        (player_modifiers, enemy_modifiers)
+        (player_modifiers, enemy_modifiers, stage_caps)
     }
 
-    /// A player stat-stage stepper that `calc_per_matchup_stage_modifiers`
-    /// applies for the move in `slot_move`: the move whose stepper is read (a
-    /// Mimic slot's stepper is stored under, and resolves its stat effect
-    /// from, the mimicked move), its count and its stat-stage info. `None`
-    /// when the stepper changes nothing. The PP tracking counts exactly these
-    /// uses, so PP and damage agree.
-    fn player_setup_entry(&self, move_db: &xpr_data::MoveDB, matchup_setup: &CustomMoveData, slot_move: &str) -> Option<SetupEntry> {
+    /// The player's stepper for the move in `slot_move`, with its count (0
+    /// when unset): the move whose stepper is read (a Mimic slot's stepper is
+    /// stored under, and resolves its stat effect from, the mimicked move)
+    /// and its stat-stage info. `None` when the move has no stepper.
+    fn player_stepper(&self, move_db: &xpr_data::MoveDB, matchup_setup: &CustomMoveData, slot_move: &str) -> Option<SetupEntry> {
         if slot_move.is_empty() {
             return None;
         }
@@ -1774,15 +1786,17 @@ impl BattleSummary {
         } else {
             slot_move
         };
+        let info = stepper_info(move_db, move_name)?;
         let count = matchup_setup.player.get(move_name).and_then(|s| damage::py_int(s)).unwrap_or(0);
-        if count <= 0 {
-            return None;
-        }
-        let info = move_db.get_stat_stage_info(move_name);
-        if !info.has_stat_effect || (!info.is_guaranteed && !info.is_damaging) {
-            return None;
-        }
         Some(SetupEntry { move_name: move_name.to_string(), count, info })
+    }
+
+    /// A player stat-stage stepper that `calc_per_matchup_stage_modifiers`
+    /// applies for the move in `slot_move` (see [`Self::player_stepper`]).
+    /// `None` when the stepper changes nothing. The PP tracking counts
+    /// exactly these uses, so PP and damage agree.
+    fn player_setup_entry(&self, move_db: &xpr_data::MoveDB, matchup_setup: &CustomMoveData, slot_move: &str) -> Option<SetupEntry> {
+        self.player_stepper(move_db, matchup_setup, slot_move).filter(|e| e.count > 0)
     }
 
     /// The setup uses the player spends PP on in matchup `mon_idx`, as
@@ -1888,6 +1902,20 @@ impl BattleSummary {
         while self.stat_stage_setup.len() <= pkmn_idx {
             self.stat_stage_setup.push(CustomMoveData::default());
         }
+        // Uses past the ones that still change something come with as many
+        // of the enemy's moves that lower the stage again.
+        if is_player {
+            let counter = self.per_matchup_stage_caps.get(pkmn_idx).and_then(|c| c.player_counters.get(&move_name)).cloned();
+            if let Some(counter) = counter {
+                let old = damage::py_int(&self.get_stat_stage_selection(pkmn_idx, true, &move_name)).unwrap_or(0);
+                let paired = damage::py_int(new_value).unwrap_or(0) - old.max(counter.useful);
+                if paired > 0 {
+                    let enemy_side = &mut self.stat_stage_setup[pkmn_idx].enemy;
+                    let cur = enemy_side.get(&counter.enemy_move).and_then(|s| damage::py_int(s)).unwrap_or(0).max(0);
+                    enemy_side.insert(counter.enemy_move, (cur + paired).to_string());
+                }
+            }
+        }
         self.stat_stage_setup[pkmn_idx].side_mut(is_player).insert(move_name, new_value.to_string());
         self.full_refresh(Some(gen), cfg);
     }
@@ -1930,6 +1958,85 @@ struct SetupEntry {
     move_name: String,
     count: i64,
     info: StatStageInfo,
+}
+
+/// The stat-stage info of a move that gets a stepper (a stat effect that is
+/// guaranteed, or rides on a damaging move).
+fn stepper_info(move_db: &xpr_data::MoveDB, move_name: &str) -> Option<StatStageInfo> {
+    let info = move_db.get_stat_stage_info(move_name);
+    (info.has_stat_effect && (info.is_guaranteed || info.is_damaging)).then_some(info)
+}
+
+/// Applies up to `count` uses of a stepper move by the side whose stages are
+/// `own` against the side whose stages are `other`. With `stop_when_useless`
+/// it stops before the first use that would change nothing (the stages it
+/// moves are already capped). Returns the uses applied. Belly Drum's count is
+/// the attack stage it ends at, so it is one use that always applies.
+fn apply_stepper_uses(
+    move_db: &xpr_data::MoveDB,
+    entry: &SetupEntry,
+    count: i64,
+    own: &mut StageModifiers,
+    other: &mut StageModifiers,
+    stop_when_useless: bool,
+) -> i64 {
+    if entry.info.is_belly_drum {
+        *own = own.set_attack_stage(entry.count);
+        return count;
+    }
+    let mods = move_db.get_stat_mod_for_target(&entry.move_name, entry.info.targets_self);
+    let target = if entry.info.targets_self { own } else { other };
+    for used in 0..count {
+        let next = target.apply_stat_mod(&mods);
+        if stop_when_useless && next == *target {
+            return used;
+        }
+        *target = next;
+    }
+    count
+}
+
+/// Bounds [`useful_uses`]: a stage goes from -6 to +6 in 12 uses.
+const MAX_USEFUL_USES: i64 = 12;
+
+/// How many uses of a stepper move still change something, starting from
+/// `own` / `other`.
+fn useful_uses(move_db: &xpr_data::MoveDB, entry: &SetupEntry, mut own: StageModifiers, mut other: StageModifiers) -> i64 {
+    apply_stepper_uses(move_db, entry, MAX_USEFUL_USES, &mut own, &mut other, true)
+}
+
+/// The most uses each stat-stage stepper offers in one matchup, by move name.
+/// Only moves whose cap goes past their usual `max_applications` are listed:
+/// a stage the other side lowered (or raised) can be set up again, so it can
+/// take more than 6 stages' worth of uses to max it out.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StageCaps {
+    pub player: HashMap<String, i64>,
+    pub enemy: HashMap<String, i64>,
+    /// Player steppers whose stage the enemy has a move to lower again, by
+    /// move name (see [`PairedCounter`]).
+    pub player_counters: HashMap<String, PairedCounter>,
+}
+
+/// An enemy move that lowers a stage a player stepper raises. Once the
+/// stepper is past `useful` (more uses would change nothing), `+` adds a use
+/// of `enemy_move` along with the player's use, so the stage stays maxed
+/// and, in gen 1, both re-apply the badge boosts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PairedCounter {
+    pub enemy_move: String,
+    /// The player's uses that still change something.
+    pub useful: i64,
+}
+
+impl StageCaps {
+    pub fn side(&self, is_player: bool) -> &HashMap<String, i64> {
+        if is_player {
+            &self.player
+        } else {
+            &self.enemy
+        }
+    }
 }
 
 /// One setup move's uses in a matchup (see

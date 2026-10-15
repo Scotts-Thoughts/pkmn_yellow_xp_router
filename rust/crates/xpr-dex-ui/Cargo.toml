@@ -19,7 +19,6 @@ image = { version = "0.25", default-features = false, features = ["png", "webp"]
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }
-log = { workspace = true }
 
 [dev-dependencies]
 xpr-dex = { path = "../xpr-dex" }

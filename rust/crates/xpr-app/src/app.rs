@@ -31,7 +31,7 @@ use crate::dialogs::{
     DialogCtx, DialogOutcome, FinalTrainersDialog, HighlightColorDialog, LoadRouteDialog, MatchupExportDialog, MessageBox,
     MsgButtons, MsgChoice, MsgTag, NewFolderDialog, ShortcutsDialog, TransferDialog,
 };
-use crate::event_details::{DetailsActions, EventDetails, BATTLE_SUMMARY_TAB, MAP_TAB, PRE_STATE_TAB};
+use crate::event_details::{DetailsActions, EventDetails, MAP_TAB, PRE_STATE_TAB};
 use crate::filter_bar::FilterBar;
 use crate::map::{MapAction, MapView};
 use crate::pages::{quick_start_ui, replay_import_ui, LandingActions, LandingPage, MapViewerPage, NewRouteActions, NewRoutePage, QuickStartActions};
@@ -1951,8 +1951,6 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
             DialogOutcome::CreateRouteForBackport { species, custom_gen_name } => {
                 self.ctrl.create_new_route(&species, None, &custom_gen_name, None, None, None);
             }
-            DialogOutcome::Message(tag, choice) => self.handle_message_choice(ctx, tag, choice),
-            DialogOutcome::ReloadCustomGens => {}
             DialogOutcome::DataDirChanged => {
                 self.paths.config_user_data_dir(&self.cfg.get_user_data_dir());
                 self.ctrl.paths = self.paths.clone();
@@ -3402,14 +3400,4 @@ pub fn initial_viewport(cfg: &Config) -> egui::ViewportBuilder {
         vb = vb.with_maximized(true);
     }
     vb
-}
-
-/// Where the icon would come from (kept for parity; the Qt app sets none).
-pub fn app_paths(source_root: &std::path::Path) -> Paths {
-    Paths::new(source_root.to_path_buf())
-}
-
-#[allow(dead_code)]
-fn _unused(_r: Registry, _t: Theme) {
-    let _ = BATTLE_SUMMARY_TAB;
 }

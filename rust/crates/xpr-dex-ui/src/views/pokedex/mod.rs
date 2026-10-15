@@ -55,8 +55,4 @@ impl PokedexView {
         &self.list.filters
     }
 
-    /// Replace the list's filters (they are not persisted by the page).
-    pub fn set_filters(&mut self, filters: Filters) {
-        self.list.filters = filters;
-    }
 }

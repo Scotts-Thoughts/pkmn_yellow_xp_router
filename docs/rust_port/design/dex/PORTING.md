@@ -88,12 +88,11 @@ names are the router's (`"Double Edge"` in gen 1); look them up in
   Tailwind's; the page background is `GRAY_900` as in Solodex; `palette::type_color`, `stat_color`, `category_color`,
   `game_color`, `trainer_category_color`, `hex("#...")`.
 - Widgets: `widgets::type_badge` (click = matchups popover), `type_chip`,
-  `section_label`, `small_button(_ex)`, `menu_entry`, `click_popover`,
+  `section_label`, `small_button(_ex)`, `click_popover`,
   `context_menu`, `modal` (router-styled dialog), `game_toggle`,
   `sort_header_cell` + `SortDir`, `search_field`, `placeholder`, `hairline`,
   `paint_glossy`, `spotlight` (search overlay). Images:
-  `images::sprite_widget`, `cx.images.sprite(ctx, species, dex, SpriteSize::Small|Full)`,
-  `images::category_icon_widget`, `images::paint_fit`. ui-kit:
+  `cx.images.sprite(ctx, species, dex, SpriteSize::Small|Full)`, `images::paint_fit`. ui-kit:
   `xpr_ui_kit::widgets::{Entry, SearchableDropdown, AmountEntry, checkbox, ...}`.
 - Long lists: `egui::ScrollArea::vertical().show_rows(ui, row_h, n, |ui, range| ..)`
   (Solodex's `VirtualList`). Give every ScrollArea / Grid / popup a unique

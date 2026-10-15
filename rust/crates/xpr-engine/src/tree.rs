@@ -175,10 +175,6 @@ impl Node {
         matches!(self, Node::Folder(_))
     }
 
-    pub fn is_group(&self) -> bool {
-        matches!(self, Node::Group(_))
-    }
-
     pub fn as_folder(&self) -> Option<&EventFolder> {
         match self {
             Node::Folder(f) => Some(f),

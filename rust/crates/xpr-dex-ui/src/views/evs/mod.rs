@@ -1,15 +1,11 @@
 //! EVs tab: EV yields of every species of a game with filters and the
-//! encounter popover, plus the spread card. Port of Solodex
-//! `EVComparisonView.tsx`, `SpreadCard.tsx`.
+//! encounter popover. Port of Solodex `EVComparisonView.tsx`.
 //!
 //! The table is Solodex's: a 356 px column of `# / sprite / Pokémon / one
 //! column per stat`, centred under a row of four filters (generation, type,
 //! stat, EV yield). Clicking a header sorts, clicking a row opens the species
 //! in the Pokédex, and hovering a name shows where the species is found in
-//! the game. [`spread_card`] is the damage view's spread graphic; it is a
-//! plain widget the Damage tab can draw.
-
-pub mod spread_card;
+//! the game.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -19,8 +15,6 @@ use xpr_dex::text::locale_cmp;
 use xpr_dex::{EncounterEntry, PokemonData, StatKey};
 use xpr_ui_kit::modal::pointer_blocked;
 use xpr_ui_kit::theme::{self, Theme};
-
-pub use spread_card::{show_spread_card, spread_card_height, SpreadCardProps, SPREAD_CARD_WIDTH};
 
 use crate::widgets::SortDir;
 use crate::{palette, DexCx, DexTab};

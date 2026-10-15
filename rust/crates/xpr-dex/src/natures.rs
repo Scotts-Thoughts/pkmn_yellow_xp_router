@@ -17,22 +17,6 @@ pub fn nature(name: &str) -> Option<&'static NatureData> {
     store().natures().get(name)
 }
 
-pub fn nature_by_index(index: i64) -> Option<&'static str> {
-    store().natures().iter().find(|(_, v)| v.index as i64 == index).map(|(k, _)| k.as_str())
-}
-
-/// Display label of a nature stat key (`specialAttack` -> "Sp. Atk").
-pub fn nature_stat_label(key: &str) -> &str {
-    match key {
-        "attack" => "Attack",
-        "defense" => "Defense",
-        "speed" => "Speed",
-        "specialAttack" => "Sp. Atk",
-        "specialDefense" => "Sp. Def",
-        other => other,
-    }
-}
-
 /// Moves the user has marked as banned, conditional, or unobtainable in one game.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]

@@ -158,14 +158,6 @@ impl ShortcutMap {
         }
     }
 
-    /// Whether `action_id` is bound to a chord that needs no modifier or
-    /// only Shift (a "plain key" that must not fire while typing).
-    pub fn is_plain_key(&self, action_id: &str) -> bool {
-        match self.shortcuts.get(action_id) {
-            Some(sc) => !sc.modifiers.command && !sc.modifiers.ctrl && !sc.modifiers.alt,
-            None => false,
-        }
-    }
 }
 
 /// Which key chords a focused text field swallows. Qt lets a `QLineEdit`

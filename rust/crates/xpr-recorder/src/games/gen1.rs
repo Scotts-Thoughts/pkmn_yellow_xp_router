@@ -431,6 +431,8 @@ struct OverworldData {
     waiting_for_solo_mon_in_slot_1: bool,
     wrong_mon_delay: i64,
     wrong_mon_in_slot_1: bool,
+    /// money went down since the last game-second tick
+    money_just_lost: bool,
 }
 
 const BASE_DELAY: i64 = 2;
@@ -899,7 +901,9 @@ impl Gen1Machine {
             GameState::InventoryChange => {
                 self.inventory.seconds_delay = BASE_DELAY;
                 self.inventory.money_gained = self.money_cache_update(store).unwrap_or(false);
-                self.inventory.money_lost = false;
+                // a mart adds the item and takes the money in one frame; a feed that
+                // reports that frame's money change first still makes it a purchase
+                self.inventory.money_lost = std::mem::take(&mut self.overworld.money_just_lost);
             }
             GameState::RareCandy => {
                 self.candy.move_learned = false;
@@ -920,6 +924,7 @@ impl Gen1Machine {
                 o.waiting_for_solo_mon_in_slot_1 = false;
                 o.wrong_mon_delay = 2;
                 o.wrong_mon_in_slot_1 = false;
+                o.money_just_lost = false;
             }
             GameState::MoveDelete => {}
         }
@@ -1027,7 +1032,7 @@ impl Gen1Machine {
                         // Appendix B item 11: Python compares the battle-type property
                         // *object* to the "Wild"/"Trainer" strings, which is always false, so
                         // gen 1 always starts in the overworld (a battle in progress when
-                        // recording starts is picked up on its next battle-type change).
+                        // recording starts is entered on the overworld's next change).
                         // Reproduced for parity with the Python recorder.
                         let _ = (WILD_BATTLE_TYPE, TRAINER_BATTLE_TYPE);
                         return GameState::Overworld;
@@ -1121,13 +1126,26 @@ impl Gen1Machine {
         }
     }
 
+    /// The trainer being fought, spelled as the trainer data spells it. The
+    /// mappers disagree on class names (the replay import's mapper gives
+    /// "Lt.Surge", "Bugcatcher" and "Supernerd" where the live one gives
+    /// "LtSurge", "BugCatcher" and "SuperNerd"), and the fight-reward and
+    /// major-fight lookups compare names exactly.
+    fn battle_trainer_name(&self, store: &PropertyStore) -> String {
+        let name = self.conv.trainer_name_convert(
+            store.str_of(&self.keys.battle_trainer_class).as_deref(),
+            &store.value(&self.keys.battle_trainer_number),
+            &store.str_of(&self.keys.overworld_map).unwrap_or_else(|| "None".into()),
+        );
+        match self.gen.trainer_db().get_trainer(&name) {
+            Some(t) => t.name.clone(),
+            None => name,
+        }
+    }
+
     fn create_initial_trainer_event(&mut self, store: &PropertyStore) {
         if self.battle.is_trainer_battle {
-            let name = self.conv.trainer_name_convert(
-                store.str_of(&self.keys.battle_trainer_class).as_deref(),
-                &store.value(&self.keys.battle_trainer_number),
-                &store.str_of(&self.keys.overworld_map).unwrap_or_else(|| "None".into()),
-            );
+            let name = self.battle_trainer_name(store);
             self.battle.trainer_name = name.clone();
             self.queue_new_event(EventDefinition::with_trainer(TrainerEventDefinition::new(&name)));
         }
@@ -1196,8 +1214,23 @@ impl Gen1Machine {
             if self.keys.is_none_battle_type(new) {
                 return GameState::Overworld;
             }
+        } else if (new.path == self.keys.battle_trainer_class || new.path == self.keys.battle_trainer_number)
+            && self.battle.is_trainer_battle
+            && !self.battle.trainer_name.is_empty()
+        {
+            let name = self.battle_trainer_name(store);
+            if name != self.battle.trainer_name && self.gen.trainer_db().get_trainer(&name).is_some() {
+                // back-to-back fights whose gap the feed missed: close this one; the overworld
+                // enters the next one on the following change
+                log::warn!("Trainer changed mid-battle from {} to {}: the end of the first fight was missed", self.battle.trainer_name, name);
+                return GameState::Overworld;
+            }
         }
         state
+    }
+
+    fn battle_in_progress(&self, store: &PropertyStore) -> bool {
+        store.get(&self.keys.battle_type).map(|p| p.eq_str(TRAINER_BATTLE_TYPE) || p.eq_str(WILD_BATTLE_TYPE)).unwrap_or(false)
     }
 
     fn overworld_transition(&mut self, store: &PropertyStore, new: &GameHookProperty, prev: &GameHookProperty) -> GameState {
@@ -1215,6 +1248,12 @@ impl Gen1Machine {
             return state;
         }
         if new.path == self.keys.battle_type {
+            return GameState::Battle;
+        } else if self.battle_in_progress(store) {
+            // the battle began while the feed was down (a GameHook reconnect, or a reset that
+            // resumed late): its start never showed, so pick it up now instead of reading its
+            // exp, level and move changes as overworld ones
+            log::warn!("A battle is already in progress: entering it late");
             return GameState::Battle;
         } else if new.path == self.keys.overworld_map {
             // (a null map name makes Python's `split` raise; the change is dropped)
@@ -1234,6 +1273,8 @@ impl Gen1Machine {
                 // configure the cached money so the sale check sees the gain
                 self.cached_money = prev.as_i64().unwrap_or(0);
                 return GameState::InventoryChange;
+            } else if new.as_i64().unwrap_or(0) < prev.as_i64().unwrap_or(0) {
+                self.overworld.money_just_lost = true;
             }
         } else if new.path == self.keys.mon_species {
             if !prev.truthy() {
@@ -1276,6 +1317,8 @@ impl Gen1Machine {
                 self.overworld.heal_delay = 2;
             }
         } else if new.path == self.keys.gametime_seconds {
+            // an unrelated loss (the Safari Zone fee) must not make a later pickup a purchase
+            self.overworld.money_just_lost = false;
             if self.overworld.waiting_for_registration {
                 if self.overworld.register_delay <= 0 {
                     self.overworld.waiting_for_registration = false;

@@ -121,13 +121,6 @@ impl AutoClearingLabel {
         self.set_at = if self.text.is_empty() { None } else { Some(Instant::now()) };
     }
 
-    pub fn is_visible(&self) -> bool {
-        match self.set_at {
-            Some(t) => Instant::now().duration_since(t) < self.timeout,
-            None => false,
-        }
-    }
-
     /// Draw the label if it is visible (nothing is allocated otherwise).
     pub fn ui(&mut self, ui: &mut egui::Ui, theme: &Theme) {
         if let Some(t) = self.set_at {

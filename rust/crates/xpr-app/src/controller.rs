@@ -205,14 +205,6 @@ impl MainController {
         self.router.gen().cloned()
     }
 
-    pub fn get_raw_route(&self) -> &Router {
-        &self.router
-    }
-
-    pub fn get_raw_route_mut(&mut self) -> &mut Router {
-        &mut self.router
-    }
-
     pub fn get_current_route_name(&self) -> &str {
         &self.route_name
     }
@@ -226,10 +218,6 @@ impl MainController {
         self.custom_image_path.as_deref()
     }
 
-    pub fn get_preview_event(&self) -> Option<&EventDefinition> {
-        self.preview_event.as_ref()
-    }
-
     pub fn obj_kind(&self, id: NodeId) -> Option<ObjKind> {
         self.router.obj_kind(id)
     }
@@ -240,16 +228,6 @@ impl MainController {
 
     pub fn get_version(&self) -> Option<&str> {
         self.router.pkmn_version.as_deref()
-    }
-
-    pub fn get_state_after(&self, previous_event_id: Option<NodeId>) -> Option<Arc<RouteState>> {
-        match previous_event_id {
-            None => self.router.init_route_state.clone(),
-            Some(id) => match self.router.init_state_of(id) {
-                Some(s) => Some(s.clone()),
-                None => self.router.init_route_state.clone(),
-            },
-        }
     }
 
     pub fn get_init_state(&self) -> Option<Arc<RouteState>> {
@@ -1076,25 +1054,6 @@ impl MainController {
             Ok(p) => self.send_message(format!("Exported notes to: {}", p.display())),
             Err(e) => self.trigger_exception(format!("Couldn't export notes: {}", e)),
         }
-    }
-
-    /// The directory screenshots go to: the custom image path when it is (or
-    /// can be made) a directory, else the configured images dir.
-    pub fn screenshot_dir(&self, cfg: &Config, custom_path: Option<&str>) -> PathBuf {
-        let path_to_use = custom_path.map(|s| s.to_string()).or_else(|| self.custom_image_path.clone());
-        if let Some(p) = path_to_use {
-            let cleaned = p.trim().trim_matches('"').trim_matches('\'');
-            if !cleaned.is_empty() {
-                let pb = PathBuf::from(cleaned);
-                if pb.is_dir() {
-                    return pb;
-                }
-                if std::fs::create_dir_all(&pb).is_ok() && pb.is_dir() {
-                    return pb;
-                }
-            }
-        }
-        cfg.get_images_dir()
     }
 
     /// `take_screenshot`'s naming: `<timestamp>-<route>_<image_name>.png`

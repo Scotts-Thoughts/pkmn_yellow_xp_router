@@ -158,10 +158,6 @@ impl Registry {
         pyjson::loads(&text).map_err(|e| e.to_string())
     }
 
-    pub fn is_builtin(version: &str) -> bool {
-        consts::VERSION_LIST.contains(&version)
-    }
-
     /// `get_specific_version`: built-in (lazily loaded) or custom.
     pub fn get_version(&self, version: &str) -> Result<Arc<GenData>, String> {
         if let Some(g) = self.cache.lock().unwrap().get(version) {

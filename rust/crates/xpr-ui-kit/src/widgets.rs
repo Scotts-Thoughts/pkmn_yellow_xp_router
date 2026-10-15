@@ -8,7 +8,7 @@
 
 use egui::{
     Align, Color32, CornerRadius, FontId, Id, Key, Layout, Modifiers, Pos2, Rect, Response, Sense, Stroke, TextEdit,
-    TextStyle, Ui, Vec2, WidgetText,
+    Ui, Vec2, WidgetText,
 };
 
 use crate::theme::Theme;
@@ -61,12 +61,6 @@ pub fn label_bold(ui: &mut Ui, theme: &Theme, text: impl Into<String>) -> Respon
 
 pub fn label_font(ui: &mut Ui, text: impl Into<String>, font: FontId, color: Color32) -> Response {
     ui.label(egui::RichText::new(text.into()).font(font).color(color))
-}
-
-/// A label whose text is elided with "…" to fit `max_width`.
-pub fn label_elided(ui: &mut Ui, text: &str, font: FontId, color: Color32, max_width: f32) -> Response {
-    let shown = elide(ui, text, &font, max_width);
-    ui.label(egui::RichText::new(shown).font(font).color(color))
 }
 
 /// Qt `elidedText(..., ElideRight, width)`.
@@ -1281,11 +1275,6 @@ pub fn group_box<R>(ui: &mut Ui, theme: &Theme, title: &str, add_contents: impl 
     inner.inner
 }
 
-/// `RoundedSection`-style frame: solid fill, rounded corners, inner margin.
-pub fn rounded_section<R>(ui: &mut Ui, fill: Color32, radius: u8, margin: egui::Margin, add_contents: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<R> {
-    egui::Frame::new().fill(fill).corner_radius(CornerRadius::same(radius)).inner_margin(margin).show(ui, add_contents)
-}
-
 /// `QFrame.HLine`
 pub fn hline(ui: &mut Ui, theme: &Theme) {
     let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 1.0), Sense::hover());
@@ -1758,16 +1747,6 @@ pub fn status_chip(ui: &mut Ui, theme: &Theme, text: &str, color: Color32, heigh
     } else {
         resp
     }
-}
-
-/// Use the theme body font for a plain `RichText`.
-pub fn rich(theme: &Theme, text: impl Into<String>) -> egui::RichText {
-    egui::RichText::new(text.into()).font(theme.body()).color(theme.text)
-}
-
-pub fn set_body_style(ui: &mut Ui, theme: &Theme) {
-    ui.style_mut().override_font_id = Some(theme.body());
-    ui.style_mut().text_styles.insert(TextStyle::Body, theme.body());
 }
 
 // ---------------------------------------------------------------------------

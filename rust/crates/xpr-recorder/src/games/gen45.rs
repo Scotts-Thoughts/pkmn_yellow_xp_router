@@ -31,7 +31,6 @@ pub const GOLDENROD_LOTTERY_ITEMS: [&str; 21] = [
     "Net Ball", "Quick Ball", "Dusk Ball", "Timer Ball", "Persim Berry", "Cheri Berry", "Chesto Berry", "Pecha Berry", "Rawst Berry", "Aspear Berry",
     "Oran Berry",
 ];
-pub const SAVE_SOUND_EFFECT_VALUE: i64 = 36342100;
 pub const HEAL_SOUND_EFFECT_VALUE: i64 = 36335692;
 
 pub fn reset_flag() -> String {
@@ -388,17 +387,6 @@ impl Gen45Converter {
 
     pub fn is_game_tm(&self, item_name: &str) -> bool {
         item_name.starts_with("TM")
-    }
-
-    const TUTOR_MOVES: [&'static str; 42] = [
-        "Blast Burn", "Draco Meteor", "Frenzy Plant", "Hydro Cannon", "Air Cutter", "Dive", "Fire Punch", "Fury Cutter", "Ice Punch", "Icy Wind", "Knock Off",
-        "Ominous Wind", "Sucker Punch", "ThunderPunch", "Trick", "Vacuum Wave", "Zen Headbutt", "Helping Hand", "Last Resort", "Magnet Rise", "Snore", "Spite",
-        "Swift", "Synthesis", "Uproar", "AncientPower", "Aqua Tail", "Bounce", "Earth Power", "Endeavor", "Gastro Acid", "Gunk Shot", "Heat Wave",
-        "Iron Defense", "Iron Head", "Mud-Slap", "Outrage", "Rollout", "Seed Bomb", "Signal Beam", "Superpower", "Twister",
-    ];
-
-    pub fn is_tutor_move(&self, gh_move_name: &str) -> bool {
-        Self::TUTOR_MOVES.contains(&name_prettify(gh_move_name).as_str())
     }
 
     pub fn get_hm_name(&self, gh_move_name: &str) -> Option<&'static str> {

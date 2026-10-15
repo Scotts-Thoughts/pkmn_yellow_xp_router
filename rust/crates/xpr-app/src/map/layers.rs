@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use egui::{Align2, Color32, Pos2, Rect, Stroke, Vec2};
-use xpr_map::{geom, MapKind, MapPack, ObjectKind, Scope, CHUNK_PX};
+use xpr_map::{geom, MapPack, ObjectKind, Scope, CHUNK_PX};
 use xpr_ui_kit::theme::{self, Theme};
 
 use super::camera::Camera;
@@ -299,6 +299,3 @@ pub fn draw_focus(painter: &egui::Painter, vp: Rect, cam: &Camera, pack: &MapPac
     animating
 }
 
-pub fn map_is_outdoor(pack: &MapPack, id: xpr_map::MapId) -> bool {
-    pack.map(id).map(|m| m.kind == MapKind::Outdoor).unwrap_or(false)
-}

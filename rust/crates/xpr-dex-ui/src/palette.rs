@@ -44,7 +44,6 @@ pub const PURPLE_400: Color32 = Color32::from_rgb(0xc0, 0x84, 0xfc);
 pub const VIOLET_400: Color32 = Color32::from_rgb(0xa7, 0x8b, 0xfa);
 pub const VIOLET_600: Color32 = Color32::from_rgb(0x7c, 0x3a, 0xed);
 pub const SLATE_400: Color32 = Color32::from_rgb(0x94, 0xa3, 0xb8);
-pub const SKY_400: Color32 = Color32::from_rgb(0x29, 0xb6, 0xf6);
 
 /// Type colours (Solodex `TYPE_COLORS`).
 pub fn type_color(t: &str) -> Color32 {

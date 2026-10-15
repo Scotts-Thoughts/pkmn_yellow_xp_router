@@ -15,7 +15,6 @@ use serde_json::{json, Value};
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket};
 
-pub const DEFAULT_CONNECTION_STRING: &str = "http://localhost:8085";
 const RECORD_SEPARATOR: char = '\u{1e}';
 const AUTOMATIC_REFRESH: Duration = Duration::from_secs(60);
 const PING_INTERVAL: Duration = Duration::from_secs(15);
@@ -263,14 +262,6 @@ impl GameHookClient {
     /// mapper loaded in GameHook *after* recording started gets picked up.
     pub fn reconnect(&self) {
         self.reconnect_now.store(true, Ordering::SeqCst);
-    }
-
-    pub fn is_connected(&self) -> bool {
-        self.shared.lock().unwrap().connected
-    }
-
-    pub fn is_mapper_loaded(&self) -> bool {
-        self.shared.lock().unwrap().mapper_loaded
     }
 
     pub fn connection_string(&self) -> &str {

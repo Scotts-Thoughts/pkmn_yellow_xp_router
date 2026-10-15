@@ -12,7 +12,7 @@ use xpr_data::GenData;
 use xpr_engine::EventDefinition;
 
 use crate::controller::{ActiveFlag, EventQueue, RecorderController};
-use crate::gamehook::{GameHookProperty, PropertyStore};
+use crate::gamehook::PropertyStore;
 
 /// Python `str(value)` for the JSON values GameHook sends.
 pub fn py_str(v: &Value) -> String {
@@ -327,10 +327,6 @@ pub fn resolve_tm_name(gen: &GenData, prefix: &str) -> Option<String> {
         .get_filtered_names(consts::ITEM_TYPE_TM, consts::ITEM_TYPE_ALL_ITEMS, None)
         .into_iter()
         .find(|n| n.starts_with(prefix))
-}
-
-pub fn prop_i64(p: &GameHookProperty) -> Option<i64> {
-    p.as_i64()
 }
 
 pub fn store_i64(store: &PropertyStore, key: &str) -> i64 {

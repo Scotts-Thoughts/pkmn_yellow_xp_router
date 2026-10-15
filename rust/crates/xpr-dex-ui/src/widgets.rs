@@ -239,37 +239,6 @@ pub fn small_button_ex(
     }
 }
 
-/// One entry of a context / popup menu; returns true when clicked.
-pub fn menu_entry(ui: &mut Ui, theme: &Theme, text: &str, enabled: bool) -> bool {
-    let font = palette::px(theme, 14.0);
-    // not `available_width()`: inside a popup that is the screen's width
-    let w = (text_w(ui, text, &font) + 24.0).max(ui.min_rect().width()).max(220.0);
-    let (rect, resp) = ui.allocate_exact_size(
-        Vec2::new(w, 26.0),
-        if enabled {
-            Sense::click()
-        } else {
-            Sense::hover()
-        },
-    );
-    if enabled && resp.hovered() {
-        ui.painter()
-            .rect_filled(rect, CornerRadius::same(3), palette::GRAY_700);
-    }
-    ui.painter().text(
-        Pos2::new(rect.min.x + 12.0, rect.center().y),
-        Align2::LEFT_CENTER,
-        text,
-        font,
-        if enabled {
-            palette::GRAY_200
-        } else {
-            palette::GRAY_600
-        },
-    );
-    enabled && resp.clicked()
-}
-
 // ---------------------------------------------------------------------------
 // popovers and dialogs
 // ---------------------------------------------------------------------------

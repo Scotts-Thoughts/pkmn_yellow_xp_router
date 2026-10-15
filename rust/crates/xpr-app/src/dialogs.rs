@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use egui::{Color32, CornerRadius, Stroke, Ui, Vec2};
 
-use xpr_core::config::{DEFAULT_SHORTCUTS, SHORTCUT_CATEGORIES, SHORTCUT_LABELS};
+use xpr_core::config::{DEFAULT_SHORTCUTS, SHORTCUT_CATEGORIES};
 use xpr_core::consts;
 use xpr_core::io_utils;
 use xpr_core::{Config, Paths};
@@ -98,8 +98,6 @@ pub enum DialogOutcome {
     MatchupExport { idx: usize, mode: crate::battle_ui::ScreenshotMode },
     RestartForUpdate,
     CreateRouteForBackport { species: String, custom_gen_name: String },
-    Message(MsgTag, MsgChoice),
-    ReloadCustomGens,
     DataDirChanged,
 }
 
@@ -730,7 +728,6 @@ impl CustomGenDialog {
     pub fn ui(&mut self, ctx: &egui::Context, d: &mut DialogCtx, message: &mut Option<MessageBox>) -> (bool, Option<DialogOutcome>) {
         let theme = d.theme;
         let mut close = false;
-        let mut outcome = None;
         // species-name prompt for a backport import
         if let Some(bp) = self.pending_backport.as_mut() {
             let mut done: Option<bool> = None;
@@ -834,10 +831,7 @@ impl CustomGenDialog {
                 }
             }
         }
-        if close {
-            outcome = Some(DialogOutcome::ReloadCustomGens);
-        }
-        (close, outcome)
+        (close, None)
     }
 }
 
@@ -1837,11 +1831,6 @@ impl Dialog {
             Dialog::EvOverride(x) => x.ui(ctx, d),
         }
     }
-}
-
-/// Little helper for keyboard-shortcut labels in menus.
-pub fn label_for(action_id: &str) -> String {
-    SHORTCUT_LABELS.iter().find(|(a, _)| *a == action_id).map(|(_, l)| l.to_string()).unwrap_or_else(|| action_id.to_string())
 }
 
 #[cfg(test)]

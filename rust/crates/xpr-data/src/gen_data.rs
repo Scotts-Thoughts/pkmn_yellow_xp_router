@@ -203,23 +203,6 @@ impl GenData {
         result
     }
 
-    pub fn get_field_moves(&self) -> Vec<String> {
-        match self.gen {
-            Gen::One | Gen::Two | Gen::Three => Vec::new(),
-            Gen::Four | Gen::Five => {
-                let mut result: Vec<String> = self
-                    .move_db
-                    .field_moves
-                    .keys()
-                    .filter_map(|k| self.move_db.get_move(k).map(|m| m.name.clone()))
-                    .collect();
-                result.push(gen_consts::SLOW_START.to_string());
-                result.sort();
-                result
-            }
-        }
-    }
-
     pub fn get_fight_reward(&self, trainer_name: &str) -> Option<&str> {
         self.fight_rewards.get(trainer_name).map(|s| s.as_str())
     }
@@ -230,10 +213,6 @@ impl GenData {
 
     pub fn get_fight_category(&self, trainer_name: &str) -> Option<&str> {
         self.trainer_to_category.get(trainer_name).map(|s| s.as_str())
-    }
-
-    pub fn is_branched_mandatory_fight(&self, trainer_name: &str) -> bool {
-        self.branched_mandatory_fights.iter().any(|t| t == trainer_name)
     }
 
     pub fn has_branched_mandatory_fights(&self) -> bool {

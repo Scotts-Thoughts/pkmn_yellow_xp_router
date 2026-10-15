@@ -68,8 +68,31 @@ impl WorkerProc {
         Ok(w)
     }
 
+    /// The next answer. When the worker died instead, say how: a crash usually means it is
+    /// older than the Super Shuckie that recorded the replay (its save states changed).
+    fn frame(&mut self) -> Result<Vec<u8>, String> {
+        read_frame(&mut self.stdout, "the replay worker").map_err(|e| {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+            let status = loop {
+                match self.child.try_wait() {
+                    Ok(Some(s)) => break Some(s),
+                    Ok(None) if std::time::Instant::now() < deadline => std::thread::sleep(std::time::Duration::from_millis(20)),
+                    _ => break None,
+                }
+            };
+            match status.and_then(|s| s.code()) {
+                Some(code) if code < 0 || code > 255 => format!(
+                    "the replay worker crashed (exception 0x{:08X}). It may be older than the Super Shuckie that recorded this replay: rebuild it with tools/replay_to_route/build.sh",
+                    code as u32
+                ),
+                Some(code) => format!("the replay worker exited with code {code}"),
+                None => e,
+            }
+        })
+    }
+
     fn json(&mut self) -> Result<Value, String> {
-        let buf = read_frame(&mut self.stdout, "the replay worker")?;
+        let buf = self.frame()?;
         if buf.first() != Some(&b'J') {
             return Err("the replay worker sent something unexpected".into());
         }
@@ -101,10 +124,10 @@ impl WorkerProc {
 
     pub fn next(&mut self) -> Result<WorkerMsg, String> {
         let mut sram = None;
-        let mut buf = read_frame(&mut self.stdout, "the replay worker")?;
+        let mut buf = self.frame()?;
         if buf.first() == Some(&b'H') && buf.len() >= 9 {
             sram = Some(u64::from_le_bytes(buf[1..9].try_into().unwrap()));
-            buf = read_frame(&mut self.stdout, "the replay worker")?;
+            buf = self.frame()?;
         }
         match buf.first() {
             Some(b'D') if buf.len() >= 21 => {

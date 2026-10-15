@@ -37,10 +37,3 @@ pub fn is_embedded() -> bool {
     cfg!(feature = "embed-map-data")
 }
 
-/// The games with an embedded pack (top-level directories of the table).
-pub fn embedded_games() -> Vec<String> {
-    let mut games: Vec<String> = FILES.iter().filter_map(|(p, _)| p.split('/').next().map(|s| s.to_string())).collect();
-    games.sort();
-    games.dedup();
-    games
-}

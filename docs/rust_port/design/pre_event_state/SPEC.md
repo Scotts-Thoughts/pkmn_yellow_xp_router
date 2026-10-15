@@ -297,8 +297,15 @@ Overflow: when `cur_items.len() > 20`, rows 1–19 then a final row
 
 Empty bag / no state: a centred block with a 26 px bag outline icon
 (stroke `lighten(bg, 0.3)`) and `Bag is empty before this event` (12 px
-muted). The card keeps the height of its row (all three cards stretch to the
-tallest).
+muted). The card keeps the height of its row.
+
+Height: by default the cards row is as tall as the Stats / Moves cards need
+(they always show everything) and the bag's item rows scroll inside the card.
+When the bag doesn't fit, the title gets an `Expand` / `Collapse` button
+(whole bag / default). The 12 px gap under the cards row is a drag handle
+(grip pill, vertical-resize cursor): dragging it sets the row height between
+the default and the whole bag, double-click resets it. The choice is saved in
+the config as `pre_state_bag_height` (`null` = default).
 
 ### 5.6 Warning banner
 
@@ -401,7 +408,7 @@ pub fn warning_banner(ui, theme, message: &str)
 pub fn col_text(ui, theme, width: f32, text: &str, font: FontId, color: Color32, align: Align)
 ```
 
-`rounded_section` stays for the other editors.
+`rounded_section` had no other users and was removed (2026-10-15).
 
 ---
 

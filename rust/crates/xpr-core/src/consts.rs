@@ -3,13 +3,9 @@
 
 use std::path::{Path, PathBuf};
 
-pub const APP_VERSION: &str = "v6.1a";
+pub const APP_VERSION: &str = "v6.1b";
 pub const APP_RELEASE_DATE: &str = "2026-Sep-11";
-/// The Python release this port reproduces (used by the golden tooling).
-pub const REFERENCE_APP_VERSION: &str = "v5.0a";
 
-pub const DEBUG_MODE: bool = false;
-pub const DEBUG_RECORDING_MODE: bool = false;
 pub const APP_NAME: &str = "pkmn_xp_router";
 pub const APP_DATA_FOLDER_DEFAULT_NAME: &str = "pkmn_xp_router_data";
 pub const USER_LOCATION_DATA_KEY: &str = "user_data_location";
@@ -54,7 +50,6 @@ pub const BASE_DEF_KEY: &str = "base_def";
 pub const BASE_SPA_KEY: &str = "base_spc_atk";
 pub const BASE_SPD_KEY: &str = "base_spc_def";
 pub const OLD_BASE_SPD_KEY: &str = "base_spd";
-pub const BASE_SPE_KEY: &str = "base_spe";
 pub const BASE_SPC_KEY: &str = "base_spc";
 pub const EV_YIELD_KEY: &str = "ev_yield";
 pub const EV_YIELD_HP_KEY: &str = "ev_yield_hp";
@@ -65,7 +60,6 @@ pub const EV_YIELD_SPC_DEF_KEY: &str = "ev_yield_spc_def";
 pub const EV_YIELD_SPD_KEY: &str = "ev_yield_spd";
 pub const FIRST_TYPE_KEY: &str = "type_1";
 pub const SECOND_TYPE_KEY: &str = "type_2";
-pub const CATCH_RATE_KEY: &str = "catch_rate";
 pub const BASE_XP_KEY: &str = "base_xp";
 pub const BASE_EXPERIENCE_KEY: &str = "base_experience";
 pub const INITIAL_MOVESET_KEY: &str = "initial_moveset";
@@ -84,8 +78,6 @@ pub const STAT_KEY: &str = "stat";
 pub const MODIFIER_KEY: &str = "modifier";
 pub const TARGET_KEY: &str = "target";
 pub const EFFECT_TARGET_SELF: &str = "self";
-pub const EFFECT_TARGET_ENEMY: &str = "enemy";
-pub const EFFECT_TARGET_FOE: &str = "foe";
 pub const NATURE_KEY: &str = "nature";
 
 pub const REALIZED_STAT_XP_KEY: &str = "realized_stat_xp";
@@ -94,7 +86,6 @@ pub const SOLO_MON_KEY: &str = "solo_mon";
 pub const BADGES_KEY: &str = "badges";
 pub const INVENTORY_KEY: &str = "inventory";
 pub const XP_TO_NEXT_LEVEL: &str = "xp_to_next_level";
-pub const PERCENT_XP_TO_NEXT_LEVEL: &str = "percent_xp_to_next_level";
 pub const ITEMS_KEY: &str = "items";
 pub const COUNT_KEY: &str = "count";
 
@@ -124,11 +115,9 @@ pub const TRAINER_CLASS: &str = "trainer_class";
 pub const ROM_ID: &str = "rom_id";
 pub const TRAINER_ID: &str = "trainer_id";
 pub const TRAINER_LOC: &str = "trainer_location";
-pub const TRAINER_PARTY: &str = "party";
 pub const TRAINER_POKEMON: &str = "pokemon";
 pub const TRAINER_REFIGHTABLE: &str = "refightable";
 pub const TRAINER_DOUBLE_BATTLE: &str = "is_double_battle";
-pub const SPECIAL_MOVES: &str = "special_moves";
 pub const MONEY: &str = "money";
 pub const VERBOSE_KEY: &str = "verbose";
 pub const TEST_MOVES_KEY: &str = "test_moves";
@@ -169,7 +158,6 @@ pub const BASE_POWER: &str = "base_power";
 pub const MOVE_PP: &str = "pp";
 pub const MOVE_ACCURACY: &str = "accuracy";
 pub const MOVE_EFFECTS: &str = "effects";
-pub const MOVE_EFFECT: &str = "effect";
 pub const MOVE_FLAVOR: &str = "attack_flavor";
 pub const MOVE_TARGET: &str = "target";
 pub const MOVE_CATEGORY: &str = "category";
@@ -210,7 +198,6 @@ pub const ALL_HIGHLIGHT_STRATS: [&str; 4] = [
     HIGHLIGHT_NONE,
 ];
 
-pub const DEFAULT_FOLDER_NAME: &str = "Main";
 pub const EVENT_FOLDER_NAME: &str = "Event Folder Name";
 pub const INVENTORY_EVENT_DEFINITON: &str = "Inventory Event";
 
@@ -237,14 +224,6 @@ pub const TASK_EV_OVERRIDE: &str = "EV Override";
 pub const TASK_NOTES_ONLY: &str = "Just Notes";
 pub const ERROR_SEARCH: &str = "Invalid Events";
 pub const MAJOR_BATTLE_FILTER: &str = "Major Battles";
-
-pub const ITEM_ROUTE_EVENT_TYPES: [&str; 5] = [
-    TASK_GET_FREE_ITEM,
-    TASK_PURCHASE_ITEM,
-    TASK_USE_ITEM,
-    TASK_SELL_ITEM,
-    TASK_HOLD_ITEM,
-];
 
 pub const ROUTE_EVENT_TYPES: [&str; 19] = [
     TASK_TRAINER_BATTLE,
@@ -337,7 +316,6 @@ pub const EVENT_TAG_ERRORS: &str = "errors";
 /// items were found at other slots). Never makes the run invalid.
 pub const EVENT_TAG_WARNINGS: &str = "warnings";
 pub const EVENT_TAG_BRANCHED_MANDATORY: &str = "branched_mandatory";
-pub const EVENT_TAG_FOLDER: &str = "folder";
 
 pub const FIGHT_CATEGORY_RIVAL: &str = "rival";
 pub const FIGHT_CATEGORY_GYM_LEADER: &str = "gym_leader";
@@ -420,16 +398,7 @@ pub const DEBUG_MODE_KEY: &str = "debug_mode";
 pub const AUTO_SWITCH_KEY: &str = "auto_switch";
 pub const NOTES_VISIBILITY_KEY: &str = "notes_visibility";
 
-pub const IMPORTANT_COLOR: &str = "#b3b6b7";
-pub const USER_FLAGGED_COLOR: &str = "#ff8888";
-pub const VALID_COLOR: &str = "#abebc6";
-pub const ERROR_COLOR: &str = "#f9e79f";
-
-pub const CONFIG_ROUTE_ONE_PATH: &str = "route_one_path";
 pub const CONFIG_WINDOW_GEOMETRY: &str = "tkinter_window_geometry";
-
-pub const STATE_SUMMARY_LABEL: &str = "State Summary";
-pub const BADGE_BOOST_LABEL: &str = "Badge Boost Calculator";
 
 pub const ROOT_FOLDER_NAME: &str = "ROOT";
 
@@ -598,7 +567,6 @@ pub const SPEED_SLOWING_ITEMS: [&str; 7] = [
 
 pub const TARGETING_BOTH_ENEMIES: &str = "target_both_enemies";
 
-pub const TYPE_TYPELESS: &str = "none";
 pub const TYPE_NORMAL: &str = "Normal";
 pub const TYPE_FIGHTING: &str = "Fighting";
 pub const TYPE_FLYING: &str = "Flying";
@@ -680,7 +648,6 @@ pub const DEFAULT_OUTRO_TIME: f64 = 1.195;
 pub const DEFAULT_KO_TIME: f64 = 1.84;
 pub const DEFAULT_SEND_OUT_TIME: f64 = 0.75;
 
-pub const GAME_SAVED_FRAGMENT: &str = "Game Saved: ";
 pub const RECORDING_ERROR_FRAGMENT: &str = "ERROR RECORDING! ";
 pub const BACKPORT_SPECIES_CHECK: &str = "backport";
 // trainer_class of the champion in the trainer DBs; recorders use it to know a
@@ -766,14 +733,6 @@ impl Paths {
         self.saved_routes_dir = user_data_dir.join(SAVED_ROUTES_FOLDER_NAME);
         self.outdated_routes_dir = user_data_dir.join(OUTDATED_ROUTES_FOLDER_NAME);
         self.custom_gens_dir = user_data_dir.join(CUSTOM_GENS_FOLDER_NAME);
-    }
-
-    pub fn all_user_data_paths(&self) -> [&Path; 3] {
-        [
-            &self.saved_routes_dir,
-            &self.outdated_routes_dir,
-            &self.custom_gens_dir,
-        ]
     }
 
     /// `Constants.get_potential_user_data_dirs`

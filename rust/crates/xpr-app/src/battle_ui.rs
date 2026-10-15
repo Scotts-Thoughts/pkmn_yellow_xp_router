@@ -170,10 +170,6 @@ impl BattleSummaryUi {
         self.should_render = true;
     }
 
-    pub fn set_legacy_expanded(&mut self, v: bool) {
-        self.legacy_expanded = v;
-    }
-
     // ---- candy stepper (immediate) / debounced vitamins -----------------------------
 
     /// `_on_candy_adjust(delta)`: apply the click to the route right away.

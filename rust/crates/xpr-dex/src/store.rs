@@ -109,11 +109,6 @@ impl DexStore {
             .clone()
     }
 
-    /// Whether a game's table is already in memory (no load is started).
-    pub fn is_game_loaded(&self, game: &str) -> bool {
-        game_idx(game).map(|i| self.games[i].get().is_some()).unwrap_or(false)
-    }
-
     /// A game's wild encounters by species; `None` when the game has none.
     pub fn encounters(&self, game: &str) -> Option<Arc<EncounterTable>> {
         let idx = game_idx(game)?;

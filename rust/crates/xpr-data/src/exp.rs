@@ -159,8 +159,8 @@ impl LevelLookup {
 
 /// Cached lookups for the six growth rates (`universal_utils.level_lookups`).
 pub fn level_lookup(growth_rate: &str) -> Option<&'static LevelLookup> {
-    use once_cell::sync::Lazy;
-    static LOOKUPS: Lazy<Vec<LevelLookup>> = Lazy::new(|| {
+    use std::sync::LazyLock;
+    static LOOKUPS: LazyLock<Vec<LevelLookup>> = LazyLock::new(|| {
         ALL_GROWTH_RATES
             .iter()
             .map(|g| LevelLookup::new(g).expect("static growth rates are valid"))

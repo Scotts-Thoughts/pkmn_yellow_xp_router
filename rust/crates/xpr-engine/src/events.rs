@@ -616,26 +616,12 @@ impl TrainerEventDefinition {
         self.second_trainer_name = Value::String(name.to_string());
     }
 
-    pub fn is_verbose(&self) -> bool {
-        truthy(&self.verbose_export)
-    }
-
-    pub fn set_verbose(&mut self, v: bool) {
-        self.verbose_export = Value::Bool(v);
-    }
-
     pub fn is_transformed(&self) -> bool {
         truthy(&self.transformed)
     }
 
     pub fn set_transformed(&mut self, v: bool) {
         self.transformed = Value::Bool(v);
-    }
-
-    /// `trainer_def.weather` as the damage code sees it (`None` -> falsy;
-    /// the battle summary treats a missing weather as `WEATHER_NONE`).
-    pub fn weather_str(&self) -> &str {
-        self.weather.as_deref().unwrap_or(consts::WEATHER_NONE)
     }
 
     /// Python `isinstance(pay_day_amount, int)` (bools count as ints there,
@@ -1309,14 +1295,6 @@ impl EventDefinition {
 
     pub fn recorded_time_str(&self) -> Option<String> {
         match &self.recorded_time {
-            Value::Null => None,
-            Value::String(s) => Some(s.clone()),
-            other => Some(pyjson::python_str_number(other)),
-        }
-    }
-
-    pub fn split_time_str(&self) -> Option<String> {
-        match &self.split_time {
             Value::Null => None,
             Value::String(s) => Some(s.clone()),
             other => Some(pyjson::python_str_number(other)),

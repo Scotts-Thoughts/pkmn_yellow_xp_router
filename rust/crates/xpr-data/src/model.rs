@@ -1,6 +1,5 @@
 //! Port of `pkmn/universal_data_objects.py`: the shared value types.
 
-use std::sync::Arc;
 
 use indexmap::IndexMap;
 use serde_json::Value;
@@ -381,12 +380,6 @@ impl StatBlock {
     pub fn as_stat_xp(&self) -> StatBlock {
         let mut c = *self;
         c.is_stat_xp = true;
-        c
-    }
-
-    pub fn with_gen(&self, gen: Gen) -> StatBlock {
-        let mut c = *self;
-        c.gen = gen;
         c
     }
 
@@ -880,4 +873,3 @@ impl FieldStatus {
     }
 }
 
-pub type SpeciesRef = Arc<PokemonSpecies>;

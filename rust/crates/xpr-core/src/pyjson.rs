@@ -25,13 +25,6 @@ pub fn dumps_indent4(value: &Value) -> String {
     out
 }
 
-/// `json.dumps(value, indent=indent)`.
-pub fn dumps_indent(value: &Value, indent: usize) -> String {
-    let mut out = String::new();
-    write_value(&mut out, value, 0, indent);
-    out
-}
-
 /// `json.dumps(value)` (compact-ish: Python's default separators are
 /// `', '` and `': '`).
 pub fn dumps_compact(value: &Value) -> String {
@@ -239,12 +232,6 @@ pub fn python_float_repr(f: f64) -> String {
     result
 }
 
-/// `f"{x:.1f}"` and friends: Rust's fixed formatting is correctly rounded with
-/// ties-to-even on the exact binary value, which is what CPython does too.
-pub fn python_fixed(f: f64, decimals: usize) -> String {
-    format!("{:.*}", decimals, f)
-}
-
 /// Python's `round(x)` -> int (round half to even).
 pub fn python_round_int(f: f64) -> i64 {
     f.round_ties_even() as i64
@@ -339,24 +326,12 @@ pub fn get<'a>(v: &'a Value, key: &str) -> Option<&'a Value> {
     v.as_object().and_then(|o| o.get(key))
 }
 
-/// `dict.get(key)` collapsing both "missing" and `null` to `None`.
-pub fn get_non_null<'a>(v: &'a Value, key: &str) -> Option<&'a Value> {
-    match get(v, key) {
-        Some(Value::Null) | None => None,
-        other => other,
-    }
-}
-
 pub fn get_str<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
     get(v, key).and_then(|x| x.as_str())
 }
 
 pub fn get_i64(v: &Value, key: &str) -> Option<i64> {
     get(v, key).and_then(value_as_i64)
-}
-
-pub fn get_bool(v: &Value, key: &str) -> Option<bool> {
-    get(v, key).and_then(|x| x.as_bool())
 }
 
 /// Python `int()`-like view of a number: integers as-is, floats truncated.

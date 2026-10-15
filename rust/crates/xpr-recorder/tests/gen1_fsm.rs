@@ -392,3 +392,94 @@ fn an_item_the_route_cannot_hold_is_not_a_slot() {
     assert_eq!(swap_strings(&got[0]), vec!["Potion (1) <-> Antidote (3)".to_string()]);
     sim.machine.shutdown();
 }
+
+// ---- purchases --------------------------------------------------------------------------
+
+fn acquires(got: &[EventDefinition]) -> Vec<(String, bool)> {
+    got.iter().filter_map(|d| d.item_event_def.as_ref()).filter(|i| i.is_acquire).map(|i| (i.item_name.clone(), i.with_money)).collect()
+}
+
+#[test]
+fn a_purchase_whose_money_change_arrives_first_is_still_a_purchase() {
+    // the mart adds the item and takes the money in one frame; the replay
+    // import hands the recorder that frame's money change first
+    let (mut sim, controller, events) = overworld_sim(&[("POTION", 1)]);
+    sim.set("bag.money", json!(2400));
+    set_bag(&mut sim, &controller, &[("POTION", 1), ("POKé BALL", 3)]);
+    let got = collect_events(&events, 1);
+    assert_eq!(acquires(&got), vec![("Poke Ball".to_string(), true)], "{:?}", labels(&events));
+    sim.machine.shutdown();
+}
+
+#[test]
+fn an_earlier_money_loss_does_not_make_a_pickup_a_purchase() {
+    // the Safari Zone fee, then an item found a while later
+    let (mut sim, controller, events) = overworld_sim(&[("POTION", 1)]);
+    sim.set("bag.money", json!(2500));
+    sim.tick(1);
+    set_bag(&mut sim, &controller, &[("POTION", 1), ("CARBOS", 1)]);
+    let got = collect_events(&events, 1);
+    assert_eq!(acquires(&got), vec![("Carbos".to_string(), false)], "{:?}", labels(&events));
+    sim.machine.shutdown();
+}
+
+// ---- battles whose changes the feed missed ------------------------------------------
+
+fn trainer_names(got: &[EventDefinition]) -> Vec<String> {
+    got.iter().filter_map(|d| d.trainer_def.as_ref().map(|t| t.trainer_name.clone())).collect()
+}
+
+#[test]
+fn a_battle_that_began_while_the_feed_was_down_is_still_recorded() {
+    let (mut sim, controller, events) = overworld_sim(&[("POTION", 1)]);
+    // the battle starts unseen (a GameHook reconnect): the store has it, the machine was not told
+    sim.store.set_value("battle.opponent.trainer", json!("LASS")).unwrap();
+    sim.store.set_value("battle.opponent.id", json!(1)).unwrap();
+    sim.store.set_value("battle.mode", json!("Trainer")).unwrap();
+    // the first change seen is the stat exp of a knocked-out mon: a battle, not a vitamin
+    sim.set("player.team.0.evs.hp", json!(50));
+    assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Battle));
+    sim.tick(2);
+    sim.set("battle.mode", Value::Null);
+    assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Overworld));
+    let got = collect_events(&events, 1);
+    assert_eq!(trainer_names(&got), vec!["Lass 1".to_string()], "{:?}", labels(&events));
+    sim.machine.shutdown();
+}
+
+#[test]
+fn trainer_names_follow_the_trainer_data_whatever_the_mapper_calls_the_class() {
+    // the replay import's mapper says "LT. SURGE" (the live one "LT.SURGE"):
+    // the fight must still be "LtSurge 1", or the fight-reward lookup misses
+    // and his TM24 is recorded a second time on top of the engine's reward
+    let (mut sim, controller, events) = overworld_sim(&[("POTION", 1)]);
+    sim.set("battle.opponent.trainer", json!("LT. SURGE"));
+    sim.set("battle.opponent.id", json!(1));
+    sim.set("battle.mode", json!("Trainer"));
+    sim.tick(2);
+    sim.set("battle.mode", Value::Null);
+    assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Overworld));
+    set_bag(&mut sim, &controller, &[("POTION", 1), ("TM24:THUNDERBOLT", 1)]);
+    let got = collect_events(&events, 1);
+    assert_eq!(got.len(), 1, "the reward TM is not a separate event: {:?}", labels(&events));
+    assert_eq!(trainer_names(&got), vec!["LtSurge 1".to_string()]);
+    sim.machine.shutdown();
+}
+
+#[test]
+fn back_to_back_fights_whose_gap_was_missed_are_both_recorded() {
+    let (mut sim, controller, events) = overworld_sim(&[("POTION", 1)]);
+    sim.set("battle.opponent.trainer", json!("LASS"));
+    sim.set("battle.opponent.id", json!(1));
+    sim.set("battle.mode", json!("Trainer"));
+    sim.tick(2);
+    // the first fight ends and the next begins without the feed showing the battle mode drop
+    sim.set("battle.opponent.id", json!(2));
+    assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Overworld));
+    sim.tick(3);
+    assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Battle));
+    sim.set("battle.mode", Value::Null);
+    let got = collect_events(&events, 2);
+    assert_eq!(trainer_names(&got), vec!["Lass 1".to_string(), "Lass 2".to_string()], "{:?}", labels(&events));
+    sim.machine.shutdown();
+}

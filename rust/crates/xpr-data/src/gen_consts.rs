@@ -3,7 +3,7 @@
 //! `xpr_core::consts::Paths` / the registry.
 
 use indexmap::IndexMap;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 use xpr_core::consts;
 
@@ -280,7 +280,6 @@ pub const TECHNICIAN: &str = "Technician";
 pub const TINTED_LENS: &str = "Tinted Lens";
 pub const MULTITYPE: &str = "Multitype";
 pub const INSOMNIA: &str = "Insomnia";
-pub const SLOW_START: &str = "Slow Start";
 pub const IRON_FIST: &str = "Iron Fist";
 pub const RECKLESS: &str = "Reckless";
 
@@ -451,10 +450,10 @@ const NATURAL_GIFT_TABLE: &[(&str, i64, i64, &str)] = &[
     ("Rowap Berry", 80, 100, consts::TYPE_DARK),
 ];
 
-pub static GEN4_NATURAL_GIFT: Lazy<IndexMap<&'static str, (i64, &'static str)>> = Lazy::new(|| {
+pub static GEN4_NATURAL_GIFT: LazyLock<IndexMap<&'static str, (i64, &'static str)>> = LazyLock::new(|| {
     NATURAL_GIFT_TABLE.iter().map(|(b, p4, _, t)| (*b, (*p4, *t))).collect()
 });
-pub static GEN5_NATURAL_GIFT: Lazy<IndexMap<&'static str, (i64, &'static str)>> = Lazy::new(|| {
+pub static GEN5_NATURAL_GIFT: LazyLock<IndexMap<&'static str, (i64, &'static str)>> = LazyLock::new(|| {
     NATURAL_GIFT_TABLE.iter().map(|(b, _, p5, t)| (*b, (*p5, *t))).collect()
 });
 
@@ -467,7 +466,7 @@ pub fn natural_gift(gen: Gen, held_item: Option<&str>) -> Option<(i64, &'static 
     }
 }
 
-pub static GEN4_FLING_POWER: Lazy<IndexMap<&'static str, i64>> = Lazy::new(|| {
+pub static GEN4_FLING_POWER: LazyLock<IndexMap<&'static str, i64>> = LazyLock::new(|| {
     let entries: &[(&str, i64)] = &[
         ("Iron Ball", 130),
         ("Hard Stone", 100), ("Rare Bone", 100),
@@ -570,7 +569,7 @@ fn two(a: &str, b: &str) -> Vec<String> {
 
 /// `CUSTOM_MOVE_DATA` per gen (move name -> dropdown options).
 pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<String>> {
-    static GEN1: Lazy<IndexMap<&'static str, Vec<String>>> = Lazy::new(|| {
+    static GEN1: LazyLock<IndexMap<&'static str, Vec<String>>> = LazyLock::new(|| {
         let mut m = IndexMap::new();
         m.insert(
             "Super Fang",
@@ -592,7 +591,7 @@ pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<S
         m.insert("Bide", cb);
         m
     });
-    static GEN2: Lazy<IndexMap<&'static str, Vec<String>>> = Lazy::new(|| {
+    static GEN2: LazyLock<IndexMap<&'static str, Vec<String>>> = LazyLock::new(|| {
         let mut m = IndexMap::new();
         m.insert(MAGNITUDE_MOVE, magnitude_options());
         m.insert(consts::FLAIL_MOVE_NAME, flail_options());
@@ -616,7 +615,7 @@ pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<S
         m.insert(BEAT_UP_MOVE, range_strings(1, 7, 1));
         m
     });
-    static GEN3: Lazy<IndexMap<&'static str, Vec<String>>> = Lazy::new(|| {
+    static GEN3: LazyLock<IndexMap<&'static str, Vec<String>>> = LazyLock::new(|| {
         let mut m = IndexMap::new();
         m.insert(MAGNITUDE_MOVE, magnitude_options());
         m.insert(consts::FLAIL_MOVE_NAME, flail_options());
@@ -653,7 +652,7 @@ pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<S
         m.insert(BIDE_MOVE, cb);
         m
     });
-    static GEN4: Lazy<IndexMap<&'static str, Vec<String>>> = Lazy::new(|| {
+    static GEN4: LazyLock<IndexMap<&'static str, Vec<String>>> = LazyLock::new(|| {
         let mut m = IndexMap::new();
         m.insert(MAGNITUDE_MOVE, magnitude_options());
         m.insert(consts::FLAIL_MOVE_NAME, flail_options());
@@ -695,7 +694,7 @@ pub fn custom_move_data_table(gen: Gen) -> &'static IndexMap<&'static str, Vec<S
         m.insert(BEAT_UP_MOVE, range_strings(1, 7, 1));
         m
     });
-    static GEN5: Lazy<IndexMap<&'static str, Vec<String>>> = Lazy::new(|| {
+    static GEN5: LazyLock<IndexMap<&'static str, Vec<String>>> = LazyLock::new(|| {
         let mut m = IndexMap::new();
         m.insert(MAGNITUDE_MOVE, magnitude_options());
         m.insert(consts::FLAIL_MOVE_NAME, flail_options());

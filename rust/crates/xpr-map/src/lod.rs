@@ -37,27 +37,6 @@ impl Pixmap {
         [self.data[i], self.data[i + 1], self.data[i + 2], self.data[i + 3]]
     }
 
-    /// Copy a rectangle of `src` (src_x, src_y, w, h) to (dst_x, dst_y),
-    /// clipped to both images. Opaque copy (no blending).
-    pub fn blit(&mut self, dst_x: i32, dst_y: i32, src: &Pixmap, src_x: i32, src_y: i32, w: i32, h: i32) {
-        for row in 0..h {
-            let sy = src_y + row;
-            let dy = dst_y + row;
-            if sy < 0 || dy < 0 || sy >= src.h as i32 || dy >= self.h as i32 {
-                continue;
-            }
-            let x_start = (-dst_x).max(-src_x).max(0);
-            let x_end = w.min(self.w as i32 - dst_x).min(src.w as i32 - src_x);
-            if x_end <= x_start {
-                continue;
-            }
-            let si = ((sy as usize) * src.w + (src_x + x_start) as usize) * 4;
-            let di = ((dy as usize) * self.w + (dst_x + x_start) as usize) * 4;
-            let n = (x_end - x_start) as usize * 4;
-            self.data[di..di + n].copy_from_slice(&src.data[si..si + n]);
-        }
-    }
-
     /// Box-downsample `src` by `factor` into this image at (dst_x, dst_y).
     pub fn downsample_into(&mut self, dst_x: usize, dst_y: usize, src: &Pixmap, factor: usize) {
         let ow = src.w / factor;

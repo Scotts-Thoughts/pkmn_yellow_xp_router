@@ -152,10 +152,6 @@ impl RecorderController {
         (self.wake)();
     }
 
-    pub fn get_status(&self) -> Option<String> {
-        self.status.lock().unwrap().status.clone()
-    }
-
     pub fn set_ready(&self, new_val: bool) {
         self.status.lock().unwrap().ready = Some(new_val);
         (self.wake)();

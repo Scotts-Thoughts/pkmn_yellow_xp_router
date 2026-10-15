@@ -7,7 +7,6 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use xpr_core::consts;
-use xpr_core::floor_div;
 use xpr_data::badges::BadgeList;
 use xpr_data::exp;
 use xpr_data::model::{BaseItem, EnemyPkmn, Nature, PokemonSpecies, StageModifiers, StatBlock};
@@ -1088,7 +1087,3 @@ fn py_opt(s: Option<&str>) -> String {
     }
 }
 
-/// Python's `floor(x / n)` helper re-exported for the router.
-pub fn floor_div_i64(a: i64, b: i64) -> i64 {
-    floor_div(a, b)
-}

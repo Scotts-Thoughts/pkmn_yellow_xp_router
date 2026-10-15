@@ -66,6 +66,8 @@ pub struct EventDetails {
     cur_delayed_deadline: Option<Instant>,
     deferred_show_at: Option<Instant>,
     last_pkmn: Option<LastPkmn>,
+    /// the Pre-Event State cards-row height the user dragged / expanded to
+    bag_h: Option<f32>,
     editor_reload_pending: bool,
 }
 
@@ -87,6 +89,7 @@ impl EventDetails {
             cur_delayed_deadline: None,
             deferred_show_at: None,
             last_pkmn: None,
+            bag_h: cfg.get_pre_state_bag_height().map(|v| v as f32),
             editor_reload_pending: false,
         }
     }
@@ -468,7 +471,9 @@ impl EventDetails {
                 return;
             }
             if self.tab == PRE_STATE_TAB {
-                self.pre_state_tab(ui, theme, cfg, ctrl, assets, content_h, actions);
+                if let Some(h) = self.pre_state_tab(ui, theme, cfg, ctrl, assets, content_h, actions) {
+                    cfg.set_pre_state_bag_height(h.map(f64::from));
+                }
             } else {
                 let pane = egui::Frame::new().stroke(theme.border_stroke()).inner_margin(egui::Margin::same(0));
                 pane.show(ui, |ui| {
@@ -592,8 +597,10 @@ impl EventDetails {
         Some((view, ctrl.pp.messages(&ctrl.router, id)))
     }
 
+    /// Returns the cards-row height to save when the user changed it.
     #[allow(clippy::too_many_arguments)]
-    fn pre_state_tab(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, ctrl: &mut MainController, assets: &mut Assets, height: f32, actions: &mut DetailsActions) {
+    fn pre_state_tab(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, ctrl: &mut MainController, assets: &mut Assets, height: f32, actions: &mut DetailsActions) -> Option<Option<f32>> {
+        let mut bag_height = None;
         let (moves_pp, pp_messages) = match Self::moves_pp(cfg, ctrl) {
             Some((v, m)) => (Some(v), m),
             None => (None, Vec::new()),
@@ -606,7 +613,8 @@ impl EventDetails {
                 let gen = ctrl.gen();
                 let state = self.current_init_state.clone();
                 let before = Self::before_info(ctrl);
-                let clicks = state_views::state_viewer(ui, theme, gen.as_deref(), state.as_deref(), moves_pp.as_ref(), &mut self.last_pkmn, assets, &before);
+                let clicks = state_views::state_viewer(ui, theme, gen.as_deref(), state.as_deref(), moves_pp.as_ref(), &mut self.last_pkmn, &mut self.bag_h, assets, &before);
+                bag_height = clicks.bag_height;
                 if clicks.move_slot.is_some() {
                     actions.pre_state_assign_move_slot = clicks.move_slot;
                 }
@@ -618,8 +626,9 @@ impl EventDetails {
                 }
                 let mut warnings = Self::selected_warnings(ctrl);
                 warnings.extend(pp_messages.iter().cloned());
+                // the cards row ends with its resize handle, which is the gap
+                // below it
                 if !warnings.is_empty() {
-                    ui.add_space(state_views::CARD_GAP);
                     for (i, w) in warnings.iter().enumerate() {
                         if i > 0 {
                             ui.add_space(6.0);
@@ -628,7 +637,9 @@ impl EventDetails {
                     }
                 }
                 if let (Some(et), Some(gen)) = (self.current_event_type.clone(), gen) {
-                    ui.add_space(state_views::CARD_GAP);
+                    if !warnings.is_empty() {
+                        ui.add_space(state_views::CARD_GAP);
+                    }
                     let init = self.current_init_state.clone();
                     let ctx = EditorCtx { theme, gen: &gen, cfg, cur_state: init.as_deref(), event_type: &et, enabled: self.allow_updates };
                     let (out, reload) = self.editors.ui(ui, &ctx, assets, &before);
@@ -658,6 +669,7 @@ impl EventDetails {
                 }
             }
         }
+        bag_height
     }
 
     fn battle_tab(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, ctrl: &mut MainController, assets: &mut Assets, actions: &mut DetailsActions) {

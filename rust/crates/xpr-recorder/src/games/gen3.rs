@@ -317,18 +317,6 @@ impl Gen3Converter {
         item_name.starts_with("TM")
     }
 
-    const TUTOR_MOVES: [&'static str; 35] = [
-        "Body Slam", "Counter", "Double Edge", "Double-Edge", "Dream Eater", "Explosion", "Mega Kick", "Mega Punch", "Metronome", "Mimic", "Rock Slide",
-        "Seismic Toss", "Softboiled", "Substitute", "Swords Dance", "Thunder Wave", "Blast Burn", "Frenzy Plant", "Hydro Cannon", "Dynamicpunch",
-        "Dynamic Punch", "Fury Cutter", "Rollout", "Sleep Talk", "Swagger", "Defense Curl", "Snore", "Mud Slap", "Swift", "Icy Wind", "Endure", "Psych Up",
-        "Ice Punch", "Thunderpunch", "Thunder Punch",
-    ];
-
-    pub fn is_tutor_move(&self, gh_move_name: &str) -> bool {
-        let p = name_prettify(gh_move_name);
-        Self::TUTOR_MOVES.contains(&p.as_str()) || p == "Fire Punch"
-    }
-
     pub fn get_hm_name(&self, gh_move_name: &str) -> Option<&'static str> {
         match name_prettify(gh_move_name).as_str() {
             "Cut" => Some("HM01 Cut"),

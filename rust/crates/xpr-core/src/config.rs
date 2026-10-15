@@ -472,6 +472,7 @@ pub struct Config {
     suppress_update_prompt: Value,
     notes_collapsed: Value,
     pre_state_left_fraction: Value,
+    pre_state_bag_height: Value,
     battle_summary_left_fraction: Value,
     map_docked: Value,
     map_open: Value,
@@ -606,6 +607,7 @@ impl Config {
             suppress_update_prompt: gv("suppress_update_prompt", Value::Bool(false)),
             notes_collapsed: gv("notes_collapsed", Value::Bool(false)),
             pre_state_left_fraction: gv("pre_state_left_fraction", Value::Null),
+            pre_state_bag_height: gv("pre_state_bag_height", Value::Null),
             battle_summary_left_fraction: gv("battle_summary_left_fraction", Value::Null),
             map_docked: gv("map_docked", Value::Bool(true)),
             map_open: gv("map_open", Value::Bool(false)),
@@ -670,6 +672,7 @@ impl Config {
             ("suppress_update_prompt".into(), self.suppress_update_prompt.clone()),
             ("notes_collapsed".into(), self.notes_collapsed.clone()),
             ("pre_state_left_fraction".into(), self.pre_state_left_fraction.clone()),
+            ("pre_state_bag_height".into(), self.pre_state_bag_height.clone()),
             ("battle_summary_left_fraction".into(), self.battle_summary_left_fraction.clone()),
             ("map_docked".into(), self.map_docked.clone()),
             ("map_open".into(), self.map_open.clone()),
@@ -736,9 +739,6 @@ impl Config {
 
     pub fn get_user_data_dir(&self) -> PathBuf {
         PathBuf::from(&self.user_data_dir)
-    }
-    pub fn get_user_data_dir_str(&self) -> &str {
-        &self.user_data_dir
     }
     pub fn set_user_data_dir(&mut self, new_dir: &str) {
         self.user_data_dir = new_dir.to_string();
@@ -873,6 +873,13 @@ impl Config {
     pub fn get_pre_state_left_fraction(&self) -> Option<f64> { pyjson::value_as_f64(&self.pre_state_left_fraction) }
     pub fn set_pre_state_left_fraction(&mut self, v: Option<f64>) {
         self.pre_state_left_fraction = v.map(|f| Value::from(f)).unwrap_or(Value::Null);
+        self.save();
+    }
+    /// Height of the Pre-Event State cards row as dragged / expanded by the
+    /// user; `None` fits it to the Stats and Moves cards.
+    pub fn get_pre_state_bag_height(&self) -> Option<f64> { pyjson::value_as_f64(&self.pre_state_bag_height) }
+    pub fn set_pre_state_bag_height(&mut self, v: Option<f64>) {
+        self.pre_state_bag_height = v.map(|f| Value::from(f)).unwrap_or(Value::Null);
         self.save();
     }
     pub fn get_battle_summary_left_fraction(&self) -> Option<f64> { pyjson::value_as_f64(&self.battle_summary_left_fraction) }
@@ -1066,10 +1073,6 @@ impl Config {
     pub fn reset_all_shortcuts(&mut self) {
         self.shortcut_overrides.clear();
         self.save();
-    }
-
-    pub fn is_shortcut_customized(&self, action_id: &str) -> bool {
-        self.shortcut_overrides.contains_key(action_id)
     }
 
     pub fn export_shortcuts(&self, file_path: &Path) -> std::io::Result<()> {

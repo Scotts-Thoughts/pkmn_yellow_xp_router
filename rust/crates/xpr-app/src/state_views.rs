@@ -24,6 +24,9 @@ const BAG_ROW_H: f32 = 25.0;
 const EMPTY_BAG_H: f32 = 72.0;
 /// Bag rows drawn before the overflow row takes the last slot.
 const MAX_BAG_ROWS: usize = 20;
+/// Stored cards-row height meaning "expanded": clamped to the whole bag, so it
+/// stays expanded as the bag grows.
+const BAG_EXPANDED: f32 = 100_000.0;
 /// Column widths of the stats table: (Now, from EVs, real / total).
 const STAT_COLS_EV: [f32; 3] = [56.0, 78.0, 108.0];
 const STAT_COLS_STATEXP: [f32; 3] = [56.0, 86.0, 118.0];
@@ -523,19 +526,36 @@ fn bag_rows(inv: &Inventory) -> Vec<(String, Option<i64>, String)> {
     out
 }
 
-fn bag_inner_height(items: usize) -> f32 {
-    let body = if items == 0 { EMPTY_BAG_H } else { items.min(MAX_BAG_ROWS) as f32 * BAG_ROW_H };
+/// Inner height of a Bag card that shows every row.
+fn bag_full_height(inventory: Option<&Inventory>) -> f32 {
+    let rows = inventory.map(|i| i.cur_items.len().min(MAX_BAG_ROWS)).unwrap_or(0);
+    let body = if rows == 0 { EMPTY_BAG_H } else { rows as f32 * BAG_ROW_H };
     CARD_TITLE_H + TITLE_GAP + MONEY_ROW_H + body
 }
 
-pub fn bag_card(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory>, min_inner_h: f32) {
+/// Draws the Bag card at exactly `inner_h`; rows that don't fit scroll
+/// inside it. `expanded` is `Some` when the card can't show the whole bag at
+/// its default height: the title then has an Expand / Collapse button.
+/// Returns true when that button was clicked.
+pub fn bag_card(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory>, inner_h: f32, expanded: Option<bool>) -> bool {
     let rows = inventory.map(bag_rows).unwrap_or_default();
     let n_items = inventory.map(|i| i.cur_items.len()).unwrap_or(0).min(MAX_BAG_ROWS);
     let money = inventory.map(|i| i.cur_money).unwrap_or(0);
+    let mut toggled = false;
     widgets::card(ui, theme, None, |ui| {
-        ui.set_min_height(min_inner_h);
+        ui.set_min_height(inner_h);
         ui.spacing_mut().item_spacing.y = 0.0;
-        widgets::card_title(ui, theme, "Bag", Some(&format!("{} of {} slots", n_items, MAX_BAG_ROWS)));
+        let caption = format!("{} of {} slots", n_items, MAX_BAG_ROWS);
+        let title = widgets::card_title(ui, theme, "Bag", Some(&caption));
+        if let Some(expanded) = expanded {
+            let cap_w = widgets::text_width(ui, &caption, &theme.caption_font());
+            let left = title.min.x + 40.0;
+            let r = Rect::from_min_max(Pos2::new(left, title.min.y), Pos2::new((title.max.x - cap_w - 8.0).max(left), title.max.y));
+            let mut bui = ui.new_child(egui::UiBuilder::new().max_rect(r).layout(Layout::right_to_left(Align::Center)));
+            let (text, tip) = if expanded { ("Collapse", "Fit the bag to the Stats and Moves cards") } else { ("Expand", "Show the whole bag") };
+            let resp = widgets::StyledButton::new(theme, text).min_size(Vec2::new(0.0, 20.0)).padding(Vec2::new(6.0, 1.0)).show(&mut bui);
+            toggled = resp.on_hover_text(tip).clicked();
+        }
         ui.add_space(TITLE_GAP);
         let divider = theme.row_divider();
         let r = widgets::table_row(ui, MONEY_ROW_H, Some(divider));
@@ -543,7 +563,7 @@ pub fn bag_card(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory>, min_i
         widgets::col_text(ui, r, &format!("${}", fmt_thousands(money)), theme.font_bold(13.5), theme.text_strong(), Align::Max);
         if rows.is_empty() {
             // centred empty state filling the rest of the card
-            let h = (min_inner_h - CARD_TITLE_H - TITLE_GAP - MONEY_ROW_H).max(EMPTY_BAG_H);
+            let h = (inner_h - CARD_TITLE_H - TITLE_GAP - MONEY_ROW_H).max(EMPTY_BAG_H);
             let r = widgets::table_row(ui, h, Some(divider));
             let text = "Bag is empty before this event";
             let tw = row_h(ui, &theme.body());
@@ -555,20 +575,42 @@ pub fn bag_card(ui: &mut Ui, theme: &Theme, inventory: Option<&Inventory>, min_i
             widgets::col_text(ui, cell, text, theme.body(), theme.secondary, Align::Center);
             return;
         }
-        for (slot, qty, name) in &rows {
-            let r = widgets::table_row(ui, BAG_ROW_H, Some(divider));
-            let slot_cell = Rect::from_min_max(r.min, Pos2::new(r.min.x + 18.0, r.max.y));
-            widgets::col_text(ui, slot_cell, slot, theme.caption_font(), theme.secondary, Align::Min);
-            let qty_cell = Rect::from_min_max(Pos2::new(r.min.x + 18.0 + 10.0, r.min.y), Pos2::new(r.min.x + 18.0 + 10.0 + 26.0, r.max.y));
-            if let Some(q) = qty {
-                widgets::col_text(ui, qty_cell, &format!("{}×", q), theme.body(), theme.secondary, Align::Max);
+        let list_h = (inner_h - CARD_TITLE_H - TITLE_GAP - MONEY_ROW_H).max(BAG_ROW_H);
+        let area = egui::ScrollArea::vertical().id_salt("pre_state_bag").max_height(list_h).auto_shrink([false, true]);
+        widgets::show_scroll(ui, area, |ui| {
+            ui.spacing_mut().item_spacing.y = 0.0;
+            for (slot, qty, name) in &rows {
+                let r = widgets::table_row(ui, BAG_ROW_H, Some(divider));
+                let slot_cell = Rect::from_min_max(r.min, Pos2::new(r.min.x + 18.0, r.max.y));
+                widgets::col_text(ui, slot_cell, slot, theme.caption_font(), theme.secondary, Align::Min);
+                let qty_cell = Rect::from_min_max(Pos2::new(r.min.x + 18.0 + 10.0, r.min.y), Pos2::new(r.min.x + 18.0 + 10.0 + 26.0, r.max.y));
+                if let Some(q) = qty {
+                    widgets::col_text(ui, qty_cell, &format!("{}×", q), theme.body(), theme.secondary, Align::Max);
+                }
+                let name_cell = Rect::from_min_max(Pos2::new(qty_cell.max.x + 10.0, r.min.y), r.max);
+                let shown = widgets::elide(ui, name, &theme.body(), name_cell.width());
+                let color = if qty.is_some() { theme.contrast } else { theme.secondary };
+                widgets::col_text(ui, name_cell, &shown, theme.body(), color, Align::Min);
             }
-            let name_cell = Rect::from_min_max(Pos2::new(qty_cell.max.x + 10.0, r.min.y), r.max);
-            let shown = widgets::elide(ui, name, &theme.body(), name_cell.width());
-            let color = if qty.is_some() { theme.contrast } else { theme.secondary };
-            widgets::col_text(ui, name_cell, &shown, theme.body(), color, Align::Min);
-        }
+        });
     });
+    toggled
+}
+
+/// The draggable gap under the cards row: drag it to resize the row (and so
+/// how much of the bag shows), double-click it to reset. It takes the place
+/// of the usual gap below the cards.
+fn bag_resize_handle(ui: &mut Ui, theme: &Theme, resizable: bool) -> egui::Response {
+    let sense = if resizable { Sense::click_and_drag() } else { Sense::hover() };
+    let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), CARD_GAP), sense);
+    if !resizable {
+        return resp;
+    }
+    let active = resp.hovered() || resp.dragged();
+    let grip = Rect::from_center_size(r.center(), Vec2::new(36.0, 4.0));
+    let color = if active { theme.secondary } else { theme.card_border() };
+    ui.painter().rect_filled(grip, egui::CornerRadius::same(2), color);
+    resp.on_hover_cursor(egui::CursorIcon::ResizeVertical).on_hover_text("Drag to show more or less of the bag; double-click to reset")
 }
 
 // ---------------------------------------------------------------------------
@@ -587,10 +629,16 @@ pub struct StateViewerClicks {
     pub evs: bool,
     /// a PP item picked from a move row's menu: (item, target move)
     pub use_pp_item: Option<(String, Option<String>)>,
+    /// the cards-row height the user settled on (Expand / Collapse, or the
+    /// end of a drag), to save; `Some(None)` is the default height
+    pub bag_height: Option<Option<f32>>,
 }
 
+/// `bag_h` is the cards-row height the user picked (dragged or expanded);
+/// `None` fits the row to the Stats and Moves cards. It is updated live
+/// while the resize handle is dragged.
 #[allow(clippy::too_many_arguments)]
-pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Option<&RouteState>, pp: Option<&MovesPp>, last_pkmn: &mut Option<LastPkmn>, assets: &mut Assets, before: &BeforeInfo) -> StateViewerClicks {
+pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Option<&RouteState>, pp: Option<&MovesPp>, last_pkmn: &mut Option<LastPkmn>, bag_h: &mut Option<f32>, assets: &mut Assets, before: &BeforeInfo) -> StateViewerClicks {
     if let Some(s) = state {
         *last_pkmn = Some(LastPkmn {
             pkmn: s.solo_pkmn.get_pkmn_obj(&s.badges, None),
@@ -605,8 +653,16 @@ pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Op
     ui.add_space(CARD_GAP);
 
     let n_stat_rows = if gen.map(|g| g.get_generation()).unwrap_or(3) == 1 { 5 } else { 6 };
-    let n_items = state.map(|s| s.inventory.cur_items.len()).unwrap_or(0);
+    // Stats and Moves always show everything; by default the bag matches
+    // their height and scrolls, but the user can drag the row taller (up to
+    // the whole bag) or expand it.
+    let fit_h = stats_inner_height(n_stat_rows).max(moves_inner_height());
     let inventory = state.map(|s| &s.inventory);
+    let full_h = bag_full_height(inventory).max(fit_h);
+    let resizable = full_h > fit_h + 0.5;
+    let h = bag_h.map(|v| v.clamp(fit_h, full_h)).unwrap_or(fit_h);
+    let expanded = resizable.then_some(h >= full_h - 0.5);
+    let mut toggled = false;
     let content_w = ui.available_width();
     let two_rows = content_w - 2.0 * CARD_GAP < 360.0 + 180.0 + 240.0;
     let column = |ui: &mut Ui, w: f32, add: &mut dyn FnMut(&mut Ui)| {
@@ -620,26 +676,42 @@ pub fn state_viewer(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, state: Op
         let avail = content_w - CARD_GAP;
         let stats_w = (avail * 0.65).max(360.0);
         let moves_w = (avail - stats_w).max(180.0);
-        let h = stats_inner_height(n_stat_rows).max(moves_inner_height());
         ui.horizontal_top(|ui| {
             ui.spacing_mut().item_spacing.x = CARD_GAP;
-            column(ui, stats_w, &mut |ui| clicks.evs = stats_card(ui, theme, gen, last, state, h));
-            column(ui, moves_w, &mut |ui| (clicks.move_slot, clicks.use_pp_item) = moves_card(ui, theme, last, pp, h));
+            column(ui, stats_w, &mut |ui| clicks.evs = stats_card(ui, theme, gen, last, state, fit_h));
+            column(ui, moves_w, &mut |ui| (clicks.move_slot, clicks.use_pp_item) = moves_card(ui, theme, last, pp, fit_h));
         });
         ui.add_space(CARD_GAP);
-        bag_card(ui, theme, inventory, bag_inner_height(n_items));
+        toggled = bag_card(ui, theme, inventory, h, expanded);
     } else {
         let avail = content_w - 2.0 * CARD_GAP;
         let stats_w = (avail * 0.443).max(360.0);
         let moves_w = (avail * 0.237).max(180.0);
         let bag_w = (avail - stats_w - moves_w).max(240.0);
-        let h = stats_inner_height(n_stat_rows).max(moves_inner_height()).max(bag_inner_height(n_items));
         ui.horizontal_top(|ui| {
             ui.spacing_mut().item_spacing.x = CARD_GAP;
             column(ui, stats_w, &mut |ui| clicks.evs = stats_card(ui, theme, gen, last, state, h));
             column(ui, moves_w, &mut |ui| (clicks.move_slot, clicks.use_pp_item) = moves_card(ui, theme, last, pp, h));
-            column(ui, bag_w, &mut |ui| bag_card(ui, theme, inventory, h));
+            column(ui, bag_w, &mut |ui| toggled = bag_card(ui, theme, inventory, h, expanded));
         });
+    }
+    let handle = bag_resize_handle(ui, theme, resizable);
+    if toggled {
+        *bag_h = if expanded == Some(true) { None } else { Some(BAG_EXPANDED) };
+        clicks.bag_height = Some(*bag_h);
+    } else if handle.double_clicked() {
+        *bag_h = None;
+        clicks.bag_height = Some(None);
+    } else if handle.dragged() {
+        *bag_h = Some((h + handle.drag_delta().y).clamp(fit_h, full_h));
+    } else if handle.drag_stopped() {
+        // snap the ends to "default" and "expanded"
+        *bag_h = match *bag_h {
+            Some(v) if v <= fit_h + 0.5 => None,
+            Some(v) if v >= full_h - 0.5 => Some(BAG_EXPANDED),
+            other => other,
+        };
+        clicks.bag_height = Some(*bag_h);
     }
     clicks
 }

@@ -46,14 +46,6 @@ fn fold(c: char) -> char {
     }
 }
 
-/// Case-insensitive substring test (`haystack.toLowerCase().includes(needle.toLowerCase())`).
-pub fn contains_ci(haystack: &str, needle: &str) -> bool {
-    if needle.is_empty() {
-        return true;
-    }
-    haystack.to_lowercase().contains(&needle.to_lowercase())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

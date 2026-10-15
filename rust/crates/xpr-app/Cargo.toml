@@ -31,7 +31,6 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 rfd = { version = "0.15", default-features = false, features = ["gtk3"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-indexmap = { workspace = true }
 log = { workspace = true }
 chrono = { workspace = true }
 

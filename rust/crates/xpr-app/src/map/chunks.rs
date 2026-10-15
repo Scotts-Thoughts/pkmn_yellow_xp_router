@@ -124,10 +124,6 @@ impl ChunkCache {
         })
     }
 
-    pub fn drawn_this_frame(&self) -> usize {
-        self.stats_drawn
-    }
-
     pub fn is_pending(&self, key: &ChunkKey) -> bool {
         self.pending.contains(key)
     }

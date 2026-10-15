@@ -12,7 +12,7 @@ use xpr_core::Config;
 use xpr_data::model::EnemyPkmn;
 use xpr_engine::{
     EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, NodeId,
-    ObjKind, RareCandyEventDefinition, RouteState, VitaminEventDefinition,
+    ObjKind, RouteState, VitaminEventDefinition,
 };
 
 use crate::controller::MainController;
@@ -622,22 +622,4 @@ impl BattleController {
         }
     }
 
-    /// `take_screenshot` naming: the trainer name with spaces replaced.
-    pub fn screenshot_name(&self) -> Option<String> {
-        if self.summary.trainer_name.is_empty() {
-            None
-        } else {
-            Some(self.summary.trainer_name.replace(' ', "_"))
-        }
-    }
-
-    /// The vitamin shadow bookkeeping reset when a different battle is loaded.
-    pub fn is_loaded_event(&self, gid: NodeId) -> bool {
-        self.summary.event_group_id == Some(gid)
-    }
-
-    /// The `RareCandyEventDefinition` helper used by the legacy widget.
-    pub fn candy_def(amount: i64) -> RareCandyEventDefinition {
-        RareCandyEventDefinition::new(amount)
-    }
 }
