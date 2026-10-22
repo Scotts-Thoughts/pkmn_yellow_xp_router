@@ -903,6 +903,13 @@ impl EvolutionEventDefinition {
     pub fn to_string(&self) -> String {
         format!("Evolve into: {}", self.evolved_species.as_deref().unwrap_or("None"))
     }
+
+    /// The label when the event only changes `from_species`' form (Shaymin
+    /// (Land) -> Shaymin (Sky)); form changes are stored as evolutions.
+    pub fn form_change_label(&self, gen: &GenData, from_species: &str) -> Option<String> {
+        let to = self.evolved_species.as_deref()?;
+        gen.pkmn_db().is_form_change(from_species, to).then(|| format!("Change Form into: {}", to))
+    }
 }
 
 // ---------------------------------------------------------------------------

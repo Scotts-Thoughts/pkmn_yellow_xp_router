@@ -31,7 +31,7 @@ use crate::dialogs::{
     DialogCtx, DialogOutcome, FinalTrainersDialog, HighlightColorDialog, LoadRouteDialog, MatchupExportDialog, MessageBox,
     MsgButtons, MsgChoice, MsgTag, NewFolderDialog, ShortcutsDialog, TransferDialog,
 };
-use crate::event_details::{DetailsActions, EventDetails, MAP_TAB, PRE_STATE_TAB};
+use crate::event_details::{DetailsActions, EventDetails, MAP_TAB};
 use crate::filter_bar::FilterBar;
 use crate::map::{MapAction, MapView};
 use crate::pages::{quick_start_ui, replay_import_ui, LandingActions, LandingPage, MapViewerPage, NewRouteActions, NewRoutePage, QuickStartActions};
@@ -1096,10 +1096,8 @@ impl XprApp {
     }
 
     fn close_map(&mut self) {
-        if self.details.is_map_tab() {
-            let mut da = DetailsActions::default();
-            self.details.set_tab(&self.cfg, PRE_STATE_TAB, &mut da);
-        }
+        let mut da = DetailsActions::default();
+        self.details.leave_map(&self.cfg, &mut da);
         self.map.open = false;
         self.cfg.set_map_open(false);
     }
@@ -1115,10 +1113,8 @@ impl XprApp {
     fn undock_map(&mut self) {
         self.map.docked = false;
         self.cfg.set_map_docked(false);
-        if self.details.is_map_tab() {
-            let mut da = DetailsActions::default();
-            self.details.set_tab(&self.cfg, PRE_STATE_TAB, &mut da);
-        }
+        let mut da = DetailsActions::default();
+        self.details.leave_map(&self.cfg, &mut da);
         self.map.open = true;
         self.cfg.set_map_open(true);
     }
@@ -2415,10 +2411,10 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                 self.details.set_tab(&self.cfg, MAP_TAB, &mut da);
             }
         }
-        if self.details.is_map_tab() && !self.map_available() {
+        if (self.details.is_map_tab() || self.details.is_map_home()) && !self.map_available() {
             // the route's game has no map pack: the Map tab is gone
             let mut da = DetailsActions::default();
-            self.details.set_tab(&self.cfg, PRE_STATE_TAB, &mut da);
+            self.details.leave_map(&self.cfg, &mut da);
         }
         let is_battle = self.details.is_battle_tab();
         let is_map = self.details.is_map_tab();

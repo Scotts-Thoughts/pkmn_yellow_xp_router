@@ -91,6 +91,8 @@ pub struct Gen5Keys {
     /// bit 0 of a save block's save counter
     pub save_flag: String,
     pub species: Vec<String>,
+    /// `flags.alternate_form`: the form bits (Shaymin's Land/Sky)
+    pub form: Vec<String>,
     pub level: Vec<String>,
     pub exp: Vec<String>,
     pub held: Vec<String>,
@@ -144,6 +146,8 @@ impl Gen5Keys {
             gametime_seconds: "game_time.seconds".into(),
             save_flag: "flags.new_game".into(),
             species: team("species"),
+            // optional: without it every Shaymin reads as Land Forme
+            form: if store.contains("player.team.0.flags.alternate_form") { team("flags.alternate_form") } else { Vec::new() },
             level: team("level"),
             exp: team("exp"),
             held: team("held_item"),
@@ -190,7 +194,7 @@ impl Gen5Keys {
             self.opp_pos.clone(),
             self.player_pos.clone(),
         ];
-        for list in [&self.species, &self.level, &self.exp, &self.held, &self.friendship, &self.pid, &self.decrypted, &self.hp, &self.max_hp] {
+        for list in [&self.species, &self.form, &self.level, &self.exp, &self.held, &self.friendship, &self.pid, &self.decrypted, &self.hp, &self.max_hp] {
             v.extend(list.iter().cloned());
         }
         for slot in &self.moves {
@@ -216,7 +220,7 @@ impl Gen5Keys {
         s.insert(self.money.clone());
         s.insert(self.player_id.clone());
         // HP too: a Pokémon Center heal changes nothing else
-        for list in [&self.species, &self.level, &self.exp, &self.held, &self.pid, &self.decrypted, &self.hp, &self.max_hp] {
+        for list in [&self.species, &self.form, &self.level, &self.exp, &self.held, &self.pid, &self.decrypted, &self.hp, &self.max_hp] {
             s.extend(list.iter().cloned());
         }
         for slot in &self.moves {
@@ -475,9 +479,9 @@ impl Gen5Machine {
         store_i64(store, key)
     }
 
-    fn species_name(&self, raw: &Value) -> Option<String> {
+    fn species_name(&self, raw: &Value, form: Option<i64>) -> Option<String> {
         let name = opt_str(raw)?;
-        let converted = self.conv.pkmn_name_convert(Some(&name), None)?;
+        let converted = self.conv.pkmn_name_convert(Some(&name), None, form)?;
         self.gen.pkmn_db().get_pkmn(&converted).map(|p| p.name.clone())
     }
 
@@ -496,7 +500,8 @@ impl Gen5Machine {
     fn read_mon(&self, store: &PropertyStore, slot: usize) -> Result<Mon, String> {
         let k = &self.keys;
         let raw_species = store.get_value(Some(&k.species[slot]));
-        let species = self.species_name(&raw_species).ok_or_else(|| format!("slot {} species {}", slot, py_str(&raw_species)))?;
+        let form = k.form.get(slot).and_then(|f| store.get_value(Some(f)).as_i64());
+        let species = self.species_name(&raw_species, form).ok_or_else(|| format!("slot {} species {}", slot, py_str(&raw_species)))?;
         let level = Self::i64_of(store, &k.level[slot]);
         if !(1..=100).contains(&level) {
             return Err(format!("slot {} level {}", slot, level));
@@ -661,6 +666,10 @@ impl Gen5Machine {
         }
         log::info!("[gen5] evolution: {} -> {}", o.species, n.species);
         self.queue_event(EventDefinition::with_evolution(&n.species));
+        if self.gen.pkmn_db().is_form_change(&o.species, &n.species) {
+            // a form change teaches nothing
+            return;
+        }
         self.level_up_events(&n.species.clone(), n.level, n.level, &o.moves, &n.moves, handled, true);
     }
 
@@ -944,7 +953,7 @@ impl Gen5Machine {
             } else if b.opp_seen_alive[s] && b.opp_hp[s] > 0 && !b.opp_fainted[s] {
                 b.opp_fainted[s] = true;
                 let raw = store.get_value(Some(&k.opp_struct_species[s]));
-                let species = opt_str(&raw).and_then(|r| conv.pkmn_name_convert(Some(&r), None)).unwrap_or_default();
+                let species = opt_str(&raw).and_then(|r| conv.pkmn_name_convert(Some(&r), None, None)).unwrap_or_default();
                 let level = Self::i64_of(store, &k.opp_struct_level[s]);
                 log::info!("[gen5] opponent slot {} fainted: {} Lv{}", s + 1, species, level);
                 if !b.appear_order.contains(&s) {

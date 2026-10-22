@@ -146,7 +146,7 @@ Re-run the golden verify with the config toggles that change battle output
 ## 6. Event details (right pane)
 
 - [ ] Splitter drag between list and details; min widths; fraction persisted (500 ms debounce) and restored.
-- [ ] Tabs: Pre-State / Battle Summary; "auto switch" checkbox (config `auto_switch`) switches to Battle for trainer/wild fights and back for other events.
+- [ ] Tabs: Pre-State / Battle Summary; "auto switch" checkbox (config `auto_switch`) switches to Battle for trainer/wild fights and back for other events. "Back" is whichever of Pre-State / Map the user last picked: on the Map, battles show the Battle Summary and other events return to the Map (with auto switch off, the Map stays put).
 - [ ] Pre-state viewer: Pokémon viewer (species, level, exp, held item "None" when absent, moves, ability/nature for gen 3+, stats with badge-boost markers, gen-2 Sp.Def glitch note), stat-exp/EV viewer, badge list, inventory (20 slots, `# 00:` format, money).
 - [ ] Editor per event type (trainer: order/exp-split menus, per-mon cards with speed preview; vitamin, rare candy, learn move incl. TM & tutor slot "Move #N (Over X)", wild pkmn, inventory events, location, evolution, notes with visibility mode) — every change saves after 2 s or immediately on Enter/focus loss, and the route recalcs.
 - [ ] Notes footer: collapsed / expanded states, visibility modes (always / when space allows / never).

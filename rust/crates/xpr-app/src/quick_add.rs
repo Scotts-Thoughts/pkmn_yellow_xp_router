@@ -589,6 +589,18 @@ fn quick_misc_ui(ui: &mut Ui, theme: &Theme, ctrl: &mut MainController) {
                 ctrl.new_event(EventDefinition::with_rare_candy(10), after, None, None, true);
             }
             ui.end_row();
+            // a form change (Shaymin (Land) <-> Shaymin (Sky)) is an evolution
+            // into the first other form; the details panel picks among several
+            let form = match (ctrl.gen(), ctrl.get_active_state()) {
+                (Some(g), Some(st)) if ok => g.pkmn_db().get_forms(&st.solo_pkmn.name).into_iter().next(),
+                _ => None,
+            };
+            if widgets::button_enabled(ui, theme, "Change Form", form.is_some()).clicked() {
+                if let Some(form) = form {
+                    ctrl.new_event(EventDefinition::with_evolution(&form), after, None, None, true);
+                }
+            }
+            ui.end_row();
         });
     });
     let _ = RareCandyEventDefinition::new(0);

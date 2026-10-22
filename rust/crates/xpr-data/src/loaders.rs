@@ -224,6 +224,7 @@ fn load_pkmn_db(gen: Gen, raw: &Value) -> Result<Vec<PokemonSpecies>, String> {
                     stat_xp_yield: base,
                     abilities: vec![String::new()],
                     weight: None,
+                    national_dex_number: None,
                 }
             }
             Gen::Two => {
@@ -250,6 +251,7 @@ fn load_pkmn_db(gen: Gen, raw: &Value) -> Result<Vec<PokemonSpecies>, String> {
                     stat_xp_yield: base,
                     abilities: vec![String::new()],
                     weight: None,
+                    national_dex_number: None,
                 }
             }
             Gen::Three => PokemonSpecies {
@@ -287,6 +289,7 @@ fn load_pkmn_db(gen: Gen, raw: &Value) -> Result<Vec<PokemonSpecies>, String> {
                     Value::Null => None,
                     other => pyjson::value_as_f64(other),
                 }),
+                national_dex_number: None,
             },
             Gen::Four | Gen::Five => {
                 let bs = req(cur, consts::BASE_STATS_KEY)?;
@@ -325,6 +328,8 @@ fn load_pkmn_db(gen: Gen, raw: &Value) -> Result<Vec<PokemonSpecies>, String> {
                         Value::Null => None,
                         other => pyjson::value_as_f64(other),
                     },
+                    // optional: custom gens may leave it out
+                    national_dex_number: pyjson::get(cur, consts::NATIONAL_DEX_NUMBER_KEY).and_then(|v| v.as_i64()),
                 }
             }
         };

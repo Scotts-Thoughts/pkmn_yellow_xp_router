@@ -74,6 +74,10 @@ pub struct Gen45Keys {
     pub mon_level: String,
     pub mon_species: String,
     pub mon_held_item: String,
+    /// party form bits (Shaymin's Land/Sky); `None` / empty when the mapper
+    /// has none (only the Platinum and HGSS forks map them)
+    pub mon_form: Option<String>,
+    pub team_form: Vec<String>,
     pub team_held_item: Vec<String>,
     pub mon_friendship: String,
     pub mon_pid: String,
@@ -149,6 +153,8 @@ impl Gen45Keys {
             mon_level: "player.team.0.level".into(),
             mon_species: "player.team.0.species".into(),
             mon_held_item: "player.team.0.held_item".into(),
+            mon_form: opt("player.team.0.flags.alternate_forms"),
+            team_form: team("flags.alternate_forms"),
             team_held_item: team("held_item"),
             mon_friendship: "player.team.0.friendship".into(),
             mon_pid: "player.team.0.internals.personality_value".into(),
@@ -244,6 +250,7 @@ impl Gen45Keys {
         push(Some(&self.mon_level));
         push(Some(&self.mon_species));
         push(Some(&self.mon_held_item));
+        push(self.mon_form.as_ref());
         push(Some(&self.mon_pid));
         push(Some(&self.gametime_seconds));
         push(self.trainer_battle_flag.as_ref());
@@ -285,6 +292,14 @@ impl Gen45Keys {
 
     pub fn fix_case(&mut self, store: &PropertyStore) -> Vec<String> {
         let mut invalid = Vec::new();
+        // optional: without form bits every Shaymin reads as Land Forme
+        if self.team_form.iter().any(|k| !store.contains(k) && store.resolve_case(k).is_none()) {
+            log::warn!("the mapper has no party form bits; Shaymin is always read as Land Forme");
+            self.mon_form = None;
+            self.team_form.clear();
+        }
+        fix_opt_key(store, &mut self.mon_form, &mut invalid);
+        fix_keys(store, &mut self.team_form, &mut invalid);
         for k in [
             &mut self.meta_state,
             &mut self.overworld_map,
@@ -463,8 +478,13 @@ impl Gen45Converter {
         Some(convert_move_name_gen2plus(&name_prettify(&name.replace('-', " "))))
     }
 
-    pub fn pkmn_name_convert(&self, gh_pkmn_name: Option<&str>, held_item_gh_value: Option<&str>) -> Option<String> {
+    /// `form` is the party struct's form bits (`None` when unknown, e.g. for
+    /// enemy Pokémon).
+    pub fn pkmn_name_convert(&self, gh_pkmn_name: Option<&str>, held_item_gh_value: Option<&str>, form: Option<i64>) -> Option<String> {
         let name = gh_pkmn_name?;
+        if let Some(converted) = form_species_name(name, form, self.flavor.is_gen5()) {
+            return Some(converted);
+        }
         Some(match name {
             "Mr. Mime" => "MrMime".to_string(),
             "Farfetch'd" => "FarfetchD".to_string(),
@@ -480,6 +500,25 @@ impl Gen45Converter {
             }
             other => other.to_string(),
         })
+    }
+}
+
+/// The data's name for a species whose forms the mapper reports under one
+/// name, from the party struct's form bits (`None` when unknown). `None` for
+/// every other species.
+pub fn form_species_name(gh_pkmn_name: &str, form: Option<i64>, gen5: bool) -> Option<String> {
+    match gh_pkmn_name {
+        // SHAYMIN_LAND = 0, SHAYMIN_SKY = 1; gen 4 data names both forms,
+        // gen 5 data only the Sky Forme
+        "Shaymin" => Some(
+            match (form.unwrap_or(0), gen5) {
+                (1, _) => "Shaymin (Sky)",
+                (_, true) => "Shaymin",
+                (_, false) => "Shaymin (Land)",
+            }
+            .to_string(),
+        ),
+        _ => None,
     }
 }
 
@@ -596,6 +635,9 @@ struct InventoryData {
     money_change_amount: Option<i64>,
     held_item_changed: bool,
     external_held_item_flag: bool,
+    /// a move changed too: Platinum's move tutors take shards (the bag
+    /// changes first) and the move reminder a Heart Scale
+    move_changed: bool,
 }
 
 #[derive(Default)]
@@ -766,13 +808,24 @@ impl Gen45Machine {
         mon_key_from(dvs.as_ref(), species)
     }
 
-    fn convert_species(&self, store: &PropertyStore, species: Option<&str>, held_key: Option<&str>) -> Option<String> {
+    fn convert_species(&self, store: &PropertyStore, species: Option<&str>, held_key: Option<&str>, form_key: Option<&str>) -> Option<String> {
         let held = held_key.and_then(|k| store.str_of(k));
-        self.conv.pkmn_name_convert(species, held.as_deref())
+        let form = form_key.and_then(|k| store.value(k).as_i64());
+        self.conv.pkmn_name_convert(species, held.as_deref(), form)
+    }
+
+    /// `convert_species` for party slot 1.
+    fn convert_slot_1_species(&self, store: &PropertyStore, species: Option<&str>) -> Option<String> {
+        self.convert_species(store, species, Some(&self.keys.mon_held_item), self.keys.mon_form.as_deref())
     }
 
     fn mon_key(&self, store: &PropertyStore, mon_idx: usize) -> MonKey {
-        let species = self.convert_species(store, store.str_of(&self.keys.team_species[mon_idx]).as_deref(), Some(&self.keys.team_held_item[mon_idx]));
+        let species = self.convert_species(
+            store,
+            store.str_of(&self.keys.team_species[mon_idx]).as_deref(),
+            Some(&self.keys.team_held_item[mon_idx]),
+            self.keys.team_form.get(mon_idx).map(|k| k.as_str()),
+        );
         MonKey {
             species,
             attack: store.value(&self.keys.team_iv_attack[mon_idx]),
@@ -884,7 +937,9 @@ impl Gen45Machine {
                         self.queue_new_event(EventDefinition::notes_only(&format!("{}{}", consts::RECORDING_ERROR_FRAGMENT, err_msg)));
                     }
                     self.valid_solo_mon = true;
-                    self.solo_mon_key = found_evolutions[0].clone();
+                    // trigger_evolution sets solo_mon_key: it needs the old
+                    // species to tell a form change (a Sky Forme Shaymin back
+                    // from the PC as Land Forme) from an evolution
                     self.trigger_evolution(found_evolutions[0].clone());
                 }
             }
@@ -968,12 +1023,19 @@ impl Gen45Machine {
 
     fn trigger_evolution(&mut self, new_mon_key: MonKey) {
         log::info!("Evolving into: {}", new_mon_key.species.as_deref().unwrap_or("None"));
+        let form_change = match (self.solo_mon_key.species.as_deref(), new_mon_key.species.as_deref()) {
+            (Some(from), Some(to)) => self.gen.pkmn_db().is_form_change(from, to),
+            _ => false,
+        };
         self.pre_evolution_moves = Some(self.cached_moves.iter().flatten().cloned().collect());
         self.pre_evolution_move_list = Some(self.cached_moves.to_vec());
         self.solo_mon_key = new_mon_key.clone();
         self.load_level_up_moves();
-        // moves are checked when back in the overworld (party data may lag)
-        self.pending_evolution_level_check = Some(new_mon_key.level_i64());
+        // moves are checked when back in the overworld (party data may lag);
+        // a form change teaches nothing
+        if !form_change {
+            self.pending_evolution_level_check = Some(new_mon_key.level_i64());
+        }
         self.queue_new_event(EventDefinition::with_evolution(new_mon_key.species.as_deref().unwrap_or("None")));
     }
 
@@ -1587,6 +1649,7 @@ impl Gen45Machine {
             }
             GameState::InventoryChange => {
                 self.inventory.seconds_delay = BASE_DELAY;
+                self.inventory.move_changed = false;
                 match self.money_cache_update(store) {
                     Some(change) => {
                         self.inventory.money_change_amount = Some(change);
@@ -1626,7 +1689,7 @@ impl Gen45Machine {
                     self.pre_evolution_move_list = None;
                 }
                 let species_raw = store.get_value(Some(&self.keys.mon_species));
-                let species_conv = self.convert_species(store, species_raw.as_str(), Some(&self.keys.mon_held_item));
+                let species_conv = self.convert_slot_1_species(store, species_raw.as_str());
                 let save_count = self.opt_value(store, &self.keys.save_count);
                 let o = &mut self.overworld;
                 o.waiting_for_registration = false;
@@ -1764,7 +1827,11 @@ impl Gen45Machine {
                     let evs_changed = self.evs_changed(store);
                     log::info!("InventoryChangeState._on_exit: cached EVs = {:?}, current EVs = {:?}, changed = {}", self.cached_evs, self.current_evs(store), evs_changed);
                     let (gained, lost, amount, held) = (self.inventory.money_gained, self.inventory.money_lost, self.inventory.money_change_amount, self.inventory.held_item_changed);
-                    self.item_cache_update(store, true, lost, gained, amount, evs_changed, false, false, held);
+                    let move_changed = self.inventory.move_changed;
+                    // as in the TM state: a TM used up explains the move, otherwise it was tutored
+                    if !self.item_cache_update(store, true, lost, gained, amount, evs_changed, false, move_changed, held) && move_changed {
+                        self.move_cache_update(store, true, None, false, false, true);
+                    }
                 }
             }
             GameState::RareCandy => {
@@ -1867,6 +1934,9 @@ impl Gen45Machine {
                     self.inventory.seconds_delay = BASE_DELAY;
                 } else if new.path == self.keys.mon_held_item {
                     self.inventory.held_item_changed = true;
+                } else if self.keys.player_moves.contains(&new.path) {
+                    self.inventory.move_changed = true;
+                    self.inventory.seconds_delay = BASE_DELAY;
                 } else if new.path == self.keys.mon_level {
                     if let (Some(p), Some(n)) = (prev.as_i64(), new.as_i64()) {
                         if n > p {
@@ -2043,7 +2113,7 @@ impl Gen45Machine {
                     log::info!("[EXP_SPLIT] Adding previously cached Pokemon to defeated list before overwriting: {} level {}", s, l);
                 }
                 let species_raw = store.str_of(&k.battle_first_enemy_species);
-                self.battle.cached_first_mon_species = self.conv.pkmn_name_convert(species_raw.as_deref(), None).unwrap_or_default();
+                self.battle.cached_first_mon_species = self.conv.pkmn_name_convert(species_raw.as_deref(), None, None).unwrap_or_default();
                 self.battle.cached_first_mon_level = store_i64(store, &k.battle_first_enemy_level);
                 log::info!("[EXP_SPLIT] Cached first enemy: {} level {}", self.battle.cached_first_mon_species, self.battle.cached_first_mon_level);
                 self.battle.friendship_data.push(store_i64(store, &k.mon_friendship));
@@ -2057,7 +2127,7 @@ impl Gen45Machine {
                     self.battle.defeated_trainer_mons.push(EventDefinition::with_wild(WildPkmnEventDefinition::new(&s, l, 1, true)));
                 }
                 let species_raw = self.opt_value(store, &k.battle_second_enemy_species);
-                self.battle.cached_second_mon_species = self.conv.pkmn_name_convert(species_raw.as_str(), None).unwrap_or_default();
+                self.battle.cached_second_mon_species = self.conv.pkmn_name_convert(species_raw.as_str(), None, None).unwrap_or_default();
                 self.battle.cached_second_mon_level = self.opt_i64(store, &k.battle_second_enemy_level);
                 self.battle.friendship_data.push(store_i64(store, &k.mon_friendship));
                 log::info!("[EXP_SPLIT] ===== END SECOND ENEMY FAINTED =====");
@@ -2306,14 +2376,19 @@ impl Gen45Machine {
         } else if k.all_item_fields.contains(&new.path) {
             return GameState::InventoryChange;
         } else if new.path == k.mon_species {
-            let held_key = Some(k.mon_held_item.as_str());
             if !prev.truthy() {
                 self.overworld.waiting_for_registration = true;
-            } else if self.solo_mon_key.species == self.convert_species(store, prev.as_str(), held_key) {
+            } else if self.solo_mon_key.species == self.convert_slot_1_species(store, prev.as_str()) {
                 self.overworld.wrong_mon_in_slot_1 = true;
-            } else if self.solo_mon_key.species == self.convert_species(store, new.as_str(), held_key) {
+            } else if self.solo_mon_key.species == self.convert_slot_1_species(store, new.as_str()) {
                 self.overworld.wrong_mon_delay = BASE_DELAY;
                 self.overworld.waiting_for_solo_mon_in_slot_1 = true;
+            }
+        } else if Self::is_path(&k.mon_form, &new.path) {
+            // a form change (Gracidea, or Shaymin's Sky Forme reverting): the
+            // species name stays, so the team cache sees a new species
+            if !self.overworld.waiting_for_registration && !self.overworld.wrong_mon_in_slot_1 {
+                self.update_team_cache(store, true, false);
             }
         } else if new.path == k.mon_level {
             if !self.overworld.waiting_for_registration && !self.overworld.wrong_mon_in_slot_1 {
@@ -2359,7 +2434,7 @@ impl Gen45Machine {
             } else if self.overworld.wrong_mon_in_slot_1 {
                 if self.overworld.wrong_mon_delay <= 0 {
                     self.update_team_cache(store, true, true);
-                    let cur = self.convert_species(store, store.str_of(&k.mon_species).as_deref(), Some(k.mon_held_item.as_str()));
+                    let cur = self.convert_slot_1_species(store, store.str_of(&k.mon_species).as_deref());
                     self.overworld.wrong_mon_in_slot_1 = self.solo_mon_key.species != cur;
                 }
                 self.overworld.wrong_mon_delay -= 1;

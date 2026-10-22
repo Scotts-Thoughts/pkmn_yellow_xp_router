@@ -20,7 +20,7 @@ use crate::editors::slot_template;
 pub const INLINE_ROW_HEIGHT: f32 = 34.0;
 
 /// (display name, internal key)
-pub const EVENT_TYPES: [(&str, &str); 18] = [
+pub const EVENT_TYPES: [(&str, &str); 19] = [
     ("Fight Trainer", "trainer"),
     ("Get Item", "get_item"),
     ("Buy Item", "buy_item"),
@@ -37,6 +37,7 @@ pub const EVENT_TYPES: [(&str, &str); 18] = [
     ("Heal", "heal"),
     ("Blackout", "blackout"),
     ("Evolve", "evolve"),
+    ("Change Form", "change_form"),
     ("EV Override", "ev_override"),
     ("Notes", "notes"),
 ];
@@ -191,6 +192,13 @@ impl InlineEventCreator {
             None => ctrl.get_init_state(),
             Some(id) => ctrl.router.final_state_of(id).cloned().or_else(|| ctrl.get_init_state()),
         }
+    }
+
+    /// The first other form of the species at the insertion point.
+    fn first_other_form(&self, ctrl: &MainController) -> Option<String> {
+        let gen = ctrl.gen()?;
+        let state = self.state_at_insertion_point(ctrl)?;
+        gen.pkmn_db().get_forms(&state.solo_pkmn.name).into_iter().next()
     }
 
     /// `_on_type_changed` + `_build_config`
@@ -567,6 +575,9 @@ impl InlineEventCreator {
                 let species = self.state_at_insertion_point(ctrl).map(|s| s.solo_pkmn.name.clone()).unwrap_or_default();
                 Some(EventDefinition::with_evolution(&species))
             }
+            // stored as an evolution into the first other form (the details
+            // panel picks among several)
+            Some("change_form") => self.first_other_form(ctrl).map(|form| EventDefinition::with_evolution(&form)),
             // a new override starts at the mon's current values: the numbers
             // are set in the details panel
             Some("ev_override") => {
@@ -617,7 +628,9 @@ impl InlineEventCreator {
                 // the bag can only be reordered in gen 1
                 // (still offered while editing an existing one, whatever the route's gen)
                 let gen1 = ctrl.gen().map(|g| g.supports_bag_reorder()).unwrap_or(false) || self.type_key == Some("reorder_bag");
-                let names: Vec<String> = EVENT_TYPES.iter().filter(|(_, k)| gen1 || *k != "reorder_bag").map(|(d, _)| d.to_string()).collect();
+                // only a species with forms (Shaymin) can change form
+                let forms = self.type_key == Some("change_form") || self.first_other_form(ctrl).is_some();
+                let names: Vec<String> = EVENT_TYPES.iter().filter(|(_, k)| (gen1 || *k != "reorder_bag") && (forms || *k != "change_form")).map(|(d, _)| d.to_string()).collect();
                 let before = self.type_text.clone();
                 let r = SearchableDropdown::new(theme, self.id.with("type"), &mut self.type_text, &names)
                     .widths(110.0, 140.0)

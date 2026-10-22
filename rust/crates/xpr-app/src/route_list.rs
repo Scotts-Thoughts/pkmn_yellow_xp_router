@@ -815,6 +815,8 @@ impl RouteList {
                 let mut scroll_to_rect: Option<Rect> = None;
                 let selected_set: HashSet<NodeId> = self.selection.iter().copied().collect();
                 let inline_h = INLINE_ROW_HEIGHT;
+                // the "+" sits at the right end of the name cell, clear of the branch arrow and checkbox
+                let plus_rect_at = |row_top: f32| Rect::from_min_size(Pos2::new(left_x + widths[0] - 20.0, row_top + (ROW_HEIGHT - 16.0) / 2.0), Vec2::splat(16.0));
                 // the visible "+" button (drawn after the rows) must not also select its row
                 let plus_btn_rect: Option<Rect> = self.plus_visible_for.and_then(|pid| {
                     let row_pos = self.rows.iter().position(|r| r.id == pid && r.kind != RowKind::Item)?;
@@ -822,7 +824,7 @@ impl RouteList {
                     for r in &self.rows[..row_pos] {
                         ry += if r.kind == RowKind::InlineSpacer { inline_h } else { ROW_HEIGHT };
                     }
-                    Some(Rect::from_min_size(Pos2::new(left_x + 2.0, ry + (ROW_HEIGHT - 16.0) / 2.0), Vec2::splat(16.0)))
+                    Some(plus_rect_at(ry))
                 });
                 for idx in 0..n {
                     let row = self.rows[idx].clone();
@@ -970,7 +972,7 @@ impl RouteList {
                     }
                     // hover "+" button
                     if is_hovered && row.kind != RowKind::Item && row.kind != RowKind::LevelUpSibling && self.drag.as_ref().map(|d| !d.active).unwrap_or(true) {
-                        plus_rect = Some((row.id, Rect::from_min_size(Pos2::new(rect.min.x + 2.0, rect.center().y - 8.0), Vec2::splat(16.0))));
+                        plus_rect = Some((row.id, plus_rect_at(rect.min.y)));
                     }
                     // clicks (not on the checkbox/branch/quantity)
                     if let Some(p) = pointer {
@@ -1058,7 +1060,7 @@ impl RouteList {
                     for r in &self.rows[..row_pos] {
                         ry += if r.kind == RowKind::InlineSpacer { inline_h } else { ROW_HEIGHT };
                     }
-                    let prect = Rect::from_min_size(Pos2::new(left_x + 2.0, ry + (ROW_HEIGHT - 16.0) / 2.0), Vec2::splat(16.0));
+                    let prect = plus_rect_at(ry);
                     let resp = ui.interact(prect, ui.id().with("plus_btn"), Sense::click());
                     let fill = if resp.hovered() { theme.accent_hover } else { theme.accent };
                     ui.painter().circle_filled(prect.center(), 8.0, fill);

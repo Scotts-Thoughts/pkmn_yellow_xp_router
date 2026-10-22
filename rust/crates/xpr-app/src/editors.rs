@@ -1210,6 +1210,9 @@ impl LocationEditor {
 #[derive(Default)]
 pub struct EvolutionEditor {
     growth_rate: String,
+    /// the other forms of the species before the event (Shaymin (Land) ->
+    /// [Shaymin (Sky)]): a form change is an evolution into one of them
+    forms: Vec<String>,
     pkmn_types: OptionMenu,
     pkmn_filter: String,
     item_selector: OptionMenu,
@@ -1228,6 +1231,7 @@ impl EvolutionEditor {
         self.growth_rate = ctx.gen.pkmn_db().get_pkmn(&species).map(|p| p.growth_rate.clone()).unwrap_or_default();
         self.pkmn_types.new_values(ctx.gen.pkmn_db().get_all_names(Some(&self.growth_rate)), Some(&species));
         self.pkmn_filter.clear();
+        self.forms = ctx.cur_state.map(|s| ctx.gen.pkmn_db().get_forms(&s.solo_pkmn.name)).unwrap_or_default();
         match &ev.by_stone {
             Some(s) if !s.is_empty() => self.item_selector.set(s),
             _ => self.item_selector.set(consts::NO_ITEM),
@@ -1259,6 +1263,26 @@ impl EvolutionEditor {
                 out.merge(EditorOutput::save());
             }
             ui.end_row();
+            if !self.forms.is_empty() {
+                widgets::label(ui, theme, "Change Form:");
+                let mut picked: Option<String> = None;
+                ui.horizontal_wrapped(|ui| {
+                    for form in &self.forms {
+                        let current = self.pkmn_types.get() == form;
+                        if widgets::button_enabled(ui, theme, form.as_str(), ctx.enabled && !current).clicked() {
+                            picked = Some(form.clone());
+                        }
+                    }
+                });
+                ui.end_row();
+                if let Some(form) = picked {
+                    // forms share a growth rate, so the unfiltered list holds every one
+                    self.pkmn_filter.clear();
+                    self.growth_rate = ctx.gen.pkmn_db().get_pkmn(&form).map(|p| p.growth_rate.clone()).unwrap_or_default();
+                    self.pkmn_types.new_values(ctx.gen.pkmn_db().get_all_names(Some(&self.growth_rate)), Some(&form));
+                    out.merge(EditorOutput::save());
+                }
+            }
         });
         if filter_changed {
             let f = self.pkmn_filter.trim().to_string();

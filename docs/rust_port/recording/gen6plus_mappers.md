@@ -241,6 +241,7 @@ data).
 | Field | Gen 3 | Gen 4/5 | Expect | 3DS (PK6/PK7, decrypted) |
 |---|---|---|---|---|
 | species | `species` | `species` | glossary string == `pokemon.json` name after `pkmn_name_convert`; null/empty = empty slot | 0x08 u16 |
+| form | - | `flags.alternate_forms` (Platinum / HGSS forks), `flags.alternate_form` (gen 5) | form bits (0x40 bits 3-7); the mappers name every Shaymin "Shaymin", so `form_species_name` turns form 1 into "Shaymin (Sky)". Optional: missing = Land Forme | 0x1D bits 3-7 |
 | level | `level` | `level` | 1..100 | party stats 0xEC |
 | experience | `expPoints` | `exp` | u32 | 0x10 |
 | held item | `itemHeld` | `held_item` | glossary string or null | 0x0A u16 |

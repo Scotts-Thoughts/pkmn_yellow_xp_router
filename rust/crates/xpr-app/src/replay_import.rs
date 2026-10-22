@@ -334,12 +334,24 @@ pub fn import_replay(
     Ok((ctrl, report))
 }
 
+/// Party slot `slot` holds `species` (sanitized). The mappers name every
+/// form of some species alike ("Shaymin"): the slot's form bits decide.
+fn slot_is_species(store: &xpr_recorder::PropertyStore, slot: usize, want: &str) -> bool {
+    let value = |names: &[&str]| names.iter().find_map(|n| store.resolve_case(&format!("player.team.{slot}.{n}"))).map(|p| store.get_value(Some(&p)));
+    let Some(raw) = value(&["species"]).and_then(|v| v.as_str().map(String::from)) else { return false };
+    if norm(&raw) == want {
+        return true;
+    }
+    let form = value(&["flags.alternate_forms", "flags.alternate_form"]).and_then(|v| v.as_i64());
+    // gen 4 and gen 5 data name the forms differently; either may be the route's
+    [false, true].iter().any(|&gen5| xpr_recorder::games::gen45::form_species_name(&raw, form, gen5).map(|n| norm(&n) == want).unwrap_or(false))
+}
+
 /// The game's exp of the party member of `species` (slot 1 first).
 fn solo_exp(store: &xpr_recorder::PropertyStore, species: &str) -> Option<i64> {
     let want = norm(species);
     (0..6).find_map(|slot| {
-        let sp = store.resolve_case(&format!("player.team.{slot}.species")).map(|p| store.get_value(Some(&p)))?;
-        if sp.as_str().map(norm).as_deref() != Some(want.as_str()) {
+        if !slot_is_species(store, slot, &want) {
             return None;
         }
         ["exp", "experience", "expPoints", "exp_points"].iter().find_map(|n| store.resolve_case(&format!("player.team.{slot}.{n}"))).and_then(|p| store.get_value(Some(&p)).as_i64())
@@ -359,7 +371,7 @@ pub fn check_solo_mon(store: &xpr_recorder::PropertyStore, solo: &xpr_engine::st
         names.iter().find_map(|n| store.resolve_case(&format!("player.team.{slot}.{n}"))).map(|p| store.get_value(Some(&p)))
     };
     let want = norm(&solo.species_def.name);
-    let slot = (0..6).find(|&i| get(i, &["species"]).and_then(|v| v.as_str().map(norm)).as_deref() == Some(want.as_str()));
+    let slot = (0..6).find(|&i| slot_is_species(store, i, &want));
     let Some(slot) = slot else {
         lines.push(format!("the game's party has no {} (slot 1: {:?})", solo.species_def.name, get(0, &["species"])));
         return (false, lines);

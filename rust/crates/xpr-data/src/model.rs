@@ -540,6 +540,9 @@ pub struct PokemonSpecies {
     pub stat_xp_yield: StatBlock,
     pub abilities: Vec<String>,
     pub weight: Option<f64>,
+    /// gens 4-5: shared by every form of a species (Shaymin (Land) and
+    /// Shaymin (Sky) are separate entries); `None` for gens 1-3
+    pub national_dex_number: Option<i64>,
 }
 
 /// Per-Pokémon custom move data: `{ "player": {move: selection}, "enemy": {...} }`.

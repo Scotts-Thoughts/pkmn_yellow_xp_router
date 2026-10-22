@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-pub const APP_VERSION: &str = "v6.1b";
+pub const APP_VERSION: &str = "v6.1c";
 pub const APP_RELEASE_DATE: &str = "2026-Sep-11";
 
 pub const APP_NAME: &str = "pkmn_xp_router";
@@ -74,6 +74,7 @@ pub const HELD_ITEM_KEY: &str = "held_item";
 pub const ABILITY_KEY: &str = "ability";
 pub const ABILITY_LIST_KEY: &str = "abilities";
 pub const WEIGHT_KEY: &str = "weight";
+pub const NATIONAL_DEX_NUMBER_KEY: &str = "national_dex_number";
 pub const STAT_KEY: &str = "stat";
 pub const MODIFIER_KEY: &str = "modifier";
 pub const TARGET_KEY: &str = "target";

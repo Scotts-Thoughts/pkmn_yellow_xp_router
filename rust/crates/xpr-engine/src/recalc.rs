@@ -231,6 +231,9 @@ impl Router {
         // fights and learn moves set their own name below
         if item.to_defeat_mon.is_none() && item.event_definition.learn_move.is_none() {
             item.name = item.event_definition.get_item_label(&gen)?;
+            if let Some(label) = item.event_definition.evolution.as_ref().and_then(|e| e.form_change_label(&gen, &cur_state.solo_pkmn.name)) {
+                item.name = label;
+            }
         }
 
         let mut warning_message = String::new();
@@ -384,6 +387,7 @@ impl Router {
         let (def, label) = {
             let g = self.nodes.get_mut(&group_id).and_then(|n| n.as_group_mut()).unwrap();
             let label = g.event_definition.get_label(&gen)?;
+            let label = g.event_definition.evolution.as_ref().and_then(|e| e.form_change_label(&gen, &cur_state.solo_pkmn.name)).unwrap_or(label);
             g.init_state = Some(cur_state.clone());
             g.pkmn_after_levelups.clear();
             g.event_items.clear();

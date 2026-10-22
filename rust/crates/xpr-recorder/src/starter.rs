@@ -126,7 +126,9 @@ pub struct PartyMon {
 #[derive(Clone, Debug)]
 pub struct StarterInfo {
     pub game: DetectedGame,
-    /// the species as the mapper names it (the app resolves it in the DB)
+    /// the species as the mapper names it, with the form folded in for the
+    /// species the mapper names one way for every form ("Shaymin" ->
+    /// "Shaymin (Sky)"); the app resolves it in the DB
     pub species: String,
     pub level: i64,
     /// DVs (gens 1-2, HP derived) or IVs (gens 3+)
@@ -226,6 +228,8 @@ struct SlotKeys {
     special_defense: Option<String>,
     nature: Option<String>,
     ability: Option<String>,
+    /// the form bits (gens 4-5)
+    form: Option<String>,
 }
 
 impl SlotKeys {
@@ -243,12 +247,13 @@ impl SlotKeys {
             special_defense: pick(&["player.team.0.ivSpecialDefense", "player.team.0.ivs.special_defense"]),
             nature: pick(&["player.team.0.nature"]),
             ability: pick(&["player.team.0.ability"]),
+            form: pick(&["player.team.0.flags.alternate_forms", "player.team.0.flags.alternate_form"]),
         })
     }
 
     fn all(&self) -> Vec<String> {
         let mut v = vec![self.species.clone()];
-        for k in [&self.level, &self.team_count, &self.hp, &self.attack, &self.defense, &self.speed, &self.special_attack, &self.special_defense, &self.nature, &self.ability].into_iter().flatten() {
+        for k in [&self.level, &self.team_count, &self.hp, &self.attack, &self.defense, &self.speed, &self.special_attack, &self.special_defense, &self.nature, &self.ability, &self.form].into_iter().flatten() {
             v.push(k.clone());
         }
         v
@@ -321,7 +326,13 @@ impl SlotKeys {
             None
         };
         let ability = if game.generation >= 3 { self.ability.as_deref().map(|k| store.get_value(Some(k))).unwrap_or(Value::Null) } else { Value::Null };
-        StarterInfo { game: game.clone(), species: current.species, level: current.level, dvs, nature, ability }
+        let species = if game.generation >= 4 {
+            let form = self.form.as_deref().and_then(|k| store.get_value(Some(k)).as_i64());
+            crate::games::gen45::form_species_name(&current.species, form, game.generation == 5).unwrap_or(current.species)
+        } else {
+            current.species
+        };
+        StarterInfo { game: game.clone(), species, level: current.level, dvs, nature, ability }
     }
 }
 
@@ -779,6 +790,24 @@ mod tests {
         assert_eq!(info.nature, Nature::from_index(13));
         assert_eq!(info.ability, json!("Blaze"));
         assert_eq!(resolve_ability_idx(&info.ability, &["Blaze".to_string(), "Iron Fist".to_string()]), 0);
+    }
+
+    #[test]
+    fn shaymin_starter_reads_its_form() {
+        // the mappers name both forms "Shaymin"; the form bits tell them apart
+        let read = |mapper: &str, form_key: &str, form: i64| {
+            let mut props = json!({ "player.team_count": 1, "player.team.0.species": "Shaymin", "player.team.0.level": 5 });
+            props[form_key] = json!(form);
+            let s = store(props);
+            SlotKeys::resolve(&s).unwrap().read(&s, &detect_game(mapper).unwrap()).species
+        };
+        assert_eq!(read("Pokemon Platinum", "player.team.0.flags.alternate_forms", 0), "Shaymin (Land)");
+        assert_eq!(read("Pokemon Platinum", "player.team.0.flags.alternate_forms", 1), "Shaymin (Sky)");
+        assert_eq!(read("Pokemon Black", "player.team.0.flags.alternate_form", 0), "Shaymin");
+        assert_eq!(read("Pokemon Black", "player.team.0.flags.alternate_form", 1), "Shaymin (Sky)");
+        // a mapper without form bits: Land Forme
+        let s = store(json!({ "player.team_count": 1, "player.team.0.species": "Shaymin", "player.team.0.level": 5 }));
+        assert_eq!(SlotKeys::resolve(&s).unwrap().read(&s, &detect_game("Pokemon HeartGold").unwrap()).species, "Shaymin (Land)");
     }
 
     #[test]

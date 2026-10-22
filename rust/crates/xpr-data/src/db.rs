@@ -114,6 +114,30 @@ impl PkmnDB {
         self.data.get(&sanitize_string(name))
     }
 
+    /// The other forms of `name` (every entry with its national dex number),
+    /// in data order. Empty for a species with one form, and for gens 1-3,
+    /// whose data has no dex numbers.
+    pub fn get_forms(&self, name: &str) -> Vec<String> {
+        let Some(dex) = self.get_pkmn(name).and_then(|p| p.national_dex_number) else {
+            return Vec::new();
+        };
+        let key = sanitize_string(name);
+        self.data
+            .iter()
+            .filter(|(k, v)| **k != key && v.national_dex_number == Some(dex))
+            .map(|(_, v)| v.name.clone())
+            .collect()
+    }
+
+    /// `from` -> `to` is a form change (Shaymin (Land) -> Shaymin (Sky)),
+    /// not an evolution.
+    pub fn is_form_change(&self, from: &str, to: &str) -> bool {
+        match (self.get_pkmn(from), self.get_pkmn(to)) {
+            (Some(a), Some(b)) => a.name != b.name && a.national_dex_number.is_some() && a.national_dex_number == b.national_dex_number,
+            _ => false,
+        }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &Arc<PokemonSpecies>> {
         self.data.values()
     }

@@ -52,6 +52,9 @@ pub struct DetailsActions {
 
 pub struct EventDetails {
     pub tab: usize,
+    /// the non-battle tab (Pre-Event State or Map) the user last chose:
+    /// auto-switch toggles between it and the Battle Summary
+    home_tab: usize,
     pub auto_switch: bool,
     pub bc: BattleController,
     pub battle_ui: BattleSummaryUi,
@@ -75,6 +78,7 @@ impl EventDetails {
     pub fn new(cfg: &Config) -> EventDetails {
         EventDetails {
             tab: PRE_STATE_TAB,
+            home_tab: PRE_STATE_TAB,
             auto_switch: cfg.do_auto_switch(),
             bc: BattleController::new(),
             battle_ui: BattleSummaryUi::new(),
@@ -105,6 +109,9 @@ impl EventDetails {
     /// `_tab_changed_callback`
     fn tab_changed(&mut self, cfg: &Config, actions: &mut DetailsActions) {
         let is_battle = self.is_battle_tab();
+        if !is_battle {
+            self.home_tab = self.tab;
+        }
         actions.tab_changed = Some(is_battle);
         if is_battle {
             self.deferred_show_at = Some(Instant::now() + Duration::from_millis(300));
@@ -115,7 +122,7 @@ impl EventDetails {
     }
 
     pub fn change_tabs(&mut self, cfg: &Config, actions: &mut DetailsActions) {
-        self.tab = if self.tab == BATTLE_SUMMARY_TAB { PRE_STATE_TAB } else { BATTLE_SUMMARY_TAB };
+        self.tab = if self.tab == BATTLE_SUMMARY_TAB { self.home_tab } else { BATTLE_SUMMARY_TAB };
         self.tab_changed(cfg, actions);
     }
 
@@ -128,9 +135,22 @@ impl EventDetails {
 
     pub fn set_suppress_battle_summary(&mut self, cfg: &Config, suppress: bool, actions: &mut DetailsActions) {
         self.suppress_battle_summary = suppress;
-        if suppress {
+        if suppress && self.is_battle_tab() {
+            self.set_tab(cfg, self.home_tab, actions);
+        }
+    }
+
+    /// The map was closed, undocked or is unavailable: leave the Map tab and
+    /// stop auto-switching back to it.
+    pub fn leave_map(&mut self, cfg: &Config, actions: &mut DetailsActions) {
+        self.home_tab = PRE_STATE_TAB;
+        if self.is_map_tab() {
             self.set_tab(cfg, PRE_STATE_TAB, actions);
         }
+    }
+
+    pub fn is_map_home(&self) -> bool {
+        self.home_tab == MAP_TAB
     }
 
     /// `_update_notes_visibility`
@@ -209,9 +229,11 @@ impl EventDetails {
     /// `_handle_selection` (also fired on record-mode changes)
     pub fn handle_selection(&mut self, cfg: &Config, ctrl: &mut MainController, actions: &mut DetailsActions) {
         let force_pre = self.suppress_battle_summary;
-        // the Map tab stays put: the map is a working surface, not a per-event view
-        let on_map = self.tab == MAP_TAB;
-        if ctrl.is_record_mode_active() && !on_map {
+        // without auto-switch the Map tab stays put: the map is a working
+        // surface, not a per-event view. With it, the map is the home tab
+        // that battles switch away from and other events switch back to.
+        let on_map = self.tab == MAP_TAB && !self.auto_switch;
+        if ctrl.is_record_mode_active() && self.tab != MAP_TAB {
             self.set_tab(cfg, BATTLE_SUMMARY_TAB, actions);
         }
         let sel = ctrl.get_single_selected_event_id(true);
@@ -247,7 +269,7 @@ impl EventDetails {
                     if on_map {
                         // keep the map
                     } else if force_pre {
-                        self.set_tab(cfg, PRE_STATE_TAB, actions);
+                        self.set_tab(cfg, self.home_tab, actions);
                     } else if self.ignore_tab_switching || self.auto_switch {
                         if ctrl.is_record_mode_active() {
                             if has_battle {
@@ -256,7 +278,7 @@ impl EventDetails {
                         } else if has_battle {
                             self.set_tab(cfg, BATTLE_SUMMARY_TAB, actions);
                         } else {
-                            self.set_tab(cfg, PRE_STATE_TAB, actions);
+                            self.set_tab(cfg, self.home_tab, actions);
                         }
                     }
                     let init = ctrl.router.init_state_of(id).cloned();
