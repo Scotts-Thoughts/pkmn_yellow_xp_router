@@ -15,7 +15,7 @@ use egui::{Event, Key, Modifiers, PointerButton, Pos2, RawInput, Rect, Vec2};
 
 use xpr_app::assets::Assets;
 use xpr_app::controller::MainController;
-use xpr_app::dialogs::{block_secondary_window, AssignMoveDialog, DialogCtx};
+use xpr_app::dialogs::{block_secondary_window, AssignMoveDialog, DialogCtx, DialogOutcome};
 use xpr_app::quick_add::QuickAddPopover;
 use xpr_app::route_list::{ListActions, RouteList, ROW_HEIGHT};
 use xpr_core::{Config, Paths};
@@ -37,6 +37,8 @@ struct Harness {
     quick_add: QuickAddPopover,
     assets: Assets,
     dialog: Option<AssignMoveDialog>,
+    /// What the dialog returned when it last closed.
+    outcome: Option<DialogOutcome>,
     /// Draw a menu bar (before the page, as the app's own bar is) and
     /// where its "File" button landed.
     menu_bar: bool,
@@ -58,7 +60,7 @@ impl Harness {
         ctrl.load_route(&root.join("tests/test_data").join(route));
         let _ = ctrl.take_signals();
         let list = RouteList::new(&cfg);
-        let mut h = Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add: QuickAddPopover::new(), assets: Assets::new(), dialog: None, menu_bar: false, menu_button: None, size: Vec2::new(1000.0, 700.0) };
+        let mut h = Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add: QuickAddPopover::new(), assets: Assets::new(), dialog: None, outcome: None, menu_bar: false, menu_button: None, size: Vec2::new(1000.0, 700.0) };
         h.frame(vec![]);
         h.frame(vec![]);
         h
@@ -70,7 +72,7 @@ impl Harness {
     /// of everything.
     fn frame(&mut self, events: Vec<Event>) {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
-        let Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add, assets, dialog, menu_bar, menu_button, .. } = self;
+        let Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add, assets, dialog, outcome, menu_bar, menu_button, .. } = self;
         let _ = ctx.run(input, |ctx| {
             if *menu_bar {
                 egui::TopBottomPanel::bottom("menu_bar").show(ctx, |ui| {
@@ -91,8 +93,9 @@ impl Harness {
             quick_add.ui(ctx, theme, ctrl, assets);
             if let Some(d) = dialog.as_mut() {
                 let mut dctx = DialogCtx { theme, cfg, ctrl, registry, paths };
-                let (close, _) = d.ui(ctx, &mut dctx);
+                let (close, out) = d.ui(ctx, &mut dctx);
                 if close {
+                    *outcome = out;
                     *dialog = None;
                 }
             }
@@ -183,6 +186,24 @@ fn clicks_and_keys_on_a_dialog_do_not_reach_the_route_list() {
     h.click(Harness::row_pos(3, 100.0));
     let after = h.selected();
     assert!(!after.is_empty() && after != before, "with the dialog gone a click selects again");
+}
+
+/// The dialog opens with the top match selected and Enter assigns it, so it
+/// works from the keyboard alone: straight away, and after typing a filter.
+#[test]
+fn enter_assigns_the_top_match_in_the_assign_move_dialog() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    let first = h.ctrl.gen().unwrap().move_db().get_filtered_names(None, false)[0].clone();
+    h.open_dialog();
+    h.press(Key::Enter);
+    assert!(h.dialog.is_none(), "Enter closes the dialog");
+    assert!(matches!(&h.outcome, Some(DialogOutcome::AssignMove { slot: 0, mv, .. }) if *mv == first), "Enter assigns the top move");
+
+    h.open_dialog();
+    h.frame(vec![Event::Text("thunderb".into())]);
+    h.frame(vec![]);
+    h.press(Key::Enter);
+    assert!(matches!(&h.outcome, Some(DialogOutcome::AssignMove { mv, .. }) if mv.to_lowercase().contains("thunderb")), "Enter assigns the top filtered match");
 }
 
 #[test]
@@ -470,4 +491,17 @@ fn escape_under_a_dialog_does_not_cancel_the_replay_import() {
         run(false, vec![]);
     }
     assert!(run(false, escape()), "without a dialog Escape cancels the import");
+}
+
+#[test]
+fn tmp_chevron_probe() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    let folders: Vec<i64> = h.ctrl.router.root().children.clone();
+    let state = |h: &Harness| folders.iter().map(|f| h.ctrl.router.folder(*f).map(|f| f.is_expanded()).unwrap_or(false)).collect::<Vec<_>>();
+    eprintln!("start {:?}", state(&h));
+    for i in 0..4 {
+        h.click(Harness::row_pos(i, 19.0));
+        h.frame(vec![]);
+        eprintln!("click row {i} -> {:?}", state(&h));
+    }
 }

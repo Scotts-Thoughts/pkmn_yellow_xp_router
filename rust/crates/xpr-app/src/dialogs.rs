@@ -1706,6 +1706,11 @@ impl AssignMoveDialog {
             }
             let needle = self.filter.trim().to_lowercase();
             let visible: Vec<String> = self.moves.iter().filter(|m| needle.is_empty() || m.to_lowercase().contains(&needle)).cloned().collect();
+            // Keep a selection whenever anything matches, defaulting to the
+            // top match, so Enter / Assign work without touching the mouse.
+            if !self.selected.as_ref().is_some_and(|s| visible.contains(s)) {
+                self.selected = visible.first().cloned();
+            }
             list_well(ui, theme, fit_h(ui, 320.0, 280.0), |ui| {
                 for m in &visible {
                     let is_sel = self.selected.as_deref() == Some(m.as_str());
@@ -1723,14 +1728,10 @@ impl AssignMoveDialog {
                     ui.vertical_centered(|ui| widgets::label_font(ui, "No moves match", theme.body(), theme.secondary));
                 }
             });
-            if r.enter_pressed {
-                let pick = self.selected.clone().or_else(|| visible.first().cloned());
-                if let Some(m) = pick {
-                    outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: m, pre_state: self.pre_state });
-                    close = true;
-                }
-            }
-            help(ui, theme, "Double-click a move, or press Enter to assign the selected (or first) match.");
+            help(ui, theme, "Double-click a move, or press Enter to assign the selected move.");
+            // Enter anywhere in the dialog (the search field loses focus once
+            // a row is clicked) is the same as pressing Assign.
+            let enter = r.enter_pressed || ui.input(|i| i.key_pressed(egui::Key::Enter));
             footer(ui, theme, |ui| {
                 let can = self.selected.is_some();
                 if action_button(ui, theme, "Assign", Tone::Primary, can).clicked() && can {
@@ -1741,6 +1742,12 @@ impl AssignMoveDialog {
                     close = true;
                 }
             });
+            if enter && !close {
+                if let Some(m) = self.selected.clone() {
+                    outcome = Some(DialogOutcome::AssignMove { slot: self.slot_idx, mv: m, pre_state: self.pre_state });
+                    close = true;
+                }
+            }
         });
         (close, outcome)
     }
