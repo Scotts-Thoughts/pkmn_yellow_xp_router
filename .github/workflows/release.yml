@@ -7,6 +7,12 @@
 # Running copies of the program check the latest release at start-up and
 # offer the update (xpr-update).
 #
+# The gen 4/5 map pictures are not in the program zips. Each game's pictures
+# are an asset named after their content (imagery_<game>_<sha>.zip), and a
+# release carries only the ones no earlier release has
+# (rust/release_assets.py). The app downloads them from whichever release
+# has them, so don't delete old releases.
+#
 # The version commit does not have to be the last one in the push: the
 # newest version-named commit in the push is used, and the build is of the
 # pushed head. A version that already has a release is skipped. It can also
@@ -81,12 +87,22 @@ jobs:
           workspaces: rust
       - name: Build exe
         run: python rust/windows_build.py --out dist
+      - name: Stage the map pictures no release has yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python rust/release_assets.py --out dist --new-only --tag ${{ needs.detect.outputs.version }}
       - uses: actions/upload-artifact@v4
         with:
           name: windows
           path: dist/windows_*.zip
           compression-level: 0
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: imagery
+          path: dist/imagery/*.zip
+          compression-level: 0
+          if-no-files-found: ignore
 
   macos:
     needs: detect

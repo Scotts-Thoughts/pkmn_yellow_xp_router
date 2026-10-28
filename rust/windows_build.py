@@ -6,6 +6,8 @@ app) for the Rust app:
 1. ``cargo build --release -p xpr-app`` — one exe with the Pokémon data and
    the image assets embedded (``xpr-data``'s ``embed-data`` feature and
    ``xpr-app/build.rs``) and the MSVC CRT linked statically (``.cargo/config.toml``).
+   The gen 4/5 map pictures are not in it: they are separate release
+   assets the app downloads when needed (step 5).
 2. Checks the exe imports nothing but Windows system DLLs.
 3. Copies it to ``dist/rust/pkmn_xp_router.exe`` and zips it as
    ``dist/rust/windows_pkmn_xp_router_<version>.zip`` — one exe at the top
@@ -13,6 +15,9 @@ app) for the Rust app:
    (rust_port_plan.md §4.4); the asset name must start with ``windows``.
 4. ``--smoke``: runs the packaged exe from an empty temp directory (no repo
    files in reach, a scratch config dir) and requires a screenshot back.
+5. Stages the map pictures under their release asset names in
+   ``dist/rust/imagery/`` and lists the ones no release has yet
+   (``release_assets.py``): attach only those to the release.
 
     py -3.14 rust/windows_build.py [--no-build] [--smoke] [--out DIR]
 """
@@ -30,6 +35,8 @@ import sys
 import tempfile
 import time
 import zipfile
+
+import release_assets
 
 RUST_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(RUST_DIR)
@@ -127,6 +134,7 @@ def smoke(exe: str) -> bool:
     env.update({
         "XPR_GLOBAL_CONFIG_DIR": cfg_dir,
         "XPR_DISABLE_AUTO_UPDATE": "1",
+        "XPR_NO_MAP_DOWNLOAD": "1",
         "XPR_SMOKE_SCREENSHOT": shot,
         # a route from the embedded data, rendered with the embedded icons
         "XPR_SMOKE_NEW_ROUTE": "Yellow|Charmander",
@@ -171,6 +179,7 @@ def main():
     exe, _zip = package(args.out, version)
     if args.smoke and not smoke(exe):
         sys.exit(1)
+    release_assets.stage_and_report(args.out, version)
 
 
 if __name__ == "__main__":

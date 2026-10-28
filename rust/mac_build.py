@@ -22,6 +22,9 @@ Mirrors ``windows_build.py`` (the Windows exe build) for macOS
 5. ``--smoke``: runs the bundle's own binary from an empty temp directory
    (no repo files in reach, a scratch config dir) and requires a
    screenshot back.
+6. Stages the gen 4/5 map pictures (not in the binary) under their release
+   asset names and lists the ones no release has yet (``release_assets.py``);
+   they are the same files for Windows and macOS, so upload them once.
 
     python3 rust/mac_build.py [--no-build] [--arch universal|arm64|x86_64] [--smoke] [--out DIR]
 """
@@ -38,6 +41,8 @@ import sys
 import tempfile
 import time
 import zipfile
+
+import release_assets
 
 RUST_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(RUST_DIR)
@@ -221,6 +226,7 @@ def smoke(bundle: str) -> bool:
     env.update({
         "XPR_GLOBAL_CONFIG_DIR": cfg_dir,
         "XPR_DISABLE_AUTO_UPDATE": "1",
+        "XPR_NO_MAP_DOWNLOAD": "1",
         "XPR_SMOKE_SCREENSHOT": shot,
         # a route from the embedded data, rendered with the embedded icons
         "XPR_SMOKE_NEW_ROUTE": "Yellow|Charmander",
@@ -268,6 +274,7 @@ def main():
         app, _zip = package(bundle, args.out, version)
     if args.smoke and not smoke(app):
         sys.exit(1)
+    release_assets.stage_and_report(args.out, version)
 
 
 if __name__ == "__main__":

@@ -140,8 +140,8 @@ struct Loaded {
 }
 
 /// The compositor for a pack: an image world's draws from its imagery when installed.
-fn compositor_for(pack: &Arc<MapPack>, source: &PackSource) -> Arc<Compositor> {
-    let imagery = if pack.is_image() { imagery::find_local(pack, source.dir.as_deref()) } else { None };
+fn compositor_for(pack: &Arc<MapPack>, source: &PackSource, imagery_cache: Option<&std::path::Path>) -> Arc<Compositor> {
+    let imagery = if pack.is_image() { imagery::find_local(pack, source.dir.as_deref(), imagery_cache) } else { None };
     Arc::new(Compositor::with_imagery(pack.clone(), imagery))
 }
 
@@ -157,6 +157,15 @@ pub struct MapView {
     loading: Option<(String, Receiver<Result<Loaded, String>>)>,
     load_error: Option<String>,
     source: PackSource,
+    /// where downloaded gen 4/5 map pictures are kept (`imagery.rs`)
+    imagery_cache: Option<PathBuf>,
+    /// the current game's pictures being downloaded
+    fetch: Option<imagery::Fetch>,
+    /// why the last download of the current game's pictures stopped
+    fetch_error: Option<String>,
+    /// the current game's pictures were already downloaded automatically
+    /// once (a cancelled or failed download waits for Retry)
+    fetch_tried: bool,
     camera: Camera,
     scope: Scope,
     chunks: ChunkCache,
@@ -211,6 +220,10 @@ impl MapView {
             loading: None,
             load_error: None,
             source: PackSource::new(dir),
+            imagery_cache: Some(xpr_update::assets::imagery_cache_dir(&xpr_core::Paths::global_config_dir())),
+            fetch: None,
+            fetch_error: None,
+            fetch_tried: false,
             camera: Camera::default(),
             scope: Scope::World,
             chunks: ChunkCache::new(cfg.get_map_texture_budget_mb()),
@@ -292,16 +305,20 @@ impl MapView {
         self.focus = None;
         self.hover = None;
         self.selected = None;
+        self.fetch = None;
+        self.fetch_error = None;
+        self.fetch_tried = false;
         self.chunks.clear();
         self.atlas.clear();
         let (tx, rx) = channel();
         let source = self.source.clone();
+        let imagery_cache = self.imagery_cache.clone();
         let game_s = game.to_string();
         let wake = ctx.clone();
         std::thread::spawn(move || {
             let r = MapPack::load(&game_s, &source).map(|p| {
                 let pack = Arc::new(p);
-                let comp = compositor_for(&pack, &source);
+                let comp = compositor_for(&pack, &source, imagery_cache.as_deref());
                 let grid = Arc::new(ObjectGrid::build(&pack));
                 Loaded { pack, comp, grid }
             });
@@ -322,11 +339,7 @@ impl MapView {
                 self.pending_fit = true;
                 let pack = self.loaded.as_ref().map(|l| l.pack.clone());
                 self.state.sync(ctrl, pack.as_deref());
-                // warm the overview levels so zooming out never shows holes
-                if let Some(p) = self.pack() {
-                    let keys = layers::overview_keys(p, Scope::World, self.night, self.toggles.mask, 3);
-                    self.chunks.request(keys);
-                }
+                self.warm_overview();
                 if let Some((q, label)) = self.pending_focus.take() {
                     self.request_focus(q, label);
                 }
@@ -342,9 +355,115 @@ impl MapView {
         }
     }
 
+    /// Warm the overview levels so zooming out never shows holes.
+    fn warm_overview(&mut self) {
+        if let Some(p) = self.pack() {
+            let keys = layers::overview_keys(p, Scope::World, self.night, self.toggles.mask, 3);
+            self.chunks.request(keys);
+        }
+    }
+
     /// Whether the current pack draws from its pictures (always true for gens 1–3).
     pub fn has_imagery(&self) -> bool {
         self.loaded.as_ref().map(|l| !l.pack.is_image() || l.comp.imagery().is_some()).unwrap_or(false)
+    }
+
+    /// The current game's pictures are being downloaded.
+    pub fn is_fetching_imagery(&self) -> bool {
+        self.fetch.is_some()
+    }
+
+    /// Point the download cache somewhere else (tests), or nowhere.
+    pub fn set_imagery_cache(&mut self, dir: Option<PathBuf>) {
+        self.imagery_cache = dir;
+    }
+
+    /// The loaded image world has no pictures, but a release has them to
+    /// download: (game, bytes, sha256).
+    fn imagery_downloadable(&self) -> Option<(String, u64, String)> {
+        let l = self.loaded.as_ref()?;
+        if !l.pack.is_image() || l.comp.imagery().is_some() || self.imagery_cache.is_none() {
+            return None;
+        }
+        let (bytes, sha) = imagery::downloadable(&l.pack)?;
+        Some((l.pack.game.clone(), bytes, sha))
+    }
+
+    fn start_fetch(&mut self, ctx: &egui::Context) {
+        let (Some((game, bytes, sha)), Some(cache)) = (self.imagery_downloadable(), self.imagery_cache.clone()) else { return };
+        self.fetch_tried = true;
+        self.fetch_error = None;
+        self.fetch = Some(imagery::Fetch::start(ctx, &game, bytes, sha, cache));
+    }
+
+    /// Download the current game's pictures the first time its map is shown
+    /// without them, and draw from them once they are in.
+    fn poll_imagery(&mut self, ctx: &egui::Context) {
+        if let Some(r) = self.fetch.as_mut().and_then(|f| f.poll()) {
+            self.fetch = None;
+            match r.and_then(|zip| imagery::open_downloaded(&zip)) {
+                Ok(img) => {
+                    if let Some(l) = self.loaded.as_mut() {
+                        l.comp = Arc::new(Compositor::with_imagery(l.pack.clone(), Some(img)));
+                        self.chunks.set_compositor(l.comp.clone());
+                        self.warm_overview();
+                    }
+                }
+                Err(e) => self.fetch_error = Some(e),
+            }
+        }
+        if self.fetch.is_none() && !self.fetch_tried && xpr_update::assets::downloads_enabled() && self.imagery_downloadable().is_some() {
+            self.start_fetch(ctx);
+        }
+    }
+
+    /// The banner over a gen 4/5 map that is still waiting for its pictures:
+    /// the download's progress, or why it stopped and a Retry.
+    fn imagery_banner(&mut self, ctx: &egui::Context, vp: Rect, theme: &Theme) {
+        let Some((game, bytes, _)) = self.imagery_downloadable() else { return };
+        if self.fetch.is_none() && self.fetch_error.is_none() {
+            return;
+        }
+        let mb = |b: u64| format!("{:.1} MB", b as f64 / 1e6);
+        let width = (vp.width() - 16.0).min(440.0);
+        let pos = Pos2::new(vp.center().x - width / 2.0, vp.min.y + 8.0);
+        let mut cancel = false;
+        let mut retry = false;
+        egui::Area::new(egui::Id::new(("map_imagery_banner", game))).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
+            egui::Frame::new().fill(theme.card_bg()).stroke(theme.border_stroke()).corner_radius(6.0).inner_margin(egui::Margin::symmetric(10, 6)).show(ui, |ui| {
+                ui.set_width(width - 20.0);
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 4.0);
+                if let Some(f) = &self.fetch {
+                    widgets::label_font(ui, "Downloading this game's map pictures\u{2026}", theme.body_bold(), theme.text_strong());
+                    ui.add(egui::ProgressBar::new(f.fraction()).desired_width(ui.available_width()).fill(theme.accent));
+                    ui.horizontal(|ui| {
+                        widgets::label_font(ui, format!("{} of {} \u{00B7} only needed once per game", mb(f.done), mb(f.total.unwrap_or(bytes))), theme.body(), theme.secondary);
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if widgets::StyledButton::new(theme, "Cancel").show(ui).clicked() {
+                                cancel = true;
+                            }
+                        });
+                    });
+                } else if let Some(e) = &self.fetch_error {
+                    widgets::label_font(ui, format!("The map pictures ({}) are not downloaded: {}", mb(bytes), e), theme.body(), theme.text_strong());
+                    ui.horizontal(|ui| {
+                        widgets::label_font(ui, "The map is drawn as a sketch until then.", theme.body(), theme.secondary);
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if widgets::StyledButton::new(theme, "Retry").show(ui).clicked() {
+                                retry = true;
+                            }
+                        });
+                    });
+                }
+            });
+        });
+        if cancel {
+            self.fetch = None;
+            self.fetch_error = Some("cancelled".into());
+        }
+        if retry {
+            self.start_fetch(ctx);
+        }
     }
 
     /// Route / selection changed: refresh the routed-state overlay.
@@ -538,6 +657,7 @@ impl MapView {
         let mut actions = Vec::new();
         self.poll_load(ctrl);
         self.ensure_game(ui.ctx(), Self::game_of(ctrl));
+        self.poll_imagery(ui.ctx());
         self.chunks.begin_frame();
         ui.spacing_mut().item_spacing = Vec2::new(4.0, 2.0);
         let full = ui.available_rect_before_wrap();
@@ -554,7 +674,10 @@ impl MapView {
         ui.painter().rect_filled(vp, 0.0, egui::Color32::from_rgb(10, 10, 24));
         let resp = ui.allocate_rect(vp, Sense::click_and_drag());
         match (&self.loaded, &self.loading, &self.load_error) {
-            (Some(_), _, _) => self.viewport(ui, &resp, vp, theme, ctrl, assets, &mut actions),
+            (Some(_), _, _) => {
+                self.viewport(ui, &resp, vp, theme, ctrl, assets, &mut actions);
+                self.imagery_banner(ui.ctx(), vp, theme);
+            }
             (None, Some(_), _) => {
                 ui.painter().text(vp.center(), egui::Align2::CENTER_CENTER, "Loading map data…", theme.body(), theme.secondary);
                 ui.ctx().request_repaint_after(Duration::from_millis(100));
@@ -1105,8 +1228,12 @@ impl MapView {
         let pending = self.chunks.pending_count();
         let mut right = format!("{} chunks · {} sprites", self.chunks.cached_count(), self.atlas.frame_count());
         if self.loaded.is_some() && !self.has_imagery() {
-            // a gen 4/5 build without its pictures (`imagery.rs`): the terrain sketch
-            right = format!("map pictures missing from this build · {}", right);
+            // a gen 4/5 map without its pictures (`imagery.rs`): the terrain sketch
+            let missing = match &self.fetch {
+                Some(f) => format!("downloading map pictures {:.0} %", f.fraction() * 100.0),
+                None => "map pictures not downloaded".to_string(),
+            };
+            right = format!("{} · {}", missing, right);
         }
         if pending > 0 {
             right = format!("rendering {} · {}", pending, right);

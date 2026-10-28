@@ -1,10 +1,12 @@
 //! A gen 4 route on the world map (GEN45_REQUIREMENTS §8): the Platinum
 //! route opens Sinnoh as an image-world pack drawn from the pack's pictures
-//! (`map_data/platinum/imagery.zip`, which the executable embeds); without
-//! them the map is a terrain sketch and says so; a tall-grass tile opens its
+//! (`map_data/platinum/imagery.zip`, which releases ship as a separate
+//! download); without them the map is a terrain sketch and says so; a
+//! downloaded copy in the cache is used when it matches; a tall-grass tile opens its
 //! encounter card, whose condition chips switch the tables.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -130,6 +132,47 @@ impl Harness {
     }
 }
 
+/// A stand-in for the GitHub releases API with `zip` as Platinum's pictures
+/// asset; the file itself is held back until `gate` opens.
+fn serve_release(zip: &std::path::Path, sha256: &str, gate: Arc<AtomicBool>) -> String {
+    use std::io::{BufRead, BufReader, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let name = xpr_update::assets::imagery_asset_name("platinum", sha256);
+    let (zip, thread_base) = (zip.to_path_buf(), base.clone());
+    std::thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let mut reader = BufReader::new(&stream);
+            let mut line = String::new();
+            let _ = reader.read_line(&mut line);
+            let mut h = String::new();
+            while reader.read_line(&mut h).map(|n| n > 2).unwrap_or(false) {
+                h.clear();
+            }
+            let path = line.split_whitespace().nth(1).unwrap_or("").to_string();
+            let mut out = &stream;
+            if path.starts_with("/releases") {
+                let size = std::fs::metadata(&zip).unwrap().len();
+                let body = if path.ends_with("page=1") {
+                    serde_json::json!([{"tag_name": "v6.3a", "assets": [{"name": name, "size": size, "browser_download_url": format!("{}/files/{}", thread_base, name)}]}])
+                } else {
+                    serde_json::json!([])
+                }
+                .to_string();
+                let _ = write!(out, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body);
+            } else {
+                while !gate.load(Ordering::SeqCst) {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                let mut f = std::fs::File::open(&zip).unwrap();
+                let _ = write!(out, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", f.metadata().unwrap().len());
+                let _ = std::io::copy(&mut f, &mut out);
+            }
+        }
+    });
+    base
+}
+
 #[test]
 fn a_platinum_route_opens_sinnoh_and_its_encounter_cards_switch_conditions() {
     let scratch = std::env::temp_dir().join(format!("xpr_map_image_world_{}", std::process::id()));
@@ -161,14 +204,68 @@ fn a_platinum_route_opens_sinnoh_and_its_encounter_cards_switch_conditions() {
     assert!(h.view.card_is_tile(), "the chip keeps the card open");
     assert!(h.has_text("Walk · Night"), "the night table is shown");
 
-    // a build without the pictures (this test binary embeds none) and no pack folder: the sketch, and a note
+    // no pictures built in (this test binary embeds none), no pack folder and
+    // nothing downloaded (downloads are off here): the sketch, and a note
     let empty = scratch.join("empty");
     std::fs::create_dir_all(&empty).unwrap();
     std::env::set_var("XPR_MAP_DATA_DIR", &empty);
+    std::env::set_var("XPR_MAP_IMAGERY_DIR", &empty);
+    std::env::set_var("XPR_NO_MAP_DOWNLOAD", "1");
     let mut h2 = Harness::new("platinum_chimchar.json");
     h2.wait_ready();
+    h2.frame(Vec::new());
     assert!(!h2.view.has_imagery());
-    assert!(h2.has_text("map pictures missing from this build"));
+    assert!(!h2.view.is_fetching_imagery());
+    assert!(h2.has_text("map pictures not downloaded"));
+
+    // a downloaded copy in the cache, named after its content (`xpr_update::assets`)
+    let cache = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("xpr_map_imagery_cache_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&cache);
+    std::fs::create_dir_all(&cache).unwrap();
+    let info = pack.image.as_ref().unwrap().imagery.clone().unwrap();
+    let cached = cache.join(xpr_update::assets::imagery_asset_name("platinum", &info.sha256));
+    let src = repo_root().join("map_data/platinum/imagery.zip");
+    if std::fs::hard_link(&src, &cached).is_err() {
+        std::fs::copy(&src, &cached).unwrap();
+    }
+    std::env::set_var("XPR_MAP_IMAGERY_DIR", &cache);
+    let mut h4 = Harness::new("platinum_chimchar.json");
+    h4.wait_ready();
+    assert!(h4.view.has_imagery(), "the cached download");
+    // a copy of another version (a stale cache) is not used
+    std::fs::remove_file(&cached).unwrap();
+    std::fs::write(cache.join(xpr_update::assets::imagery_asset_name("platinum", &"0".repeat(64))), b"old").unwrap();
+    let mut h5 = Harness::new("platinum_chimchar.json");
+    h5.wait_ready();
+    assert!(!h5.view.has_imagery());
+
+    // with downloads on, the map fetches its pictures from the release
+    // assets (a local stand-in for GitHub), shows the progress, then draws them
+    let gate = Arc::new(AtomicBool::new(false));
+    let base = serve_release(&src, &info.sha256, gate.clone());
+    std::env::set_var("XPR_RELEASES_URL", format!("{}/releases", base));
+    std::env::remove_var("XPR_NO_MAP_DOWNLOAD");
+    let mut h6 = Harness::new("platinum_chimchar.json");
+    h6.wait_ready();
+    assert!(h6.view.is_fetching_imagery(), "the download starts by itself");
+    assert!(h6.has_text("Downloading this game's map pictures"));
+    assert!(h6.has_text("downloading map pictures"), "the status strip");
+    gate.store(true, Ordering::SeqCst);
+    let t = Instant::now();
+    while h6.view.is_fetching_imagery() {
+        assert!(t.elapsed() < Duration::from_secs(60), "the download did not finish");
+        h6.frame(vec![]);
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    h6.frame(vec![]);
+    assert!(h6.view.has_imagery(), "the downloaded pictures are drawn");
+    assert!(!h6.has_text("Downloading this game's map pictures"));
+    assert!(cached.is_file(), "kept in the cache under its asset name");
+    assert!(!cache.join(xpr_update::assets::imagery_asset_name("platinum", &"0".repeat(64))).exists(), "the stale copy is dropped");
+    std::env::remove_var("XPR_RELEASES_URL");
+    std::env::set_var("XPR_NO_MAP_DOWNLOAD", "1");
+    std::env::remove_var("XPR_MAP_IMAGERY_DIR");
+    let _ = std::fs::remove_dir_all(&cache);
 
     // pictures as loose folders beside the pack (a pokemap checkout's layout)
     let data = scratch.join("map_data");

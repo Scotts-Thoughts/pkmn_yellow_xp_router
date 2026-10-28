@@ -850,21 +850,26 @@ everything it does for gens 1–3, plus encounter conditions and masks.
 - `sprites.rs`: gen 4/5 sheets are four RGBA frames (down, up, left, right).
 
 **`xpr-app/src/map/`**
-- **The pictures are built into the executable, like the gen 1–3 maps
-  (decided 2026-10-01).**
-  - `xpr-app/build.rs` (`write_map_imagery`) `include_bytes!`s every
-    `map_data/<game>/imagery.zip` into code that only `main.rs` includes,
-    and `main` registers the zips at startup. The library and the test
-    binaries don't carry them.
-  - The executable is ≈ 414 MB in release; the build takes ≈ 3 min with fat
-    LTO.
-  - `XPR_NO_EMBED_MAP_IMAGERY=1` builds without them.
+- **The pictures are downloaded per game, on demand (decided 2026-10-28;
+  they were built into the executable from 2026-10-01).**
+  - Releases attach each `map_data/<game>/imagery.zip` as its own asset,
+    `imagery_<game>_<first 16 hex of sha256>.zip`. Only releases whose
+    pictures changed attach them (`rust/release_assets.py`), and the app
+    looks for the name on every release (`xpr_update::assets`).
+  - The first time a game's map is shown without its pictures, the map
+    downloads them, with a progress banner and Cancel / Retry. It checks the
+    size and sha256 against the manifest, keeps them in
+    `<config dir>/map_imagery/`, and drops that game's older copies. The
+    executable is ≈ 44 MB (≈ 30 MB zipped) instead of ≈ 427 MB.
+  - `XPR_EMBED_MAP_IMAGERY=1` still builds them in (`xpr-app/build.rs`,
+    `write_map_imagery`, included only by `main.rs`), for an offline build.
   - `map/imagery.rs` finds the pictures in this order: the embedded zip;
     `<map_data dir>/<game>/imagery.zip` (run from source, or
-    `XPR_MAP_DATA_DIR`); loose `world/` + `interiors/` folders. A zip whose
-    size doesn't match the manifest is ignored.
+    `XPR_MAP_DATA_DIR`); loose `world/` + `interiors/` folders; the
+    download cache. A zip whose size doesn't match the manifest is ignored,
+    and the cache only holds copies named by their sha256.
   - Without the pictures the map draws the terrain sketch, and the status
-    line says "map pictures missing from this build".
+    line says "map pictures not downloaded".
   - **Committing the zips puts ≈ 365 MB into git.** Each file is under
     GitHub's 100 MB limit but over its 50 MB warning; consider Git LFS for
     `map_data/*/imagery.zip`.
@@ -946,8 +951,10 @@ everything it does for gens 1–3, plus encounter conditions and masks.
 
 The export above is designed so that none of these block pokemap work.
 
-- **D-A: how imagery reaches users.** **Decided 2026-10-01: embed it in the
-  executable, like the gen 1–3 maps (§8).** The options were:
+- **D-A: how imagery reaches users.** **Decided 2026-10-28: option 1,
+  on-demand per-game download (§8)**, so that updates that leave the
+  pictures alone are small. From 2026-10-01 until then it was embedded in
+  the executable. The options were:
   1. On-demand per-game download from a GitHub release asset of the router
      repo. It is cached in the app data dir and checked against the manifest's
      sha256, and the map works without it until it arrives.

@@ -11,6 +11,8 @@
 //! was there, so only one old version is ever kept), and a roll-back is the
 //! same swap with that saved copy as the new app ([`stage_previous`]).
 
+pub mod assets;
+
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,6 +24,12 @@ pub use xpr_core::version::{extract_version_info, get_newer_version, is_upgrade_
 
 const GITHUB_API_URL: &str = "https://api.github.com/repos/Scotts-Thoughts/pkmn_yellow_xp_router/releases";
 const USER_AGENT: &str = concat!("pkmn_xp_router/", env!("CARGO_PKG_VERSION"));
+
+/// The releases API: GitHub's, or `XPR_RELEASES_URL` (tests).
+pub(crate) fn releases_url() -> String {
+    std::env::var("XPR_RELEASES_URL").ok().filter(|u| !u.is_empty()).unwrap_or_else(|| GITHUB_API_URL.to_string())
+}
+
 /// `<config dir>/previous_version/`: the saved copy and its `version.txt`.
 const PREVIOUS_DIR: &str = "previous_version";
 const PREVIOUS_VERSION_FILE: &str = "version.txt";
@@ -57,7 +65,7 @@ pub fn asset_prefix() -> &'static str {
 
 /// `get_new_version_info`: `(None, None)` on any failure, as in Python.
 pub fn get_new_version_info() -> ReleaseInfo {
-    match fetch_json(&format!("{}/latest", GITHUB_API_URL)) {
+    match fetch_json(&format!("{}/latest", releases_url())) {
         Ok(data) => parse_release(&data, asset_prefix()),
         Err(e) => {
             log::error!("Exception during new version info extraction: {}", e);
@@ -68,7 +76,7 @@ pub fn get_new_version_info() -> ReleaseInfo {
 
 /// Every published release with an asset for this platform, newest first.
 pub fn list_releases() -> Result<Vec<Release>, String> {
-    let data = fetch_json(&format!("{}?per_page=100", GITHUB_API_URL))?;
+    let data = fetch_json(&format!("{}?per_page=100", releases_url()))?;
     Ok(parse_release_list(&data, asset_prefix()))
 }
 
@@ -81,7 +89,7 @@ fn client(timeout: Option<std::time::Duration>) -> Result<reqwest::blocking::Cli
         .map_err(|e| e.to_string())
 }
 
-fn fetch_json(url: &str) -> Result<Value, String> {
+pub(crate) fn fetch_json(url: &str) -> Result<Value, String> {
     let resp = client(Some(std::time::Duration::from_secs(20)))?.get(url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
@@ -230,8 +238,8 @@ pub fn download_release(zip_url: &str, staging: &Path, cancel: &AtomicBool, prog
     find_app_in(&extract_dir).ok_or_else(|| "the downloaded zip did not contain the program".to_string())
 }
 
-fn download(url: &str, dest: &Path, cancel: &AtomicBool, progress: &mut dyn FnMut(u64, Option<u64>)) -> Result<(), String> {
-    // no overall timeout: the zip is a few hundred MB
+pub(crate) fn download(url: &str, dest: &Path, cancel: &AtomicBool, progress: &mut dyn FnMut(u64, Option<u64>)) -> Result<(), String> {
+    // no overall timeout: the release zips and map pictures are tens of MB
     let mut resp = client(None)?.get(url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));

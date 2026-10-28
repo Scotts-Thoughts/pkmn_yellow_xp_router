@@ -10,7 +10,7 @@ use xpr_app::app::{initial_viewport, ExitState, StartupWork, XprApp};
 use xpr_core::{Config, Paths};
 use xpr_data::Registry;
 
-// the gen 4/5 map pictures (`build.rs`: `write_map_imagery`)
+// the gen 4/5 map pictures, in `XPR_EMBED_MAP_IMAGERY=1` builds only (`build.rs`: `write_map_imagery`)
 include!(concat!(env!("OUT_DIR"), "/embedded_imagery.rs"));
 
 fn main() {

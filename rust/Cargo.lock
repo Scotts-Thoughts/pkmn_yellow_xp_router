@@ -4458,6 +4458,7 @@ dependencies = [
  "log",
  "reqwest",
  "serde_json",
+ "sha2",
  "xpr-core",
  "zip",
 ]

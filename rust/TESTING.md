@@ -39,12 +39,25 @@ repo in reach, a scratch config dir, `XPR_SMOKE_NEW_ROUTE=Yellow|Charmander`)
 and fails unless it exits cleanly with a screenshot and no `ERROR` in its
 log. `--no-build` packages the existing `target/release/xpr-app.exe`.
 
+The gen 4/5 map pictures (~380 MB) are not in the exe, so an update
+downloads only the program (~30 MB zipped). Each game's
+`map_data/<game>/imagery.zip` is a release asset of its own, named after
+its content (`imagery_<game>_<sha256 prefix>.zip`). The app downloads a
+game's pictures the first time that map is shown without them, from
+whichever release has that exact file (`xpr_update::assets`). It keeps them
+in `<config dir>/map_imagery/` until a release changes them. The build
+scripts end with `rust/release_assets.py`, which checks the zips against
+their manifests, stages them in `dist/rust/imagery/` and lists the ones no
+release has yet. Only those need attaching, and old releases must stay up,
+since they hold the pictures later versions still download.
+
 Releases are built by GitHub Actions (`.github/workflows/release.yml`), not
 by hand: push a commit to `main` whose message is a version (`v6.2a`, or
 `6.2A`) and the workflow stamps that version into `consts.rs`
 (`.github/scripts/stamp_version.py`, not committed), runs `windows_build.py`
 and `mac_build.py`, and publishes a release tagged with the version with
-both zips (a failed Mac build does not hold back the Windows release). The
+both zips, plus any map pictures no earlier release has (`release_assets.py
+--new-only`). A failed Mac build does not hold back the Windows release. The
 newest version-named commit in a push counts; a version that already has a
 release is skipped; the workflow can also be run by hand from the Actions
 tab. Installed copies see it at their next start.
@@ -73,6 +86,10 @@ Test-hook environment variables (all optional):
 | `XPR_SMOKE_ACTION=dex` (+ `XPR_SMOKE_DEX_TAB=pokedex\|evs\|trainers\|stats\|damage\|movedex\|natures\|misc`) | open the Dex page on that tab (from whatever page start-up reached; with `XPR_SMOKE_NEW_ROUTE` the Damage tab starts on the route's Pokémon) |
 | `XPR_SMOKE_ACTION=map` (+ `XPR_SMOKE_EVENT=<substring>`) | open the Map tab of the right pane; with `XPR_SMOKE_EVENT`, select the first event whose name contains it and "show it on the map" (SPEC §5 Phase 2 step 7) |
 | `XPR_MAP_DATA_DIR=<dir>` | read the map pack from this directory instead of the embedded copy / `map_data/` next to `raw_pkmn_data` |
+| `XPR_MAP_IMAGERY_DIR=<dir>` | keep downloaded gen 4/5 map pictures here instead of `<config dir>/map_imagery/` |
+| `XPR_NO_MAP_DOWNLOAD=1` | never download map pictures (the gen 4/5 maps stay sketches unless `map_data/` has them); the build scripts' `--smoke` sets it |
+| `XPR_RELEASES_URL=<url>` | use this releases API instead of GitHub's, for the update check and the map-picture downloads (tests serve a local stand-in) |
+| `XPR_EMBED_MAP_IMAGERY=1` (build time) | build the gen 4/5 map pictures into the executable (~380 MB more), for an offline build; releases leave them out |
 | `XPR_SMOKE_COMPARE_A` / `_B=<route path>`, `XPR_SMOKE_COMPARE_TAB=overview\|checkpoints\|diff`, `XPR_SMOKE_COMPARE_EXPAND=<n>` | with `XPR_SMOKE_ACTION=compare`: the two routes to compare, which tab to show and which checkpoint row to expand |
 | `XPR_SMOKE_EXPORT=<kind>[,<kind>...]` | run these exports right before the capture (`event_list`, `battle_summary`, `player_ranges`, `enemy_ranges`, `run_summary`, `setup_summary`, `compare`, `map` (the map's current view at 1× with the toggled layers; needs `XPR_SMOKE_ACTION=map`), `matchup:<n>[:player\|:enemy]`); the PNGs land in the configured images dir |
 | `XPR_FRAME_LOG=1` | log every frame slower than 1 ms (with the route-list / details draw split) and every route-list rebuild |
