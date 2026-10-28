@@ -35,6 +35,9 @@ fn main() {
         }
     }
     paths.config_user_data_dir(&data_dir);
+    // the copy a previous update moved aside, and any leftover download
+    xpr_update::auto_cleanup_old_version();
+    let config_dir = paths.global_config_dir.clone();
     let registry = Arc::new(Registry::new(paths.pokemon_raw_data.clone(), paths.custom_gens_dir.clone()));
     let background = StartupWork::spawn(&paths, &registry);
     let exit = Arc::new(std::sync::Mutex::new(ExitState::default()));
@@ -53,17 +56,11 @@ fn main() {
         log::error!("eframe error: {}", e);
     }
     let exit_state = exit.lock().unwrap().clone();
-    log::info!("App closed, autoupdate requested? {}", exit_state.update_requested);
-    if exit_state.update_requested {
-        log::info!("Beginning cleanup of old version");
-        xpr_update::auto_cleanup_old_version();
-        let temp_dir = std::env::temp_dir().join("pkmn_xp_router_update");
-        let _ = std::fs::create_dir_all(&temp_dir);
-        let mut display = |msg: &str| {
-            log::info!("{}", msg);
-            eprintln!("{}", msg);
-        };
-        let ok = xpr_update::update(exit_state.update_version.as_deref(), exit_state.update_url.as_deref(), &temp_dir, &mut display);
+    if let Some(swap) = exit_state.pending_swap {
+        log::info!("App closed, switching to {}", swap.to_version);
+        // on failure the old version stays in place; either way the restarted
+        // app reports the result (`xpr_update::take_result`)
+        let ok = xpr_update::apply_swap(&swap, &config_dir).is_ok();
         log::info!("Update result: {}", ok);
         if let Err(e) = xpr_update::restart(&args) {
             log::error!("Failed to restart: {}", e);

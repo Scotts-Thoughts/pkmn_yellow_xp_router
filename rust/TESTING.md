@@ -39,6 +39,16 @@ repo in reach, a scratch config dir, `XPR_SMOKE_NEW_ROUTE=Yellow|Charmander`)
 and fails unless it exits cleanly with a screenshot and no `ERROR` in its
 log. `--no-build` packages the existing `target/release/xpr-app.exe`.
 
+Releases are built by GitHub Actions (`.github/workflows/release.yml`), not
+by hand: push a commit to `main` whose message is a version (`v6.2a`, or
+`6.2A`) and the workflow stamps that version into `consts.rs`
+(`.github/scripts/stamp_version.py`, not committed), runs `windows_build.py`
+and `mac_build.py`, and publishes a release tagged with the version with
+both zips (a failed Mac build does not hold back the Windows release). The
+newest version-named commit in a push counts; a version that already has a
+release is skipped; the workflow can also be run by hand from the Actions
+tab. Installed copies see it at their next start.
+
 Isolated run (does not touch the real config / routes):
 
 ```
@@ -232,7 +242,11 @@ handling, or the route list's folder handling.
 ## 13. Update flow
 
 - [ ] Start-up check against GitHub releases (skip with `XPR_DISABLE_AUTO_UPDATE`); "Never prompt" suppresses the dialog; Update → Check for Updates re-checks (button disabled while running).
-- [ ] Update found → defer → the menu's "Update to vX and restart" applies it on quit; the app restarts from the new binary; old version cleaned up on the next start (`auto_cleanup_old_version`).
+- [ ] Update found → prompt with Update Now / Later / Skip This Version; Skip stops the start-up prompt for that version only (`skipped_update_version`), a newer one prompts again.
+- [ ] Update Now → progress dialog downloads and unpacks the zip (Cancel, Retry on failure) → the app quits (unsaved-changes prompt first; Cancel there drops the update) → `main` swaps the new exe in and restarts → a message reports "Updated from vX to vY". The `.<exe>.old` copy is removed on the next start.
+- [ ] The version updated from is kept in `<config dir>/previous_version/` (one copy, replaced by every swap). Update → "Revert to vX" swaps it back (the version left goes into the slot, and is skipped by the start-up prompt).
+- [ ] Update → Install Another Version… lists every GitHub release with an asset for this platform (newest first, the installed one marked) and the saved previous version; installing an older release also keeps the running version in the slot.
+- [ ] A failed swap leaves the old version in place and the next start says so (`update_result.json`).
 - [ ] "Update not possible" path (e.g. running from `cargo run` / no release asset for this platform).
 
 ## 14. Persistence and shutdown

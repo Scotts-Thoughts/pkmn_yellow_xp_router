@@ -622,6 +622,12 @@ impl RouteList {
                 }
                 let path = self.path_of_row(ctrl, row.id);
                 self.persistent_expand_state.insert(path, new_val);
+                // refresh() snapshots the expand state from the current rows
+                // before rebuilding, so the row must carry the new state too or
+                // the rebuild puts the old one back
+                for r in self.rows.iter_mut().filter(|r| r.id == row.id && r.kind == RowKind::Folder) {
+                    r.expanded = new_val;
+                }
                 self.dirty = true;
             }
             RowKind::Group => {

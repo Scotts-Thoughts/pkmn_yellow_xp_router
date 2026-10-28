@@ -492,16 +492,23 @@ fn escape_under_a_dialog_does_not_cancel_the_replay_import() {
     }
     assert!(run(false, escape()), "without a dialog Escape cancels the import");
 }
-
+/// Clicking a folder's chevron collapses it and clicking again expands it.
+/// The rebuild used to restore the expand state from the old rows, so the
+/// folder stayed open on screen whatever the chevron did.
 #[test]
-fn tmp_chevron_probe() {
+fn a_chevron_click_collapses_and_expands_a_folder() {
     let mut h = Harness::new("yellow-pinsir-lv10brock.json");
-    let folders: Vec<i64> = h.ctrl.router.root().children.clone();
-    let state = |h: &Harness| folders.iter().map(|f| h.ctrl.router.folder(*f).map(|f| f.is_expanded()).unwrap_or(false)).collect::<Vec<_>>();
-    eprintln!("start {:?}", state(&h));
-    for i in 0..4 {
-        h.click(Harness::row_pos(i, 19.0));
-        h.frame(vec![]);
-        eprintln!("click row {i} -> {:?}", state(&h));
-    }
+    let folders = h.ctrl.router.root().children.clone();
+    let expanded = |h: &Harness, i: usize| h.ctrl.router.folder(folders[i]).unwrap().is_expanded();
+    assert!(expanded(&h, 0) && expanded(&h, 1));
+    h.click(Harness::row_pos(0, 19.0));
+    h.frame(vec![]);
+    assert!(!expanded(&h, 0), "the first click collapses the folder");
+    // with its children hidden the next folder is the second row
+    h.click(Harness::row_pos(1, 19.0));
+    h.frame(vec![]);
+    assert!(!expanded(&h, 1), "the folder's children are hidden from the list");
+    h.click(Harness::row_pos(0, 19.0));
+    h.frame(vec![]);
+    assert!(expanded(&h, 0), "a second click expands it again");
 }

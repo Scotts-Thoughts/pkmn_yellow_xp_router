@@ -29,7 +29,7 @@ use crate::dex_damage::DexDamage;
 use crate::dialogs::{
     AppConfigDialog, AssignMoveDialog, BattleConfigDialog, ColorConfigDialog, CustomDvsDialog, CustomGenDialog, Dialog, EvOverrideDialog,
     DialogCtx, DialogOutcome, FinalTrainersDialog, HighlightColorDialog, LoadRouteDialog, MatchupExportDialog, MessageBox,
-    MsgButtons, MsgChoice, MsgTag, NewFolderDialog, ShortcutsDialog, TransferDialog,
+    MsgButtons, MsgChoice, MsgTag, NewFolderDialog, ShortcutsDialog, TransferDialog, UpdateDialog,
 };
 use crate::event_details::{DetailsActions, EventDetails, MAP_TAB};
 use crate::filter_bar::FilterBar;
@@ -58,9 +58,9 @@ pub enum Page {
 /// What `main` needs to know after the window closes.
 #[derive(Clone, Debug, Default)]
 pub struct ExitState {
-    pub update_requested: bool,
-    pub update_version: Option<String>,
-    pub update_url: Option<String>,
+    /// a downloaded release (or the saved previous version) to swap in
+    /// before restarting
+    pub pending_swap: Option<xpr_update::PendingSwap>,
 }
 
 pub type SharedExit = Arc<std::sync::Mutex<ExitState>>;
@@ -131,9 +131,12 @@ impl StartupWork {
 struct UpdateState {
     rx: Option<Receiver<xpr_update::ReleaseInfo>>,
     startup_check: bool,
-    deferred_version: Option<String>,
-    deferred_url: Option<String>,
-    requested: bool,
+    /// the newest release, when it is newer than this version: (tag, asset url)
+    available: Option<(String, String)>,
+    /// the version saved for roll-back (it only changes with a restart)
+    previous: Option<String>,
+    /// set on the way out: `main` swaps it in and restarts
+    pending_swap: Option<xpr_update::PendingSwap>,
     check_button_enabled: bool,
 }
 
@@ -261,7 +264,9 @@ impl XprApp {
         let map_fraction = cfg.get_map_left_fraction();
         let map = MapView::new(&cfg, &paths.pokemon_raw_data);
         let restore_position_px = saved_position_px(&cfg);
-        XprApp {
+        let update_result = xpr_update::take_result(&paths.global_config_dir);
+        let update_previous = xpr_update::previous_version(&paths.global_config_dir);
+        let mut app = XprApp {
             cfg,
             paths,
             registry,
@@ -306,7 +311,7 @@ impl XprApp {
             first_frame: true,
             window_monitor: None,
             restore_position_px,
-            update: UpdateState { rx: Some(urx), startup_check: true, deferred_version: None, deferred_url: None, requested: false, check_button_enabled: true },
+            update: UpdateState { rx: Some(urx), startup_check: true, available: None, previous: update_previous, pending_swap: None, check_button_enabled: true },
             pre_state_fraction,
             battle_fraction,
             map_fraction,
@@ -334,7 +339,11 @@ impl XprApp {
             smoke_prestate: None,
             smoke_record: None,
             smoke_stop_flag: None,
+        };
+        if let Some(r) = update_result {
+            app.show_update_result(&r);
         }
+        app
     }
 
     // ---- helpers ----------------------------------------------------------------------------
@@ -1602,24 +1611,72 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
             }
             return;
         }
-        self.update.deferred_version = Some(v.clone());
-        self.update.deferred_url = info.asset_url.clone();
-        if startup && self.cfg.get_suppress_update_prompt() {
-            log::info!("Update prompt suppressed by user preference");
+        let Some(url) = info.asset_url.clone() else {
+            if !startup {
+                self.show_message("Update available", &format!("Version {} is available, but it has no download for this platform yet.", v), MsgButtons::Ok, MsgTag::UpdateNotPossible);
+            }
+            return;
+        };
+        self.update.available = Some((v.clone(), url.clone()));
+        if startup {
+            if self.cfg.get_suppress_update_prompt() {
+                log::info!("Update prompt suppressed by user preference");
+                return;
+            }
+            if xpr_update::same_version(&v, &self.cfg.get_skipped_update_version()) {
+                log::info!("Update prompt skipped: the user skipped {}", v);
+                return;
+            }
+            // don't cover a message already up (e.g. the last update's result)
+            if self.message.is_some() {
+                return;
+            }
+        }
+        let text = format!("Version {} is available (you have {}).\nDo you want to update now?", v, consts::APP_VERSION);
+        self.show_message("Update available", &text, MsgButtons::UpdatePrompt, MsgTag::UpdateFound(v, url));
+    }
+
+    /// Download `version` in a progress dialog; the swap and restart follow
+    /// once it is unpacked (`DialogOutcome::SwapReady`).
+    fn start_download(&mut self, version: String, url: String) {
+        if !xpr_update::is_upgrade_possible() {
+            self.show_message("Update", "Automatic updates are not supported for this installation.\nPlease download the new version manually.", MsgButtons::Ok, MsgTag::UpdateNotPossible);
             return;
         }
-        let text = if startup { format!("Found new version {}\nDo you want to update?", v) } else { format!("Version {} is available.\nDo you want to update now?", v) };
-        self.show_message(if startup { "Update?" } else { "Update available" }, &text, MsgButtons::YesNo, MsgTag::UpdateFound(v, info.asset_url.unwrap_or_default()));
+        self.dialog = Some(Dialog::Update(UpdateDialog::download(version, url)));
     }
 
-    fn apply_deferred_update(&mut self) {
-        let Some(v) = self.update.deferred_version.clone() else { return };
-        self.show_message("Apply Update", &format!("The application will close and update to {}.\nContinue?", v), MsgButtons::YesNo, MsgTag::ApplyUpdate);
+    /// Roll back to the saved previous version (no download: it is copied
+    /// out of the config folder and swapped in on the way out).
+    fn revert_to_previous(&mut self, ctx: &egui::Context) {
+        match xpr_update::stage_previous(&self.paths.global_config_dir, &xpr_update::staging_dir()) {
+            Ok(swap) => {
+                // don't prompt to update straight back to the version being left
+                self.cfg.set_skipped_update_version(consts::APP_VERSION);
+                self.quit_for_update(ctx, swap);
+            }
+            Err(e) => self.show_message("Revert failed", &format!("Could not prepare the previous version:\n{}", e), MsgButtons::Ok, MsgTag::UpdateError),
+        }
     }
 
-    fn cancel_and_quit(&mut self, ctx: &egui::Context) {
-        self.allow_close = true;
+    /// Close the window (asking about unsaved changes as any quit does);
+    /// `main` then swaps `swap` in and restarts.
+    fn quit_for_update(&mut self, ctx: &egui::Context, swap: xpr_update::PendingSwap) {
+        log::info!("quitting to install {}", swap.to_version);
+        self.update.pending_swap = Some(swap);
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+    }
+
+    /// The note the last swap left for this launch.
+    fn show_update_result(&mut self, r: &xpr_update::UpdateResult) {
+        let verb = if r.revert { "Reverted" } else { "Updated" };
+        if r.ok && xpr_update::same_version(&r.to, consts::APP_VERSION) {
+            let text = format!("{} from {} to {}.\n\n{} is saved: Update \u{25B8} Revert switches back to it.", verb, r.from, r.to, r.from);
+            self.show_message(verb, &text, MsgButtons::Ok, MsgTag::Info);
+        } else if !r.ok {
+            let text = format!("Could not switch from {} to {}:\n{}\n\nYou are still on {}.", r.from, r.to, r.error.as_deref().unwrap_or("unknown error"), consts::APP_VERSION);
+            self.show_message("Update failed", &text, MsgButtons::Ok, MsgTag::UpdateError);
+        }
     }
 
     // ---- screenshots -------------------------------------------------------------------------
@@ -1837,7 +1894,12 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                     self.allow_close = true;
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
-                _ => {}
+                _ => {
+                    if let Some(swap) = self.update.pending_swap.take() {
+                        let _ = std::fs::remove_dir_all(xpr_update::staging_dir());
+                        self.show_message("Update cancelled", &format!("{} was not installed.", swap.to_version), MsgButtons::Ok, MsgTag::Info);
+                    }
+                }
             },
             MsgTag::NewRouteFromCurrentUnsaved => match choice {
                 MsgChoice::Cancel => {}
@@ -1862,18 +1924,19 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                     self.ctrl.delete_events(&ids);
                 }
             }
-            MsgTag::UpdateFound(v, url) => {
+            MsgTag::UpdateFound(v, url) => match choice {
+                MsgChoice::Yes => self.start_download(v, url),
+                MsgChoice::No => self.cfg.set_skipped_update_version(&v),
+                _ => {}
+            },
+            MsgTag::InstallRelease(v, url) => {
                 if choice == MsgChoice::Yes {
-                    self.update.deferred_version = Some(v);
-                    self.update.deferred_url = Some(url);
-                    self.update.requested = true;
-                    self.cancel_and_quit(ctx);
+                    self.start_download(v, url);
                 }
             }
-            MsgTag::ApplyUpdate => {
+            MsgTag::RevertToPrevious(_) => {
                 if choice == MsgChoice::Yes {
-                    self.update.requested = true;
-                    self.cancel_and_quit(ctx);
+                    self.revert_to_previous(ctx);
                 }
             }
             MsgTag::BackportResult { species, custom_gen_name } => {
@@ -1940,10 +2003,8 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                 self.ctrl.override_evs_before_selected(values);
             }
             DialogOutcome::MatchupExport { idx, mode } => self.request_shot(ShotKind::Matchup { idx, mode }),
-            DialogOutcome::RestartForUpdate => {
-                self.update.requested = true;
-                self.cancel_and_quit(ctx);
-            }
+            DialogOutcome::StartUpdate { version, url } => self.start_download(version, url),
+            DialogOutcome::SwapReady(swap) => self.quit_for_update(ctx, swap),
             DialogOutcome::CreateRouteForBackport { species, custom_gen_name } => {
                 self.ctrl.create_new_route(&species, None, &custom_gen_name, None, None, None);
             }
@@ -2333,12 +2394,27 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                     self.cfg.set_suppress_update_prompt(v);
                 }
                 widgets::menu_separator(ui, &theme);
-                let label_text = match &self.update.deferred_version {
-                    Some(v) => format!("Update to {}", v),
+                let label_text = match &self.update.available {
+                    Some((v, _)) => format!("Update to {}", v),
                     None => "Update".to_string(),
                 };
-                if widgets::menu_item(ui, &theme, &label_text, "", self.update.deferred_version.is_some()) {
-                    self.apply_deferred_update();
+                if widgets::menu_item(ui, &theme, &label_text, "", self.update.available.is_some()) {
+                    if let Some((v, url)) = self.update.available.clone() {
+                        self.start_download(v, url);
+                    }
+                }
+                let possible = xpr_update::is_upgrade_possible();
+                let revert_text = match &self.update.previous {
+                    Some(v) => format!("Revert to {}", v),
+                    None => "Revert to Previous Version".to_string(),
+                };
+                if widgets::menu_item(ui, &theme, &revert_text, "", possible && self.update.previous.is_some()) {
+                    if let Some(v) = self.update.previous.clone() {
+                        self.message = Some(crate::dialogs::revert_prompt(&v));
+                    }
+                }
+                if widgets::menu_item(ui, &theme, "Install Another Version\u{2026}", "", true) {
+                    self.dialog = Some(Dialog::Update(UpdateDialog::versions(self.update.previous.clone())));
                 }
             });
         });
@@ -2695,6 +2771,24 @@ impl XprApp {
                 }
                 log::info!("smoke: compare page");
             }
+            // `XPR_SMOKE_ACTION=update`: the Update menu's dialogs, picked by
+            // `XPR_SMOKE_UPDATE` (versions | prompt | download; the download
+            // fetches `XPR_SMOKE_UPDATE_URL`, or fails on a dead address).
+            if !self.smoke_action_done && std::env::var("XPR_SMOKE_ACTION").as_deref() == Ok("update") && self.deferred_post_init.is_none() && Instant::now() >= at - Duration::from_millis(2500) {
+                self.smoke_action_done = true;
+                match std::env::var("XPR_SMOKE_UPDATE").unwrap_or_default().as_str() {
+                    "prompt" => {
+                        let text = format!("Version v9.9z is available (you have {}).\nDo you want to update now?", consts::APP_VERSION);
+                        self.show_message("Update available", &text, MsgButtons::UpdatePrompt, MsgTag::UpdateFound("v9.9z".into(), String::new()));
+                    }
+                    "download" => {
+                        let url = std::env::var("XPR_SMOKE_UPDATE_URL").unwrap_or_else(|_| "http://127.0.0.1:9/none.zip".into());
+                        self.dialog = Some(Dialog::Update(UpdateDialog::download("v9.9z".into(), url)));
+                    }
+                    _ => self.dialog = Some(Dialog::Update(UpdateDialog::versions(self.update.previous.clone()))),
+                }
+                log::info!("smoke: update dialog");
+            }
             // `XPR_SMOKE_ACTION=dex`: open the Dex (from whatever page the
             // start-up reached) on `XPR_SMOKE_DEX_TAB` (pokedex | evs |
             // trainers | stats | damage | movedex | natures | misc).
@@ -2940,9 +3034,7 @@ impl eframe::App for XprApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.details.force_and_clear_event_update(&self.cfg, &mut self.ctrl);
         let mut e = self.exit.lock().unwrap();
-        e.update_requested = self.update.requested;
-        e.update_version = self.update.deferred_version.clone();
-        e.update_url = self.update.deferred_url.clone();
+        e.pending_swap = self.update.pending_swap.clone();
     }
 }
 

@@ -470,6 +470,7 @@ pub struct Config {
     run_summary_docked: Value,
     color_major_battles: Value,
     suppress_update_prompt: Value,
+    skipped_update_version: Value,
     notes_collapsed: Value,
     pre_state_left_fraction: Value,
     pre_state_bag_height: Value,
@@ -605,6 +606,7 @@ impl Config {
             run_summary_docked: gv("run_summary_docked", Value::Bool(true)),
             color_major_battles: gv("color_major_battles", Value::Bool(true)),
             suppress_update_prompt: gv("suppress_update_prompt", Value::Bool(false)),
+            skipped_update_version: gv("skipped_update_version", Value::String(String::new())),
             notes_collapsed: gv("notes_collapsed", Value::Bool(false)),
             pre_state_left_fraction: gv("pre_state_left_fraction", Value::Null),
             pre_state_bag_height: gv("pre_state_bag_height", Value::Null),
@@ -670,6 +672,7 @@ impl Config {
             ("run_summary_docked".into(), self.run_summary_docked.clone()),
             ("color_major_battles".into(), self.color_major_battles.clone()),
             ("suppress_update_prompt".into(), self.suppress_update_prompt.clone()),
+            ("skipped_update_version".into(), self.skipped_update_version.clone()),
             ("notes_collapsed".into(), self.notes_collapsed.clone()),
             ("pre_state_left_fraction".into(), self.pre_state_left_fraction.clone()),
             ("pre_state_bag_height".into(), self.pre_state_bag_height.clone()),
@@ -1026,6 +1029,12 @@ impl Config {
 
     pub fn get_suppress_update_prompt(&self) -> bool { pyjson::truthy(&self.suppress_update_prompt) }
     pub fn set_suppress_update_prompt(&mut self, v: bool) { self.suppress_update_prompt = Value::Bool(v); self.save(); }
+    /// The release the user chose to skip (or rolled back from): the start-up
+    /// check does not prompt for it, only for a newer one.
+    pub fn get_skipped_update_version(&self) -> String {
+        self.skipped_update_version.as_str().map(|s| s.to_string()).unwrap_or_default()
+    }
+    pub fn set_skipped_update_version(&mut self, v: &str) { self.skipped_update_version = Value::String(v.into()); self.save(); }
     pub fn get_run_summary_docked(&self) -> bool { pyjson::truthy(&self.run_summary_docked) }
     pub fn set_run_summary_docked(&mut self, v: bool) { self.run_summary_docked = Value::Bool(v); self.save(); }
 

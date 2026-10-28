@@ -23,6 +23,9 @@ use crate::controller::MainController;
 use crate::custom_dvs::CustomDvsFrame;
 use crate::editors::{ev_field_indices, OptionMenu, EV_STAT_NAMES, EV_STAT_NAMES_GEN12};
 
+mod update;
+pub use update::{install_prompt, revert_prompt, UpdateDialog};
+
 /// Identifies which prompt a message-box answer belongs to.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MsgTag {
@@ -35,7 +38,10 @@ pub enum MsgTag {
     UpdateNoUpdate,
     UpdateNotPossible,
     UpdateError,
-    ApplyUpdate,
+    /// "Install <tag>?" from the version list: (tag, asset url)
+    InstallRelease(String, String),
+    /// "Revert to <version>?" (the saved previous version)
+    RevertToPrevious(String),
     NewRouteError,
     Info,
     BackportResult { species: String, custom_gen_name: String },
@@ -62,6 +68,9 @@ pub enum MsgButtons {
     /// `save` ("Save, then close") answers Yes, `discard` ("Close without
     /// saving") answers No, and Cancel answers Cancel.
     SaveDiscardCancel { save: &'static str, discard: &'static str },
+    /// The new-version prompt: "Update Now" answers Yes, "Skip This Version"
+    /// No, and "Later" Cancel.
+    UpdatePrompt,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -96,7 +105,10 @@ pub enum DialogOutcome {
     /// `[hp, atk, def, spa, spd, spe]` for an EV override before the selected event
     EvOverride([i64; 6]),
     MatchupExport { idx: usize, mode: crate::battle_ui::ScreenshotMode },
-    RestartForUpdate,
+    /// download and install this release (version, asset url)
+    StartUpdate { version: String, url: String },
+    /// a release is downloaded and unpacked: quit, swap it in, restart
+    SwapReady(xpr_update::PendingSwap),
     CreateRouteForBackport { species: String, custom_gen_name: String },
     DataDirChanged,
 }
@@ -116,6 +128,7 @@ pub enum Dialog {
     MatchupExport(MatchupExportDialog),
     AssignMove(AssignMoveDialog),
     EvOverride(EvOverrideDialog),
+    Update(UpdateDialog),
 }
 
 /// Shared context handed to dialog `ui` calls.
@@ -378,6 +391,7 @@ impl MessageBox {
         let width = match self.buttons {
             // room for the two long labels and Cancel on one row
             MsgButtons::SaveDiscardCancel { save, discard } => if save.len() + discard.len() > 40 { 540.0 } else { 480.0 },
+            MsgButtons::UpdatePrompt => 480.0,
             _ if self.text.len() > 160 => 480.0,
             _ => 400.0,
         };
@@ -421,6 +435,19 @@ impl MessageBox {
                         }
                     });
                 }
+                MsgButtons::UpdatePrompt => {
+                    if action_button(ui, theme, "Update Now", Tone::Primary, true).clicked() || enter_pressed(ui) {
+                        choice = Some(MsgChoice::Yes);
+                    }
+                    if action_button(ui, theme, "Later", Tone::Secondary, true).clicked() {
+                        choice = Some(MsgChoice::Cancel);
+                    }
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        if action_button(ui, theme, "Skip This Version", Tone::Secondary, true).clicked() {
+                            choice = Some(MsgChoice::No);
+                        }
+                    });
+                }
                 MsgButtons::OkCreateRoute => {
                     if action_button(ui, theme, "OK", Tone::Primary, true).clicked() || enter_pressed(ui) {
                         choice = Some(MsgChoice::Ok);
@@ -432,7 +459,7 @@ impl MessageBox {
             });
             if escape_pressed(ui) {
                 choice = Some(match self.buttons {
-                    MsgButtons::YesNoCancel | MsgButtons::SaveDiscardCancel { .. } => MsgChoice::Cancel,
+                    MsgButtons::YesNoCancel | MsgButtons::SaveDiscardCancel { .. } | MsgButtons::UpdatePrompt => MsgChoice::Cancel,
                     MsgButtons::YesNo => MsgChoice::No,
                     _ => MsgChoice::Ok,
                 });
@@ -1236,12 +1263,14 @@ impl AppConfigDialog {
                         None => ("No Upgrade Needed", Tone::Secondary, false),
                     };
                     if button_sized(ui, theme, label, tone, enabled, 26.0, 0.0, theme.body()).clicked() {
-                        outcome = Some(DialogOutcome::RestartForUpdate);
-                        close = true;
+                        if let Some((version, url)) = self.upgrade_available.clone() {
+                            outcome = Some(DialogOutcome::StartUpdate { version, url });
+                            close = true;
+                        }
                     }
                 });
             });
-            help(ui, theme, "Automatic updates are only supported on Windows.");
+            help(ui, theme, "Automatic updates are supported for the installed Windows and macOS program. Update \u{25B8} Install Another Version lists every release and the saved previous version.");
 
             section(ui, theme, "Recording", None);
             if widgets::checkbox(ui, theme, &mut self.debug_mode, "Debug logging when recording", true).changed() {
@@ -1836,6 +1865,7 @@ impl Dialog {
             Dialog::MatchupExport(x) => x.ui(ctx, d),
             Dialog::AssignMove(x) => x.ui(ctx, d),
             Dialog::EvOverride(x) => x.ui(ctx, d),
+            Dialog::Update(x) => x.ui(ctx, d, message),
         }
     }
 }

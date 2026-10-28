@@ -1,0 +1,141 @@
+# Automatic releases.
+#
+# Push a commit to main whose message (first line) is a version, e.g.
+# "v6.2a" (or "6.2A"; it is normalised to lower case with a leading "v").
+# This workflow then builds the Windows exe (and the macOS app), stamps that
+# version into it, and publishes a GitHub release tagged with the version.
+# Running copies of the program check the latest release at start-up and
+# offer the update (xpr-update).
+#
+# The version commit does not have to be the last one in the push: the
+# newest version-named commit in the push is used, and the build is of the
+# pushed head. A version that already has a release is skipped. It can also
+# be run by hand from the Actions tab with a version.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. v6.2a)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        name: Find a version commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            raw="$INPUT_VERSION"
+          else
+            raw=$(jq -r '[.commits[]?.message | split("\n")[0] | gsub("^[[:space:]]+|[[:space:]]+$"; "") | select(test("^[vV]?[0-9]+[.][0-9]+[a-zA-Z]$"))] | last // ""' "$GITHUB_EVENT_PATH")
+          fi
+          raw=$(echo "$raw" | tr -d '[:space:]')
+          if ! echo "$raw" | grep -Eq '^[vV]?[0-9]+\.[0-9]+[a-zA-Z]$'; then
+            echo "No version commit in this push; nothing to release."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="v$(echo "${raw#[vV]}" | tr '[:upper:]' '[:lower:]')"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$version" >/dev/null 2>&1; then
+            echo "Release $version already exists; skipping."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Releasing $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: detect
+    if: needs.detect.outputs.version != ''
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Stamp version
+        run: python .github/scripts/stamp_version.py ${{ needs.detect.outputs.version }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Build exe
+        run: python rust/windows_build.py --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/windows_*.zip
+          compression-level: 0
+          if-no-files-found: error
+
+  macos:
+    needs: detect
+    if: needs.detect.outputs.version != ''
+    runs-on: macos-latest
+    timeout-minutes: 120
+    # a broken Mac build must not hold back the Windows release
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Stamp version
+        run: python .github/scripts/stamp_version.py ${{ needs.detect.outputs.version }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Build app
+        run: python rust/mac_build.py --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/macos_*.zip
+          compression-level: 0
+          if-no-files-found: error
+
+  release:
+    needs: [detect, windows, macos]
+    if: always() && needs.windows.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          ls -la assets
+          gh release create "$VERSION" assets/*.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --generate-notes \
+            --latest

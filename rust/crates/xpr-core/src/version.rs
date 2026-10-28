@@ -1,5 +1,6 @@
 //! Version string parsing from `utils/auto_update.py` (`vX.Ya`: major,
-//! minor, and the last character as a bug-fix letter).
+//! minor, and the last character as a bug-fix letter, compared without
+//! regard to case: `v6.0A` is `v6.0a`).
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VersionInfo {
@@ -20,7 +21,7 @@ pub fn extract_version_info(version_string: &str) -> Option<VersionInfo> {
     };
     let major = digits(parts[0])?;
     let minor = digits(parts[1])?;
-    let bugfix = parts[1].chars().last()?;
+    let bugfix = parts[1].chars().last()?.to_ascii_lowercase();
     Some(VersionInfo { major, minor, bugfix })
 }
 
@@ -54,7 +55,15 @@ pub fn get_newer_version<'a>(v_one: &'a str, v_two: &'a str) -> &'a str {
 pub fn is_upgrade_needed(new_version: Option<&str>, old_version: &str) -> bool {
     match new_version {
         None => false,
-        Some(nv) => nv != crate::consts::APP_VERSION && nv == get_newer_version(nv, old_version),
+        Some(nv) => !same_version(nv, crate::consts::APP_VERSION) && nv == get_newer_version(nv, old_version),
+    }
+}
+
+/// Whether two version strings name the same release (`v6.1c` == `6.1C`).
+pub fn same_version(a: &str, b: &str) -> bool {
+    match (extract_version_info(a), extract_version_info(b)) {
+        (Some(x), Some(y)) => x == y,
+        _ => a.eq_ignore_ascii_case(b),
     }
 }
 
@@ -71,5 +80,9 @@ mod tests {
         assert_eq!(get_newer_version("v5.0a", "v5.0b"), "v5.0b");
         assert_eq!(get_newer_version("v6.0a", "v5.9z"), "v6.0a");
         assert!(extract_version_info("garbage").is_none());
+        assert_eq!(get_newer_version("v6.0A", "v6.0b"), "v6.0b");
+        assert_eq!(get_newer_version("v6.10a", "v6.9z"), "v6.10a");
+        assert!(same_version("v6.1C", "6.1c"));
+        assert!(!same_version("v6.1c", "v6.1d"));
     }
 }
