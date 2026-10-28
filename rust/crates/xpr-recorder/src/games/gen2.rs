@@ -15,12 +15,20 @@ use xpr_data::GenData;
 use xpr_engine::{EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
 
 use super::common::*;
-use crate::controller::{dedupe, fix_key, fix_keys, is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
+use crate::controller::{dedupe, fix_key, fix_keys, fix_optional_key, fix_optional_keys, is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
 use crate::gamehook::{GameHookProperty, PropertyStore};
 use crate::host::StartInfo;
 
 pub const PKMN_CENTER_HEAL_SOUND_ID: i64 = 18;
 pub const SAVE_HEAL_SOUND_ID: i64 = 37;
+/// `MUSIC_HEAL`: the Pokémon Center machine plays it after `PKMN_CENTER_HEAL_SOUND_ID`,
+/// and the bed/rest heals play it alone
+pub const HEAL_MUSIC_ID: i64 = 0x0D;
+/// Maps whose `MUSIC_HEAL` is a heal; the others are not (Daisy's grooming,
+/// the haircut brothers, Moomoo's berries, the Battle Tower).
+pub const HEAL_MUSIC_MAPS: [&str; 3] = ["Route 30 - Mr. Pokemon's House", "Route 26 - Heal House", "Fast Ship - SW / SSW / NW Cabins"];
+/// Game seconds after a Pokémon Center heal when its `MUSIC_HEAL` is not another heal
+const HEAL_MUSIC_COOLDOWN: i64 = 3;
 pub const TRAINER_BATTLE_TYPE: &str = "Trainer";
 pub const WILD_BATTLE_TYPE: &str = "Wild";
 pub const RETURN_MOVE_NAME: &str = "Return";
@@ -113,6 +121,15 @@ pub struct Gen2Keys {
     pub tm_keys: Vec<String>,
     pub hm_keys: Vec<String>,
     pub all_item_fields: HashSet<String>,
+    /// Event flags a scripted heal with no heal sound sets: after the
+    /// Cherrygrove rival fight (the rival's hide flag), Proton in Slowpoke
+    /// Well, Sailor Stanly on the Fast Ship, and Lance in the Rocket HQ.
+    /// Empty for the deprecated mapper.
+    pub scripted_heal_flags: Vec<String>,
+    /// `wMusicID`; empty for the deprecated mapper
+    pub audio_music_id: String,
+    /// the map's full name (`overworld_map` is only its group); empty for the deprecated mapper
+    pub overworld_map_name: String,
 }
 
 impl Gen2Keys {
@@ -193,6 +210,13 @@ impl Gen2Keys {
                 HM_NAMES_STANDARD.iter().map(|t| format!("bag.hms.{}", t)).collect()
             },
             all_item_fields: HashSet::new(),
+            scripted_heal_flags: if deprecated {
+                Vec::new()
+            } else {
+                ["rival_cherrygrove_city", "cleared_slowpoke_well", "beat_sailor_stanly", "lance_healed_you_in_team_rocket_base"].iter().map(|f| format!("event_flags.{}", f)).collect()
+            },
+            audio_music_id: d("", "audio.music_id"),
+            overworld_map_name: d("", "overworld.map_name"),
         };
         k.rebuild_item_fields();
         k
@@ -237,6 +261,8 @@ impl Gen2Keys {
         v.extend(self.stat_exp.iter().cloned());
         v.extend(self.all_item_fields.iter().cloned());
         v.extend(self.team_species.iter().cloned());
+        v.extend(self.scripted_heal_flags.iter().cloned());
+        v.extend([&self.audio_music_id, &self.overworld_map_name].into_iter().filter(|k| !k.is_empty()).cloned());
         v
     }
 
@@ -301,6 +327,9 @@ impl Gen2Keys {
             fix_keys(store, list, &mut invalid);
         }
         self.rebuild_item_fields();
+        fix_optional_keys(store, &mut self.scripted_heal_flags);
+        fix_optional_key(store, &mut self.audio_music_id);
+        fix_optional_key(store, &mut self.overworld_map_name);
         dedupe(invalid)
     }
 }
@@ -531,6 +560,10 @@ struct OverworldData {
     waiting_for_solo_mon_in_slot_1: bool,
     wrong_mon_delay: i64,
     wrong_mon_in_slot_1: bool,
+    /// game seconds left in which `MUSIC_HEAL` belongs to the last Pokémon Center heal
+    heal_music_cooldown: i64,
+    /// a scripted heal's flag was set; queued once any battle it followed ends
+    scripted_heal_pending: bool,
 }
 
 const BASE_DELAY: i64 = 2;
@@ -1513,8 +1546,15 @@ impl Gen2Machine {
             // the location is the map *group* value as the mapper reports it (an int)
             if new.eq_i64(PKMN_CENTER_HEAL_SOUND_ID) {
                 self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
+                self.overworld.heal_music_cooldown = HEAL_MUSIC_COOLDOWN;
             } else if new.eq_i64(SAVE_HEAL_SOUND_ID) {
                 self.queue_new_event(EventDefinition::with_save_value(&store.value(&self.keys.overworld_map)));
+            }
+        } else if new.path == self.keys.audio_music_id {
+            // a bed/rest heal (Mr. Pokémon's house, the Route 26 heal house, the Fast Ship's cabins)
+            let map = store.str_of(&self.keys.overworld_map_name).unwrap_or_default();
+            if new.eq_i64(HEAL_MUSIC_ID) && self.overworld.heal_music_cooldown <= 0 && HEAL_MUSIC_MAPS.contains(&map.as_str()) {
+                self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
             }
         } else if new.path == self.keys.gametime_seconds {
             if self.overworld.waiting_for_registration {
@@ -1524,6 +1564,7 @@ impl Gen2Machine {
                 }
                 self.overworld.register_delay -= 1;
             }
+            self.overworld.heal_music_cooldown -= 1;
         }
         state
     }
@@ -1824,6 +1865,12 @@ impl GameRecorder for Gen2Machine {
                 py_str(&store.value(&self.keys.gametime_frames))
             );
         }
+        // a scripted heal with no heal sound: its event flag turns on (one
+        // after a fight can turn on before the battle state ends; it waits
+        // for the fight's events)
+        if self.keys.scripted_heal_flags.contains(&new.path) && new.truthy() && !prev.truthy() && self.valid_solo_mon && !matches!(self.cur_state, GameState::Uninitialized | GameState::Resetting) {
+            self.overworld.scripted_heal_pending = true;
+        }
         let result = self.transition(store, new, prev);
         if result != self.cur_state {
             log::info!("Moving from {} state to {} due to change {}, from {} to {}", self.cur_state, result, new.path, py_str(&prev.value), py_str(&new.value));
@@ -1832,6 +1879,12 @@ impl GameRecorder for Gen2Machine {
             self.on_enter(result, store);
             self.cur_state = result;
             self.controller.set_game_state(result);
+        }
+        if self.overworld.scripted_heal_pending && self.cur_state != GameState::Battle {
+            self.overworld.scripted_heal_pending = false;
+            if self.cur_state != GameState::Resetting {
+                self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
+            }
         }
     }
 

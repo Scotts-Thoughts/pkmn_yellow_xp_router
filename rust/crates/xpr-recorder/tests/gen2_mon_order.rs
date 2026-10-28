@@ -195,6 +195,13 @@ fn mapper(game_name: &str) -> Value {
     for path in k.tm_keys.iter().chain(k.hm_keys.iter()) {
         add(path, json!(0));
     }
+    for path in &k.scripted_heal_flags {
+        add(path, json!(false));
+    }
+    if !k.audio_music_id.is_empty() {
+        add(&k.audio_music_id, json!(0));
+        add(&k.overworld_map_name, json!("New Bark Town"));
+    }
     json!({"meta": {"gameName": game_name}, "glossary": {}, "properties": props})
 }
 
@@ -405,4 +412,32 @@ fn enemy_level_from_max_hp_picks_the_level_that_fits() {
     assert_eq!(enemy_level_from_max_hp(45, 30, Some(12), 10), Some(10));
     // nothing fits
     assert_eq!(enemy_level_from_max_hp(45, 2, None, 5), None);
+}
+
+#[test]
+fn crystal_scripted_heals_are_recorded() {
+    let (mut sim, log, _gen, _controller) = start(STANDARD);
+    let k = sim.keys.clone();
+    // a Pokémon Center: the machine's sound, then MUSIC_HEAL (one heal)
+    sim.set(&k.overworld_map_name, json!("Cherrygrove City - Pokecenter - 1F"));
+    sim.set(&k.audio_current_sound, json!(18));
+    sim.set(&k.audio_music_id, json!(0x0D));
+    sim.tick(4);
+    sim.set(&k.audio_music_id, json!(0));
+    // Mr. Pokémon's house: MUSIC_HEAL alone
+    sim.set(&k.overworld_map_name, json!("Route 30 - Mr. Pokemon's House"));
+    sim.set(&k.audio_music_id, json!(0x0D));
+    sim.set(&k.audio_music_id, json!(0));
+    // Daisy's grooming plays MUSIC_HEAL but heals nothing
+    sim.set(&k.overworld_map_name, json!("Pallet Town - Blue's House"));
+    sim.set(&k.audio_music_id, json!(0x0D));
+    sim.set(&k.audio_music_id, json!(0));
+    // Lance in the Rocket HQ: no heal sound, only his flag
+    sim.set(&k.overworld_map_name, json!("Mahogany Town - Team Rocket Base B2F"));
+    sim.set("event_flags.lance_healed_you_in_team_rocket_base", json!(true));
+    let got = wait_for_events(&log, 3);
+    let heals: Vec<_> = got.iter().filter(|d| d.heal.is_some()).collect();
+    assert_eq!(heals.len(), 3, "{:?}", got.iter().map(|d| d.serialize().to_string()).collect::<Vec<_>>());
+    assert_eq!(got.len(), 3);
+    sim.machine.shutdown();
 }

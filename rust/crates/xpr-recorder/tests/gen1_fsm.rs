@@ -136,6 +136,8 @@ fn mapper_with_bag(bag: &[(&str, i64)]) -> Value {
         json!({"path": "battle.opponent.active_pokemon.species", "value": null}),
         json!({"path": "battle.opponent.active_pokemon.level", "value": 0}),
         json!({"path": "bag.item_count", "value": bag.len()}),
+        json!({"path": "event_flags.in_purified_zone", "value": false}),
+        json!({"path": "event_flags.battled_rival_in_oaks_lab", "value": false}),
     ];
     for i in 0..6 {
         let species = if i == 0 { json!("Pikachu") } else { Value::Null };
@@ -481,5 +483,54 @@ fn back_to_back_fights_whose_gap_was_missed_are_both_recorded() {
     sim.set("battle.mode", Value::Null);
     let got = collect_events(&events, 2);
     assert_eq!(trainer_names(&got), vec!["Lass 1".to_string(), "Lass 2".to_string()], "{:?}", labels(&events));
+    sim.machine.shutdown();
+}
+
+// ---- scripted heals -----------------------------------------------------------------
+
+fn heal_count(got: &[EventDefinition]) -> usize {
+    got.iter().filter(|d| d.heal.is_some()).count()
+}
+
+#[test]
+fn every_step_into_the_purified_zone_is_a_heal() {
+    let (mut sim, _controller, events) = overworld_sim(&[("POTION", 1)]);
+    sim.set("overworld.map_name", json!("Pokemon Tower - 5F"));
+    sim.set("event_flags.in_purified_zone", json!(true));
+    sim.set("event_flags.in_purified_zone", json!(false));
+    sim.set("event_flags.in_purified_zone", json!(true));
+    let got = collect_events(&events, 2);
+    assert_eq!(heal_count(&got), 2, "{:?}", labels(&events));
+    sim.machine.shutdown();
+}
+
+#[test]
+fn a_heal_flag_set_before_the_battle_ends_follows_the_fight() {
+    // the Oak's Lab rival fight: the script heals and sets its flag right after the battle
+    let (mut sim, controller, events) = overworld_sim(&[("POTION", 1)]);
+    sim.set("battle.opponent.trainer", json!("LASS"));
+    sim.set("battle.opponent.id", json!(1));
+    sim.set("battle.mode", json!("Trainer"));
+    sim.tick(2);
+    sim.set("event_flags.battled_rival_in_oaks_lab", json!(true));
+    assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Battle));
+    sim.set("battle.mode", Value::Null);
+    let got = collect_events(&events, 2);
+    assert_eq!(got.len(), 2, "{:?}", labels(&events));
+    assert!(got[0].trainer_def.is_some() && got[1].heal.is_some(), "{:?}", labels(&events));
+    sim.machine.shutdown();
+}
+
+#[test]
+fn the_captains_back_rub_jingle_is_not_a_heal() {
+    let (mut sim, _controller, events) = overworld_sim(&[("POTION", 1)]);
+    sim.set("overworld.map_name", json!("SS Anne - Captain's Room"));
+    sim.set("audio.channels.4", json!(158));
+    sim.set("audio.channels.4", json!(0));
+    sim.tick(4);
+    sim.set("overworld.map_name", json!("Viridian City - Pokecenter"));
+    sim.set("audio.channels.4", json!(158));
+    let got = collect_events(&events, 1);
+    assert_eq!(heal_count(&got), 1, "{:?}", labels(&events));
     sim.machine.shutdown();
 }

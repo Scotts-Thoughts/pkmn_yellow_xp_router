@@ -12,7 +12,7 @@ use xpr_data::GenData;
 use xpr_engine::{swaps_between, BagSwap, EventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
 
 use super::common::*;
-use crate::controller::{fix_key, fix_keys, dedupe, is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
+use crate::controller::{fix_key, fix_keys, fix_optional_keys, dedupe, is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
 use crate::gamehook::{GameHookProperty, PropertyStore};
 use crate::host::StartInfo;
 
@@ -29,6 +29,8 @@ pub const TRAINER_BATTLE_TYPE: &str = "Trainer";
 pub const WILD_BATTLE_TYPE: &str = "Wild";
 pub const END_OF_ITEM_LIST: &str = "--End of list--";
 pub const MAP_GAME_CORNER: &str = "Celadon City - Game Corner";
+/// Rubbing the captain's back plays the heal jingle but heals nothing.
+pub const MAP_SS_ANNE_CAPTAINS_ROOM: &str = "SS Anne - Captain's Room";
 
 pub fn reset_flag() -> String {
     format!("{}FLAG TO SIGNAL GAME RESET. USER SHOULD NEVER SEE THIS", consts::RECORDING_ERROR_FRAGMENT)
@@ -72,6 +74,10 @@ pub struct Gen1Keys {
     pub item_count: String,
     pub item_type: Vec<String>,
     pub item_quantity: Vec<String>,
+    /// Event flags a scripted heal with no heal jingle sets: Pokémon Tower
+    /// 5F's purified zone, and the heal after the Oak's Lab rival fight.
+    /// Empty for the deprecated mapper.
+    pub scripted_heal_flags: Vec<String>,
 }
 
 impl Gen1Keys {
@@ -118,6 +124,11 @@ impl Gen1Keys {
             item_count: d("player.itemCount", "bag.item_count"),
             item_type: items("item", "item"),
             item_quantity: items("quantity", "quantity"),
+            scripted_heal_flags: if deprecated {
+                Vec::new()
+            } else {
+                vec!["event_flags.in_purified_zone".into(), "event_flags.battled_rival_in_oaks_lab".into()]
+            },
         }
     }
 
@@ -152,6 +163,7 @@ impl Gen1Keys {
         v.extend(self.item_type.iter().cloned());
         v.extend(self.item_quantity.iter().cloned());
         v.extend(self.team_species.iter().cloned());
+        v.extend(self.scripted_heal_flags.iter().cloned());
         v
     }
 
@@ -194,6 +206,7 @@ impl Gen1Keys {
         ] {
             fix_keys(store, list, &mut invalid);
         }
+        fix_optional_keys(store, &mut self.scripted_heal_flags);
         dedupe(invalid)
     }
 }
@@ -433,6 +446,8 @@ struct OverworldData {
     wrong_mon_in_slot_1: bool,
     /// money went down since the last game-second tick
     money_just_lost: bool,
+    /// a scripted heal's flag was set; queued once any battle it followed ends
+    scripted_heal_pending: bool,
 }
 
 const BASE_DELAY: i64 = 2;
@@ -1229,6 +1244,10 @@ impl Gen1Machine {
         state
     }
 
+    fn in_captains_room(&self, store: &PropertyStore) -> bool {
+        store.str_of(&self.keys.overworld_map).as_deref() == Some(MAP_SS_ANNE_CAPTAINS_ROOM)
+    }
+
     fn battle_in_progress(&self, store: &PropertyStore) -> bool {
         store.get(&self.keys.battle_type).map(|p| p.eq_str(TRAINER_BATTLE_TYPE) || p.eq_str(WILD_BATTLE_TYPE)).unwrap_or(false)
     }
@@ -1302,7 +1321,7 @@ impl Gen1Machine {
                 return GameState::Vitamin;
             }
         } else if new.path == self.keys.audio_channel_5 {
-            if new.eq_i64(158) && !self.overworld.waiting_for_heal_completion {
+            if new.eq_i64(158) && !self.overworld.waiting_for_heal_completion && !self.in_captains_room(store) {
                 self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
                 self.overworld.waiting_for_heal_completion = true;
                 self.overworld.heal_delay = 2;
@@ -1311,7 +1330,7 @@ impl Gen1Machine {
             }
         } else if new.path == self.keys.audio_channel_4 {
             // channel 4 for R/B pokecenters, channel 5 for Y
-            if new.eq_i64(158) && !self.overworld.waiting_for_heal_completion {
+            if new.eq_i64(158) && !self.overworld.waiting_for_heal_completion && !self.in_captains_room(store) {
                 self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
                 self.overworld.waiting_for_heal_completion = true;
                 self.overworld.heal_delay = 2;
@@ -1485,6 +1504,12 @@ impl GameRecorder for Gen1Machine {
         {
             log::info!("Change of {} from {} to {} for state {}", new.path, py_str(&prev.value), py_str(&new.value), self.cur_state);
         }
+        // a scripted heal with no heal jingle: its event flag turns on (one
+        // after a fight can turn on before the battle state ends; it waits
+        // for the fight's events)
+        if self.keys.scripted_heal_flags.contains(&new.path) && new.truthy() && !prev.truthy() && self.valid_solo_mon && !matches!(self.cur_state, GameState::Uninitialized | GameState::Resetting) {
+            self.overworld.scripted_heal_pending = true;
+        }
         let result = self.transition(store, new, prev);
         if result != self.cur_state {
             log::info!("Moving from {} state to {} due to change {}, from {} to {}", self.cur_state, result, new.path, py_str(&prev.value), py_str(&new.value));
@@ -1493,6 +1518,12 @@ impl GameRecorder for Gen1Machine {
             self.on_enter(result, store);
             self.cur_state = result;
             self.controller.set_game_state(result);
+        }
+        if self.overworld.scripted_heal_pending && self.cur_state != GameState::Battle {
+            self.overworld.scripted_heal_pending = false;
+            if self.cur_state != GameState::Resetting {
+                self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
+            }
         }
     }
 

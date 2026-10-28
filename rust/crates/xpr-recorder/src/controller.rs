@@ -690,6 +690,29 @@ pub fn fix_keys(store: &PropertyStore, keys: &mut [String], invalid: &mut Vec<St
     }
 }
 
+/// `fix_key` for a key some mappers lack: one the store doesn't have becomes
+/// empty (no change matches it) instead of being reported.
+pub fn fix_optional_key(store: &PropertyStore, key: &mut String) {
+    if key.is_empty() || store.contains(key) {
+        return;
+    }
+    match store.resolve_case(key) {
+        Some(real) => *key = real,
+        None => {
+            log::info!("Mapper has no {}: not watching it", key);
+            key.clear();
+        }
+    }
+}
+
+/// `fix_optional_key` for a list: the missing keys are dropped.
+pub fn fix_optional_keys(store: &PropertyStore, keys: &mut Vec<String>) {
+    for k in keys.iter_mut() {
+        fix_optional_key(store, k);
+    }
+    keys.retain(|k| !k.is_empty());
+}
+
 /// Dedupe while keeping order (Python's `set` only affects the message).
 pub fn dedupe(mut invalid: Vec<String>) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();

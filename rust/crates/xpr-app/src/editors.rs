@@ -1023,6 +1023,7 @@ impl InventoryEventEditor {
         self.item_type.set(consts::ITEM_TYPE_ALL_ITEMS);
         self.amount = "1".to_string();
         self.set_event_type(ctx.event_type);
+        self.item_filter_callback(ctx);
         self.pp_tossed = false;
         self.refresh_pp(ctx, Some(None));
     }
@@ -1033,6 +1034,9 @@ impl InventoryEventEditor {
         self.mart.set(consts::ITEM_TYPE_ALL_ITEMS);
         self.item_type.set(consts::ITEM_TYPE_ALL_ITEMS);
         self.set_event_type(def.get_event_type());
+        // the item list may still be narrowed by the last event's filters,
+        // and `set` ignores names that aren't in it
+        self.item_filter_callback(ctx);
         if self.event_type != consts::TASK_HOLD_ITEM {
             if let Some(ie) = &def.item_event_def {
                 self.item_selector.set(&ie.item_name);
@@ -1297,7 +1301,9 @@ impl EvolutionEditor {
 // ---------------------------------------------------------------------------
 
 /// The bag as it is right before the event, rearranged by dragging rows (or
-/// with the arrow buttons). Saving stores the swaps that turn the pre-event
+/// with the arrow buttons). Dropping a row on the middle of another swaps the
+/// two (like SELECT in the game's bag); dropping near a row's top or bottom
+/// edge inserts it there instead. Saving stores the swaps that turn the pre-event
 /// order into the displayed one, so a re-save also refreshes stale slots.
 #[derive(Default)]
 pub struct BagReorderEditor {
@@ -1365,11 +1371,12 @@ impl BagReorderEditor {
             widgets::label(ui, theme, "The bag is empty before this event.");
             return out;
         }
-        widgets::label_font(ui, "Drag a row (or use the arrows) to rearrange the bag:", theme.body(), theme.secondary);
+        widgets::label_font(ui, "Drop a row on another to swap them, or between rows to move it (or use the arrows):", theme.body(), theme.secondary);
         ui.add_space(8.0);
         let font = theme.body();
         let n = self.order.len();
         let mut drop: Option<(usize, usize)> = None;
+        let mut swap: Option<(usize, usize)> = None;
         let mut nudge: Option<(usize, bool)> = None;
         let mut row_rects: Vec<egui::Rect> = Vec::with_capacity(n);
         let zone = egui::Frame::new().inner_margin(egui::Margin::same(0));
@@ -1422,17 +1429,20 @@ impl BagReorderEditor {
                 if let (Some(pointer), Some(hovered)) = (ui.input(|i| i.pointer.interact_pos()), response.dnd_hover_payload::<usize>()) {
                     let rect = response.rect;
                     let stroke = egui::Stroke::new(2.0_f32, theme.accent);
-                    let insert_at = if *hovered == idx {
-                        idx
-                    } else if pointer.y < rect.center().y {
+                    // the middle half of another row swaps, its outer quarters insert
+                    let edge = rect.height() / 4.0;
+                    let released = response.dnd_release_payload::<usize>().map(|from| *from);
+                    if *hovered == idx {
+                        // over its own row: nothing to do
+                    } else if pointer.y < rect.top() + edge {
                         ui.painter().hline(rect.x_range(), rect.top(), stroke);
-                        idx
-                    } else {
+                        drop = released.map(|from| (from, idx)).or(drop);
+                    } else if pointer.y > rect.bottom() - edge {
                         ui.painter().hline(rect.x_range(), rect.bottom(), stroke);
-                        idx + 1
-                    };
-                    if let Some(from) = response.dnd_release_payload::<usize>() {
-                        drop = Some((*from, insert_at));
+                        drop = released.map(|from| (from, idx + 1)).or(drop);
+                    } else {
+                        ui.painter().rect_stroke(rect, egui::CornerRadius::same(6), stroke, egui::StrokeKind::Inside);
+                        swap = released.map(|from| (from, idx)).or(swap);
                     }
                 }
             }
@@ -1447,6 +1457,12 @@ impl BagReorderEditor {
         let mut changed = false;
         if let Some((from, to)) = drop {
             changed |= self.move_item(from, to);
+        }
+        if let Some((a, b)) = swap {
+            if a < n && b < n && a != b {
+                self.order.swap(a, b);
+                changed = true;
+            }
         }
         if let Some((idx, up)) = nudge {
             // the buttons are only enabled where the neighbour exists
@@ -1869,4 +1885,37 @@ impl EventEditors {
         (out, reload)
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use xpr_data::Registry;
+
+    use super::*;
+
+    #[test]
+    fn loading_an_item_event_ignores_the_last_events_filter() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        let reg = Registry::new(root.join("raw_pkmn_data"), PathBuf::new());
+        let gen = reg.get_version("Yellow").unwrap();
+        let cfg = Config::load(&crate::scratch_config_path());
+        let theme = Theme::from_config(&cfg);
+        let ctx = |event_type| EditorCtx { theme: &theme, gen: &gen, cfg: &cfg, cur_state: None, event_type, enabled: true };
+
+        let mut ed = InventoryEventEditor::default();
+        let sell = EventDefinition::with_item(InventoryEventDefinition::new("TM34 Bide", 1, false, true, None));
+        ed.load_event(&ctx(consts::TASK_SELL_ITEM), &sell);
+        // narrow the list the way typing in the name filter does
+        ed.item_filter = "bide".to_string();
+        ed.item_filter_callback(&ctx(consts::TASK_SELL_ITEM));
+        assert_eq!(ed.item_selector.get(), "TM34 Bide");
+
+        let buy = EventDefinition::with_item(InventoryEventDefinition::new("Great Ball", 3, true, true, None));
+        ed.load_event(&ctx(consts::TASK_PURCHASE_ITEM), &buy);
+        assert_eq!(ed.item_selector.get(), "Great Ball");
+        let InventoryEventDefinition { item_name, item_amount, .. } = ed.get_event().unwrap().item_event_def.unwrap();
+        assert_eq!((item_name.as_str(), item_amount), ("Great Ball", 3));
+    }
 }
