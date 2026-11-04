@@ -12,7 +12,9 @@ use std::time::Duration;
 use serde_json::Value;
 
 use xpr_core::consts;
-use xpr_engine::{EventDefinition, NodeId};
+use xpr_data::send_out_order::{self, SendOutMon, SendOutMove, SendOutPlayer};
+use xpr_data::GenData;
+use xpr_engine::{EventDefinition, NodeId, SoloPokemon, TrainerEventDefinition};
 
 use crate::gamehook::{GameHookClient, GameHookProperty, PropertyStore, SessionEvents};
 use crate::host::{HostHandle, PrevEvent, StartInfo};
@@ -431,7 +433,7 @@ impl RecorderController {
             self.host.call(move |h| h.finalize_new_folder(&name));
         }
 
-        if let Some(td) = &event_def.trainer_def {
+        if let Some(td) = event_def.trainer_def.as_mut() {
             let defeated = self.host.call(|h| h.get_defeated_trainers());
             if defeated.contains(&td.trainer_name) {
                 let msg = format!("{} Tried to fight trainer that has already been defeated: {}", consts::RECORDING_ERROR_FRAGMENT, td.trainer_name);
@@ -439,6 +441,16 @@ impl RecorderController {
                 let folder = active_folder.clone();
                 self.host.call(move |h| h.new_event(EventDefinition::notes_only(&msg), &folder));
                 return;
+            }
+            // the event a battle opens with. The queue is in order, so the route
+            // has everything up to this battle in it and its solo mon is the one
+            // walking in. The end-of-battle update overwrites this with the order
+            // the game really used.
+            if td.mon_order.is_empty() && event_def.notes.is_empty() {
+                if let (Some(gen), Some(solo)) = (self.host.call(|h| h.gen()), self.host.call(|h| h.final_solo_pkmn())) {
+                    td.mon_order = predicted_mon_order(&gen, td, &solo);
+                    log::info!("predicted send-out order for {}: {:?}", td.trainer_name, td.mon_order);
+                }
             }
         } else if let Some(lm) = event_def.learn_move.as_mut() {
             if let Some(dest_name) = lm.destination_name.take() {
@@ -517,6 +529,36 @@ impl RecorderController {
         let folder = active_folder;
         self.host.call(move |h| h.new_event(event_def, &folder));
     }
+}
+
+/// The order `td`'s team will come out in against `solo`, as a `mon_order`.
+/// Empty (party order) for gen 1, where party order is the rule, and for battles
+/// the rules don't cover: two trainers interleave their mons, and a double battle
+/// picks against a random target.
+fn predicted_mon_order(gen: &GenData, td: &TrainerEventDefinition, solo: &SoloPokemon) -> Vec<i64> {
+    if xpr_core::pyjson::truthy(&td.second_trainer_name) {
+        return Vec::new();
+    }
+    let Some(trainer) = gen.trainer_db().get_trainer(&td.trainer_name) else { return Vec::new() };
+    if trainer.double_battle {
+        return Vec::new();
+    }
+    let party: Vec<SendOutMon> = trainer.pkmn.iter().map(|m| send_out_order::send_out_mon(gen, m)).collect();
+    let moves: Vec<SendOutMove> = solo.move_list.iter().flatten().filter(|m| !m.is_empty()).map(|m| send_out_order::send_out_move(gen, m)).collect();
+    let species = solo.species_def.name.clone();
+    let player = SendOutPlayer {
+        types: send_out_order::species_types(gen, &species),
+        species,
+        // `cur_stats` already has gen 3's badge boosts in it
+        defense: solo.cur_stats.defense,
+        special_defense: solo.cur_stats.special_defense,
+        ability: (!solo.ability.is_empty()).then(|| solo.ability.clone()),
+        item: solo.held_item.clone().filter(|i| !i.is_empty()),
+        ko_move: send_out_order::strongest_move(&moves),
+        defense_badge: false,
+        special_defense_badge: false,
+    };
+    send_out_order::predict(gen.get_generation(), &party, &player).map(|order| send_out_order::mon_order_of(&order)).unwrap_or_default()
 }
 
 /// A game-specific recorder (the FSM `Machine` of one generation).

@@ -12,6 +12,9 @@
 //! Also: a berry eaten mid-fight must not turn the Thief that follows into
 //! a "Hold" from the bag (the held item the steal is compared against has to
 //! follow the mon's real one, not stay at what it held as the fight began).
+//!
+//! And the send-out prediction: a trainer event opens in the order the AI
+//! will use, and the ROAR update replaces it with the order the game really used.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -19,9 +22,10 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-use xpr_data::model::StatBlock;
+use xpr_data::model::{Nature, StatBlock};
 use xpr_data::{GenData, Registry};
-use xpr_engine::{EventDefinition, LearnMoveEventDefinition, NodeId};
+use xpr_engine::state::SoloPokemonArgs;
+use xpr_engine::{EventDefinition, LearnMoveEventDefinition, NodeId, SoloPokemon};
 use xpr_recorder::controller::GameRecorder;
 use xpr_recorder::games::gen3::{Gen3Keys, Gen3Machine};
 use xpr_recorder::host::{HostHandle, PrevEvent, RecorderHost, StartInfo};
@@ -37,6 +41,7 @@ struct Log {
 struct FakeHost {
     gen: Arc<GenData>,
     log: Arc<Mutex<Log>>,
+    solo: Option<SoloPokemon>,
 }
 
 impl RecorderHost for FakeHost {
@@ -98,6 +103,9 @@ impl RecorderHost for FakeHost {
     }
     fn final_held_item(&self) -> Option<String> {
         None
+    }
+    fn final_solo_pkmn(&self) -> Option<SoloPokemon> {
+        self.solo.clone()
     }
     fn final_inventory_has(&self, _item_name: &str) -> bool {
         false
@@ -369,13 +377,16 @@ const JACE: (i64, &[(&str, i64)]) = (204, &[("Slugma", 23)]);
 const FLANNERY: (i64, &[(&str, i64)]) = (268, &[("Numel", 24), ("Slugma", 24), ("Camerupt", 26), ("Torkoal", 29)]);
 const WINONA: (i64, &[(&str, i64)]) = (270, &[("Swablu", 29), ("Tropius", 29), ("Pelipper", 30), ("Skarmory", 31), ("Altaria", 33)]);
 
-#[test]
-fn emerald_counts_the_party_after_the_batch_that_raised_the_battle_flag() {
+fn emerald() -> Arc<GenData> {
     let root = xpr_core::consts::find_source_root().expect("source root");
     let reg = Arc::new(Registry::new(root.join("raw_pkmn_data"), PathBuf::new()));
-    let gen = reg.get_version("Emerald").expect("emerald");
+    reg.get_version("Emerald").expect("emerald")
+}
+
+/// A recording in the overworld, the host's final state holding `solo`.
+fn record(gen: &Arc<GenData>, solo: Option<SoloPokemon>) -> (Sim, Arc<Mutex<Log>>) {
     let log = Arc::new(Mutex::new(Log::default()));
-    let host = FakeHost { gen: gen.clone(), log: log.clone() };
+    let host = FakeHost { gen: gen.clone(), log: log.clone(), solo };
     let controller = RecorderController::new(HostHandle::direct(Box::new(host)), Arc::new(|| {}));
     let info = StartInfo {
         version: "Emerald".into(),
@@ -394,6 +405,13 @@ fn emerald_counts_the_party_after_the_batch_that_raised_the_battle_flag() {
     let mut sim = Sim { store, machine, keys, seconds: 0, exp: 21012 };
     sim.tick(4); // UNINITIALIZED -> OVERWORLD
     assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Overworld));
+    (sim, log)
+}
+
+#[test]
+fn emerald_counts_the_party_after_the_batch_that_raised_the_battle_flag() {
+    let gen = emerald();
+    let (mut sim, log) = record(&gen, None);
 
     // Kindler Jace, scripted the way the mock harness does it
     sim.start_in_separate_batches(JACE.0, JACE.1);
@@ -432,5 +450,46 @@ fn emerald_counts_the_party_after_the_batch_that_raised_the_battle_flag() {
         let names: Vec<String> = def.pokemon_list(&gen).expect("pokemon list").iter().map(|p| p.name.clone()).collect();
         assert_eq!(names, expect);
     }
+    sim.machine.shutdown();
+}
+
+fn houndoom(gen: &GenData) -> SoloPokemon {
+    let species = gen.pkmn_db().get_pkmn("Houndoom").expect("Houndoom").clone();
+    let moves = ["Bite", "Ember", "Thief"].iter().map(|m| Some(m.to_string())).chain([None]).collect();
+    let args = SoloPokemonArgs { move_list: Some(moves), ..SoloPokemonArgs::default() };
+    let dvs = gen.make_stat_block(30, 30, 31, 30, 31, 31, false);
+    SoloPokemon::new("Houndoom", species, dvs, gen.make_badge_list(), gen.make_stat_block(0, 0, 0, 0, 0, 0, true), 0, Nature::HARDY, args).expect("solo mon")
+}
+
+fn team_of(gen: &GenData, def: &EventDefinition) -> Vec<String> {
+    def.pokemon_list(gen).expect("pokemon list").iter().map(|p| p.name.clone()).collect()
+}
+
+/// Winona against a Fire/Dark mon. Pass 1 skips Tropius and Skarmory, the hardest
+/// hit, for having nothing super effective, so Pelipper (Water Gun) and Altaria
+/// (Earthquake) come first. Pass 2 then has Skarmory's Sand Attack, a status move
+/// that still scores (Ground x2), beat Tropius's Aerial Ace (STAB x1.5).
+/// The event opens that way, before anything has fainted.
+#[test]
+fn a_trainer_event_opens_in_the_predicted_order_and_ends_in_the_real_one() {
+    let gen = emerald();
+    let (mut sim, log) = record(&gen, Some(houndoom(&gen)));
+
+    sim.start_flag_first(WINONA.0, WINONA.1);
+    let events = wait_for_events(&log, 1);
+    let opened = events.iter().find(|d| d.trainer_def.is_some()).expect("trainer event");
+    assert_eq!(opened.trainer_def.as_ref().unwrap().mon_order, vec![1, 5, 2, 4, 3]);
+    assert_eq!(team_of(&gen, opened), ["Swablu", "Pelipper", "Altaria", "Skarmory", "Tropius"]);
+
+    // the game goes another way (a voluntary switch, say): what it did wins
+    sim.fight_and_win(WINONA.1, None, None);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while log.lock().unwrap().events.iter().flat_map(|(_, d)| d.trainer_def.as_ref()).any(|t| t.mon_order != vec![1, 2, 3, 4, 5]) {
+        assert!(Instant::now() < deadline, "the ROAR update never replaced the prediction");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let events = wait_for_events(&log, 1);
+    let closed = events.iter().find(|d| d.trainer_def.is_some()).expect("trainer event");
+    assert_eq!(team_of(&gen, closed), ["Swablu", "Tropius", "Pelipper", "Skarmory", "Altaria"]);
     sim.machine.shutdown();
 }

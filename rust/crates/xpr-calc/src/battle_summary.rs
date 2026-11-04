@@ -612,6 +612,12 @@ impl BattleSummary {
 
         self.player_stage_modifier = calc_stage_modifier(gen, &self.player_setup_move_list);
         self.enemy_stage_modifier = calc_stage_modifier(gen, &self.enemy_setup_move_list);
+        // The per-matchup stages below skip global setup, so they can't apply it
+        if self.using_global_setup {
+            if let Some(stat) = self.player_download_stat() {
+                self.player_stage_modifier = self.player_stage_modifier.apply_stat_mod(&[(stat.to_string(), 1)]);
+            }
+        }
         let num_matchups = self.original_player_mon_list.len();
         self.player_field_statuses = (0..num_matchups).map(|i| self.calc_field_status(true, i as i64)).collect();
         self.enemy_field_statuses = (0..num_matchups).map(|i| self.calc_field_status(false, i as i64)).collect();
@@ -1538,6 +1544,27 @@ impl BattleSummary {
         self.full_refresh(Some(gen), cfg);
     }
 
+    /// The stat ([`consts::ATK`] or [`consts::SPA`]) that Download raises when
+    /// the player's Pokemon enters the fight; `None` without the ability.
+    ///
+    /// Download compares the Defense and Sp. Def totals of the opposing
+    /// Pokemon on the field: Attack rises when Defense is lower, otherwise
+    /// (ties included) Sp. Atk does (`SWITCH_IN_CHECK_STATE_DOWNLOAD` in
+    /// pokeplatinum's battle_lib.c). That is party slot 0 alone, or the two
+    /// leads in a double battle, whatever order the matchups were dragged
+    /// into. Enemy stages don't count: nothing has moved yet.
+    pub fn player_download_stat(&self) -> Option<&'static str> {
+        if self.original_player_mon_list.first()?.ability != consts::DOWNLOAD_ABILITY {
+            return None;
+        }
+        let mut leads: Vec<&EnemyPkmn> = self.original_enemy_mon_list.iter().collect();
+        leads.sort_by_key(|m| m.definition_order);
+        leads.truncate(if self.double_battle_flag { 2 } else { 1 });
+        let defense: i64 = leads.iter().map(|m| m.cur_stats.defense).sum();
+        let special_defense: i64 = leads.iter().map(|m| m.cur_stats.special_defense).sum();
+        Some(if defense >= special_defense { consts::SPA } else { consts::ATK })
+    }
+
     pub fn toggle_screen_from_move(&mut self, gen: &GenData, cfg: &SummaryConfig, move_name: &str, enabled: bool, mon_idx: i64, is_player: bool) {
         let Some(screen_id) = BattleSummary::get_screen_for_move(move_name) else { return };
         let screens = if is_player { &mut self.player_screens } else { &mut self.enemy_screens };
@@ -1655,6 +1682,11 @@ impl BattleSummary {
         let mut enemy_modifiers = Vec::new();
         let mut stage_caps = Vec::new();
         let mut cur_player = StageModifiers::default();
+        // Once, at the start: the solo Pokemon never switches, so it carries
+        // the boost through the whole fight rather than re-rolling per matchup
+        if let Some(stat) = self.player_download_stat() {
+            cur_player = cur_player.apply_stat_mod(&[(stat.to_string(), 1)]);
+        }
         let player_intimidate_active = self.resolve_intimidate(true);
         let enemy_intimidate_active = self.resolve_intimidate(false);
         let intimidate_drop = vec![(consts::ATK.to_string(), -1i64)];

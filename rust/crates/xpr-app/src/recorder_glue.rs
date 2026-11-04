@@ -137,6 +137,10 @@ macro_rules! recorder_host {
                 self.ctrl().get_final_state().and_then(|s| s.solo_pkmn.held_item.clone())
             }
 
+            fn final_solo_pkmn(&self) -> Option<xpr_engine::SoloPokemon> {
+                self.ctrl().get_final_state().map(|s| s.solo_pkmn.clone())
+            }
+
             fn final_inventory_has(&self, item_name: &str) -> bool {
                 self.ctrl().get_final_state().map(|s| s.inventory.has_item(item_name)).unwrap_or(false)
             }

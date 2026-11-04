@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use xpr_data::model::StatBlock;
 use xpr_data::GenData;
-use xpr_engine::{EventDefinition, LearnMoveEventDefinition, NodeId};
+use xpr_engine::{EventDefinition, LearnMoveEventDefinition, NodeId, SoloPokemon};
 
 /// What the UI thread hands over when recording starts (everything the
 /// machines would otherwise have to ask the host for synchronously while
@@ -60,6 +60,11 @@ pub trait RecorderHost {
     /// `get_final_state().solo_pkmn.held_item`
     fn final_held_item(&self) -> Option<String>;
     /// `get_final_state().inventory._item_lookup.get(name) is not None`
+    /// `get_final_state().solo_pkmn`, for the send-out prediction. `None` leaves
+    /// a trainer in party order until the battle ends.
+    fn final_solo_pkmn(&self) -> Option<SoloPokemon> {
+        None
+    }
     fn final_inventory_has(&self, item_name: &str) -> bool;
     fn can_evolve_into(&self, species: &str) -> bool;
     fn is_valid_levelup_move(&self, def: &LearnMoveEventDefinition) -> bool;

@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-pub const APP_VERSION: &str = "v6.2d";
+pub const APP_VERSION: &str = "v6.2e";
 pub const APP_RELEASE_DATE: &str = "2026-Oct-28";
 
 pub const APP_NAME: &str = "pkmn_xp_router";
@@ -140,6 +140,7 @@ pub const INTIMIDATE_ABILITY: &str = "Intimidate";
 pub const CLEAR_BODY_ABILITY: &str = "Clear Body";
 pub const HYPER_CUTTER_ABILITY: &str = "Hyper Cutter";
 pub const INTIMIDATE_BLOCKING_ABILITIES: [&str; 2] = [CLEAR_BODY_ABILITY, HYPER_CUTTER_ABILITY];
+pub const DOWNLOAD_ABILITY: &str = "Download";
 pub const FORECAST_ABILITY: &str = "Forecast";
 pub const PAY_DAY_AMOUNT: &str = "pay_day_amount";
 pub const MON_ORDER: &str = "mon_order";

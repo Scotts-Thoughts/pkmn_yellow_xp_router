@@ -11,6 +11,7 @@ pub mod gen_data;
 pub mod loaders;
 pub mod model;
 pub mod registry;
+pub mod send_out_order;
 pub mod stats;
 
 pub use badges::BadgeList;

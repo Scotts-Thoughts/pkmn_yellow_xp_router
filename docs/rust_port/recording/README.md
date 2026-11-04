@@ -71,6 +71,17 @@ the Hall of Fame autosave so the "reset" has nothing to roll back).
 * `Recorded Time` comes from Super Shuckie's live timer, so it differs between
   runs when Super Shuckie happens to be running.
 
+## Enemy team order
+
+A trainer event opens with its team in the order the AI is predicted to send
+it out, and the end-of-battle update replaces that with the order the recorder
+saw. `RecorderController::add_event` makes the prediction (the queue is in
+order, so the route's final state is the solo mon going into this battle); the
+rules are `xpr_data::send_out_order`, a port of the unified frontend's
+`core/logic/sendOutOrder.ts`, whose `docs/send-out-order.md` cites the decomps.
+Change the two together. Gen 1, double battles and two-trainer battles stay in
+party order.
+
 ## Gen 6 and later
 
 [gen6plus_mappers.md](gen6plus_mappers.md) is the plan for adding a recorder

@@ -585,6 +585,12 @@ impl BattleSummaryUi {
                         }
                     }
                 }
+                // Download fires once, entering the fight against the first matchup
+                if mon_idx == 0 {
+                    if let Some(stat) = bc.summary.player_download_stat() {
+                        download_label(ui, theme, ui.id().with("download_p"), right_x, header_rect, stat);
+                    }
+                }
                 let mut right_x2 = header_rect.max.x - 6.0;
                 if self.screenshot_mode.is_none() {
                     let export_rect = Rect::from_min_size(Pos2::new(right_x2 - 54.0, header_rect.center().y - 11.0), Vec2::new(54.0, 22.0));
@@ -1185,6 +1191,23 @@ fn intimidate_toggle(ui: &mut Ui, theme: &Theme, id: Id, right_x: &mut f32, head
     } else {
         None
     }
+}
+
+/// The stat Download raised, drawn right-aligned in the player's header half.
+/// It is automatic, so there is nothing to toggle.
+fn download_label(ui: &mut Ui, theme: &Theme, id: Id, right_x: f32, header_rect: Rect, stat: &str) {
+    let (stat_name, why) = if stat == consts::ATK {
+        ("Atk", "Defense is lower than its Sp. Def")
+    } else {
+        ("Sp. Atk", "Defense is not lower than its Sp. Def")
+    };
+    let text = format!("Download: {stat_name} +1");
+    let w = widgets::text_width(ui, &text, &theme.body()) + 8.0;
+    let rect = Rect::from_min_size(Pos2::new(right_x - w, header_rect.center().y - 10.0), Vec2::new(w, 20.0));
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::left_to_right(egui::Align::Center)).id_salt(id));
+    child
+        .add(egui::Label::new(egui::RichText::new(text).font(theme.body()).color(theme.text)).selectable(false))
+        .on_hover_text(format!("Raised on entering the fight: the opposing lead's {why}"));
 }
 
 /// `SetupMovesSummary`: [Reset Setup] Move: [combo] [Apply Move] Player/Enemy Setup: <list>
