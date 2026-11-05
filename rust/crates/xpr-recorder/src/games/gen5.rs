@@ -7,7 +7,9 @@
 //! - A battle is on while `battle.other.battle` holds [`BATTLE_WORD`]; the
 //!   outcome is decided when `battle.other.battle_end` becomes 1. (The
 //!   mappers' `meta.state` is built from the same values, but in White 2 it
-//!   can stay at `To Battle` for a whole battle.)
+//!   can stay at `To Battle` for a whole battle.) In a trainer battle that
+//!   word also goes to 1 mid-battle and can stay there for thousands of
+//!   frames, so it counts only once no enemy is left and the player stands.
 //! - The party (`player.team.N`) only changes when a battle ends: the
 //!   experience, levels, moves, EVs and held item of a whole battle land in one
 //!   update, together with the prize money, after `battle_end` is set and
@@ -37,7 +39,7 @@
 //!   Pokémon, and what the route keeps is decided by comparing the loaded save
 //!   with the last saved and the pre-reset state.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -46,6 +48,7 @@ use indexmap::IndexMap;
 use serde_json::Value;
 
 use xpr_core::consts;
+use xpr_data::exp;
 use xpr_data::model::CustomMoveData;
 use xpr_data::GenData;
 use xpr_engine::{EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
@@ -67,6 +70,8 @@ const SAVE_COUNTER_ADDRESSES: [i64; 4] = [0x2235014, 0x2235034, 0x221EA94, 0x221
 const PARTY_BLOCK_COUNTERS: [i64; 2] = [0x2234EE0, 0x2234F00];
 /// `battle.other.battle` while a battle is on (the same in both games).
 const BATTLE_WORD: i64 = 21828;
+/// The most one KO can pay (`AddExpAndEVs`): anything more is a garbage read.
+const MAX_EXP_GAIN: i64 = 100_000;
 /// How long the party and bag must stay unchanged before a change is read.
 const SETTLE: Duration = Duration::from_millis(400);
 /// How long an overworld snapshot may stay unreadable before it is logged.
@@ -119,6 +124,10 @@ pub struct Gen5Keys {
     pub opp_struct_hp: Vec<String>,
     pub player_struct_hp: Vec<String>,
     pub opp_held: Vec<String>,
+    /// the battle's copy of the party's experience, written KO by KO
+    pub battle_exp: Vec<String>,
+    /// the enemy party's form bits (optional: White Kyurem reads as Kyurem without it)
+    pub opp_form: Vec<String>,
 }
 
 impl Gen5Keys {
@@ -172,6 +181,8 @@ impl Gen5Keys {
             opp_struct_hp: (0..6).map(|i| format!("battle.opponent.pkmn_ram.pokemon_{}_ram.stats.hp", i)).collect(),
             player_struct_hp: (0..6).map(|i| format!("battle.player.pkmn_ram.pokemon_{}_ram.stats.hp", i)).collect(),
             opp_held: (0..6).map(|i| format!("battle.opponent.team.{}.held_item", i)).collect(),
+            battle_exp: if store.contains("battle.player.team.0.exp") { (0..6).map(|i| format!("battle.player.team.{}.exp", i)).collect() } else { Vec::new() },
+            opp_form: if store.contains("battle.opponent.team.0.flags.alternate_form") { (0..6).map(|i| format!("battle.opponent.team.{}.flags.alternate_form", i)).collect() } else { Vec::new() },
         }
     }
 
@@ -207,7 +218,7 @@ impl Gen5Keys {
             v.push(i.clone());
             v.push(q.clone());
         }
-        for list in [&self.opp_struct_species, &self.opp_struct_level, &self.opp_struct_hp, &self.player_struct_hp, &self.opp_held] {
+        for list in [&self.opp_struct_species, &self.opp_struct_level, &self.opp_struct_hp, &self.player_struct_hp, &self.opp_held, &self.battle_exp, &self.opp_form] {
             v.extend(list.iter().cloned());
         }
         v
@@ -297,6 +308,19 @@ struct BattleTrack {
     opp_fainted: [bool; 6],
     /// (slot, species, level) in the order they fainted
     faints: Vec<(usize, String, i64)>,
+    /// slots that fainted with the solo mon already down: the game gives a
+    /// fainted mon no experience (`AddExpAndEVs`)
+    no_exp: Vec<usize>,
+    /// the solo mon's slot in the battle's party, and its experience there
+    solo_slot: Option<usize>,
+    /// the last read, and the last that held for a second read: the game can
+    /// show a torn or decrypted value for a frame (55109 -> 55136 -> 55939)
+    exp_read: i64,
+    exp_settled: i64,
+    /// what the game has paid and no faint has claimed yet
+    exp_steps: VecDeque<i64>,
+    /// per entry of `faints`: what the game paid the solo mon for it
+    paid: Vec<Option<i64>>,
     /// opponent party slots in the order they were first sent out
     appear_order: Vec<usize>,
     /// player party slots that fought each opponent party slot
@@ -324,6 +348,12 @@ impl BattleTrack {
             opp_seen_alive: [false; 6],
             opp_fainted: [false; 6],
             faints: Vec::new(),
+            no_exp: Vec::new(),
+            solo_slot: None,
+            exp_read: 0,
+            exp_settled: 0,
+            exp_steps: VecDeque::new(),
+            paid: Vec::new(),
             appear_order: Vec::new(),
             participants: Default::default(),
             player_hp: [0; 6],
@@ -867,6 +897,11 @@ impl Gen5Machine {
         for s in 0..6 {
             b.opp_held[s] = store.str_of(&self.keys.opp_held[s]);
         }
+        if !self.keys.battle_exp.is_empty() {
+            b.solo_slot = self.solo_pid.and_then(|p| b.pre.team.iter().position(|m| m.pid == p));
+            b.exp_settled = b.solo_slot.map(|s| b.pre.team[s].exp).unwrap_or(0);
+            b.exp_read = b.exp_settled;
+        }
         self.battle = Some(b);
         self.set_phase(Phase::Battle);
         self.update_battle(store);
@@ -875,7 +910,8 @@ impl Gen5Machine {
     /// Follow the battle structs; called after every batch while in battle.
     fn update_battle(&mut self, store: &PropertyStore) {
         let k = self.keys.clone();
-        let decided = !self.in_battle(store) || Self::i64_of(store, &k.battle_end) == 1;
+        let in_battle = self.in_battle(store);
+        let battle_end = Self::i64_of(store, &k.battle_end) == 1;
         let opp_count = (Self::i64_of(store, &k.opp_count).clamp(0, 6)) as usize;
         let player_count = (Self::i64_of(store, &k.team_count).clamp(0, 6)) as usize;
         let player_pos = store.i64_of(&k.player_pos).filter(|p| (0..player_count as i64).contains(p)).map(|p| p as usize);
@@ -884,9 +920,24 @@ impl Gen5Machine {
         let trainer_b = Self::i64_of(store, &k.trainer_b);
         let mut to_queue: Vec<EventDefinition> = Vec::new();
         let conv = self.conv.clone();
-        let gen = self.gen.clone();
+        let solo_pid = self.solo_pid;
+        let solo_exp = self.battle.as_ref().and_then(|b| b.solo_slot).filter(|_| in_battle).map(|s| Self::i64_of(store, &k.battle_exp[s]));
         let Some(b) = self.battle.as_mut() else { return };
-        if decided {
+        // what the game pays arrives before the enemy's HP reads 0
+        if let Some(v) = solo_exp {
+            if v == b.exp_read && (1..=MAX_EXP_GAIN).contains(&(v - b.exp_settled)) {
+                b.exp_steps.push_back(v - b.exp_settled);
+                b.exp_settled = v;
+            }
+            b.exp_read = v;
+        }
+        // a trainer who still has a Pokémon standing is not beaten, whatever
+        // `battle_end` says (Black, Cheren on Route 4: it went to 1 with three of
+        // his four to come, during a learn-a-move dialogue, and faints went
+        // unseen until it next dropped to 0). `opp_hp` is from the previous
+        // batch, so the last enemy's faint still gets counted below.
+        let fight_on = b.trainer_a != 0 && !b.all_player_fainted && b.opp_hp.iter().any(|hp| *hp > 0);
+        if !in_battle || (battle_end && !fight_on) {
             if !b.over {
                 log::info!("[gen5] the battle is decided");
             }
@@ -951,10 +1002,19 @@ impl Gen5Machine {
             if hp > 0 {
                 b.opp_seen_alive[s] = true;
             } else if b.opp_seen_alive[s] && b.opp_hp[s] > 0 && !b.opp_fainted[s] {
-                b.opp_fainted[s] = true;
                 let raw = store.get_value(Some(&k.opp_struct_species[s]));
-                let species = opt_str(&raw).and_then(|r| conv.pkmn_name_convert(Some(&r), None, None)).unwrap_or_default();
+                let form = k.opp_form.get(s).and_then(|f| store.i64_of(f));
+                let species = opt_str(&raw).and_then(|r| conv.pkmn_name_convert(Some(&r), None, form)).unwrap_or_default();
                 let level = Self::i64_of(store, &k.opp_struct_level[s]);
+                // the last battle's struct read as a live mon until this battle
+                // wiped it: a real faint keeps its species and level
+                if species.is_empty() || level <= 0 {
+                    log::info!("[gen5] opponent slot {} was wiped: not a faint", s + 1);
+                    b.opp_seen_alive[s] = false;
+                    b.opp_hp[s] = hp;
+                    continue;
+                }
+                b.opp_fainted[s] = true;
                 log::info!("[gen5] opponent slot {} fainted: {} Lv{}", s + 1, species, level);
                 if !b.appear_order.contains(&s) {
                     b.appear_order.push(s);
@@ -965,14 +1025,14 @@ impl Gen5Machine {
                     }
                 }
                 b.faints.push((s, species.clone(), level));
+                b.paid.push(b.exp_steps.pop_front());
+                let solo_down = solo_pid.and_then(|p| b.pre.team.iter().position(|m| m.pid == p)).is_some_and(|i| b.player_fainted[i]);
+                if solo_down {
+                    b.no_exp.push(s);
+                }
                 if b.trainer_a == 0 {
                     // still no trainer id: it is a wild battle
                     b.is_trainer = Some(false);
-                    if gen.pkmn_db().get_pkmn(&species).is_some() {
-                        to_queue.push(EventDefinition::with_wild(WildPkmnEventDefinition::new(&species, level, 1, false)));
-                    } else {
-                        log::error!("[gen5] unknown wild Pokémon {:?}", species);
-                    }
                 }
             }
             b.opp_hp[s] = hp;
@@ -990,7 +1050,7 @@ impl Gen5Machine {
 
     /// The battle is over and the party holds its outcome.
     fn finish_battle(&mut self, post: Snap) {
-        let Some(b) = self.battle.take() else { return };
+        let Some(mut b) = self.battle.take() else { return };
         let pre = b.pre.clone();
         let solo_exp = |snap: &Snap| self.solo_pid.and_then(|p| snap.by_pid(p)).map(|m| format!("{} Lv{}", m.exp, m.level)).unwrap_or_else(|| "?".into());
         log::info!(
@@ -1006,6 +1066,32 @@ impl Gen5Machine {
         let (mut gained, lost) = diff_items(&pre.items, &post.items);
         let o = self.solo_pid.and_then(|p| pre.by_pid(p)).cloned();
         let n = self.solo_pid.and_then(|p| post.by_pid(p)).cloned();
+        // the game's word on who paid what, when the steps add up to the party's
+        // gain. A faint the game paid nothing for is one the solo mon was down
+        // for, even if its HP read 0 later: Struggle's recoil lands after the KO
+        // and a fainted mon gets nothing (White 2's Patrat Lv3, frame 46732)
+        let exp_known = b.solo_slot.is_some() && n.as_ref().is_some_and(|m| m.exp == b.exp_settled && m.level < 100);
+        // (no faints are seen in a tag battle: `tag_fight` reads the steps themselves)
+        if exp_known && b.trainer_b == 0 {
+            while let Some(step) = b.exp_steps.pop_front() {
+                match b.paid.iter_mut().find(|p| p.is_none()) {
+                    Some(p) => *p = Some(step),
+                    None => log::error!("[gen5] {} exp paid with no enemy to show for it", step),
+                }
+            }
+            b.no_exp = b.faints.iter().zip(&b.paid).filter(|(_, p)| p.is_none()).map(|((s, _, _), _)| *s).collect();
+        }
+        if b.is_trainer == Some(false) {
+            for (slot, species, level) in &b.faints {
+                if b.no_exp.contains(slot) {
+                    log::info!("[gen5] the solo mon was down: no experience for {}", species);
+                } else if self.gen.pkmn_db().get_pkmn(species).is_some() {
+                    self.queue_event(EventDefinition::with_wild(WildPkmnEventDefinition::new(species, *level, 1, false)));
+                } else {
+                    log::error!("[gen5] unknown wild Pokémon {:?}", species);
+                }
+            }
+        }
         let mut thief_mons: Vec<i64> = Vec::new();
         if let (Some(o), Some(n)) = (&o, &n) {
             // held item
@@ -1057,8 +1143,10 @@ impl Gen5Machine {
                 let mut ev = EventDefinition::with_trainer(TrainerEventDefinition::new(&b.trainer_a.to_string()));
                 ev.notes = trainer_loss_flag();
                 self.queue_event(ev);
-                for (_, species, level) in &b.faints {
-                    self.queue_event(EventDefinition::with_wild(WildPkmnEventDefinition::new(species, *level, 1, true)));
+                for (slot, species, level) in &b.faints {
+                    if !b.no_exp.contains(slot) {
+                        self.queue_event(EventDefinition::with_wild(WildPkmnEventDefinition::new(species, *level, 1, true)));
+                    }
                 }
             }
             self.queue_event(EventDefinition::with_blackout());
@@ -1078,20 +1166,45 @@ impl Gen5Machine {
             if b.trainer_b != 0 {
                 td.second_trainer_name = Value::from(b.trainer_b);
             }
-            let known = opp_slots.iter().copied().max().map(|m| m + 1).unwrap_or(0);
+            // the whole team, not just the slots seen: `recalc` reads `exp_split` by party
+            // slot, and a mon the feed lost is still in the fight (see `finish_mon_order`)
+            let team: usize = [b.trainer_a, b.trainer_b].iter().filter(|id| **id != 0).filter_map(|id| self.gen.trainer_db().get_trainer_by_id(*id)).map(|t| t.pkmn.len()).sum();
+            let known = opp_slots.iter().copied().max().map(|m| m + 1).unwrap_or(0).max(team.min(6));
             // only the first field position is followed: in a double battle the
             // two leads share every enemy's experience (as gen 4 records it)
             let double = self.gen.trainer_db().get_trainer_by_id(b.trainer_a).map(|t| t.double_battle).unwrap_or(false);
             let least = if double && pre.team.iter().filter(|m| m.hp > 0).count() >= 2 { 2 } else { 1 };
-            let split: Vec<i64> = (0..known).map(|s| b.participants[s].len().max(least) as i64).collect();
-            td.exp_split = if split.iter().any(|x| *x > 1) { split } else { Vec::new() };
-            // two trainers interleave their mons: a custom order would break
-            td.mon_order = if b.trainer_b != 0 {
-                Vec::new()
+            // the mappers don't show a tag battle's enemies, so what was paid
+            // says who fell when (the order decides who a level-up lands on)
+            let tag = if exp_known && b.trainer_b != 0 { self.tag_fight(&b, o.as_ref()) } else { None };
+            let split: Vec<i64> = if let Some((_, shares)) = &tag {
+                shares.clone()
+            } else if b.trainer_b != 0 {
+                // two trainers mean an ally on the player's side, and the game counts
+                // every mon on the field against an enemy (BtlPosPoke_RecordOpponents),
+                // so the ally's mon takes half of each enemy's experience: Wellspring
+                // Cave's two Patrat give Victini 85 each. Without what was paid, this
+                // assumes the ally's first mon lasted the whole fight.
+                let team = |id: i64| self.gen.trainer_db().get_trainer_by_id(id).map(|t| t.pkmn.len()).unwrap_or(0);
+                vec![2; team(b.trainer_a) + team(b.trainer_b)]
             } else {
-                let mut sorted = opp_slots.clone();
-                sorted.sort();
-                sorted.iter().map(|x| opp_slots.iter().position(|y| y == x).unwrap_or(0) as i64 + 1).collect()
+                // what the game paid says how many shared each enemy. The mappers
+                // follow one field position, and the trainer data calls every
+                // triple and rotation battle a double (ROM trainer byte 2 is
+                // 0-3): Motorcyclist Charles paid 1/2, 1, 1 and Veteran Denae 1/3
+                let shares = if exp_known { self.shares_paid(&b, o.as_ref()) } else { HashMap::new() };
+                (0..known).map(|s| shares.get(&s).copied().unwrap_or_else(|| b.participants[s].len().max(least) as i64)).collect()
+            };
+            if let Some(slot) = b.no_exp.first().filter(|_| exp_known && b.paid.iter().any(|p| p.is_some())) {
+                log::warn!("[gen5] the solo mon got nothing for enemy slot {}, which a trainer event can't show", slot + 1);
+            }
+            td.exp_split = if split.iter().any(|x| *x > 1) { split } else { Vec::new() };
+            // the slots seen: `finish_mon_order` makes the real order of them (two
+            // trainers' mons interleave, and `tag_fight`'s slots are of that list)
+            td.mon_order = match &tag {
+                Some((order, _)) => order.iter().map(|s| *s as i64).collect(),
+                None if b.trainer_b != 0 => Vec::new(),
+                None => opp_slots.iter().map(|s| *s as i64).collect(),
             };
             td.thief_mons = thief_mons;
             if let Some(o) = &o {
@@ -1118,6 +1231,80 @@ impl Gen5Machine {
         }
         self.baseline = Some(post);
         self.dirty = false;
+    }
+
+    /// How many mons shared each enemy's experience (by enemy party slot), from
+    /// what the solo mon was paid: the game's own sum, run back.
+    fn shares_paid(&self, b: &BattleTrack, solo: Option<&Mon>) -> HashMap<usize, i64> {
+        let mut shares = HashMap::new();
+        let Some(solo) = solo else { return shares };
+        let Some(lookup) = self.gen.pkmn_db().get_pkmn(&solo.species).and_then(|p| exp::level_lookup(&p.growth_rate)) else { return shares };
+        let lucky_egg = solo.held.as_deref() == Some("Lucky Egg");
+        let mut total = solo.exp;
+        for ((slot, species, level), paid) in b.faints.iter().zip(&b.paid) {
+            let Some(paid) = *paid else { continue };
+            let player_level = lookup.get_level_info(total).0;
+            total += paid;
+            let Some(base) = self.gen.pkmn_db().get_pkmn(species).map(|p| p.base_xp) else { continue };
+            match (1..=6).find(|s| exp::calc_xp_yield_gen5(base, *level, player_level, true, *s, lucky_egg) == paid) {
+                Some(s) => {
+                    shares.insert(*slot, s);
+                }
+                None => log::error!("[gen5] {} exp for {} Lv{} at Lv{} is no share of its experience", paid, species, level, player_level),
+            }
+        }
+        shares
+    }
+
+    /// A tag battle from what the game paid: the enemies in the order they fell
+    /// and each one's share, as slots of the event's list (the two trainers'
+    /// mons, turn about). `None` if the payments don't fit the two teams.
+    fn tag_fight(&self, b: &BattleTrack, solo: Option<&Mon>) -> Option<(Vec<usize>, Vec<i64>)> {
+        let solo = solo?;
+        let lookup = exp::level_lookup(&self.gen.pkmn_db().get_pkmn(&solo.species)?.growth_rate)?;
+        let lucky_egg = solo.held.as_deref() == Some("Lucky Egg");
+        let first = self.gen.trainer_db().get_trainer_by_id(b.trainer_a)?;
+        let second = self.gen.trainer_db().get_trainer_by_id(b.trainer_b)?;
+        let mut team: Vec<(i64, i64)> = Vec::new();
+        for idx in 0..3 {
+            for t in [first, second] {
+                if let Some(m) = t.pkmn.get(idx) {
+                    team.push((self.gen.pkmn_db().get_pkmn(&m.name)?.base_xp, m.level));
+                }
+            }
+        }
+        let steps: Vec<(i64, i64)> = b
+            .exp_steps
+            .iter()
+            .scan(solo.exp, |total, step| {
+                let level = lookup.get_level_info(*total).0;
+                *total += *step;
+                Some((*step, level))
+            })
+            .collect();
+        // an ally on the field is the usual share, so it is tried first
+        fn fit(i: usize, steps: &[(i64, i64)], team: &[(i64, i64)], lucky_egg: bool, order: &mut Vec<usize>, shares: &mut Vec<i64>) -> bool {
+            let Some((paid, player_level)) = steps.get(i) else { return true };
+            for s in [2, 1, 3, 4, 5, 6] {
+                for slot in 0..team.len() {
+                    if !order.contains(&slot) && exp::calc_xp_yield_gen5(team[slot].0, team[slot].1, *player_level, true, s, lucky_egg) == *paid {
+                        order.push(slot);
+                        shares[slot] = s;
+                        if fit(i + 1, steps, team, lucky_egg, order, shares) {
+                            return true;
+                        }
+                        order.pop();
+                    }
+                }
+            }
+            false
+        }
+        let (mut order, mut shares) = (Vec::new(), vec![2; team.len()]);
+        if steps.is_empty() || !fit(0, &steps, &team, lucky_egg, &mut order, &mut shares) {
+            log::error!("[gen5] the exp paid {:?} doesn't fit trainers {} and {}", b.exp_steps, b.trainer_a, b.trainer_b);
+            return None;
+        }
+        Some((order, shares))
     }
 
     // ---- lifecycle ----------------------------------------------------------------

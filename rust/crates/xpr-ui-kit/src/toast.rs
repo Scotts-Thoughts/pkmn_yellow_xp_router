@@ -65,7 +65,7 @@ impl ToastHost {
         let mut open_folder: Option<PathBuf> = None;
         let mut dismiss = false;
         let alpha = |c: Color32| Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (opacity * 255.0) as u8);
-        egui::Area::new(egui::Id::new("xpr_toast"))
+        egui::Area::new(egui::Id::unique("xpr_toast"))
             .order(egui::Order::Tooltip)
             .anchor(Align2::RIGHT_BOTTOM, Vec2::new(-20.0, -20.0))
             .interactable(true)

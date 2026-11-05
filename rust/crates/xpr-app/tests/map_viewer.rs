@@ -48,11 +48,12 @@ impl Harness {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1000.0, 700.0))), ..Default::default() };
         let mut actions = MapViewerActions::default();
         let Harness { ctx, theme, cfg, assets, map, viewer, texts } = self;
-        let out = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let mut out = ctx.run_ui(input, |root| {
+            egui::CentralPanel::default().show(root, |ui| {
                 actions = viewer.ui(ui, theme, cfg, map, assets);
             });
         });
+        out.textures_delta.clear();
         texts.clear();
         for cs in &out.shapes {
             if let Shape::Text(t) = &cs.shape {

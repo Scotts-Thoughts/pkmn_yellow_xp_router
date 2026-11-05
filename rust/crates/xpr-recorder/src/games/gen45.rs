@@ -83,6 +83,7 @@ pub struct Gen45Keys {
     pub mon_pid: String,
     pub battle_solo_hp: String,
     pub battle_team_hp: Vec<String>,
+    pub battle_team_pid: Vec<String>,
     pub team_species: Vec<String>,
     pub team_level: Vec<String>,
     pub team_hp: Vec<String>,
@@ -98,8 +99,10 @@ pub struct Gen45Keys {
     pub trainer_battle_flag: Option<String>,
     pub battle_outcome: Option<String>,
     pub battle_flags: String,
+    pub battle_weather: String,
     pub battle_player_mon_party_pos: String,
     pub battle_player_mon_hp: String,
+    pub battle_player_mon_pid: String,
     pub battle_player_mon_exp: String,
     pub battle_ally_mon_party_pos: Option<String>,
     pub battle_ally_mon_hp: Option<String>,
@@ -119,6 +122,10 @@ pub struct Gen45Keys {
     pub battle_second_enemy_pid: Option<String>,
     pub battle_enemy_1_pid: Vec<String>,
     pub battle_enemy_2_pid: Vec<String>,
+    pub battle_enemy_1_hp: Vec<String>,
+    pub battle_enemy_2_hp: Vec<String>,
+    pub battle_enemy_1_level: Vec<String>,
+    pub battle_enemy_2_level: Vec<String>,
     pub enemy_team_species: Vec<String>,
     pub enemy_2_team_species: Vec<String>,
     pub save_count: Option<String>,
@@ -160,6 +167,7 @@ impl Gen45Keys {
             mon_pid: "player.team.0.internals.personality_value".into(),
             battle_solo_hp: "battle.player.team.0.stats.hp".into(),
             battle_team_hp: (0..6).map(|i| format!("battle.player.team.{}.stats.hp", i)).collect(),
+            battle_team_pid: (0..6).map(|i| format!("battle.player.team.{}.internals.personality_value", i)).collect(),
             team_species: team("species"),
             team_level: team("level"),
             team_hp: team("stats.hp"),
@@ -175,8 +183,10 @@ impl Gen45Keys {
             trainer_battle_flag: opt("battle.mode"),
             battle_outcome: opt("battle.outcome"),
             battle_flags: "battle.other.outcome_flags".into(),
+            battle_weather: "battle.field.weather".into(),
             battle_player_mon_party_pos: "battle.player.party_position".into(),
             battle_player_mon_hp: "battle.player.active_pokemon.stats.hp".into(),
+            battle_player_mon_pid: "battle.player.active_pokemon.internals.personality_value".into(),
             battle_player_mon_exp: "battle.player.team.0.exp".into(),
             battle_ally_mon_party_pos: opt("battle.player.party_position_2"),
             battle_ally_mon_hp: opt("battle.player.active_pokemon_2.stats.hp"),
@@ -196,6 +206,10 @@ impl Gen45Keys {
             battle_second_enemy_pid: opt("battle.opponent_2.active_pokemon.internals.personality_value"),
             battle_enemy_1_pid: (0..6).map(|i| format!("battle.opponent.team.{}.internals.personality_value", i)).collect(),
             battle_enemy_2_pid: (0..6).map(|i| format!("battle.opponent_2.team.{}.internals.personality_value", i)).collect(),
+            battle_enemy_1_hp: (0..6).map(|i| format!("battle.opponent.team.{}.stats.hp", i)).collect(),
+            battle_enemy_2_hp: (0..6).map(|i| format!("battle.opponent_2.team.{}.stats.hp", i)).collect(),
+            battle_enemy_1_level: (0..6).map(|i| format!("battle.opponent.team.{}.level", i)).collect(),
+            battle_enemy_2_level: (0..6).map(|i| format!("battle.opponent_2.team.{}.level", i)).collect(),
             enemy_team_species: (0..6).map(|i| format!("battle.opponent.team.{}.species", i)).collect(),
             enemy_2_team_species: (0..6).map(|i| format!("battle.opponent_2.team.{}.species", i)).collect(),
             save_count: opt("meta.saves"),
@@ -256,6 +270,7 @@ impl Gen45Keys {
         push(self.trainer_battle_flag.as_ref());
         push(self.battle_outcome.as_ref());
         push(Some(&self.battle_flags));
+        push(Some(&self.battle_weather));
         push(Some(&self.battle_trainer_a_number));
         push(Some(&self.battle_trainer_b_number));
         push(self.battle_ally_number.as_ref());
@@ -286,6 +301,12 @@ impl Gen45Keys {
         v.extend(self.team_held_item.iter().cloned());
         v.push(self.battle_solo_hp.clone());
         v.extend(self.battle_team_hp.iter().cloned());
+        v.extend(self.battle_team_pid.iter().cloned());
+        v.extend(self.battle_enemy_1_hp.iter().cloned());
+        v.extend(self.battle_enemy_2_hp.iter().cloned());
+        v.extend(self.battle_enemy_1_level.iter().cloned());
+        v.extend(self.battle_enemy_2_level.iter().cloned());
+        v.push(self.battle_player_mon_pid.clone());
         v.push(self.meta_state.clone());
         v
     }
@@ -316,6 +337,7 @@ impl Gen45Keys {
             &mut self.battle_flags,
             &mut self.battle_player_mon_party_pos,
             &mut self.battle_player_mon_hp,
+            &mut self.battle_player_mon_pid,
             &mut self.battle_player_mon_exp,
             &mut self.battle_trainer_a_number,
             &mut self.battle_trainer_b_number,
@@ -348,6 +370,11 @@ impl Gen45Keys {
         for list in [
             &mut self.team_held_item,
             &mut self.battle_team_hp,
+            &mut self.battle_team_pid,
+            &mut self.battle_enemy_1_hp,
+            &mut self.battle_enemy_2_hp,
+            &mut self.battle_enemy_1_level,
+            &mut self.battle_enemy_2_level,
             &mut self.team_species,
             &mut self.team_level,
             &mut self.team_hp,
@@ -518,6 +545,12 @@ pub fn form_species_name(gh_pkmn_name: &str, form: Option<i64>, gen5: bool) -> O
             }
             .to_string(),
         ),
+        // the story's fused forms: base experience 315, not Kyurem's 297
+        "Kyurem" if gen5 => match form {
+            Some(1) => Some("Kyurem (White)".to_string()),
+            Some(2) => Some("Kyurem (Black)".to_string()),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -575,9 +608,19 @@ struct BattleData {
     solo_mon_pid: Value,
     current_ally_pid: Value,
     ally_hp_zero: bool,
-    enemy_pids_in_battle: Vec<Value>,
-    enemy_pid_to_participating_player_pids: IndexMap<String, (Value, HashSet<String>)>,
-    enemy_pid_to_exp_split: IndexMap<String, i64>,
+    /// The game's exp masks, one per enemy field slot (`sideGetExpMask`): every mon of
+    /// ours that stood on the field while that slot's enemy was in, by PID. A new
+    /// enemy starts its slot again with whoever is out then.
+    field_mask: [HashSet<String>; 2],
+    /// the `exp_split` index of each field slot's fainted enemy until its exp is paid
+    fainted_enemy: [Option<usize>; 2],
+    /// the size of the first and second trainers' parties; the second is 0 when
+    /// one party is behind both slots
+    enemy_team_sizes: (usize, usize),
+    /// twins: one trainer named twice, one party behind both field slots
+    merged_double: bool,
+    /// by `exp_split` index, which `get_pokemon_list` reads in definition order
+    enemy_exp_split: Vec<i64>,
     trainer_1: Value,
     trainer_2: Value,
 }
@@ -618,9 +661,11 @@ impl Default for BattleData {
             solo_mon_pid: Value::Null,
             current_ally_pid: Value::Null,
             ally_hp_zero: false,
-            enemy_pids_in_battle: Vec::new(),
-            enemy_pid_to_participating_player_pids: IndexMap::new(),
-            enemy_pid_to_exp_split: IndexMap::new(),
+            field_mask: [HashSet::new(), HashSet::new()],
+            fainted_enemy: [None, None],
+            enemy_team_sizes: (0, 0),
+            merged_double: false,
+            enemy_exp_split: Vec::new(),
             trainer_1: Value::Null,
             trainer_2: Value::Null,
         }
@@ -1371,6 +1416,65 @@ impl Gen45Machine {
         usize::try_from(p).ok().and_then(move |i| self.battle.exp_split.get_mut(i))
     }
 
+    /// An enemy took a field slot (`BtlCmd_PokemonSendOut`): the game clears that
+    /// slot's mask and flags whoever is out then.
+    fn reset_field_mask(&mut self, slot: usize, store: &PropertyStore) {
+        let mut mask = HashSet::new();
+        mask.insert(pid_key(&store.get_value(Some(&self.keys.battle_player_mon_pid))));
+        if self.battle.is_double_battle && !self.battle.multi_battle {
+            mask.insert(pid_key(&self.battle.current_ally_pid));
+        }
+        log::info!("[EXP_SPLIT] Field slot {} mask: {:?}", slot, mask);
+        self.battle.field_mask[slot] = mask;
+    }
+
+    /// One of our mons came in: the game flags it against both slots (a slot's dead
+    /// enemy has been paid by then, and its next enemy starts the mask again).
+    fn flag_player_mon(&mut self, pid: &Value) {
+        for mask in self.battle.field_mask.iter_mut() {
+            mask.insert(pid_key(pid));
+        }
+    }
+
+    /// `BtlCmd_CalcExpGain`'s count for a field slot's enemy: the mons on its mask that
+    /// still have HP. The solo mon is one of them: this runs because it gained exp.
+    fn exp_participants(&self, slot: usize, store: &PropertyStore) -> i64 {
+        let mask = &self.battle.field_mask[slot];
+        let solo = pid_key(&self.battle.solo_mon_pid);
+        let count = self.keys.battle_team_pid.iter().zip(self.keys.battle_team_hp.iter()).filter(|(pid, hp)| {
+            let pid = pid_key(&store.get_value(Some(pid)));
+            (pid == solo || mask.contains(&pid)) && store_i64(store, hp) > 0
+        });
+        count.count() as i64
+    }
+
+    /// The `exp_split` index of a mon of a trainer's party: `get_pokemon_list` deals
+    /// two trainers' mons out in turn.
+    fn enemy_index(&self, second_trainer: bool, mon: usize) -> usize {
+        let (first, second) = self.battle.enemy_team_sizes;
+        if second_trainer {
+            mon + first.min(mon + 1)
+        } else {
+            mon + second.min(mon)
+        }
+    }
+
+    /// The party slot of the second field slot's enemy, if `path` is its HP. This reads
+    /// the party, not `battle.opponent_2.active_pokemon`: HeartGold's mapper has
+    /// that at Platinum's address, so it never shows the enemy.
+    fn second_slot_mon(&self, store: &PropertyStore, path: &str) -> Option<usize> {
+        if !self.is_trainer() || !self.battle.is_double_battle {
+            return None;
+        }
+        if self.battle.merged_double {
+            let mon = self.keys.battle_enemy_1_hp.iter().position(|k| k == path)?;
+            (mon as i64 != store_i64(store, &self.keys.battle_first_enemy_party_pos)).then_some(mon)
+        } else {
+            let mon = self.keys.battle_enemy_2_hp.iter().position(|k| k == path)?;
+            (mon as i64 == self.opt_i64(store, &self.keys.battle_second_enemy_party_pos)).then_some(mon)
+        }
+    }
+
     fn check_all_team_hp_zero(&self, store: &PropertyStore) -> bool {
         for hp_key in &self.keys.battle_team_hp {
             let hp = store.get_value(Some(hp_key));
@@ -1412,40 +1516,24 @@ impl Gen45Machine {
             self.battle.second_trainer_name = if b.is_null() { Value::String(String::new()) } else { b };
             let num_enemy_pokemon = self.num_enemy_trainer_pokemon(store);
             self.battle.enemy_pos_lookup = self.enemy_pos_lookup(store);
-            // enemy PID tracking
-            self.battle.enemy_pids_in_battle.clear();
-            for k in &self.keys.battle_enemy_1_pid {
-                let pid = store.get_value(Some(k));
-                if xpr_core::pyjson::truthy(&pid) && crate::gamehook::value_as_i64(&pid) != Some(0) {
-                    self.battle.enemy_pids_in_battle.push(pid);
-                }
-            }
-            if crate::gamehook::value_as_i64(&self.battle.trainer_2).unwrap_or(0) > 0 {
-                for k in &self.keys.battle_enemy_2_pid {
-                    let pid = store.get_value(Some(k));
-                    if xpr_core::pyjson::truthy(&pid) && crate::gamehook::value_as_i64(&pid) != Some(0) {
-                        self.battle.enemy_pids_in_battle.push(pid);
-                    }
-                }
-            }
+            let team_size = |keys: &[String]| keys.iter().filter(|k| xpr_core::pyjson::truthy(&store.get_value(Some(k)))).count();
+            let two_ids = crate::gamehook::value_as_i64(&self.battle.trainer_2).unwrap_or(0) > 0;
+            self.battle.merged_double = two_ids && self.battle.trainer_1 == self.battle.trainer_2;
+            let first_team = team_size(&self.keys.enemy_team_species);
+            let second_team = if two_ids && !self.battle.merged_double { team_size(&self.keys.enemy_2_team_species) } else { 0 };
+            self.battle.enemy_team_sizes = (first_team, second_team);
+            self.battle.enemy_exp_split = vec![1; first_team + second_team];
             log::info!("[EXP_SPLIT] ===== BATTLE INITIALIZATION =====");
-            log::info!("[EXP_SPLIT] Enemy PIDs in battle: {:?}", self.battle.enemy_pids_in_battle);
+            log::info!("[EXP_SPLIT] Enemy teams: {} + {}, merged double: {}", first_team, second_team, self.battle.merged_double);
             log::info!("[EXP_SPLIT] Num enemies: {}", num_enemy_pokemon);
             log::info!("[EXP_SPLIT] Solo PID: {}", py_str(&self.battle.solo_mon_pid));
             log::info!("[EXP_SPLIT] Is double battle: {}", self.battle.is_double_battle);
             log::info!("[EXP_SPLIT] Is multi-battle: {}", self.battle.multi_battle);
-            let solo_pid = self.battle.solo_mon_pid.clone();
-            let pids = self.battle.enemy_pids_in_battle.clone();
-            for enemy_pid in pids {
-                let mut set = HashSet::new();
-                set.insert(pid_key(&solo_pid));
-                if self.battle.is_double_battle && !self.battle.multi_battle {
-                    self.battle.current_ally_pid = self.opt_value(store, &self.keys.battle_ally_mon_pid);
-                    set.insert(pid_key(&self.battle.current_ally_pid));
-                }
-                log::info!("[EXP_SPLIT] Enemy PID {} starts with participants: {:?}", py_str(&enemy_pid), set);
-                self.battle.enemy_pid_to_participating_player_pids.insert(pid_key(&enemy_pid), (enemy_pid, set));
+            if self.battle.is_double_battle && !self.battle.multi_battle {
+                self.battle.current_ally_pid = self.opt_value(store, &self.keys.battle_ally_mon_pid);
             }
+            self.reset_field_mask(0, store);
+            self.reset_field_mask(1, store);
             if self.battle.is_double_battle && !self.battle.multi_battle {
                 log::info!("[EXP_SPLIT] Initial Ally PID: {}", py_str(&self.battle.current_ally_pid));
                 self.battle.enemy_mon_order = vec![0, 1];
@@ -1640,9 +1728,11 @@ impl Gen45Machine {
                 b.solo_mon_pid = solo_pid;
                 b.current_ally_pid = Value::Null;
                 b.ally_hp_zero = false;
-                b.enemy_pids_in_battle.clear();
-                b.enemy_pid_to_participating_player_pids.clear();
-                b.enemy_pid_to_exp_split.clear();
+                b.field_mask = [HashSet::new(), HashSet::new()];
+                b.fainted_enemy = [None, None];
+                b.enemy_team_sizes = (0, 0);
+                b.merged_double = false;
+                b.enemy_exp_split.clear();
                 b.trainer_1 = Value::Null;
                 b.trainer_2 = Value::Null;
                 b.delayed_initialization.begin_waiting(true);
@@ -1779,24 +1869,17 @@ impl Gen45Machine {
                     }
                     if self.is_trainer() {
                         log::info!("[EXP_SPLIT] ===== BATTLE EXIT =====");
-                        let mut final_exp_split: Vec<i64> = Vec::new();
-                        for enemy_pid in &self.battle.enemy_pids_in_battle {
-                            match self.battle.enemy_pid_to_exp_split.get(&pid_key(enemy_pid)) {
-                                Some(n) => final_exp_split.push(*n),
-                                None => final_exp_split.push(1),
-                            }
-                        }
+                        let mut final_exp_split = self.battle.enemy_exp_split.clone();
                         log::info!("[EXP_SPLIT] Final exp_split in team order: {:?}", final_exp_split);
                         if !final_exp_split.iter().any(|x| *x > 1) {
                             final_exp_split = Vec::new();
                         }
-                        // two-trainer battles: interleaving would break a custom mon order
+                        // two-trainer battles: interleaving would break a custom mon order.
+                        // Otherwise the slots seen: `finish_mon_order` makes the real order of them
                         let final_mon_order: Vec<i64> = if xpr_core::pyjson::truthy(&self.battle.second_trainer_name) {
                             Vec::new()
                         } else {
-                            let mut sorted = self.battle.enemy_mon_order.clone();
-                            sorted.sort();
-                            sorted.iter().map(|x| self.battle.enemy_mon_order.iter().position(|y| y == x).unwrap_or(0) as i64 + 1).collect()
+                            self.battle.enemy_mon_order.clone()
                         };
                         let mut td = TrainerEventDefinition::new(&py_str(&self.battle.trainer_name));
                         td.second_trainer_name = self.battle.second_trainer_name.clone();
@@ -2017,6 +2100,19 @@ impl Gen45Machine {
         }
     }
 
+    fn cache_second_enemy(&mut self, species: String, level: i64, store: &PropertyStore) {
+        log::info!("[EXP_SPLIT] ===== SECOND ENEMY FAINTED =====");
+        if (!self.battle.cached_second_mon_species.is_empty() || self.battle.cached_second_mon_level != 0) && self.is_trainer() {
+            let (s, l) = (self.battle.cached_second_mon_species.clone(), self.battle.cached_second_mon_level);
+            self.battle.defeated_trainer_mons.push(EventDefinition::with_wild(WildPkmnEventDefinition::new(&s, l, 1, true)));
+        }
+        log::info!("[EXP_SPLIT] Cached second enemy: {} level {}", species, level);
+        self.battle.cached_second_mon_species = species;
+        self.battle.cached_second_mon_level = level;
+        self.battle.friendship_data.push(store_i64(store, &self.keys.mon_friendship));
+        log::info!("[EXP_SPLIT] ===== END SECOND ENEMY FAINTED =====");
+    }
+
     fn push_defeated(&mut self, species: String, level: i64) {
         if self.is_trainer() {
             self.battle.defeated_trainer_mons.push(EventDefinition::with_wild(WildPkmnEventDefinition::new(&species, level, 1, true)));
@@ -2041,6 +2137,13 @@ impl Gen45Machine {
     fn battle_transition(&mut self, store: &PropertyStore, new: &GameHookProperty, prev: &GameHookProperty) -> GameState {
         let state = GameState::Battle;
         let k = self.keys.clone();
+        // the field's weather is set after the battle's event went in, before the
+        // first turn; the send-out rule reads it from the first faint on
+        if new.path == k.battle_weather && self.is_trainer() && self.battle.enemy_mon_order.len() <= 1 {
+            let mut ev = EventDefinition::with_trainer(TrainerEventDefinition::new(&py_str(&self.battle.trainer_name)));
+            ev.notes = format!("{}{}", weather_flag(), new.value.as_str().unwrap_or(""));
+            self.queue_new_event(ev);
+        }
         // solo HP hitting 0 starts blackout detection
         if new.path == k.battle_solo_hp {
             if new.as_i64().map(|v| v <= 0).unwrap_or(false) && !self.battle.solo_hp_zero {
@@ -2061,30 +2164,17 @@ impl Gen45Machine {
 
         if new.path == k.mon_exppoints || new.path == k.battle_player_mon_exp {
             log::info!("[EXP_SPLIT] ===== EXP CHANGE DETECTED =====");
-            let mut defeated_enemy_pid: Option<Value> = None;
-            if !self.battle.cached_first_mon_species.is_empty() || self.battle.cached_first_mon_level != 0 {
-                let first_enemy_pid = store.get_value(Some(&k.battle_first_enemy_pid));
-                if xpr_core::pyjson::truthy(&first_enemy_pid) && self.battle.enemy_pid_to_participating_player_pids.contains_key(&pid_key(&first_enemy_pid)) {
-                    defeated_enemy_pid = Some(first_enemy_pid);
-                } else if xpr_core::pyjson::truthy(&first_enemy_pid) {
-                    log::info!("[EXP_SPLIT] WARNING: First enemy PID {} not in tracking dictionary!", py_str(&first_enemy_pid));
+            // the game pays the first slot's enemy first when both have fallen
+            let slot = self.battle.fainted_enemy.iter().position(Option::is_some);
+            match slot.and_then(|s| self.battle.fainted_enemy[s].take().map(|idx| (s, idx))) {
+                Some((s, idx)) => {
+                    let split_count = self.exp_participants(s, store);
+                    log::info!("[EXP_SPLIT] FINAL exp split for enemy {} (field slot {}): {} participants", idx, s, split_count);
+                    if let Some(entry) = self.battle.enemy_exp_split.get_mut(idx) {
+                        *entry = split_count;
+                    }
                 }
-            }
-            if defeated_enemy_pid.is_none() && (!self.battle.cached_second_mon_species.is_empty() || self.battle.cached_second_mon_level != 0) {
-                let second_enemy_pid = self.opt_value(store, &k.battle_second_enemy_pid);
-                if xpr_core::pyjson::truthy(&second_enemy_pid) && self.battle.enemy_pid_to_participating_player_pids.contains_key(&pid_key(&second_enemy_pid)) {
-                    defeated_enemy_pid = Some(second_enemy_pid);
-                } else if xpr_core::pyjson::truthy(&second_enemy_pid) {
-                    log::info!("[EXP_SPLIT] WARNING: Second enemy PID {} not in tracking dictionary!", py_str(&second_enemy_pid));
-                }
-            }
-            match defeated_enemy_pid {
-                Some(pid) => {
-                    let split_count = self.battle.enemy_pid_to_participating_player_pids.get(&pid_key(&pid)).map(|(_, s)| s.len() as i64).unwrap_or(0);
-                    log::info!("[EXP_SPLIT] FINAL exp split for enemy PID {}: {} participants", py_str(&pid), split_count);
-                    self.battle.enemy_pid_to_exp_split.insert(pid_key(&pid), split_count);
-                }
-                None => log::info!("[EXP_SPLIT] WARNING: Could not determine defeated enemy PID for exp split calculation"),
+                None => log::info!("[EXP_SPLIT] No fainted trainer mon waiting for this exp"),
             }
             self.battle.ally_hp_zero = false;
             log::info!("[EXP_SPLIT] ===== END EXP CHANGE =====");
@@ -2115,23 +2205,28 @@ impl Gen45Machine {
                 let species_raw = store.str_of(&k.battle_first_enemy_species);
                 self.battle.cached_first_mon_species = self.conv.pkmn_name_convert(species_raw.as_deref(), None, None).unwrap_or_default();
                 self.battle.cached_first_mon_level = store_i64(store, &k.battle_first_enemy_level);
+                self.battle.fainted_enemy[0] = usize::try_from(store_i64(store, &k.battle_first_enemy_party_pos)).ok().map(|mon| self.enemy_index(false, mon));
                 log::info!("[EXP_SPLIT] Cached first enemy: {} level {}", self.battle.cached_first_mon_species, self.battle.cached_first_mon_level);
                 self.battle.friendship_data.push(store_i64(store, &k.mon_friendship));
                 log::info!("[EXP_SPLIT] ===== END FIRST ENEMY FAINTED =====");
             }
-        } else if Self::is_path(&k.battle_second_enemy_hp, &new.path) {
+        } else if let Some(mon) = self.second_slot_mon(store, &new.path) {
             if new.eq_i64(0) && prev.as_i64().unwrap_or(0) > 0 {
-                log::info!("[EXP_SPLIT] ===== SECOND ENEMY FAINTED =====");
-                if (!self.battle.cached_second_mon_species.is_empty() || self.battle.cached_second_mon_level != 0) && self.is_trainer() {
-                    let (s, l) = (self.battle.cached_second_mon_species.clone(), self.battle.cached_second_mon_level);
-                    self.battle.defeated_trainer_mons.push(EventDefinition::with_wild(WildPkmnEventDefinition::new(&s, l, 1, true)));
-                }
-                let species_raw = self.opt_value(store, &k.battle_second_enemy_species);
-                self.battle.cached_second_mon_species = self.conv.pkmn_name_convert(species_raw.as_str(), None, None).unwrap_or_default();
-                self.battle.cached_second_mon_level = self.opt_i64(store, &k.battle_second_enemy_level);
-                self.battle.friendship_data.push(store_i64(store, &k.mon_friendship));
-                log::info!("[EXP_SPLIT] ===== END SECOND ENEMY FAINTED =====");
+                let (species_keys, level_keys) = if self.battle.merged_double { (&k.enemy_team_species, &k.battle_enemy_1_level) } else { (&k.enemy_2_team_species, &k.battle_enemy_2_level) };
+                let species_raw = store.str_of(&species_keys[mon]);
+                let species = self.conv.pkmn_name_convert(species_raw.as_deref(), None, None).unwrap_or_default();
+                self.cache_second_enemy(species, store_i64(store, &level_keys[mon]), store);
+                self.battle.fainted_enemy[1] = Some(self.enemy_index(!self.battle.merged_double, mon));
             }
+        } else if Self::is_path(&k.battle_second_enemy_hp, &new.path) && !(self.is_trainer() && self.battle.is_double_battle) {
+            // a wild double: a trainer's second enemy is read from its party, above
+            if new.eq_i64(0) && prev.as_i64().unwrap_or(0) > 0 {
+                let species_raw = self.opt_value(store, &k.battle_second_enemy_species);
+                let species = self.conv.pkmn_name_convert(species_raw.as_str(), None, None).unwrap_or_default();
+                self.cache_second_enemy(species, self.opt_i64(store, &k.battle_second_enemy_level), store);
+            }
+        } else if new.path == k.battle_player_mon_pid {
+            self.flag_player_mon(&new.value);
         } else if Self::is_path(&k.battle_ally_mon_pid, &new.path) && !self.battle.multi_battle {
             if self.battle.is_double_battle && !new.is_null() && !new.eq_i64(0) {
                 let new_pid = new.value.clone();
@@ -2139,26 +2234,7 @@ impl Gen45Machine {
                     log::info!("[EXP_SPLIT] ===== ALLY PID CHANGE ===== old {} new {}", py_str(&self.battle.current_ally_pid), py_str(&new_pid));
                     self.battle.current_ally_pid = new_pid.clone();
                     self.battle.ally_hp_zero = false;
-                    let first_enemy_pid = store.get_value(Some(&k.battle_first_enemy_pid));
-                    let second_enemy_pid = self.opt_value(store, &k.battle_second_enemy_pid);
-                    let first_enemy_hp = store_i64(store, &k.battle_first_enemy_hp);
-                    let second_enemy_hp = self.opt_i64(store, &k.battle_second_enemy_hp);
-                    if xpr_core::pyjson::truthy(&first_enemy_pid) && first_enemy_hp > 0 {
-                        match self.battle.enemy_pid_to_participating_player_pids.get_mut(&pid_key(&first_enemy_pid)) {
-                            Some((_, set)) => {
-                                set.insert(pid_key(&new_pid));
-                            }
-                            None => log::info!("[EXP_SPLIT] WARNING: First enemy PID {} not in tracking dictionary!", py_str(&first_enemy_pid)),
-                        }
-                    }
-                    if self.battle.is_double_battle && xpr_core::pyjson::truthy(&second_enemy_pid) && second_enemy_hp > 0 {
-                        match self.battle.enemy_pid_to_participating_player_pids.get_mut(&pid_key(&second_enemy_pid)) {
-                            Some((_, set)) => {
-                                set.insert(pid_key(&new_pid));
-                            }
-                            None => log::info!("[EXP_SPLIT] WARNING: Second enemy PID {} not in tracking dictionary!", py_str(&second_enemy_pid)),
-                        }
-                    }
+                    self.flag_player_mon(&new_pid);
                     log::info!("[EXP_SPLIT] ===== END ALLY PID CHANGE =====");
                 } else {
                     log::info!("[EXP_SPLIT] Ally PID unchanged: {}", py_str(&new_pid));
@@ -2191,12 +2267,6 @@ impl Gen45Machine {
             if self.battle.is_double_battle && new.as_i64().map(|v| v <= 0).unwrap_or(false) && prev.as_i64().unwrap_or(0) > 0 {
                 log::info!("[EXP_SPLIT] ===== ALLY FAINTED =====");
                 self.battle.ally_hp_zero = true;
-                if xpr_core::pyjson::truthy(&self.battle.current_ally_pid) {
-                    let ally = pid_key(&self.battle.current_ally_pid);
-                    for (_, (_, set)) in self.battle.enemy_pid_to_participating_player_pids.iter_mut() {
-                        set.remove(&ally);
-                    }
-                }
                 log::info!("[EXP_SPLIT] ===== END ALLY FAINTED =====");
                 // legacy exp_split tracking
                 let ally_mon_pos = self.opt_i64(store, &k.battle_ally_mon_party_pos);
@@ -2276,6 +2346,9 @@ impl Gen45Machine {
             let real_new_value = if is_first { self.first_enemy_mon_pos(store, new.as_i64()) } else { self.second_enemy_mon_pos(store, new.as_i64()) };
             log::info!("[EXP_SPLIT] ===== ENEMY SWITCHED ===== {} -> {} (real {:?})", py_str(&prev.value), py_str(&new.value), real_new_value);
             let allowed = is_first || self.battle.is_double_battle;
+            if allowed && self.is_trainer() && (0..6).contains(&new.as_i64().unwrap_or(-1)) {
+                self.reset_field_mask(if is_first { 0 } else { 1 }, store);
+            }
             if let Some(real) = real_new_value {
                 if allowed && real >= 0 && (real as usize) < self.battle.exp_split.len() {
                     if store_i64(store, &k.battle_player_mon_hp) > 0 {
@@ -2513,6 +2586,11 @@ fn repr_items_i64(map: &ItemCache) -> String {
 }
 
 /// `_process_events` body (gens 4/5).
+/// A queued trainer event that only carries the battle's weather (after the flag).
+fn weather_flag() -> String {
+    format!("{}FLAG TO SIGNAL THE WEATHER IN BATTLE. USER SHOULD NEVER SEE THIS: ", consts::RECORDING_ERROR_FRAGMENT)
+}
+
 pub(crate) fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv: &Gen45Converter) {
     let gen = &ctx.gen;
     let gen5 = conv.flavor.is_gen5();
@@ -2560,6 +2638,11 @@ pub(crate) fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv
             }
         }
         let trainer_name = trainer.name.clone();
+        if let Some(weather) = cur_event.notes.strip_prefix(&weather_flag()) {
+            log::info!("weather in the battle with {}: {:?}", trainer_name, weather);
+            ctx.controller.repredict_send_out(&trainer_name, (!weather.is_empty()).then(|| weather.to_string()));
+            return;
+        }
         if cur_event.notes == trainer_loss_flag() {
             log::info!("[BLACKOUT DEBUG] Processing TRAINER_LOSS_FLAG event for trainer: {}", trainer_name);
             ctx.controller.lost_trainer_battle(&trainer_name);
@@ -2601,6 +2684,7 @@ pub(crate) fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv
                     if let Some(t) = cur_event.trainer_def.as_mut() {
                         t.pay_day_amount = Some((t.pay_day_amount.unwrap_or(0) - expected_money).max(0));
                     }
+                    finish_mon_order(gen, &mut cur_event, &obj.definition);
                     let id = obj.group_id;
                     let ev = cur_event.clone();
                     ctx.controller.host().call(move |h| h.update_existing_event(id, ev));

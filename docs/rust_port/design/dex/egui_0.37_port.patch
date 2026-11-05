@@ -1,0 +1,1176 @@
+diff --git a/rust/crates/xpr-app/examples/dex_damage_png.rs b/rust/crates/xpr-app/examples/dex_damage_png.rs
+index 36ac8637..fe490f01 100644
+--- a/rust/crates/xpr-app/examples/dex_damage_png.rs
++++ b/rust/crates/xpr-app/examples/dex_damage_png.rs
+@@ -56,8 +56,8 @@ fn main() {
+     }
+     let route = RouteContext::default();
+     let mut off = Offscreen::new(&theme, 1.0, 8192);
+-    let prims = off.render(size, 6, |ctx| {
+-        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(ctx, |ui| {
++    let prims = off.render(size, 6, |root| {
++        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(root, |ui| {
+             let mut host = Host { damage: &mut damage, cfg: &mut cfg, assets: &mut assets, route: &route_ctrl };
+             let _ = dex.ui(ui, &theme, &registry, &route, &mut host);
+         });
+diff --git a/rust/crates/xpr-app/src/dex_damage.rs b/rust/crates/xpr-app/src/dex_damage.rs
+index 146998a4..b188bf9c 100644
+--- a/rust/crates/xpr-app/src/dex_damage.rs
++++ b/rust/crates/xpr-app/src/dex_damage.rs
+@@ -378,7 +378,7 @@ impl DexDamage {
+             rui.set_clip_rect(right.intersect(ui.clip_rect()));
+             // the panel's show / hide toggle
+             let (tb, _) = rui.allocate_exact_size(Vec2::new(22.0, 22.0), Sense::hover());
+-            let tr = ui.interact(tb, ui.id().with("dex_damage_panel_toggle"), Sense::click()).on_hover_text(if self.panel_open { "Hide the player panel" } else { "Show the player panel" });
++            let tr = ui.interact(tb, ui.scope_id().with("dex_damage_panel_toggle"), Sense::click()).on_hover_text(if self.panel_open { "Hide the player panel" } else { "Show the player panel" });
+             ui.painter().rect_filled(tb, CornerRadius::same(4), if tr.hovered() { palette::GRAY_700 } else { palette::GRAY_800 });
+             ui.painter().text(tb.center(), Align2::CENTER_CENTER, if self.panel_open { "\u{25C0}" } else { "\u{25B6}" }, palette::px(&theme, 12.0), if tr.hovered() { Color32::WHITE } else { palette::GRAY_400 });
+             if tr.clicked() {
+@@ -417,7 +417,7 @@ impl DexDamage {
+             self.copy_from_route(route);
+         }
+         row(ui, theme, "Species", |ui| {
+-            let r = SearchableDropdown::new(theme, ui.id().with("dex_dmg_species"), &mut self.species, &self.species_options).widths(FIELD_W, FIELD_W).show(ui);
++            let r = SearchableDropdown::new(theme, ui.scope_id().with("dex_dmg_species"), &mut self.species, &self.species_options).widths(FIELD_W, FIELD_W).show(ui);
+             if r.changed && self.species_options.contains(&self.species) {
+                 self.fix_ability();
+                 self.default_moves();
+@@ -425,21 +425,21 @@ impl DexDamage {
+             }
+         });
+         row(ui, theme, "Level", |ui| {
+-            let r = AmountEntry::new(theme, ui.id().with("dex_dmg_level"), &mut self.level).min(Some(1)).max(Some(100)).width(Some(6)).show(ui);
++            let r = AmountEntry::new(theme, ui.scope_id().with("dex_dmg_level"), &mut self.level).min(Some(1)).max(Some(100)).width(Some(6)).show(ui);
+             if r.changed {
+                 self.dirty = true;
+             }
+         });
+         if g >= 3 {
+             row(ui, theme, "Nature", |ui| {
+-                if widgets::option_menu(ui, theme, ui.id().with("dex_dmg_nature"), &mut self.nature, &self.nature_options, Some(FIELD_W), true) {
++                if widgets::option_menu(ui, theme, ui.scope_id().with("dex_dmg_nature"), &mut self.nature, &self.nature_options, Some(FIELD_W), true) {
+                     self.dirty = true;
+                 }
+             });
+             let abilities = self.abilities();
+             if !abilities.is_empty() {
+                 row(ui, theme, "Ability", |ui| {
+-                    if widgets::option_menu(ui, theme, ui.id().with("dex_dmg_ability"), &mut self.ability, &abilities, Some(FIELD_W), true) {
++                    if widgets::option_menu(ui, theme, ui.scope_id().with("dex_dmg_ability"), &mut self.ability, &abilities, Some(FIELD_W), true) {
+                         self.dirty = true;
+                     }
+                 });
+@@ -450,7 +450,7 @@ impl DexDamage {
+         let dv_max = if g <= 2 { 15 } else { 31 };
+         let xp_max = if g <= 2 { 65535 } else { 252 };
+         let derived_hp = (g <= 2).then(|| self.dv_block(&gen).hp);
+-        egui::Grid::new(ui.id().with("dex_dmg_spread")).num_columns(3).spacing(Vec2::new(8.0, 4.0)).show(ui, |ui| {
++        egui::Grid::new(ui.scope_id().with("dex_dmg_spread")).num_columns(3).spacing(Vec2::new(8.0, 4.0)).show(ui, |ui| {
+             ui.label("");
+             widgets::label_colored(ui, theme, if g <= 2 { "DV" } else { "IV" }, palette::GRAY_500);
+             widgets::label_colored(ui, theme, if g <= 2 { "Stat Exp" } else { "EV" }, palette::GRAY_500);
+@@ -462,13 +462,13 @@ impl DexDamage {
+                         widgets::label_colored(ui, theme, format!("{} (from the others)", hp), palette::GRAY_500).on_hover_text("The HP DV is made of the low bits of the Attack, Defense, Speed and Special DVs");
+                     }
+                     None => {
+-                        let r = AmountEntry::new(theme, ui.id().with(("dex_dmg_iv", *i)), &mut self.ivs[*i]).min(Some(0)).max(Some(dv_max)).width(Some(5)).show(ui);
++                        let r = AmountEntry::new(theme, ui.scope_id().with(("dex_dmg_iv", *i)), &mut self.ivs[*i]).min(Some(0)).max(Some(dv_max)).width(Some(5)).show(ui);
+                         if r.changed {
+                             self.dirty = true;
+                         }
+                     }
+                 }
+-                let r = AmountEntry::new(theme, ui.id().with(("dex_dmg_sx", *i)), &mut self.stat_xp[*i]).min(Some(0)).max(Some(xp_max)).width(Some(8)).show(ui);
++                let r = AmountEntry::new(theme, ui.scope_id().with(("dex_dmg_sx", *i)), &mut self.stat_xp[*i]).min(Some(0)).max(Some(xp_max)).width(Some(8)).show(ui);
+                 if r.changed {
+                     self.dirty = true;
+                 }
+@@ -481,7 +481,7 @@ impl DexDamage {
+                 widgets::label_colored(ui, theme, format!("Hidden Power: {} {}", hp_type, hp_power), palette::GRAY_400);
+             }
+             row(ui, theme, "Held item", |ui| {
+-                let r = SearchableDropdown::new(theme, ui.id().with("dex_dmg_item"), &mut self.held_item, &self.item_options).widths(FIELD_W, FIELD_W).show(ui);
++                let r = SearchableDropdown::new(theme, ui.scope_id().with("dex_dmg_item"), &mut self.held_item, &self.item_options).widths(FIELD_W, FIELD_W).show(ui);
+                 if r.changed {
+                     self.dirty = true;
+                 }
+@@ -507,7 +507,7 @@ impl DexDamage {
+         xpr_dex_ui::widgets::section_label(ui, theme, "Moves");
+         for i in 0..4 {
+             row(ui, theme, &format!("{}.", i + 1), |ui| {
+-                let r = SearchableDropdown::new(theme, ui.id().with(("dex_dmg_move", i)), &mut self.moves[i], &self.move_options).widths(FIELD_W, FIELD_W).placeholder("\u{2014} empty \u{2014}").show(ui);
++                let r = SearchableDropdown::new(theme, ui.scope_id().with(("dex_dmg_move", i)), &mut self.moves[i], &self.move_options).widths(FIELD_W, FIELD_W).placeholder("\u{2014} empty \u{2014}").show(ui);
+                 if r.changed {
+                     self.dirty = true;
+                 }
+@@ -528,7 +528,7 @@ impl DexDamage {
+         ui.add_space(6.0);
+         xpr_dex_ui::widgets::section_label(ui, theme, "Opponent");
+         row(ui, theme, "Trainer", |ui| {
+-            let r = SearchableDropdown::new(theme, ui.id().with("dex_dmg_trainer"), &mut self.trainer, &self.trainer_options).widths(FIELD_W, 300.0).show(ui);
++            let r = SearchableDropdown::new(theme, ui.scope_id().with("dex_dmg_trainer"), &mut self.trainer, &self.trainer_options).widths(FIELD_W, 300.0).show(ui);
+             if r.changed {
+                 self.dirty = true;
+             }
+diff --git a/rust/crates/xpr-app/tests/dex_page.rs b/rust/crates/xpr-app/tests/dex_page.rs
+index 6c867e0a..1b0f0fad 100644
+--- a/rust/crates/xpr-app/tests/dex_page.rs
++++ b/rust/crates/xpr-app/tests/dex_page.rs
+@@ -75,12 +75,13 @@ impl Harness {
+         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1600.0, 1000.0))), events, ..Default::default() };
+         let rc = self.route_context();
+         let Harness { ctx, theme, cfg, registry, route, damage, assets, dex, .. } = self;
+-        let out = ctx.run(input, |ctx| {
+-            egui::CentralPanel::default().show(ctx, |ui| {
++        let mut out = ctx.run_ui(input, |root| {
++            egui::CentralPanel::default().show(root, |ui| {
+                 let mut host = Host { damage, cfg, assets, route };
+                 let _ = dex.ui(ui, theme, registry, &rc, &mut host);
+             });
+         });
++        out.textures_delta.clear();
+         self.texts.clear();
+         for cs in &out.shapes {
+             collect(&cs.shape, &mut self.texts);
+diff --git a/rust/crates/xpr-dex-ui/Cargo.toml b/rust/crates/xpr-dex-ui/Cargo.toml
+index 3b5f698e..31ac7e6e 100644
+--- a/rust/crates/xpr-dex-ui/Cargo.toml
++++ b/rust/crates/xpr-dex-ui/Cargo.toml
+@@ -14,7 +14,7 @@ xpr-core = { path = "../xpr-core" }
+ xpr-data = { path = "../xpr-data" }
+ xpr-dex = { path = "../xpr-dex" }
+ xpr-ui-kit = { path = "../xpr-ui-kit" }
+-egui = "0.33.3"
++egui = { version = "0.37.0", features = ["default_fonts", "monochrome_emoji_fonts"] }
+ image = { version = "0.25", default-features = false, features = ["png", "webp"] }
+ serde = { workspace = true }
+ serde_json = { workspace = true }
+diff --git a/rust/crates/xpr-dex-ui/src/shell.rs b/rust/crates/xpr-dex-ui/src/shell.rs
+index 92af7d34..b1c82497 100644
+--- a/rust/crates/xpr-dex-ui/src/shell.rs
++++ b/rust/crates/xpr-dex-ui/src/shell.rs
+@@ -259,7 +259,7 @@ impl DexView {
+             Vec2::new(74.0, 26.0),
+         );
+         let back_resp = ui
+-            .interact(back, ui.id().with("dex_back"), Sense::click())
++            .interact(back, ui.scope_id().with("dex_back"), Sense::click())
+             .on_hover_text("Leave the Dex");
+         ui.painter().rect(
+             back,
+@@ -300,7 +300,7 @@ impl DexView {
+                 Vec2::new(tab_w, strip.height()),
+             );
+             let resp = ui
+-                .interact(r, ui.id().with(("dex_tab", i)), Sense::click())
++                .interact(r, ui.scope_id().with(("dex_tab", i)), Sense::click())
+                 .on_hover_text(tab.label());
+             let active = self.state.tab() == *tab;
+             if active {
+@@ -459,7 +459,7 @@ impl DexView {
+                 Pos2::new(full.max.x - 146.0, row_top + 3.0),
+                 Vec2::new(138.0, 22.0),
+             );
+-            let br = ui.interact(b, ui.id().with("dex_exit_compare"), Sense::click());
++            let br = ui.interact(b, ui.scope_id().with("dex_exit_compare"), Sense::click());
+             ui.painter().rect(
+                 b,
+                 CornerRadius::same(4),
+@@ -622,7 +622,7 @@ impl DexView {
+             #[cfg(not(feature = "pokedex"))]
+             widgets::placeholder(&mut lui, theme, "The Pokédex list is not built in.");
+             // splitter
+-            let resp = ui.interact(handle, ui.id().with("dex_list_splitter"), Sense::drag());
++            let resp = ui.interact(handle, ui.scope_id().with("dex_list_splitter"), Sense::drag());
+             let hot = resp.hovered() || resp.dragged();
+             ui.painter().rect_filled(
+                 handle,
+@@ -707,7 +707,7 @@ impl DexView {
+             }
+         }
+         let tr = ui
+-            .interact(tb, ui.id().with("dex_list_toggle"), Sense::click())
++            .interact(tb, ui.scope_id().with("dex_list_toggle"), Sense::click())
+             .on_hover_text(if list_open { "Hide list" } else { "Show list" });
+         ui.painter().rect_filled(
+             tb,
+@@ -865,7 +865,7 @@ impl DexView {
+         {
+             return;
+         }
+-        let in_text = ui.ctx().memory(|m| m.focused().is_some()) && ui.ctx().wants_keyboard_input();
++        let in_text = ui.ctx().memory(|m| m.focused().is_some()) && ui.ctx().egui_wants_keyboard_input();
+         let tab = self.state.tab();
+         let pressed = |k: egui::Key, m: egui::Modifiers| ui.input_mut(|i| i.consume_key(m, k));
+         let none = egui::Modifiers::NONE;
+diff --git a/rust/crates/xpr-dex-ui/src/testkit.rs b/rust/crates/xpr-dex-ui/src/testkit.rs
+index f0d7c665..2f44027d 100644
+--- a/rust/crates/xpr-dex-ui/src/testkit.rs
++++ b/rust/crates/xpr-dex-ui/src/testkit.rs
+@@ -91,10 +91,10 @@ impl DexDriver {
+             actions,
+             ..
+         } = self;
+-        let prims = off.render_with_events(*size, passes, events, |ctx| {
++        let prims = off.render_with_events(*size, passes, events, |root| {
+             egui::CentralPanel::default()
+                 .frame(egui::Frame::new().fill(crate::palette::GRAY_900))
+-                .show(ctx, |ui| {
++                .show(root, |ui| {
+                     actions.extend(view.ui(ui, theme, registry, route, host.as_mut()));
+                 });
+         });
+diff --git a/rust/crates/xpr-dex-ui/src/views/compare/draw.rs b/rust/crates/xpr-dex-ui/src/views/compare/draw.rs
+index e744f128..0d878f68 100644
+--- a/rust/crates/xpr-dex-ui/src/views/compare/draw.rs
++++ b/rust/crates/xpr-dex-ui/src/views/compare/draw.rs
+@@ -17,7 +17,7 @@ pub const RED_400: Color32 = palette::RED_400;
+ pub fn in_rect<R>(
+     ui: &mut Ui,
+     rect: Rect,
+-    salt: impl std::hash::Hash,
++    salt: impl std::hash::Hash + std::fmt::Debug,
+     f: impl FnOnce(&mut Ui) -> R,
+ ) -> R {
+     let mut child = ui.new_child(
+diff --git a/rust/crates/xpr-dex-ui/src/views/compare/header.rs b/rust/crates/xpr-dex-ui/src/views/compare/header.rs
+index 062ea9fa..244560bd 100644
+--- a/rust/crates/xpr-dex-ui/src/views/compare/header.rs
++++ b/rust/crates/xpr-dex-ui/src/views/compare/header.rs
+@@ -476,7 +476,7 @@ pub fn evo_chips(
+             let evo = &family[i];
+             let resp = ui.interact(
+                 btn,
+-                Id::new(("cmp_evo", salt, i)),
++                Id::unique(("cmp_evo", salt, i)),
+                 if it.current {
+                     Sense::hover()
+                 } else {
+@@ -562,7 +562,7 @@ pub fn game_chips(
+             let resp = ui
+                 .interact(
+                     r,
+-                    Id::new(("cmp_game", salt, g.as_str())),
++                    Id::unique(("cmp_game", salt, g.as_str())),
+                     if is_disabled {
+                         Sense::hover()
+                     } else {
+diff --git a/rust/crates/xpr-dex-ui/src/views/compare/mod.rs b/rust/crates/xpr-dex-ui/src/views/compare/mod.rs
+index 35573c56..2af78dca 100644
+--- a/rust/crates/xpr-dex-ui/src/views/compare/mod.rs
++++ b/rust/crates/xpr-dex-ui/src/views/compare/mod.rs
+@@ -36,7 +36,7 @@ mod two;
+ /// Scroll areas scroll by wheel and bar only: a drag would also scroll while
+ /// right-clicking a row.
+ pub(super) const NO_DRAG: ScrollSource = ScrollSource {
+-    drag: false,
++    drag: egui::scroll_area::DragScroll::Never,
+     ..ScrollSource::ALL
+ };
+ 
+@@ -158,7 +158,7 @@ fn unavailable(ui: &mut Ui, cx: &mut DexCx, text: &str, button: &str, hint: Opti
+         Vec2::new(btn_w, 28.0),
+     );
+     let resp = ui
+-        .interact(btn, ui.id().with("cmp_unavailable_exit"), Sense::click())
++        .interact(btn, ui.scope_id().with("cmp_unavailable_exit"), Sense::click())
+         .on_hover_cursor(egui::CursorIcon::PointingHand);
+     ui.painter().rect_filled(
+         btn,
+diff --git a/rust/crates/xpr-dex-ui/src/views/compare/tables.rs b/rust/crates/xpr-dex-ui/src/views/compare/tables.rs
+index a57b2b19..77df76f4 100644
+--- a/rust/crates/xpr-dex-ui/src/views/compare/tables.rs
++++ b/rust/crates/xpr-dex-ui/src/views/compare/tables.rs
+@@ -439,7 +439,7 @@ pub fn draw_side(ui: &mut Ui, env: &mut Env, s: &SideSpec, pos: Pos2) -> Option<
+     }
+     let top = Pos2::new(pos.x, pos.y + SECTION_HEAD_H);
+     let table_h = HEADER_H + n as f32 * ROW_H;
+-    let id_base = Id::new(("cmp_table", &s.scope));
++    let id_base = Id::unique(("cmp_table", &s.scope));
+     let mut rui = ui.new_child(
+         UiBuilder::new()
+             .max_rect(Rect::from_min_size(top, Vec2::new(w, table_h)))
+@@ -563,7 +563,7 @@ fn section_head(ui: &mut Ui, env: &mut Env, s: &SideSpec, head: Rect) {
+     let btn = Rect::from_min_size(Pos2::new(bx, cy - 10.0), Vec2::new(bw, 20.0));
+     let resp = if n > 0 {
+         let r = ui
+-            .interact(btn, Id::new(("cmp_head", &s.scope)), Sense::click())
++            .interact(btn, Id::unique(("cmp_head", &s.scope)), Sense::click())
+             .on_hover_text("Click to copy as spreadsheet")
+             .on_hover_cursor(egui::CursorIcon::PointingHand);
+         Some(r)
+diff --git a/rust/crates/xpr-dex-ui/src/views/compare/triple.rs b/rust/crates/xpr-dex-ui/src/views/compare/triple.rs
+index 001fa164..de76bf63 100644
+--- a/rust/crates/xpr-dex-ui/src/views/compare/triple.rs
++++ b/rust/crates/xpr-dex-ui/src/views/compare/triple.rs
+@@ -92,7 +92,7 @@ pub fn ui(v: &mut CompareView, ui: &mut Ui, cx: &mut DexCx) {
+         }),
+     );
+     let tw = widths.total();
+-    let epoch = egui::Id::new((v.mount, &names, &game)).value();
++    let epoch = egui::Id::unique((v.mount, &names, &game)).value();
+     let bg = palette::page_bg(theme);
+     let mut new_sorts = sorts;
+     let mut toggled: Option<String> = None;
+@@ -178,7 +178,7 @@ pub fn ui(v: &mut CompareView, ui: &mut Ui, cx: &mut DexCx) {
+                     Stroke::new(1.0_f32, palette::GRAY_700),
+                 );
+                 let args = ColumnArgs {
+-                    id: egui::Id::new(("cmp_triple_stats", i)),
++                    id: egui::Id::unique(("cmp_triple_stats", i)),
+                     epoch,
+                     scope: scopes[i],
+                     game: &game,
+diff --git a/rust/crates/xpr-dex-ui/src/views/compare/two.rs b/rust/crates/xpr-dex-ui/src/views/compare/two.rs
+index 3c5c6d61..08dd4d89 100644
+--- a/rust/crates/xpr-dex-ui/src/views/compare/two.rs
++++ b/rust/crates/xpr-dex-ui/src/views/compare/two.rs
+@@ -91,7 +91,7 @@ pub fn ui(v: &mut CompareView, ui: &mut Ui, cx: &mut DexCx, t: &Two) -> Out {
+ 
+ fn header(ui: &mut Ui, cx: &mut DexCx, t: &Two, avail_w: f32, mount: u64) -> Option<String> {
+     let theme = cx.theme;
+-    let epoch = egui::Id::new((mount, t.left_name, t.right_name, t.left_game, t.right_game)).value();
++    let epoch = egui::Id::unique((mount, t.left_name, t.right_name, t.left_game, t.right_game)).value();
+     let self_mode = matches!(t.kind, Kind::SelfCmp { .. });
+     let id_w = if self_mode { 192.0 } else { 160.0 };
+     let (lp, rp) = (&t.left.pokemon, &t.right.pokemon);
+@@ -123,7 +123,7 @@ fn header(ui: &mut Ui, cx: &mut DexCx, t: &Two, avail_w: f32, mount: u64) -> Opt
+     let l_id_h = identity_size(ui, theme, lp, &PAIR_IDENTITY, id_w).y;
+     let r_id_h = identity_size(ui, theme, rp, &PAIR_IDENTITY, id_w).y;
+     let args = DiffArgs {
+-        id: egui::Id::new(("cmp_two_stats", self_mode)),
++        id: egui::Id::unique(("cmp_two_stats", self_mode)),
+         epoch,
+         scope: if self_mode { "self" } else { "pair" },
+         left: &lp.base_stats,
+diff --git a/rust/crates/xpr-dex-ui/src/views/evs/mod.rs b/rust/crates/xpr-dex-ui/src/views/evs/mod.rs
+index 788def26..222e0e6d 100644
+--- a/rust/crates/xpr-dex-ui/src/views/evs/mod.rs
++++ b/rust/crates/xpr-dex-ui/src/views/evs/mod.rs
+@@ -503,7 +503,7 @@ impl EvsView {
+                     Pos2::new(x, y + label_h + 4.0),
+                     Vec2::new(widths[i], ctl_h),
+                 );
+-                if let Some(picked) = select(ui, theme, Id::new(*id), rect, opts, *sel) {
++                if let Some(picked) = select(ui, theme, Id::unique(*id), rect, opts, *sel) {
+                     match i {
+                         0 => new_gen = Some(picked),
+                         1 => new_type = Some(picked),
+@@ -591,7 +591,7 @@ impl EvsView {
+                 continue;
+             }
+             let resp = tui
+-                .interact(r, Id::new(("evs_head", i)), Sense::click())
++                .interact(r, Id::unique(("evs_head", i)), Sense::click())
+                 .on_hover_text("Sort by Pokedex number (click again to reverse)")
+                 .on_hover_cursor(egui::CursorIcon::PointingHand);
+             if resp.hovered() {
+@@ -613,7 +613,7 @@ impl EvsView {
+             x += w_stat;
+             let label = palette::stat_label(*key, gen1);
+             let resp = tui
+-                .interact(r, Id::new(("evs_head_stat", key.key())), Sense::click())
++                .interact(r, Id::unique(("evs_head_stat", key.key())), Sense::click())
+                 .on_hover_text(format!(
+                     "Sort by {} EV (click: high first, again: low first)",
+                     label
+@@ -889,7 +889,7 @@ impl EvsView {
+             .y
+             .max(6.0)
+             .min(screen.max.y - POPOVER_MAX_H - 6.0);
+-        let area = egui::Area::new(Id::new("evs_encounter_popover"))
++        let area = egui::Area::new(Id::unique("evs_encounter_popover"))
+             .order(egui::Order::Foreground)
+             .fixed_pos(Pos2::new(left, top))
+             .constrain(false)
+diff --git a/rust/crates/xpr-dex-ui/src/views/misc/controls.rs b/rust/crates/xpr-dex-ui/src/views/misc/controls.rs
+index 92bf0fa1..9326c147 100644
+--- a/rust/crates/xpr-dex-ui/src/views/misc/controls.rs
++++ b/rust/crates/xpr-dex-ui/src/views/misc/controls.rs
+@@ -431,11 +431,9 @@ pub fn number_field(
+         .font(font)
+         .text_color(Color32::WHITE)
+         .background_color(Color32::TRANSPARENT)
+-        .frame(false)
+-        .margin(egui::Margin::ZERO)
++        .frame(egui::Frame::NONE.inner_margin(egui::Margin::ZERO))
+         .desired_width(rect.width() - 16.0)
+-        .horizontal_align(Align::RIGHT)
+-        .vertical_align(Align::Center)
++        .align(egui::Align2::RIGHT_CENTER)
+         .show(&mut child);
+     let has_focus = out.response.has_focus();
+     ui.painter().rect_stroke(
+diff --git a/rust/crates/xpr-dex-ui/src/views/misc/effective_accuracy.rs b/rust/crates/xpr-dex-ui/src/views/misc/effective_accuracy.rs
+index 54a644d9..aa91d03c 100644
+--- a/rust/crates/xpr-dex-ui/src/views/misc/effective_accuracy.rs
++++ b/rust/crates/xpr-dex-ui/src/views/misc/effective_accuracy.rs
+@@ -68,7 +68,7 @@ impl EffectiveAccuracyView {
+     }
+ 
+     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme) {
+-        let id = Id::new("misc_eff_acc");
++        let id = Id::unique("misc_eff_acc");
+         page_header(ui, theme, "Effective Accuracy", "Build the real per-use accuracy from battle conditions, then see the hit distribution over N uses. Accuracy/evasion multipliers are Gen 6+.");
+         ui.add_space(20.0);
+ 
+diff --git a/rust/crates/xpr-dex-ui/src/views/misc/hit_calc.rs b/rust/crates/xpr-dex-ui/src/views/misc/hit_calc.rs
+index 903e2b0d..13ab5919 100644
+--- a/rust/crates/xpr-dex-ui/src/views/misc/hit_calc.rs
++++ b/rust/crates/xpr-dex-ui/src/views/misc/hit_calc.rs
+@@ -38,7 +38,7 @@ impl HitProbView {
+     }
+ 
+     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme) {
+-        let id = Id::new("misc_hit_prob");
++        let id = Id::unique("misc_hit_prob");
+         page_header(ui, theme, "Hit Probability", "If a move has accuracy X% and you use it N times, how likely is it to hit exactly, at least, or at most K times?");
+         ui.add_space(20.0);
+         card(card_fill(), palette::GRAY_700, 16).show(ui, |ui| {
+diff --git a/rust/crates/xpr-dex-ui/src/views/misc/mod.rs b/rust/crates/xpr-dex-ui/src/views/misc/mod.rs
+index 126d49dc..e6c0ac8b 100644
+--- a/rust/crates/xpr-dex-ui/src/views/misc/mod.rs
++++ b/rust/crates/xpr-dex-ui/src/views/misc/mod.rs
+@@ -64,7 +64,7 @@ impl MiscView {
+             let w = text_w(ui, label, &tab_font) + 32.0;
+             let r = Rect::from_min_size(Pos2::new(x, bar.min.y + 8.0), Vec2::new(w, 36.0));
+             let resp = ui
+-                .interact(r, ui.id().with(("misc_tab", i)), Sense::click())
++                .interact(r, ui.scope_id().with(("misc_tab", i)), Sense::click())
+                 .on_hover_cursor(egui::CursorIcon::PointingHand);
+             let color = if i == active {
+                 egui::Color32::WHITE
+diff --git a/rust/crates/xpr-dex-ui/src/views/misc/multi_hit.rs b/rust/crates/xpr-dex-ui/src/views/misc/multi_hit.rs
+index ca6d8a87..b2e12d20 100644
+--- a/rust/crates/xpr-dex-ui/src/views/misc/multi_hit.rs
++++ b/rust/crates/xpr-dex-ui/src/views/misc/multi_hit.rs
+@@ -52,7 +52,7 @@ impl MultiHitView {
+     }
+ 
+     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme) {
+-        let id = Id::new("misc_multi_hit");
++        let id = Id::unique("misc_multi_hit");
+         page_header(ui, theme, "Multi-Hit Moves", "Bullet Seed, Rock Blast, Pin Missile, Icicle Spear\u{2026} make one accuracy check for the whole move; if it passes, the number of hits (2\u{2013}5) is rolled from a fixed distribution.");
+         ui.add_space(20.0);
+ 
+diff --git a/rust/crates/xpr-dex-ui/src/views/movedex/detail.rs b/rust/crates/xpr-dex-ui/src/views/movedex/detail.rs
+index e2d55a93..bc65f337 100644
+--- a/rust/crates/xpr-dex-ui/src/views/movedex/detail.rs
++++ b/rust/crates/xpr-dex-ui/src/views/movedex/detail.rs
+@@ -57,7 +57,7 @@ impl MovedexView {
+         let back_font = palette::px(theme, 14.0);
+         let back_w = text_w(ui, "\u{2190} Back", &back_font);
+         let back = Rect::from_min_size(Pos2::new(header.min.x + 20.0, header.center().y - 12.0), Vec2::new(back_w, 24.0));
+-        let back_resp = ui.interact(back, Id::new("movedex_detail_back"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
++        let back_resp = ui.interact(back, Id::unique("movedex_detail_back"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+         ui.painter().text(back.left_center(), Align2::LEFT_CENTER, "\u{2190} Back", back_font, if back_resp.hovered() { Color32::WHITE } else { palette::GRAY_400 });
+         let title = ui.painter().text(Pos2::new(back.max.x + 12.0, header.center().y), Align2::LEFT_CENTER, name, palette::px_bold(theme, 18.0), Color32::WHITE);
+         if let (Some((first, _)), Some((last, _))) = (history.first(), history.last()) {
+@@ -132,7 +132,7 @@ impl MovedexView {
+                 ui.painter().text(Pos2::new(card.center().x, head.max.y + 28.0), Align2::CENTER_CENTER, format!("No Pokemon learn this move in {}.", game), palette::px(theme, 14.0), palette::GRAY_500);
+             } else {
+                 let area = Rect::from_min_size(Pos2::new(card.min.x + 1.0, head.max.y), Vec2::new(style.width, rows_h));
+-                clicked = self.detail.learners.show(ui, cx, area, style, Id::new("movedex_detail_rows"));
++                clicked = self.detail.learners.show(ui, cx, area, style, Id::unique("movedex_detail_rows"));
+             }
+         } else {
+             ui.painter().text(Pos2::new(card.center().x, head.max.y + 28.0), Align2::CENTER_CENTER, format!("This move does not exist in {}.", game), palette::px(theme, 14.0), palette::GRAY_500);
+diff --git a/rust/crates/xpr-dex-ui/src/views/movedex/list.rs b/rust/crates/xpr-dex-ui/src/views/movedex/list.rs
+index 6ad05368..c87a248c 100644
+--- a/rust/crates/xpr-dex-ui/src/views/movedex/list.rs
++++ b/rust/crates/xpr-dex-ui/src/views/movedex/list.rs
+@@ -110,7 +110,7 @@ impl MovedexView {
+             Entry::new(theme, &mut self.filters.search)
+                 .width(search_w)
+                 .hint("Search moves\u{2026}")
+-                .id(Id::new("movedex_search"))
++                .id(Id::unique("movedex_search"))
+                 .clearable()
+                 .font(palette::px(theme, 14.0))
+                 .margin(Margin::symmetric(8, 6))
+@@ -118,11 +118,11 @@ impl MovedexView {
+                 .show(ui);
+             ui.spacing_mut().button_padding.y = pad_y;
+             let mut t = if self.filters.type_filter == ALL { "All Types".to_string() } else { self.filters.type_filter.clone() };
+-            if option_menu(ui, theme, Id::new("movedex_type"), &mut t, &types, Some(type_w), true) {
++            if option_menu(ui, theme, Id::unique("movedex_type"), &mut t, &types, Some(type_w), true) {
+                 self.filters.type_filter = if t == "All Types" { ALL.to_string() } else { t };
+             }
+             let mut c = if self.filters.category == ALL { "All Categories".to_string() } else { self.filters.category.clone() };
+-            if option_menu(ui, theme, Id::new("movedex_category"), &mut c, &cats, Some(cat_w), true) {
++            if option_menu(ui, theme, Id::unique("movedex_category"), &mut c, &cats, Some(cat_w), true) {
+                 self.filters.category = if c == "All Categories" { ALL.to_string() } else { c };
+             }
+         });
+@@ -145,7 +145,7 @@ impl MovedexView {
+                         _ => (&mut f.min_pp, &mut f.max_pp),
+                     };
+                     for (hint, text, key) in [("Min", lo, "min"), ("Max", hi, "max")] {
+-                        let r = Entry::new(theme, text).width(64.0).hint(hint).id(Id::new(("movedex_range", *which, key))).font(palette::px(theme, 12.0)).margin(Margin::symmetric(6, 4)).min_height(26.0).show(&mut row);
++                        let r = Entry::new(theme, text).width(64.0).hint(hint).id(Id::unique(("movedex_range", *which, key))).font(palette::px(theme, 12.0)).margin(Margin::symmetric(6, 4)).min_height(26.0).show(&mut row);
+                         if r.changed {
+                             num_filter_changed(text);
+                         }
+@@ -206,7 +206,7 @@ impl MovedexView {
+                 let top = area.min.y + i as f32 * ROW_H;
+                 let rect = Rect::from_min_size(Pos2::new(left_x, top), Vec2::new(table_w, ROW_H));
+                 let cols = col_rects(left_x, top, ROW_H, name_col);
+-                let id = Id::new(("movedex_row", &row.name));
++                let id = Id::unique(("movedex_row", &row.name));
+                 let resp = ui.interact(rect, id, Sense::click()).on_hover_cursor(egui::CursorIcon::ContextMenu);
+                 let bg = ui.painter().add(Shape::Noop);
+                 kit::rule_top(ui, rect, RULE);
+@@ -278,7 +278,7 @@ impl MovedexView {
+         let cols = col_rects(origin.x, origin.y, HEADER_H, self.name_col);
+         let font = palette::px_bold(theme, 12.0);
+         for (col, rect) in Col::ALL.iter().zip(cols) {
+-            let resp = ui.interact(rect, Id::new(("movedex_header", col.label())), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
++            let resp = ui.interact(rect, Id::unique(("movedex_header", col.label())), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+             let active = self.sort.active(*col);
+             let color = if active.is_some() {
+                 palette::GRAY_300
+@@ -316,7 +316,7 @@ impl MovedexView {
+         // header: name, count, close
+         let header = Rect::from_min_size(inner.min, Vec2::new(inner.width(), 36.0));
+         let close = Rect::from_center_size(Pos2::new(header.max.x - 20.0, header.center().y), Vec2::new(24.0, 24.0));
+-        let close_resp = ui.interact(close, Id::new("movedex_panel_close"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
++        let close_resp = ui.interact(close, Id::unique("movedex_panel_close"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+         ui.painter().text(close.center(), Align2::CENTER_CENTER, "\u{d7}", palette::px(theme, 18.0), if close_resp.hovered() { palette::GRAY_300 } else { palette::GRAY_500 });
+         let name_font = palette::px_bold(theme, 14.0);
+         let shown = xpr_ui_kit::widgets::elide(ui, &name, &name_font, (close.min.x - header.min.x - 12.0 - 30.0).max(40.0));
+@@ -351,7 +351,7 @@ impl MovedexView {
+             ui.spacing_mut().item_spacing = Vec2::ZERO;
+             let (area, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), total + 4.0), Sense::hover());
+             let table = Rect::from_min_size(Pos2::new(area.min.x + 4.0, area.min.y), Vec2::new(style.width, total));
+-            clicked = self.panel.show(ui, cx, table, style, Id::new("movedex_panel_rows"));
++            clicked = self.panel.show(ui, cx, table, style, Id::unique("movedex_panel_rows"));
+         });
+         if let Some(species) = clicked {
+             learners::open_in_pokedex(cx, &species);
+@@ -368,7 +368,7 @@ impl MovedexView {
+         if self.jump.is_some() || cx.state.spotlight.is_some() || cx.state.banned_editor_open {
+             return;
+         }
+-        if pointer_blocked(ui) || ui.ctx().wants_keyboard_input() {
++        if pointer_blocked(ui) || ui.ctx().egui_wants_keyboard_input() {
+             return;
+         }
+         if ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Space)) {
+diff --git a/rust/crates/xpr-dex-ui/src/views/movepool/banned.rs b/rust/crates/xpr-dex-ui/src/views/movepool/banned.rs
+index fc35a254..5562714a 100644
+--- a/rust/crates/xpr-dex-ui/src/views/movepool/banned.rs
++++ b/rust/crates/xpr-dex-ui/src/views/movepool/banned.rs
+@@ -163,7 +163,7 @@ fn tab_strip(ui: &mut Ui, theme: &Theme, state: &mut BannedState) {
+     let mut x = rect.min.x;
+     for (t, w) in BanTab::ALL.iter().zip(&widths) {
+         let r = Rect::from_min_size(Pos2::new(x, rect.min.y), Vec2::new(*w, rect.height()));
+-        let resp = ui.interact(r, Id::new(("banned_tab", *t as u8)), Sense::click());
++        let resp = ui.interact(r, Id::unique(("banned_tab", *t as u8)), Sense::click());
+         super::probe::record("tab", "", *t as usize, t.label(), r);
+         let active = state.tab == *t;
+         if active {
+@@ -307,7 +307,7 @@ pub fn show(ctx: &egui::Context, cx: &mut DexCx, state: &mut BannedState) {
+                     if xpr_ui_kit::widgets::option_menu(
+                         ui,
+                         theme,
+-                        Id::new("banned_game"),
++                        Id::unique("banned_game"),
+                         &mut current,
+                         &options,
+                         Some(300.0),
+@@ -333,7 +333,7 @@ pub fn show(ctx: &egui::Context, cx: &mut DexCx, state: &mut BannedState) {
+             // search
+             let user = user_list(&bans, state.tab, &state.game).to_vec();
+             let statics = static_list(state.tab, &state.game);
+-            let field_id = Id::new("banned_query");
++            let field_id = Id::unique("banned_query");
+             let before = state.query.clone();
+             let er = xpr_ui_kit::widgets::Entry::new(theme, &mut state.query)
+                 .width(ui.available_width())
+@@ -394,7 +394,7 @@ pub fn show(ctx: &egui::Context, cx: &mut DexCx, state: &mut BannedState) {
+                         Pos2::new(lrect.min.x + 1.0, lrect.min.y + 1.0 + i as f32 * row_h),
+                         Vec2::new(list_w - 2.0, row_h),
+                     );
+-                    let resp = ui.interact(r, Id::new(("banned_sugg", i)), Sense::click());
++                    let resp = ui.interact(r, Id::unique(("banned_sugg", i)), Sense::click());
+                     if resp.hovered() {
+                         state.highlight = i;
+                     }
+diff --git a/rust/crates/xpr-dex-ui/src/views/movepool/coverage.rs b/rust/crates/xpr-dex-ui/src/views/movepool/coverage.rs
+index 641ffb7d..3454ef0e 100644
+--- a/rust/crates/xpr-dex-ui/src/views/movepool/coverage.rs
++++ b/rust/crates/xpr-dex-ui/src/views/movepool/coverage.rs
+@@ -372,7 +372,7 @@ pub fn panel_ui(
+             }
+         }
+     });
+-    let clear = ui.interact(clear_rect, ui.id().with("cov_clear"), Sense::click());
++    let clear = ui.interact(clear_rect, ui.scope_id().with("cov_clear"), Sense::click());
+     super::probe::record("clear", "coverage", 0, clear_label, clear_rect);
+     let clear_color = if clear.hovered() { palette::GRAY_300 } else { palette::GRAY_500 };
+     ui.painter().text(
+@@ -452,7 +452,7 @@ pub fn panel_ui(
+                     .enumerate()
+                 {
+                     let br = Rect::from_min_size(Pos2::new(x, rect.min.y), Vec2::new(68.0, 18.0));
+-                    type_badge_at(ui, theme, br, Id::new(("cov_weak_badge", i, j)), t, game);
++                    type_badge_at(ui, theme, br, Id::unique(("cov_weak_badge", i, j)), t, game);
+                     x += 72.0;
+                 }
+                 ui.painter().text(
+diff --git a/rust/crates/xpr-dex-ui/src/views/movepool/mod.rs b/rust/crates/xpr-dex-ui/src/views/movepool/mod.rs
+index 74d7705b..bb2e8bf8 100644
+--- a/rust/crates/xpr-dex-ui/src/views/movepool/mod.rs
++++ b/rust/crates/xpr-dex-ui/src/views/movepool/mod.rs
+@@ -52,7 +52,7 @@ const LEFT_MIN_W: f32 = 360.0;
+ /// Scroll areas scroll by wheel and bar only: a drag would also scroll while
+ /// right-clicking a row.
+ const NO_DRAG: egui::scroll_area::ScrollSource = egui::scroll_area::ScrollSource {
+-    drag: false,
++    drag: egui::scroll_area::DragScroll::Never,
+     ..egui::scroll_area::ScrollSource::ALL
+ };
+ /// The right-click test set holds at most this many moves.
+@@ -651,7 +651,7 @@ fn draw_section(ui: &mut Ui, env: &mut Env, s: &mut Section) {
+     let top = ui.cursor().min;
+     let table_h = HEADER_H + s.rows.len() as f32 * ROW_H;
+     ui.allocate_exact_size(Vec2::new(cols.total(), HEADER_H), Sense::hover());
+-    let id_base = ui.id().with(s.key);
++    let id_base = ui.scope_id().with(s.key);
+     {
+         let mut mx = MoveRowCx {
+             theme: env.theme,
+diff --git a/rust/crates/xpr-dex-ui/src/views/natures.rs b/rust/crates/xpr-dex-ui/src/views/natures.rs
+index 4e56dbf1..d465bc12 100644
+--- a/rust/crates/xpr-dex-ui/src/views/natures.rs
++++ b/rust/crates/xpr-dex-ui/src/views/natures.rs
+@@ -243,7 +243,7 @@ fn stat_selector(ui: &mut Ui, theme: &xpr_ui_kit::theme::Theme, rect: Rect, labe
+     let mut clicked = None;
+     for (i, key) in STAT_KEYS.iter().enumerate() {
+         let r = Rect::from_min_size(Pos2::new(x0 + i as f32 * (bw + gap), rect.min.y + 6.0), Vec2::new(bw, rect.height() - 12.0));
+-        let resp = ui.interact(r, ui.id().with(("nature_stat", label, *key)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
++        let resp = ui.interact(r, ui.scope_id().with(("nature_stat", label, *key)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+         let is_sel = selected == Some(*key);
+         let (fill, line, text) = if is_sel { (stat_bg(key), stat_color(key), stat_color(key)) } else { (hex("#111827"), hex("#374151"), hex("#9ca3af")) };
+         ui.painter().rect(r, CornerRadius::same(4), fill, Stroke::new(1.0_f32, line), StrokeKind::Inside);
+diff --git a/rust/crates/xpr-dex-ui/src/views/pokedex/common.rs b/rust/crates/xpr-dex-ui/src/views/pokedex/common.rs
+index 191714ad..862807dd 100644
+--- a/rust/crates/xpr-dex-ui/src/views/pokedex/common.rs
++++ b/rust/crates/xpr-dex-ui/src/views/pokedex/common.rs
+@@ -166,7 +166,7 @@ pub fn paint_heading(ui: &Ui, theme: &Theme, pos: Pos2, text: &str, color: Color
+ pub fn in_rect<R>(
+     ui: &mut Ui,
+     rect: Rect,
+-    salt: impl std::hash::Hash,
++    salt: impl std::hash::Hash + std::fmt::Debug,
+     f: impl FnOnce(&mut Ui) -> R,
+ ) -> R {
+     let mut child = ui.new_child(
+diff --git a/rust/crates/xpr-dex-ui/src/views/pokedex/detail.rs b/rust/crates/xpr-dex-ui/src/views/pokedex/detail.rs
+index 5eb7f07a..2f0ad645 100644
+--- a/rust/crates/xpr-dex-ui/src/views/pokedex/detail.rs
++++ b/rust/crates/xpr-dex-ui/src/views/pokedex/detail.rs
+@@ -159,7 +159,7 @@ impl DetailState {
+         let size = (screen.height().min(screen.width()) * 0.8)
+             .min(560.0)
+             .max(128.0);
+-        let modal = egui::Modal::new(Id::new("dex_artwork_lightbox"))
++        let modal = egui::Modal::new(Id::unique("dex_artwork_lightbox"))
+             .backdrop_color(Color32::from_black_alpha(204))
+             .frame(egui::Frame::NONE);
+         let resp = modal.show(ctx, |ui| {
+@@ -264,7 +264,7 @@ impl DetailState {
+             Vec2::splat(144.0),
+         );
+         let resp = ui
+-            .interact(sprite_box, Id::new("dex_detail_artwork"), Sense::click())
++            .interact(sprite_box, Id::unique("dex_detail_artwork"), Sense::click())
+             .on_hover_text("View full artwork")
+             .on_hover_cursor(egui::CursorIcon::ZoomIn);
+         if let Some(tex) = cx.images.sprite(
+@@ -338,7 +338,7 @@ impl DetailState {
+             Vec2::splat(20.0),
+         );
+         let lresp = ui
+-            .interact(link, Id::new("dex_detail_bulbapedia"), Sense::click())
++            .interact(link, Id::unique("dex_detail_bulbapedia"), Sense::click())
+             .on_hover_text("Open on Bulbapedia")
+             .on_hover_cursor(egui::CursorIcon::PointingHand);
+         common::paint_external_link(
+@@ -431,7 +431,7 @@ impl DetailState {
+                 }
+                 let btn =
+                     Rect::from_min_size(Pos2::new(x + it.label_w, y), Vec2::new(it.btn_w, 20.0));
+-                let resp = ui.interact(btn, Id::new(("dex_evo", i)), Sense::click());
++                let resp = ui.interact(btn, Id::unique(("dex_evo", i)), Sense::click());
+                 let (fill, fg) = if it.current {
+                     (palette::GRAY_600, Color32::WHITE)
+                 } else if resp.hovered() {
+@@ -492,7 +492,7 @@ impl DetailState {
+                 Vec2::new(total, 16.0),
+             );
+             let resp = ui
+-                .interact(r, Id::new("dex_filter_comparison"), Sense::click())
++                .interact(r, Id::unique("dex_filter_comparison"), Sense::click())
+                 .on_hover_cursor(egui::CursorIcon::PointingHand);
+             let track = Rect::from_min_size(r.min, Vec2::new(28.0, 16.0));
+             ui.painter().rect_filled(
+@@ -524,7 +524,7 @@ impl DetailState {
+         }
+         ui.add_space(8.0);
+         let args = BaseStatsArgs {
+-            id: Id::new("dex_detail_stats"),
++            id: Id::unique("dex_detail_stats"),
+             stats: &data.base_stats,
+             game,
+             pokemon: &data.species,
+@@ -568,7 +568,7 @@ impl DetailState {
+         let gw = widgets::text_w(ui, &data.growth_rate, &font);
+         let grect = Rect::from_min_size(Pos2::new(row.max.x - gw, row.min.y), Vec2::new(gw, 20.0));
+         let gresp = ui
+-            .interact(grect, Id::new("dex_growth_rate"), Sense::click())
++            .interact(grect, Id::unique("dex_growth_rate"), Sense::click())
+             .on_hover_cursor(egui::CursorIcon::PointingHand);
+         ui.painter().text(
+             grect.left_center(),
+@@ -634,7 +634,7 @@ impl DetailState {
+                     let aw = widgets::text_w(ui, a, &font);
+                     let r = Rect::from_min_size(Pos2::new(x, y), Vec2::new(aw, 20.0));
+                     let resp = ui
+-                        .interact(r, Id::new(("dex_ability", a.as_str())), Sense::click())
++                        .interact(r, Id::unique(("dex_ability", a.as_str())), Sense::click())
+                         .on_hover_cursor(egui::CursorIcon::PointingHand);
+                     ui.painter().text(
+                         r.left_center(),
+@@ -670,7 +670,7 @@ impl DetailState {
+                 let resp = ui
+                     .interact(
+                         r,
+-                        Id::new(("dex_hidden_ability", h.as_str())),
++                        Id::unique(("dex_hidden_ability", h.as_str())),
+                         Sense::click(),
+                     )
+                     .on_hover_cursor(egui::CursorIcon::PointingHand);
+diff --git a/rust/crates/xpr-dex-ui/src/views/pokedex/list.rs b/rust/crates/xpr-dex-ui/src/views/pokedex/list.rs
+index 007142d1..285bd335 100644
+--- a/rust/crates/xpr-dex-ui/src/views/pokedex/list.rs
++++ b/rust/crates/xpr-dex-ui/src/views/pokedex/list.rs
+@@ -213,7 +213,7 @@ impl ListState {
+             let r = Entry::new(theme, &mut self.filters.query)
+                 .width(inner_w)
+                 .hint("Search name, #, or type\u{2026}")
+-                .id(Id::new("dex_pokedex_search"))
++                .id(Id::unique("dex_pokedex_search"))
+                 .font(palette::px(theme, 14.0))
+                 .min_height(34.0)
+                 .margin(egui::Margin::symmetric(8, 6))
+@@ -234,7 +234,7 @@ impl ListState {
+             common::select(
+                 ui,
+                 theme,
+-                Id::new("dex_filter_gen"),
++                Id::unique("dex_filter_gen"),
+                 w,
+                 &mut f.gen,
+                 "Gen",
+@@ -247,7 +247,7 @@ impl ListState {
+             common::select(
+                 ui,
+                 theme,
+-                Id::new("dex_filter_type"),
++                Id::unique("dex_filter_type"),
+                 w,
+                 &mut f.type_,
+                 "Type",
+@@ -265,7 +265,7 @@ impl ListState {
+             common::select(
+                 ui,
+                 theme,
+-                Id::new("dex_filter_growth"),
++                Id::unique("dex_filter_growth"),
+                 w,
+                 &mut f.growth,
+                 "Growth",
+@@ -283,7 +283,7 @@ impl ListState {
+             common::select(
+                 ui,
+                 theme,
+-                Id::new("dex_filter_stage"),
++                Id::unique("dex_filter_stage"),
+                 w,
+                 &mut f.stage,
+                 "Stage",
+@@ -297,7 +297,7 @@ impl ListState {
+             common::mini_checkbox(
+                 ui,
+                 theme,
+-                Id::new("dex_filter_regional"),
++                Id::unique("dex_filter_regional"),
+                 &mut f.regional,
+                 "Regional",
+             );
+@@ -305,7 +305,7 @@ impl ListState {
+             common::mini_checkbox(
+                 ui,
+                 theme,
+-                Id::new("dex_filter_megas"),
++                Id::unique("dex_filter_megas"),
+                 &mut f.megas,
+                 "Megas",
+             );
+@@ -313,7 +313,7 @@ impl ListState {
+             common::mini_checkbox(
+                 ui,
+                 theme,
+-                Id::new("dex_filter_forms"),
++                Id::unique("dex_filter_forms"),
+                 &mut f.forms,
+                 "Forms",
+             );
+@@ -428,7 +428,7 @@ impl ListState {
+                 );
+             }
+         });
+-        self.scroll_y = out.state.offset.y;
++        self.scroll_y = out.state.clamped_offset().y;
+     }
+ 
+     #[allow(clippy::too_many_arguments)]
+@@ -447,7 +447,7 @@ impl ListState {
+         let (rect, _) =
+             ui.allocate_exact_size(Vec2::new(ui.available_width(), ROW_HEIGHT), Sense::hover());
+         // the row is a real widget registered before its badges, so a badge click wins
+-        let resp = ui.interact(rect, Id::new(("dex_list_row", &p.name)), Sense::click());
++        let resp = ui.interact(rect, Id::unique(("dex_list_row", &p.name)), Sense::click());
+         if !ui.is_rect_visible(rect) {
+             return;
+         }
+diff --git a/rust/crates/xpr-dex-ui/src/views/stats/combobox.rs b/rust/crates/xpr-dex-ui/src/views/stats/combobox.rs
+index bb8089eb..d498dfdc 100644
+--- a/rust/crates/xpr-dex-ui/src/views/stats/combobox.rs
++++ b/rust/crates/xpr-dex-ui/src/views/stats/combobox.rs
+@@ -68,11 +68,10 @@ pub fn combobox(ui: &mut Ui, theme: &Theme, id: Id, st: &mut ComboState, value:
+         .font(font.clone())
+         .text_color(Color32::WHITE)
+         .background_color(Color32::TRANSPARENT)
+-        .frame(false)
+-        .margin(egui::Margin::ZERO)
++        .frame(egui::Frame::NONE.inner_margin(egui::Margin::ZERO))
+         .desired_width(rect.width() - 20.0)
+         .hint_text(egui::RichText::new(placeholder).font(font.clone()).color(palette::GRAY_500))
+-        .vertical_align(Align::Center)
++        .align(egui::Align2::LEFT_CENTER)
+         .clip_text(true)
+         .show(&mut child);
+     let resp = out.response;
+diff --git a/rust/crates/xpr-dex-ui/src/views/stats/inputs.rs b/rust/crates/xpr-dex-ui/src/views/stats/inputs.rs
+index b70009c5..0ec52e48 100644
+--- a/rust/crates/xpr-dex-ui/src/views/stats/inputs.rs
++++ b/rust/crates/xpr-dex-ui/src/views/stats/inputs.rs
+@@ -60,11 +60,9 @@ pub fn int_field(ui: &mut Ui, id: Id, rect: Rect, value: &mut i32, min: i32, max
+         .font(font)
+         .text_color(if enabled { Color32::WHITE } else { palette::GRAY_500 })
+         .background_color(Color32::TRANSPARENT)
+-        .frame(false)
+-        .margin(Margin::symmetric(4, 0))
++        .frame(egui::Frame::NONE.inner_margin(Margin::symmetric(4, 0)))
+         .desired_width(rect.width())
+-        .horizontal_align(Align::RIGHT)
+-        .vertical_align(Align::Center)
++        .align(egui::Align2::RIGHT_CENTER)
+         .interactive(enabled)
+         .show(&mut child);
+     if enabled && out.response.has_focus() {
+diff --git a/rust/crates/xpr-dex-ui/src/views/stats/mod.rs b/rust/crates/xpr-dex-ui/src/views/stats/mod.rs
+index 6e58c0fa..aa4343f2 100644
+--- a/rust/crates/xpr-dex-ui/src/views/stats/mod.rs
++++ b/rust/crates/xpr-dex-ui/src/views/stats/mod.rs
+@@ -226,7 +226,7 @@ impl StatsView {
+         ui.add_space(8.0);
+         let value = if self.species.is_empty() { String::new() } else { xpr_dex::display_name(&self.species).to_string() };
+         let width = ui.available_width();
+-        let combo_id = Id::new("stats_species");
++        let combo_id = Id::unique("stats_species");
+         self.options_for(game);
+         let options = &self.options.as_ref().unwrap().1;
+         if let Some(id) = combobox(ui, theme, combo_id, &mut self.combo, &value, options, "Select a Pokemon\u{2026}", width) {
+@@ -237,7 +237,7 @@ impl StatsView {
+             ui.spacing_mut().item_spacing.x = 8.0;
+             ui.label(egui::RichText::new("Level").font(px(theme, 12.0)).color(palette::GRAY_500));
+             let (rect, _) = ui.allocate_exact_size(Vec2::new(64.0, 28.0), Sense::hover());
+-            int_field(ui, Id::new("stats_level"), rect, &mut self.level, 1, 100, px(theme, 14.0), Range::Reject, true);
++            int_field(ui, Id::unique("stats_level"), rect, &mut self.level, 1, 100, px(theme, 14.0), Range::Reject, true);
+         });
+         ui.add_space(20.0);
+ 
+@@ -293,27 +293,27 @@ impl StatsView {
+             // HP's DV is derived from the others' parity bits
+             let mut hp = derive_hp_dv(&self.dvs);
+             let hp_cell = cell(r, 0);
+-            int_field(ui, Id::new("stats_dv_hp"), hp_cell, &mut hp, 0, 15, small.clone(), Range::Clamp, false);
+-            ui.interact(hp_cell, Id::new("stats_dv_hp_tip"), Sense::hover()).on_hover_text("Derived from ATK/DEF/SPE/SPC parity bits");
++            int_field(ui, Id::unique("stats_dv_hp"), hp_cell, &mut hp, 0, 15, small.clone(), Range::Clamp, false);
++            ui.interact(hp_cell, Id::unique("stats_dv_hp_tip"), Sense::hover()).on_hover_text("Derived from ATK/DEF/SPE/SPC parity bits");
+             let d = &mut self.dvs;
+             for (i, (key, v)) in [("attack", &mut d.attack), ("defense", &mut d.defense), ("speed", &mut d.speed), ("special", &mut d.special)].into_iter().enumerate() {
+-                int_field(ui, Id::new(("stats_dv", key)), cell(r, i + 1), v, 0, 15, small.clone(), Range::Clamp, true);
++                int_field(ui, Id::unique(("stats_dv", key)), cell(r, i + 1), v, 0, 15, small.clone(), Range::Clamp, true);
+             }
+             let r = row(ui, "Exp");
+             let e = &mut self.stat_exps;
+             for (i, (key, v)) in [("hp", &mut e.hp), ("attack", &mut e.attack), ("defense", &mut e.defense), ("speed", &mut e.speed), ("special", &mut e.special)].into_iter().enumerate() {
+-                int_field(ui, Id::new(("stats_exp", key)), cell(r, i), v, 0, 65535, small.clone(), Range::Clamp, true);
++                int_field(ui, Id::unique(("stats_exp", key)), cell(r, i), v, 0, 65535, small.clone(), Range::Clamp, true);
+             }
+         } else {
+             let r = row(ui, "IV");
+             let v = &mut self.ivs;
+             for (i, (key, x)) in [("hp", &mut v.hp), ("attack", &mut v.attack), ("defense", &mut v.defense), ("spattack", &mut v.spattack), ("spdefense", &mut v.spdefense), ("speed", &mut v.speed)].into_iter().enumerate() {
+-                int_field(ui, Id::new(("stats_iv", key)), cell(r, i), x, 0, 31, small.clone(), Range::Clamp, true);
++                int_field(ui, Id::unique(("stats_iv", key)), cell(r, i), x, 0, 31, small.clone(), Range::Clamp, true);
+             }
+             let r = row(ui, "EV");
+             let v = &mut self.evs;
+             for (i, (key, x)) in [("hp", &mut v.hp), ("attack", &mut v.attack), ("defense", &mut v.defense), ("spattack", &mut v.spattack), ("spdefense", &mut v.spdefense), ("speed", &mut v.speed)].into_iter().enumerate() {
+-                int_field(ui, Id::new(("stats_ev", key)), cell(r, i), x, 0, 252, small.clone(), Range::Clamp, true);
++                int_field(ui, Id::unique(("stats_ev", key)), cell(r, i), x, 0, 252, small.clone(), Range::Clamp, true);
+             }
+         }
+     }
+@@ -524,7 +524,7 @@ fn level_pill(ui: &mut Ui, theme: &Theme, rect: Rect, level: Option<i32>) {
+         None => {
+             ui.painter().text(rect.center(), Align2::CENTER_CENTER, "\u{2014}", px_bold(theme, 11.0), palette::RED_400);
+             let tip = Rect::from_center_size(rect.center(), Vec2::new(24.0, 20.0));
+-            ui.interact(tip, ui.id().with(("stats_pill", rect.min.x as i32, rect.min.y as i32)), Sense::hover()).on_hover_text("Can't outspeed even at Lv100");
++            ui.interact(tip, ui.scope_id().with(("stats_pill", rect.min.x as i32, rect.min.y as i32)), Sense::hover()).on_hover_text("Can't outspeed even at Lv100");
+         }
+         Some(l) => {
+             ui.painter().text(rect.center(), Align2::CENTER_CENTER, format!("Lv{}", l), px_bold(theme, 14.0), palette::hex("#34d399"));
+diff --git a/rust/crates/xpr-dex-ui/src/views/stats/nature_selector.rs b/rust/crates/xpr-dex-ui/src/views/stats/nature_selector.rs
+index c14cc950..45ada126 100644
+--- a/rust/crates/xpr-dex-ui/src/views/stats/nature_selector.rs
++++ b/rust/crates/xpr-dex-ui/src/views/stats/nature_selector.rs
+@@ -87,8 +87,8 @@ fn as_static(k: &str) -> Option<&'static str> {
+ 
+ /// Draw the selector (two button rows and a caption) for `value`; returns the
+ /// new nature name when a button was clicked.
+-pub fn nature_selector(ui: &mut Ui, theme: &Theme, id_salt: impl Hash, value: &str) -> Option<String> {
+-    let id = ui.id().with(("nature_selector", id_salt));
++pub fn nature_selector(ui: &mut Ui, theme: &Theme, id_salt: impl Hash + std::fmt::Debug, value: &str) -> Option<String> {
++    let id = ui.scope_id().with(("nature_selector", id_salt));
+     let (inc, dec) = nature_pair(value).unwrap_or(("attack", "attack"));
+     let neutral = inc == dec;
+     let mut result = None;
+diff --git a/rust/crates/xpr-dex-ui/src/views/trainers/detail.rs b/rust/crates/xpr-dex-ui/src/views/trainers/detail.rs
+index 2bd31777..cd7baf4b 100644
+--- a/rust/crates/xpr-dex-ui/src/views/trainers/detail.rs
++++ b/rust/crates/xpr-dex-ui/src/views/trainers/detail.rs
+@@ -118,7 +118,7 @@ fn header_button(ui: &mut Ui, theme: &Theme, pos: Pos2, text: &str, enabled: boo
+     let font = px_bold(theme, 12.0);
+     let w = widgets::text_w(ui, text, &font) + 16.0;
+     let rect = Rect::from_min_size(pos, Vec2::new(w, 24.0));
+-    let resp = ui.interact(rect, ui.id().with(("trainer_btn", text)), if enabled { Sense::click() } else { Sense::hover() });
++    let resp = ui.interact(rect, ui.scope_id().with(("trainer_btn", text)), if enabled { Sense::click() } else { Sense::hover() });
+     let (bg, fg) = if !enabled {
+         (palette::GRAY_800, palette::GRAY_600)
+     } else if resp.hovered() {
+@@ -254,7 +254,7 @@ pub fn detail_ui(ui: &mut Ui, cx: &mut DexCx, ix: &VersionIndex, selected: Optio
+         let mut x = full.min.x + pad;
+         for &i in row {
+             let r = Rect::from_min_size(Pos2::new(x, vy), Vec2::new(variant_ws[i], 24.0));
+-            let resp = ui.interact(r, ui.id().with(("trainer_variant", i)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
++            let resp = ui.interact(r, ui.scope_id().with(("trainer_variant", i)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+             let on = i == st.group_index.min(members.len() - 1);
+             let (bg, fg) = if on {
+                 (palette::BLUE_600, Color32::WHITE)
+diff --git a/rust/crates/xpr-dex-ui/src/views/trainers/list.rs b/rust/crates/xpr-dex-ui/src/views/trainers/list.rs
+index 4c68c967..28e5b211 100644
+--- a/rust/crates/xpr-dex-ui/src/views/trainers/list.rs
++++ b/rust/crates/xpr-dex-ui/src/views/trainers/list.rs
+@@ -87,7 +87,7 @@ pub fn list_ui(ui: &mut Ui, theme: &Theme, ix: &VersionIndex, st: &mut ListState
+     let search_rect = Rect::from_min_size(Pos2::new(full.min.x + 8.0, y), Vec2::new(inner_w, 28.0));
+     {
+         let mut sui = ui.new_child(egui::UiBuilder::new().max_rect(search_rect));
+-        widgets::search_field(&mut sui, theme, &mut st.search, "Search trainers...", Id::new("trainer_search"), inner_w);
++        widgets::search_field(&mut sui, theme, &mut st.search, "Search trainers...", Id::unique("trainer_search"), inner_w);
+     }
+     y += 28.0 + 6.0;
+     let sel_w = (inner_w - 4.0) / 2.0;
+@@ -98,14 +98,14 @@ pub fn list_ui(ui: &mut Ui, theme: &Theme, ix: &VersionIndex, st: &mut ListState
+         let mut cur = if st.class.is_empty() { ALL_CLASSES.to_string() } else { st.class.clone() };
+         let mut options = vec![ALL_CLASSES.to_string()];
+         options.extend(ix.classes.iter().cloned());
+-        if xpr_ui_kit::widgets::option_menu(&mut sui, theme, Id::new("trainer_class_filter"), &mut cur, &options, Some(sel_w), true) {
++        if xpr_ui_kit::widgets::option_menu(&mut sui, theme, Id::unique("trainer_class_filter"), &mut cur, &options, Some(sel_w), true) {
+             st.class = if cur == ALL_CLASSES { String::new() } else { cur };
+         }
+         let mut cur = if st.location.is_empty() { ALL_LOCATIONS.to_string() } else { st.location.clone() };
+         let mut options = vec![ALL_LOCATIONS.to_string()];
+         options.extend(ix.locations.iter().cloned());
+         let loc_w = sel_w.min(width * 0.5);
+-        if xpr_ui_kit::widgets::option_menu(&mut sui, theme, Id::new("trainer_location_filter"), &mut cur, &options, Some(loc_w), true) {
++        if xpr_ui_kit::widgets::option_menu(&mut sui, theme, Id::unique("trainer_location_filter"), &mut cur, &options, Some(loc_w), true) {
+             st.location = if cur == ALL_LOCATIONS { String::new() } else { cur };
+         }
+     }
+@@ -197,6 +197,6 @@ pub fn list_ui(ui: &mut Ui, theme: &Theme, ix: &VersionIndex, st: &mut ListState
+             }
+         }
+     });
+-    st.offset = out.state.offset.y;
++    st.offset = out.state.clamped_offset().y;
+     picked
+ }
+diff --git a/rust/crates/xpr-dex-ui/src/views/trainers/mod.rs b/rust/crates/xpr-dex-ui/src/views/trainers/mod.rs
+index 669ca309..db6370cf 100644
+--- a/rust/crates/xpr-dex-ui/src/views/trainers/mod.rs
++++ b/rust/crates/xpr-dex-ui/src/views/trainers/mod.rs
+@@ -80,7 +80,7 @@ impl TrainersView {
+             }
+         }
+         // splitter
+-        let resp = ui.interact(handle, ui.id().with("trainers_splitter"), Sense::drag());
++        let resp = ui.interact(handle, ui.scope_id().with("trainers_splitter"), Sense::drag());
+         let hot = resp.hovered() || resp.dragged();
+         ui.painter().rect_filled(handle, CornerRadius::ZERO, if hot { palette::BLUE_500 } else { palette::GRAY_700 });
+         if hot {
+diff --git a/rust/crates/xpr-dex-ui/src/views/trainers/order_ui.rs b/rust/crates/xpr-dex-ui/src/views/trainers/order_ui.rs
+index b5e8dbec..61fcd073 100644
+--- a/rust/crates/xpr-dex-ui/src/views/trainers/order_ui.rs
++++ b/rust/crates/xpr-dex-ui/src/views/trainers/order_ui.rs
+@@ -252,7 +252,7 @@ pub fn show(ctx: &egui::Context, theme: &Theme, images: &mut DexImages, ix: &Ver
+     let card_w = (screen.width() - 32.0).min(672.0);
+     let max_body = (screen.height() * 0.9 - 64.0).max(200.0);
+     let mut close = false;
+-    let modal = egui::Modal::new(Id::new("trainer_order_calculator"))
++    let modal = egui::Modal::new(Id::unique("trainer_order_calculator"))
+         .frame(
+             egui::Frame::new()
+                 .fill(palette::hex("#1a1f29"))
+@@ -272,7 +272,7 @@ pub fn show(ctx: &egui::Context, theme: &Theme, images: &mut DexImages, ix: &Ver
+         ui.painter().text(Pos2::new(head.min.x + 20.0, head.min.y + 19.0), Align2::LEFT_CENTER, "Team Order Calculator", px_bold(theme, 16.0), Color32::WHITE);
+         ui.painter().text(Pos2::new(head.min.x + 20.0, head.min.y + 38.0), Align2::LEFT_CENTER, format!("{} \u{b7} Gen {} send-out logic", t.trainer.name, gen), px(theme, 12.0), palette::GRAY_500);
+         let x_rect = Rect::from_center_size(Pos2::new(head.max.x - 28.0, head.center().y), Vec2::splat(28.0));
+-        let xr = ui.interact(x_rect, Id::new("trainer_order_close"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
++        let xr = ui.interact(x_rect, Id::unique("trainer_order_close"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+         let xc = if xr.hovered() { Color32::WHITE } else { palette::GRAY_500 };
+         let c = x_rect.center();
+         ui.painter().line_segment([c + Vec2::new(-6.0, -6.0), c + Vec2::new(6.0, 6.0)], Stroke::new(2.0_f32, xc));
+diff --git a/rust/crates/xpr-dex-ui/src/views/trainers/speed.rs b/rust/crates/xpr-dex-ui/src/views/trainers/speed.rs
+index 0e03ec56..a0817d3e 100644
+--- a/rust/crates/xpr-dex-ui/src/views/trainers/speed.rs
++++ b/rust/crates/xpr-dex-ui/src/views/trainers/speed.rs
+@@ -55,10 +55,10 @@ pub fn speed_ui(ui: &mut Ui, theme: &Theme, ix: &VersionIndex, st: &mut SpeedSta
+     ui.painter().galley(Pos2::new(full.min.x + 12.0, cy - galley.size().y / 2.0), galley, palette::GRAY_400);
+     let b1 = Rect::from_min_size(Pos2::new(full.min.x + 12.0 + tw + gap, cy - 10.0), Vec2::new(b1w, 20.0));
+     let b2 = Rect::from_min_size(Pos2::new(b1.max.x + gap, cy - 10.0), Vec2::new(b2w, 20.0));
+-    if tag_button(ui, theme, b1, ui.id().with("speed_major"), "Major Battles", st.major_only, palette::YELLOW_400, Color32::from_rgba_unmultiplied(0xea, 0xb3, 0x08, 51)) {
++    if tag_button(ui, theme, b1, ui.scope_id().with("speed_major"), "Major Battles", st.major_only, palette::YELLOW_400, Color32::from_rgba_unmultiplied(0xea, 0xb3, 0x08, 51)) {
+         st.major_only = !st.major_only;
+     }
+-    if tag_button(ui, theme, b2, ui.id().with("speed_r1"), "R1", st.r1_only, palette::BLUE_400, Color32::from_rgba_unmultiplied(0x3b, 0x82, 0xf6, 51)) {
++    if tag_button(ui, theme, b2, ui.scope_id().with("speed_r1"), "R1", st.r1_only, palette::BLUE_400, Color32::from_rgba_unmultiplied(0x3b, 0x82, 0xf6, 51)) {
+         st.r1_only = !st.r1_only;
+     }
+     ui.painter().hline(full.x_range(), full.min.y + bar_h + 0.5, Stroke::new(1.0_f32, palette::GRAY_700));
+diff --git a/rust/crates/xpr-dex-ui/src/widgets.rs b/rust/crates/xpr-dex-ui/src/widgets.rs
+index 44cf8dec..144c0af8 100644
+--- a/rust/crates/xpr-dex-ui/src/widgets.rs
++++ b/rust/crates/xpr-dex-ui/src/widgets.rs
+@@ -373,7 +373,7 @@ fn game_toggle_rows(
+             let resp = ui
+                 .interact(
+                     r,
+-                    ui.id().with(("dex_game_toggle", &it.key)),
++                    ui.scope_id().with(("dex_game_toggle", &it.key)),
+                     Sense::click(),
+                 )
+                 .on_hover_text(&it.tooltip);
+@@ -557,7 +557,7 @@ pub fn spotlight(
+     results: &[SpotlightRow],
+ ) -> SpotlightOutcome {
+     let mut outcome = SpotlightOutcome::Open;
+-    let modal = egui::Modal::new(Id::new(id))
++    let modal = egui::Modal::new(Id::unique(id))
+         .frame(
+             egui::Frame::new()
+                 .fill(palette::GRAY_900)
+@@ -567,7 +567,7 @@ pub fn spotlight(
+         )
+         .backdrop_color(Color32::from_black_alpha(120))
+         .area(
+-            egui::Modal::default_area(Id::new(id).with("area"))
++            egui::Modal::default_area(Id::unique(id).with("area"))
+                 .anchor(Align2::CENTER_TOP, Vec2::new(0.0, 80.0)),
+         );
+     let resp = modal.show(ctx, |ui| {
+@@ -580,7 +580,7 @@ pub fn spotlight(
+                     .color(accent),
+             );
+         });
+-        let field_id = Id::new(id).with("query");
++        let field_id = Id::unique(id).with("query");
+         let r = Entry::new(theme, &mut state.query)
+             .width(520.0)
+             .hint("Type to search...")
+@@ -622,7 +622,7 @@ pub fn spotlight(
+         // `show_rows` adds the item spacing to every row's height
+         ui.spacing_mut().item_spacing.y = 0.0;
+         egui::ScrollArea::vertical()
+-            .id_salt(Id::new(id).with("results"))
++            .id_salt(Id::unique(id).with("results"))
+             .max_height(420.0)
+             .auto_shrink([false, true])
+             .show_rows(ui, row_h, results.len(), |ui, range| {
+diff --git a/rust/crates/xpr-dex-ui/tests/compare.rs b/rust/crates/xpr-dex-ui/tests/compare.rs
+index 4993be7d..3e491380 100644
+--- a/rust/crates/xpr-dex-ui/tests/compare.rs
++++ b/rust/crates/xpr-dex-ui/tests/compare.rs
+@@ -134,7 +134,7 @@ fn wheel(d: &mut DexDriver, at: Pos2, dy: f32) {
+         vec![Event::MouseWheel {
+             unit: MouseWheelUnit::Point,
+             delta: Vec2::new(0.0, -dy),
+-            modifiers: Modifiers::NONE,
++            modifiers: Modifiers::NONE, phase: egui::TouchPhase::Move, source: egui::MouseWheelSource::Unknown,
+         }],
+     );
+ }
+diff --git a/rust/crates/xpr-dex-ui/tests/evs.rs b/rust/crates/xpr-dex-ui/tests/evs.rs
+index 850dfba4..a2f6bd0f 100644
+--- a/rust/crates/xpr-dex-ui/tests/evs.rs
++++ b/rust/crates/xpr-dex-ui/tests/evs.rs
+@@ -216,7 +216,7 @@ fn wheel(d: &mut DexDriver, at: Pos2, dy: f32) {
+             Event::MouseWheel {
+                 unit: egui::MouseWheelUnit::Point,
+                 delta: Vec2::new(0.0, dy),
+-                modifiers: Modifiers::NONE,
++                modifiers: Modifiers::NONE, phase: egui::TouchPhase::Move, source: egui::MouseWheelSource::Unknown,
+             },
+         ],
+     );
+diff --git a/rust/crates/xpr-dex-ui/tests/misc.rs b/rust/crates/xpr-dex-ui/tests/misc.rs
+index 2b88c95d..ea3ae6f0 100644
+--- a/rust/crates/xpr-dex-ui/tests/misc.rs
++++ b/rust/crates/xpr-dex-ui/tests/misc.rs
+@@ -21,7 +21,7 @@ fn misc(tab: usize) -> DexDriver {
+ fn centre_of(d: &DexDriver, pred: &dyn Fn(&str) -> bool) -> Option<Pos2> {
+     fn walk(shape: &Shape, pred: &dyn Fn(&str) -> bool) -> Option<Pos2> {
+         match shape {
+-            Shape::Text(t) if pred(t.galley.text()) => Some(egui::Rect::from_min_size(t.pos, t.galley.size()).center()),
++            Shape::Text(t) if pred(t.galley.text()) => Some(t.visual_bounding_rect().center()),
+             Shape::Vec(v) => v.iter().find_map(|s| walk(s, pred)),
+             _ => None,
+         }
+diff --git a/rust/crates/xpr-dex-ui/tests/movepool.rs b/rust/crates/xpr-dex-ui/tests/movepool.rs
+index 49572c2c..b5806766 100644
+--- a/rust/crates/xpr-dex-ui/tests/movepool.rs
++++ b/rust/crates/xpr-dex-ui/tests/movepool.rs
+@@ -186,7 +186,7 @@ fn headers_stick_to_the_top_while_their_table_is_in_view() {
+     let label = probe::find("label", "TM / HM Learnset").unwrap();
+     let head0 = probe::header("tmhm", 1).unwrap();
+     d.hover(Pos2::new(900.0, 400.0));
+-    d.frame_with(3, vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, -300.0), modifiers: Modifiers::NONE }]);
++    d.frame_with(3, vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, -300.0), modifiers: Modifiers::NONE, phase: egui::TouchPhase::Move, source: egui::MouseWheelSource::Unknown }]);
+     let label2 = probe::find("label", "TM / HM Learnset").unwrap();
+     let head = probe::header("tmhm", 1).unwrap();
+     assert!(label2.min.y < label.min.y - 100.0, "scrolled: {:?} -> {:?}", label, label2);

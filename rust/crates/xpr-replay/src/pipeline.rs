@@ -769,14 +769,25 @@ fn coarse_pass(ctx: &Ctx, kf: &[u64], opts: &Options, relevant_of: &dyn Fn(&Valu
     Ok(Coarse { changed, saved, boundary_ok, paths, relevant, seeds })
 }
 
-/// Find a replay's ROM: in `dirs` (see `tools::rom_search_dirs`).
-pub fn locate_rom(tools: &Tools, replay: &Path, dirs: &[PathBuf]) -> Result<PathBuf, String> {
+const ROM_NOT_FOUND_START: &str = "The ROM this replay was recorded with (";
+const ROM_NOT_FOUND_END: &str = ") was not found";
+
+/// Find a replay's ROM: in `dirs` (see `tools::rom_search_dirs`). `rom_name` is
+/// the ROM's name for the message.
+pub fn locate_rom(tools: &Tools, replay: &Path, rom_name: &str, dirs: &[PathBuf]) -> Result<PathBuf, String> {
     crate::procs::find_rom(&tools.worker, replay, dirs)?.ok_or_else(|| {
         format!(
-            "The ROM this replay was recorded with was not found (looked in: {}). Pass it with --rom.",
+            "{ROM_NOT_FOUND_START}{rom_name}{ROM_NOT_FOUND_END} (looked in: {}).",
             dirs.iter().map(|d| d.display().to_string()).collect::<Vec<_>>().join(", ")
         )
     })
+}
+
+/// The ROM's name when `error` is [`locate_rom`]'s "not found", so the app can
+/// ask for the ROM rather than report a failure.
+pub fn missing_rom_name(error: &str) -> Option<&str> {
+    let (name, _) = error.strip_prefix(ROM_NOT_FOUND_START)?.split_once(ROM_NOT_FOUND_END)?;
+    Some(name)
 }
 
 #[cfg(test)]
@@ -796,6 +807,13 @@ mod tests {
             timer_offset: offset,
             keyframes: vec![0],
         }
+    }
+
+    #[test]
+    fn the_missing_rom_is_named() {
+        let error = format!("{ROM_NOT_FOUND_START}1-Yellow v2.gbc{ROM_NOT_FOUND_END} (looked in: C:/Users/x/Desktop).");
+        assert_eq!(missing_rom_name(&error), Some("1-Yellow v2.gbc"));
+        assert_eq!(missing_rom_name("the replay worker crashed"), None);
     }
 
     #[test]

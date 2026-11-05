@@ -86,11 +86,12 @@ impl Harness {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
         let mut actions = Vec::new();
         let Harness { ctx, theme, cfg, ctrl, assets, view, texts, text_positions, circles, line_likes, .. } = self;
-        let out = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let mut out = ctx.run_ui(input, |root| {
+            egui::CentralPanel::default().show(root, |ui| {
                 actions = view.ui(ui, theme, cfg, ctrl, assets);
             });
         });
+        out.textures_delta.clear();
         texts.clear();
         text_positions.clear();
         *circles = 0;
@@ -469,7 +470,7 @@ fn clicking_a_disc_selects_its_event() {
     let center = Pos2::new(500.0, 350.0);
     h.frame(vec![Event::PointerMoved(center)]);
     for _ in 0..4 {
-        h.frame(vec![Event::MouseWheel { unit: egui::MouseWheelUnit::Point, delta: Vec2::new(0.0, -80.0), modifiers: Modifiers::NONE }]);
+        h.frame(vec![Event::MouseWheel { unit: egui::MouseWheelUnit::Point, delta: Vec2::new(0.0, -80.0), modifiers: Modifiers::NONE, phase: egui::TouchPhase::Move, source: egui::MouseWheelSource::Unknown }]);
     }
 
     let anchor = nth_trainer(&h.ctrl, 0);

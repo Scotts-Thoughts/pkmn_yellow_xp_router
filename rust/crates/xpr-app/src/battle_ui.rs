@@ -65,9 +65,6 @@ struct SetupMovesState {
 }
 
 pub struct BattleSummaryUi {
-    /// The Dex page's Damage tab: the player is configured there, not by
-    /// route events, so the candy / vitamin / held-item controls are hidden.
-    pub free_form: bool,
     pub should_render: bool,
     legacy_expanded: bool,
 
@@ -122,7 +119,6 @@ fn hex(s: &str) -> Color32 {
 impl BattleSummaryUi {
     pub fn new() -> BattleSummaryUi {
         BattleSummaryUi {
-            free_form: false,
             should_render: false,
             legacy_expanded: false,
             candy_displayed_count: 0,
@@ -335,12 +331,11 @@ impl BattleSummaryUi {
             let row_size = Vec2::new(ui.available_width(), widgets::STEPPER_H);
             ui.allocate_ui_with_layout(row_size, egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 10.0;
-                if !self.free_form {
                 // candy stepper
                 let minus_ok = can_candies && self.candy_displayed_count > 0;
                 let count = self.candy_displayed_count;
                 let candy_icon = assets.candy_icon(ui.ctx());
-                let delta = widgets::stepper_group(ui, theme, ui.id().with("candy"), 32.0, minus_ok, can_candies, ("Decrement Pre-Fight Candies", "Increment Pre-Fight Candies"), |ui| {
+                let delta = widgets::stepper_group(ui, theme, ui.scope_id().with("candy"), 32.0, minus_ok, can_candies, ("Decrement Pre-Fight Candies", "Increment Pre-Fight Candies"), |ui| {
                     ui.add_space(8.0);
                     if let Some(tex) = &candy_icon {
                         crate::assets::draw_fit(ui, tex, 20.0).on_hover_text("Pre-Fight Rare Candies");
@@ -356,7 +351,7 @@ impl BattleSummaryUi {
                 for (stat, stat_label) in STAT_DISPLAY_ORDER {
                     let count = self.vitamin_display.get(stat).copied().unwrap_or(0);
                     let tips = (format!("Remove a vitamin for {}", stat_label), format!("Add a vitamin for {}", stat_label));
-                    let delta = widgets::stepper_group(ui, theme, ui.id().with(("vit", stat)), 30.0, can_candies, can_candies, (&tips.0, &tips.1), |ui| {
+                    let delta = widgets::stepper_group(ui, theme, ui.scope_id().with(("vit", stat)), 30.0, can_candies, can_candies, (&tips.0, &tips.1), |ui| {
                         let label_w = widgets::text_width(ui, stat_label, &theme.body());
                         let count_s = count.to_string();
                         let count_w = widgets::text_width(ui, &count_s, &theme.body_bold());
@@ -372,7 +367,7 @@ impl BattleSummaryUi {
                 }
                 ui.add_space(10.0);
                 widgets::label(ui, theme, "Held:");
-                let resp = SearchableDropdown::new(theme, ui.id().with("held_item"), &mut self.held_item_text, &self.held_item_options)
+                let resp = SearchableDropdown::new(theme, ui.scope_id().with("held_item"), &mut self.held_item_text, &self.held_item_options)
                     .widths(140.0, 200.0)
                     .enabled(can_candies)
                     .show(ui);
@@ -388,7 +383,6 @@ impl BattleSummaryUi {
                         self.held_item_text = bc.get_player_held_item();
                     }
                     self.held_item_apply_in_flight = false;
-                }
                 }
                 let chip = |ui: &mut Ui, text: String, tip: &str| {
                     let galley = ui.fonts_mut(|f| f.layout_no_wrap(text, theme.body(), Color32::PLACEHOLDER));
@@ -438,13 +432,13 @@ impl BattleSummaryUi {
                     }
                 });
             });
-            egui::Grid::new(ui.id().with("legacy_right")).spacing(Vec2::new(2.0, 2.0)).show(ui, |ui| {
+            egui::Grid::new(ui.scope_id().with("legacy_right")).spacing(Vec2::new(2.0, 2.0)).show(ui, |ui| {
                 if widgets::button(ui, theme, "Configure/Help").clicked() {
                     actions.open_config = true;
                 }
                 ui.horizontal(|ui| {
                     widgets::label(ui, theme, "Weather:");
-                    if self.weather.ui(ui, theme, ui.id().with("weather"), None, true) {
+                    if self.weather.ui(ui, theme, ui.scope_id().with("weather"), None, true) {
                         let w = self.weather.get().to_string();
                         bc.update_weather(cfg, ctrl, &w, None);
                     }
@@ -454,7 +448,7 @@ impl BattleSummaryUi {
                 ui.horizontal(|ui| {
                     widgets::label(ui, theme, "Prefight Candies:");
                     let can = bc.can_support_prefight_candies();
-                    let r = widgets::AmountEntry::new(theme, ui.id().with("legacy_candy"), &mut self.legacy_candy).min(Some(0)).width(Some(5)).enabled(can).show(ui);
+                    let r = widgets::AmountEntry::new(theme, ui.scope_id().with("legacy_candy"), &mut self.legacy_candy).min(Some(0)).width(Some(5)).enabled(can).show(ui);
                     if r.changed {
                         self.legacy_candy_deadline = Some(Instant::now() + Duration::from_millis(150));
                     }
@@ -539,7 +533,7 @@ impl BattleSummaryUi {
                     let mut x = header_rect.min.x + 6.0;
                     if drag_enabled {
                         let grip_rect = Rect::from_min_size(Pos2::new(x, header_rect.center().y - 8.0), Vec2::new(12.0, 16.0));
-                        let grip_resp = ui.interact(grip_rect, ui.id().with(("grip", mon_idx)), Sense::drag());
+                        let grip_resp = ui.interact(grip_rect, ui.scope_id().with(("grip", mon_idx)), Sense::drag());
                         let grip_color = if grip_resp.hovered() || grip_resp.dragged() { Color32::from_rgb(0xdd, 0xdd, 0xdd) } else { Color32::from_rgb(0x88, 0x88, 0x88) };
                         for row in 0..3 {
                             for col in 0..2 {
@@ -554,7 +548,7 @@ impl BattleSummaryUi {
                         x += 16.0;
                     }
                     let tri_rect = Rect::from_min_size(Pos2::new(x, header_rect.center().y - 7.0), Vec2::splat(14.0));
-                    let tri_resp = ui.interact(tri_rect, ui.id().with(("tri", mon_idx)), Sense::click());
+                    let tri_resp = ui.interact(tri_rect, ui.scope_id().with(("tri", mon_idx)), Sense::click());
                     let margin = 14.0 * 0.15;
                     let tri = 14.0 - 2.0 * margin;
                     let o = tri_rect.min;
@@ -579,7 +573,7 @@ impl BattleSummaryUi {
                 if bc.summary.pokemon_has_intimidate(mon_idx as i64, true) {
                     let active = bc.summary.is_intimidate_active(mon_idx as i64, true);
                     if self.screenshot_mode.is_none() || active {
-                        if let Some(new_val) = intimidate_toggle(ui, theme, ui.id().with(("intim_p", mon_idx)), &mut right_x, header_rect, active, !bc.summary.is_intimidate_blocked(mon_idx as i64, true), self.screenshot_mode.is_some()) {
+                        if let Some(new_val) = intimidate_toggle(ui, theme, ui.scope_id().with(("intim_p", mon_idx)), &mut right_x, header_rect, active, !bc.summary.is_intimidate_blocked(mon_idx as i64, true), self.screenshot_mode.is_some()) {
                             header_click_consumed = true;
                             bc.toggle_intimidate(cfg, ctrl, mon_idx as i64, true, new_val);
                         }
@@ -588,7 +582,7 @@ impl BattleSummaryUi {
                 // Download fires once, entering the fight against the first matchup
                 if mon_idx == 0 {
                     if let Some(stat) = bc.summary.player_download_stat() {
-                        download_label(ui, theme, ui.id().with("download_p"), right_x, header_rect, stat);
+                        download_label(ui, theme, ui.scope_id().with("download_p"), right_x, header_rect, stat);
                     }
                 }
                 let mut right_x2 = header_rect.max.x - 6.0;
@@ -604,7 +598,7 @@ impl BattleSummaryUi {
                 if bc.summary.pokemon_has_intimidate(mon_idx as i64, false) {
                     let active = bc.summary.is_intimidate_active(mon_idx as i64, false);
                     if self.screenshot_mode.is_none() || active {
-                        if let Some(new_val) = intimidate_toggle(ui, theme, ui.id().with(("intim_e", mon_idx)), &mut right_x2, header_rect, active, !bc.summary.is_intimidate_blocked(mon_idx as i64, false), self.screenshot_mode.is_some()) {
+                        if let Some(new_val) = intimidate_toggle(ui, theme, ui.scope_id().with(("intim_e", mon_idx)), &mut right_x2, header_rect, active, !bc.summary.is_intimidate_blocked(mon_idx as i64, false), self.screenshot_mode.is_some()) {
                             header_click_consumed = true;
                             bc.toggle_intimidate(cfg, ctrl, mon_idx as i64, false, new_val);
                         }
@@ -901,10 +895,10 @@ impl BattleSummaryUi {
             if is_test_move && mon_idx == 0 {
                 let slot_idx = move_idx - 4;
                 let current = test_moves.get(slot_idx).cloned().unwrap_or_default();
-                if self.test_move_typed[slot_idx] != current && !header_ui.memory(|m| m.has_focus(ui.id().with(("test_move", mon_idx, slot_idx)).with("edit"))) {
+                if self.test_move_typed[slot_idx] != current && !header_ui.memory(|m| m.has_focus(ui.scope_id().with(("test_move", mon_idx, slot_idx)).with("edit"))) {
                     self.test_move_typed[slot_idx] = current.clone();
                 }
-                let id = ui.id().with(("test_move", mon_idx, slot_idx));
+                let id = ui.scope_id().with(("test_move", mon_idx, slot_idx));
                 let mut typed = self.test_move_typed[slot_idx].clone();
                 let resp = SearchableDropdown::new(theme, id, &mut typed, &self.all_moves_cache).widths(name_w.min(160.0), name_w.max(60.0)).enabled(!should_fade).show(&mut header_ui);
                 self.test_move_typed[slot_idx] = typed.clone();
@@ -978,7 +972,7 @@ impl BattleSummaryUi {
                 let mut cur = metronome_selection.clone().unwrap_or_default();
                 let opts = mv.and_then(|m| m.metronome_options.clone()).unwrap_or_default();
                 let enabled = !screenshot && !(should_fade && !is_player);
-                let id = ui.id().with(("metronome", mon_idx, move_idx, is_player));
+                let id = ui.scope_id().with(("metronome", mon_idx, move_idx, is_player));
                 let resp = SearchableDropdown::new(theme, id, &mut cur, &opts)
                     .widths(custom_w, custom_w)
                     .placeholder(if hide_name { consts::METRONOME_MOVE_NAME } else { "Pick move" })
@@ -1000,7 +994,7 @@ impl BattleSummaryUi {
                 if hide_name && name_w > 0.0 {
                     header_ui.add_space(name_w / 2.0 + header_spacing_x);
                 }
-                if widgets::option_menu_ex(&mut header_ui, theme, ui.id().with(("custom", mon_idx, move_idx, is_player)), &mut cur, &opts, Some(custom_w), enabled, !is_mimic) {
+                if widgets::option_menu_ex(&mut header_ui, theme, ui.scope_id().with(("custom", mon_idx, move_idx, is_player)), &mut cur, &opts, Some(custom_w), enabled, !is_mimic) {
                     if is_mimic {
                         bc.update_mimic_selection(cfg, ctrl, &cur);
                     } else {
@@ -1015,7 +1009,7 @@ impl BattleSummaryUi {
             if show_stat_now {
                 let opts = stat_stage_options.clone().unwrap_or_default();
                 let mut cur = stat_stage_selection.clone();
-                if widgets::option_stepper(&mut header_ui, theme, ui.id().with(("stage", mon_idx, move_idx, is_player)), &mut cur, &opts, !screenshot) {
+                if widgets::option_stepper(&mut header_ui, theme, ui.scope_id().with(("stage", mon_idx, move_idx, is_player)), &mut cur, &opts, !screenshot) {
                     bc.update_stat_stage_setup(cfg, ctrl, mon_idx, move_idx, is_player, &cur);
                 }
             }
@@ -1219,7 +1213,7 @@ fn setup_moves_row(ui: &mut Ui, theme: &Theme, st: &mut SetupMovesState, is_play
         changed = true;
     }
     widgets::label(ui, theme, "Move:");
-    st.selector.ui(ui, theme, ui.id().with(("setup_sel", is_player)), None, true);
+    st.selector.ui(ui, theme, ui.scope_id().with(("setup_sel", is_player)), None, true);
     if widgets::button(ui, theme, "Apply Move").clicked() {
         st.move_list.push(st.selector.get().to_string());
         changed = true;

@@ -328,7 +328,7 @@ impl Theme {
     /// Build the egui style: the parts of the stylesheet egui draws itself
     /// (text colour, widget fills, selection, scrollbars, tooltips, menus).
     pub fn apply(&self, ctx: &egui::Context) {
-        let mut style: Style = (*ctx.style()).clone();
+        let mut style: Style = (*ctx.global_style()).clone();
         let mut v = Visuals::dark();
         v.override_text_color = Some(self.text);
         v.panel_fill = self.bg;
@@ -422,7 +422,15 @@ impl Theme {
         text_styles.insert(egui::TextStyle::Heading, self.font_bold(12.0));
         style.text_styles = text_styles;
         style.wrap_mode = Some(egui::TextWrapMode::Extend);
-        ctx.set_style(style);
+        // Keep the app's feel across egui's new defaults: no fade at the edges
+        // of scroll areas, snappy animations, the wider panel resize grab.
+        style.spacing.scroll.fade.strength = 0.0;
+        style.animation_time = 6.0 / 60.0;
+        style.interaction.resize_grab_radius_side = 5.0;
+        ctx.set_global_style(style);
+        // egui binds Ctrl+Q to close the window by default; shortcuts here are
+        // the app's own (the Shortcuts dialog).
+        ctx.options_mut(|o| o.quit_shortcuts.clear());
     }
 
     /// Stroke used for the 1 px widget borders.

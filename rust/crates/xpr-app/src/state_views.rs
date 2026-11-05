@@ -302,7 +302,7 @@ pub fn stats_card(ui: &mut Ui, theme: &Theme, gen: Option<&GenData>, last: Optio
                 _ => dash.to_string(),
             };
             if state.is_some() {
-                let resp = ui.interact(cell, ui.id().with(("ev_cell", row.name)), Sense::click());
+                let resp = ui.interact(cell, ui.scope_id().with(("ev_cell", row.name)), Sense::click());
                 if resp.clicked() {
                     clicked_evs = true;
                 }
@@ -467,7 +467,7 @@ pub fn moves_card(ui: &mut Ui, theme: &Theme, last: Option<&LastPkmn>, pp: Optio
             let slot_pp = pp.and_then(|p| p.snapshot.slots[i].as_ref()).filter(|s| !m.is_empty() && s.move_name == *m);
             let spend = pp.and_then(|p| p.spend).map(|s| s[i]).unwrap_or(0);
             if can_click {
-                let mut resp = ui.interact(r, ui.id().with(("move_row", i)), Sense::click());
+                let mut resp = ui.interact(r, ui.scope_id().with(("move_row", i)), Sense::click());
                 if resp.clicked() {
                     clicked_slot = Some(i as i64);
                 }

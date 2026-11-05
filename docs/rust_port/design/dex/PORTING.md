@@ -1,5 +1,20 @@
 # The Dex page: porting Solodex into the router
 
+**Removed from the router on 2026-11-05.** This guide describes the page as of
+commit `7d63714`, which still has all of its code and data. To restore it:
+
+1. Check out `rust/crates/xpr-dex`, `rust/crates/xpr-dex-ui`, `dex_data`,
+   `tools/dex_data`, `rust/crates/xpr-app/src/dex_damage.rs`,
+   `rust/crates/xpr-app/tests/dex_page.rs` and
+   `rust/crates/xpr-app/examples/dex_damage_png.rs` from that commit.
+2. Apply `egui_0.37_port.patch` here: the egui 0.37 port of those files, which
+   was never committed.
+3. Optionally apply `send_out_order_calc.patch`: a snapshot of unmerged work on
+   the Trainers tab send-out calculator (written against `7d63714`).
+4. Redo the `xpr-app` wiring (`app.rs`, `pages.rs`, `battle.rs`, `battle_ui.rs`,
+   `modal_input.rs`) and the `toggle_dex` hotkey in `xpr-core/src/config.rs`,
+   using that commit as the reference. `dex_settings` was kept in the config.
+
 The router hosts Solodex's reference views (Pokédex with movesets and
 comparisons, EV tables, trainers, stats, damage, movedex, natures, misc
 calculators) on a **Dex page**, so a route can be planned, recorded and refined

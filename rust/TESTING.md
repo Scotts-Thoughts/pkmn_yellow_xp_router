@@ -83,7 +83,6 @@ Test-hook environment variables (all optional):
 | `XPR_SMOKE_SCREENSHOT=<png>` | capture the window ~4 s after start, then exit |
 | `XPR_SMOKE_ROUTE=<route name>` / `XPR_SMOKE_NEW_ROUTE=<version>\|<solo mon>` | with a smoke screenshot: load that saved route / start a fresh route from the built-in data instead of the auto-load preference |
 | `XPR_SMOKE_ACTION=battle\|battle_last\|newroute\|summary\|inline\|candy\|compare\|map` | drive the UI into a state before the smoke capture; `candy` clicks "+" candy six times on the biggest fight (or `XPR_SMOKE_FIGHT=<substring>`) |
-| `XPR_SMOKE_ACTION=dex` (+ `XPR_SMOKE_DEX_TAB=pokedex\|evs\|trainers\|stats\|damage\|movedex\|natures\|misc`) | open the Dex page on that tab (from whatever page start-up reached; with `XPR_SMOKE_NEW_ROUTE` the Damage tab starts on the route's Pokémon) |
 | `XPR_SMOKE_ACTION=map` (+ `XPR_SMOKE_EVENT=<substring>`) | open the Map tab of the right pane; with `XPR_SMOKE_EVENT`, select the first event whose name contains it and "show it on the map" (SPEC §5 Phase 2 step 7) |
 | `XPR_MAP_DATA_DIR=<dir>` | read the map pack from this directory instead of the embedded copy / `map_data/` next to `raw_pkmn_data` |
 | `XPR_MAP_IMAGERY_DIR=<dir>` | keep downloaded gen 4/5 map pictures here instead of `<config dir>/map_imagery/` |
@@ -281,7 +280,7 @@ pair: two Emerald Houndoom routes, `e-houndoom-1-13454` (A) and
 B.json` prints every number the Overview shows, for checking by hand.
 
 - [ ] File → Compare Routes… (Ctrl+Shift+C) and the landing page's Compare
-      Routes button both open the page (the landing page's selected route
+      button both open the page (the landing page's selected route
       becomes A); Back and Esc return where you came from.
 - [ ] With a route open in the editor, on the compare page: Ctrl+Z, Delete,
       Ctrl+B, Ctrl+E/D, Shift+1..9 and F3/F4 do **nothing**; go Back and the

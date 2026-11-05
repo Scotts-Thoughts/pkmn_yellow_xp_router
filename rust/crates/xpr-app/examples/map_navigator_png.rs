@@ -41,8 +41,8 @@ fn main() {
     // 2 px per point: the picture is as crisp as on a HiDPI screen
     let mut off = Offscreen::new(&theme, 2.0, 8192);
     let mut draw = |off: &mut Offscreen, view: &mut MapView, passes: usize| {
-        off.render(size, passes, |ctx| {
-            egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(ctx, |ui| {
+        off.render(size, passes, |root| {
+            egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(root, |ui| {
                 view.ui(ui, &theme, &mut cfg, &ctrl, &mut assets);
             });
         })

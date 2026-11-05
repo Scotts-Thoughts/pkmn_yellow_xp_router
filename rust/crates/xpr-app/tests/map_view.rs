@@ -53,11 +53,11 @@ impl Harness {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
         let mut actions = Vec::new();
         let Harness { ctx, theme, cfg, ctrl, assets, view, .. } = self;
-        let _ = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        ctx.run_ui(input, |root| {
+            egui::CentralPanel::default().show(root, |ui| {
                 actions = view.ui(ui, theme, cfg, ctrl, assets);
             });
-        });
+        }).drop_without_applying_deltas();
         actions
     }
 
@@ -161,11 +161,11 @@ fn the_wheel_zooms_about_the_cursor_and_the_zoom_stays_in_range() {
     let center = Pos2::new(500.0, 350.0);
     h.frame(vec![Event::PointerMoved(center)]);
     for _ in 0..3 {
-        h.frame(vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, 40.0), modifiers: Modifiers::NONE }]);
+        h.frame(vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, 40.0), modifiers: Modifiers::NONE, phase: egui::TouchPhase::Move, source: egui::MouseWheelSource::Unknown }]);
     }
     assert!(h.view.zoom() > z0, "wheel up zooms in ({} -> {})", z0, h.view.zoom());
     for _ in 0..40 {
-        h.frame(vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, -80.0), modifiers: Modifiers::NONE }]);
+        h.frame(vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, -80.0), modifiers: Modifiers::NONE, phase: egui::TouchPhase::Move, source: egui::MouseWheelSource::Unknown }]);
     }
     assert!(h.view.zoom() >= 0.02 && h.view.zoom() < z0, "zoom out is clamped ({})", h.view.zoom());
 }
@@ -186,7 +186,7 @@ fn sprites_fill_the_atlas_when_zoomed_in_and_circles_take_over_when_zoomed_out()
     let center = Pos2::new(500.0, 350.0);
     h.frame(vec![Event::PointerMoved(center)]);
     for _ in 0..40 {
-        h.frame(vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, -80.0), modifiers: Modifiers::NONE }]);
+        h.frame(vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, -80.0), modifiers: Modifiers::NONE, phase: egui::TouchPhase::Move, source: egui::MouseWheelSource::Unknown }]);
     }
     assert!(h.view.zoom() < 0.75);
     h.view.request_focus(LinkQuery::Trainer("Youngster 1".into()), "Youngster 1".into());

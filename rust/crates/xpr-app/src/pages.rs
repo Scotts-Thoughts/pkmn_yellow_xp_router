@@ -29,6 +29,17 @@ pub const SORT_MOST_RECENT: &str = "most_recent";
 pub const SORT_GAME: &str = "game";
 pub const SORT_ALPHABETICAL: &str = "alphabetical";
 const NO_ROUTES: &str = "No saved routes found";
+/// Width of the landing page's routes section.
+const ROUTES_W: f32 = 660.0;
+/// Width of the landing page's buttons: the two wide ones, and each row of two.
+const LANDING_BUTTONS_W: f32 = 350.0;
+const LANDING_BUTTON_H: f32 = 50.0;
+/// Added to the item spacing between the landing page's buttons.
+const LANDING_BUTTON_SPACE: f32 = 10.0;
+/// Route table row height, room for `ROUTE_ICON` plus a little air.
+const ROUTE_ROW_H: f32 = 28.0;
+/// Side of the box art and species art in a route table row.
+const ROUTE_ICON: f32 = 24.0;
 
 /// What the landing page asks for.
 #[derive(Clone, Debug, Default)]
@@ -39,12 +50,10 @@ pub struct LandingActions {
     pub start_recording: bool,
     /// "Route from Replay": record a route from a Super Shuckie replay file.
     pub import_replay: bool,
-    /// "View Map": browse a game's world map without a route open.
+    /// "Map": browse a game's world map without a route open.
     pub view_map: bool,
-    /// "Pokédex": the Dex page (Pokédex, trainers, damage, movedex ...).
-    pub open_dex: bool,
     pub load_route: Option<PathBuf>,
-    /// "Compare Routes": `Some(Some(path))` seeds slot A with the selected
+    /// "Compare": `Some(Some(path))` seeds slot A with the selected
     /// route, `Some(None)` opens the page empty.
     pub compare_routes: Option<Option<PathBuf>>,
     pub auto_load_toggled: bool,
@@ -115,65 +124,63 @@ impl LandingPage {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, paths: &Paths, registry: &Registry, index: &RouteIndex, actions: &mut LandingActions) {
+    pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, cfg: &mut Config, paths: &Paths, registry: &Registry, index: &RouteIndex, assets: &mut Assets, actions: &mut LandingActions) {
         let key_load = !behind_modal(ui) && ui.input(|i| i.key_pressed(egui::Key::Enter));
         ui.vertical_centered(|ui| {
-            ui.add_space(50.0);
-            ui.label(egui::RichText::new("Pokemon Solo Challenge Router").font(theme.font_bold(24.0)).color(theme.text));
-            ui.add_space(20.0);
+            ui.add_space(12.0);
             let record = StyledButton::new(theme, egui::RichText::new("Start Recording").font(theme.font_bold(14.0)).color(Color32::from_rgb(0xe7, 0x4c, 0x3c)))
                 .dot(Color32::from_rgb(0xe7, 0x4c, 0x3c))
-                .min_size(Vec2::new(350.0, 50.0))
+                .min_size(Vec2::new(LANDING_BUTTONS_W, LANDING_BUTTON_H))
                 .text_color(Color32::from_rgb(0xe7, 0x4c, 0x3c))
                 .show(ui)
                 .on_hover_text("Connect to GameHook now: the game comes from the loaded mapper and the route is set up from your first Pokémon (species, DVs/IVs, nature, ability) the moment you receive it.");
             if record.clicked() {
                 actions.start_recording = true;
             }
-            ui.add_space(10.0);
+            ui.add_space(LANDING_BUTTON_SPACE);
             let replay = StyledButton::new(theme, egui::RichText::new("Route from Replay").font(theme.font_bold(14.0)))
-                .min_size(Vec2::new(350.0, 50.0))
+                .min_size(Vec2::new(LANDING_BUTTONS_W, LANDING_BUTTON_H))
                 .show(ui)
                 .on_hover_text("Record a route from a Super Shuckie replay: the run is replayed through the recorder (much faster than real time) and the route saved.");
             if replay.clicked() {
                 actions.import_replay = true;
             }
-            ui.add_space(10.0);
-            let map = StyledButton::new(theme, egui::RichText::new("View Map").font(theme.font_bold(14.0)))
-                .min_size(Vec2::new(350.0, 50.0))
-                .show(ui)
-                .on_hover_text("Browse a game's world map (trainers, items, encounters) without opening a route.");
-            if map.clicked() {
-                actions.view_map = true;
-            }
-            ui.add_space(10.0);
-            let dex = StyledButton::new(theme, egui::RichText::new("Pok\u{e9}dex").font(theme.font_bold(14.0)))
-                .min_size(Vec2::new(350.0, 50.0))
-                .show(ui)
-                .on_hover_text("Look up Pok\u{e9}mon, movesets, trainers, damage ranges, EV yields and moves (Ctrl+K).");
-            if dex.clicked() {
-                actions.open_dex = true;
-            }
-            ui.add_space(10.0);
-            let create = StyledButton::new(theme, egui::RichText::new("Create New Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
-            if create.clicked() {
-                actions.create_route = true;
-            }
-            ui.add_space(10.0);
+            ui.add_space(LANDING_BUTTON_SPACE);
+            // The grid's gap matches the one between its rows.
+            let gap = ui.spacing().item_spacing.y + LANDING_BUTTON_SPACE;
+            let half = Vec2::new((LANDING_BUTTONS_W - gap) / 2.0, LANDING_BUTTON_H);
             let can_load = self.selected_route.as_ref().map(|r| r != NO_ROUTES).unwrap_or(false);
-            let load = StyledButton::new(theme, egui::RichText::new("Load Selected Route").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).enabled(can_load).show(ui);
-            if (load.clicked() || key_load) && can_load {
-                if let Some(r) = &self.selected_route {
-                    actions.load_route = Some(io_utils::get_existing_route_path(paths, r));
+            let row = |ui: &mut Ui, add: &mut dyn FnMut(&mut Ui)| {
+                ui.allocate_ui_with_layout(Vec2::new(LANDING_BUTTONS_W, LANDING_BUTTON_H), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing.x = gap;
+                    add(ui);
+                });
+            };
+            row(ui, &mut |ui| {
+                let create = StyledButton::new(theme, egui::RichText::new("Create").font(theme.font_bold(14.0))).min_size(half).show(ui);
+                if create.clicked() {
+                    actions.create_route = true;
                 }
-            }
-            ui.add_space(10.0);
-            let compare = StyledButton::new(theme, egui::RichText::new("Compare Routes").font(theme.font_bold(14.0))).min_size(Vec2::new(350.0, 50.0)).show(ui);
-            if compare.on_hover_text("See how two routes differ. The selected route, if any, becomes route A.").clicked() {
-                let selected = self.selected_route.as_ref().filter(|_| can_load).map(|r| io_utils::get_existing_route_path(paths, r));
-                actions.compare_routes = Some(selected);
-            }
-            ui.add_space(10.0);
+                let load = StyledButton::new(theme, egui::RichText::new("Load").font(theme.font_bold(14.0))).min_size(half).enabled(can_load).show(ui);
+                if (load.clicked() || key_load) && can_load {
+                    if let Some(r) = &self.selected_route {
+                        actions.load_route = Some(io_utils::get_existing_route_path(paths, r));
+                    }
+                }
+            });
+            ui.add_space(LANDING_BUTTON_SPACE);
+            row(ui, &mut |ui| {
+                let compare = StyledButton::new(theme, egui::RichText::new("Compare").font(theme.font_bold(14.0))).min_size(half).show(ui);
+                if compare.on_hover_text("See how two routes differ. The selected route, if any, becomes route A.").clicked() {
+                    let selected = self.selected_route.as_ref().filter(|_| can_load).map(|r| io_utils::get_existing_route_path(paths, r));
+                    actions.compare_routes = Some(selected);
+                }
+                let map = StyledButton::new(theme, egui::RichText::new("Map").font(theme.font_bold(14.0))).min_size(half).show(ui).on_hover_text("Browse a game's world map (trainers, items, encounters) without opening a route.");
+                if map.clicked() {
+                    actions.view_map = true;
+                }
+            });
+            ui.add_space(LANDING_BUTTON_SPACE);
             let mut auto = self.auto_load;
             if widgets::checkbox(ui, theme, &mut auto, "Automatically Load Most Recent Route on Startup", true).changed() {
                 self.auto_load = auto;
@@ -181,8 +188,8 @@ impl LandingPage {
                 actions.auto_load_toggled = true;
             }
             ui.add_space(10.0);
-            // ---- routes section (600 px wide) ----
-            let width = 600.0;
+            // ---- routes section ----
+            let width = ROUTES_W;
             ui.allocate_ui_with_layout(Vec2::new(width, ui.available_height()), egui::Layout::top_down(egui::Align::Min), |ui| {
                 ui.set_width(width);
                 ui.spacing_mut().item_spacing.y = 4.0;
@@ -213,7 +220,7 @@ impl LandingPage {
                         if self.game_filter.options.len() <= 1 {
                             self.populate_game_filter(registry);
                         }
-                        if self.game_filter.ui(ui, theme, ui.id().with("game_filter"), Some(160.0), true) {
+                        if self.game_filter.ui_icons(ui, theme, ui.scope_id().with("game_filter"), 160.0, true, |ctx, game| assets.box_art(ctx, game)) {
                             self.selected_game_filter = self.game_filter.get().to_string();
                             cfg.set_landing_page_game_filter(&self.selected_game_filter);
                         }
@@ -222,17 +229,17 @@ impl LandingPage {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 6.0;
                     widgets::label(ui, theme, "Search:");
-                    let r = Entry::new(theme, &mut self.search_text).width(ui.available_width()).hint("Filter routes...").id(ui.id().with("landing_search")).clearable().show(ui);
+                    let r = Entry::new(theme, &mut self.search_text).width(ui.available_width()).hint("Filter routes...").id(ui.scope_id().with("landing_search")).clearable().show(ui);
                     if r.changed {
                         self.search_deadline = Some(Instant::now() + Duration::from_millis(300));
                     }
                 });
-                self.route_table(ui, theme, paths, index, actions);
+                self.route_table(ui, theme, paths, index, assets, actions);
             });
         });
     }
 
-    fn route_table(&mut self, ui: &mut Ui, theme: &Theme, paths: &Paths, index: &RouteIndex, actions: &mut LandingActions) {
+    fn route_table(&mut self, ui: &mut Ui, theme: &Theme, paths: &Paths, index: &RouteIndex, assets: &mut Assets, actions: &mut LandingActions) {
         // gather + filter + sort
         let mut entries: Vec<(&String, &String, &String, f64)> = index.entries.values().map(|e| (&e.name, &e.version, &e.species, e.mtime)).collect();
         if self.current_sort == SORT_GAME && self.selected_game_filter != "All Games" {
@@ -248,21 +255,22 @@ impl LandingPage {
             _ => entries.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap_or(std::cmp::Ordering::Equal)),
         }
         let font = theme.body();
-        let total_w = ui.available_width();
-        let widths = [80.0, 90.0, (total_w - 80.0 - 90.0 - 130.0).max(120.0), 130.0];
+        // Fits its text, so nothing is left over beside the dates.
+        let date_w = widgets::text_width(ui, "0000-00-00 00:00", &font).ceil() + 8.0;
         let headers = ["Game", "Species", "Route Name", "Date Played"];
         let frame = egui::Frame::new().fill(theme.bg_input).stroke(Stroke::new(1.0_f32, theme.border));
         frame.show(ui, |ui| {
             ui.set_min_height(300.0);
             ui.spacing_mut().item_spacing = Vec2::ZERO;
+            // Measured inside the frame, so its border stays within the width
+            // of the search row above.
+            let total_w = ui.available_width();
             let (hrect, _) = ui.allocate_exact_size(Vec2::new(total_w, 22.0), Sense::hover());
-            let mut x = hrect.min.x;
-            for (i, h) in headers.iter().enumerate() {
-                let r = Rect::from_min_size(Pos2::new(x, hrect.min.y), Vec2::new(widths[i], 22.0));
-                widgets::paint_table_header_cell(ui.painter(), theme, r, h, i == 0);
-                x += widths[i];
-            }
+            let mut widths = route_column_widths(total_w, date_w);
             widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("landing_routes").auto_shrink([false, false]).max_height(ui.available_height().max(300.0)), |ui| {
+                // Narrower than `total_w` when the scrollbar is showing.
+                let total_w = ui.available_width();
+                widths = route_column_widths(total_w, date_w);
                 if !index.loaded {
                     ui.add_space(4.0);
                     widgets::label_colored(ui, theme, "Loading routes...", theme.secondary);
@@ -276,26 +284,36 @@ impl LandingPage {
                 }
                 let mut clicked: Option<(String, bool)> = None;
                 for (row_idx, (name, version, species, mtime)) in entries.iter().enumerate() {
-                    let (r, resp) = ui.allocate_exact_size(Vec2::new(total_w, 22.0), Sense::click());
-                    let selected = self.selected_route.as_deref() == Some(name.as_str());
-                    let fill = if selected {
-                        theme.accent
-                    } else if resp.hovered() {
-                        theme.hover_bg
-                    } else if row_idx % 2 == 1 {
-                        theme.bg_lighter
-                    } else {
-                        theme.bg_input
-                    };
-                    ui.painter().rect_filled(r, CornerRadius::ZERO, fill);
-                    let color = if selected { Color32::WHITE } else { theme.text };
-                    let date = chrono::DateTime::<chrono::Local>::from(std::time::UNIX_EPOCH + Duration::from_secs_f64((*mtime).max(0.0))).format("%Y-%m-%d %H:%M").to_string();
-                    let cells = [version.as_str(), species.as_str(), name.as_str(), date.as_str()];
-                    let mut x = r.min.x;
-                    for (i, c) in cells.iter().enumerate() {
-                        let shown = widgets::elide(ui, c, &font, widths[i] - 8.0);
-                        ui.painter().text(Pos2::new(x + 4.0, r.center().y), Align2::LEFT_CENTER, shown, font.clone(), color);
-                        x += widths[i];
+                    let (r, resp) = ui.allocate_exact_size(Vec2::new(total_w, ROUTE_ROW_H), Sense::click());
+                    // Only rows on screen look up art, so a long list stays cheap.
+                    if ui.is_rect_visible(r) {
+                        let selected = self.selected_route.as_deref() == Some(name.as_str());
+                        let fill = if selected {
+                            theme.accent
+                        } else if resp.hovered() {
+                            theme.hover_bg
+                        } else if row_idx % 2 == 1 {
+                            theme.bg_lighter
+                        } else {
+                            theme.bg_input
+                        };
+                        ui.painter().rect_filled(r, CornerRadius::ZERO, fill);
+                        let color = if selected { Color32::WHITE } else { theme.text };
+                        let date = chrono::DateTime::<chrono::Local>::from(std::time::UNIX_EPOCH + Duration::from_secs_f64((*mtime).max(0.0))).format("%Y-%m-%d %H:%M").to_string();
+                        let art = [assets.box_art(ui.ctx(), version), assets.pkmn_icon(ui.ctx(), species), None, None];
+                        let cells = [version.as_str(), species.as_str(), name.as_str(), date.as_str()];
+                        let mut x = r.min.x;
+                        for (i, c) in cells.iter().enumerate() {
+                            // Game and species keep their text in line even
+                            // without art (custom games have none).
+                            let inset = if i < 2 { ROUTE_ICON + 4.0 } else { 0.0 };
+                            if let Some(tex) = &art[i] {
+                                widgets::paint_icon_fit(ui.painter(), tex, Pos2::new(x + 2.0 + ROUTE_ICON / 2.0, r.center().y), ROUTE_ICON);
+                            }
+                            let shown = widgets::elide(ui, c, &font, widths[i] - 8.0 - inset);
+                            ui.painter().text(Pos2::new(x + 4.0 + inset, r.center().y), Align2::LEFT_CENTER, shown, font.clone(), color);
+                            x += widths[i];
+                        }
                     }
                     if resp.clicked() {
                         clicked = Some((name.to_string(), false));
@@ -311,8 +329,24 @@ impl LandingPage {
                     }
                 }
             });
+            // After the rows, which know whether the scrollbar is showing. The
+            // last header cell runs on over the scrollbar.
+            let mut x = hrect.min.x;
+            for (i, h) in headers.iter().enumerate() {
+                let w = if i + 1 == headers.len() { hrect.max.x - x } else { widths[i] };
+                let r = Rect::from_min_size(Pos2::new(x, hrect.min.y), Vec2::new(w, 22.0));
+                widgets::paint_table_header_cell(ui.painter(), theme, r, h, i == 0);
+                x += w;
+            }
         });
     }
+}
+
+/// The route table's columns: Route Name takes whatever Game, Species and the
+/// date leave.
+fn route_column_widths(total_w: f32, date_w: f32) -> [f32; 4] {
+    let (game_w, species_w) = (112.0, 118.0);
+    [game_w, species_w, (total_w - game_w - species_w - date_w).max(120.0), date_w]
 }
 
 // ---------------------------------------------------------------------------
@@ -363,7 +397,7 @@ impl MapViewerPage {
             }
             ui.add_space(8.0);
             widgets::label(ui, theme, "Game:");
-            if self.game.ui(ui, theme, ui.id().with("map_viewer_game"), Some(160.0), true) {
+            if self.game.ui(ui, theme, ui.scope_id().with("map_viewer_game"), Some(160.0), true) {
                 let v = self.game.get().to_string();
                 self.set_version(&v);
                 map.sync_route(&self.ctrl);
@@ -500,6 +534,8 @@ pub fn replay_import_ui(ui: &mut Ui, theme: &Theme, status: &crate::replay_impor
                 let (what, fraction) = match status.phase.as_str() {
                     "scan" => ("Scanning the replay's keyframes", status.frame as f32 / status.total.max(1) as f32),
                     "record" => ("Recording", status.frame as f32 / status.total.max(1) as f32),
+                    "download" => ("Downloading the replay tools (first use only)", status.frame as f32 / status.total.max(1) as f32),
+                    "unpack" => ("Preparing the replay tools", 0.0),
                     _ => ("Starting the replay readers", 0.0),
                 };
                 let elapsed = status.started.map(|t| t.elapsed().as_secs()).unwrap_or(0);
@@ -875,7 +911,7 @@ impl NewRoutePage {
                     ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Solo Pokemon Filter:").font(lbl_font.clone()).color(theme.text));
                 });
-                let r = Entry::new(theme, &mut self.pkmn_filter).width((page_w - label_w - 10.0).max(400.0)).font(entry_font.clone()).id(ui.id().with("pkmn_filter")).show(ui);
+                let r = Entry::new(theme, &mut self.pkmn_filter).width((page_w - label_w - 10.0).max(400.0)).font(entry_font.clone()).id(ui.scope_id().with("pkmn_filter")).show(ui);
                 if r.changed {
                     self.update_pokemon_list();
                     self.pkmn_selector_callback();
@@ -886,7 +922,7 @@ impl NewRoutePage {
                     ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Solo Pokemon:").font(lbl_font.clone()).color(theme.text));
                 });
-                if self.solo_selector.ui(ui, theme, ui.id().with("solo"), Some((page_w - label_w - 10.0).max(400.0)), true) {
+                if self.solo_selector.ui(ui, theme, ui.scope_id().with("solo"), Some((page_w - label_w - 10.0).max(400.0)), true) {
                     self.pkmn_selector_callback();
                 }
             });
@@ -895,7 +931,7 @@ impl NewRoutePage {
                     ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Base Route Filter:").font(lbl_font.clone()).color(theme.text));
                 });
-                let r = Entry::new(theme, &mut self.min_battles_filter).width((page_w - label_w - 10.0).max(400.0)).font(entry_font.clone()).id(ui.id().with("base_filter")).show(ui);
+                let r = Entry::new(theme, &mut self.min_battles_filter).width((page_w - label_w - 10.0).max(400.0)).font(entry_font.clone()).id(ui.scope_id().with("base_filter")).show(ui);
                 if r.changed {
                     self.base_route_filter_callback();
                 }
@@ -905,7 +941,7 @@ impl NewRoutePage {
                     ui.set_min_width(label_w);
                     ui.label(egui::RichText::new("Base Route:").font(lbl_font.clone()).color(theme.text));
                 });
-                self.min_battles_selector.ui(ui, theme, ui.id().with("base_route"), Some((page_w - label_w - 10.0).max(400.0)), true);
+                self.min_battles_selector.ui(ui, theme, ui.scope_id().with("base_route"), Some((page_w - label_w - 10.0).max(400.0)), true);
             });
             ui.horizontal_top(|ui| {
                 let est = if self.selected_gen.as_ref().map(|g| g.get_generation() > 2).unwrap_or(false) { 760.0 } else { 300.0 };

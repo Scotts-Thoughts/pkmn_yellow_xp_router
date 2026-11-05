@@ -65,11 +65,12 @@ impl Harness {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
         let mut actions = Vec::new();
         let Harness { ctx, theme, cfg, ctrl, assets, view, texts, .. } = self;
-        let out = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let mut out = ctx.run_ui(input, |root| {
+            egui::CentralPanel::default().show(root, |ui| {
                 actions = view.ui(ui, theme, cfg, ctrl, assets);
             });
         });
+        out.textures_delta.clear();
         texts.clear();
         for cs in &out.shapes {
             collect_texts(&cs.shape, texts);

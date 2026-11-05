@@ -78,14 +78,17 @@ impl Harness {
     /// since `ToolState::handle_input` reads `i.modifiers.shift`, not a
     /// per-event modifiers field.
     fn frame_with_mods(&mut self, events: Vec<Event>, modifiers: Modifiers) -> Vec<MapAction> {
-        let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, modifiers, ..Default::default() };
+        let mut events = events;
+        events.insert(0, egui::Event::ModifiersChanged(modifiers));
+        let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
         let mut actions = Vec::new();
         let Harness { ctx, theme, cfg, ctrl, assets, view, shapes, .. } = self;
-        let out = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let mut out = ctx.run_ui(input, |root| {
+            egui::CentralPanel::default().show(root, |ui| {
                 actions = view.ui(ui, theme, cfg, ctrl, assets);
             });
         });
+        out.textures_delta.clear();
         shapes.clear();
         for cs in &out.shapes {
             shapes.push(cs.shape.clone());

@@ -95,7 +95,7 @@ impl ItemSearch {
         let mut chosen: Option<String> = None;
         let width = anchor.width().max(260.0);
         let pos = Pos2::new(anchor.min.x, anchor.max.y + 2.0);
-        let area = egui::Area::new(ui.id().with("map_item_popup")).order(egui::Order::Foreground).fixed_pos(pos);
+        let area = egui::Area::new(ui.scope_id().with("map_item_popup")).order(egui::Order::Foreground).fixed_pos(pos);
         let inner = area.show(ui.ctx(), |ui| {
             egui::Frame::new().fill(theme.bg_darker).stroke(theme.border_stroke()).corner_radius(6.0).inner_margin(6.0).show(ui, |ui| {
                 ui.set_width(width);

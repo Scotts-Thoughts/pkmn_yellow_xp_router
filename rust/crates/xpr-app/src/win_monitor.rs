@@ -54,7 +54,7 @@ pub fn install(frame: &eframe::Frame, native_ppp: f32, saved_pos_px: Option<Pos2
     let RawWindowHandle::Win32(h) = handle.as_raw() else {
         return;
     };
-    let hwnd: HWND = h.hwnd.get();
+    let hwnd = h.hwnd.get() as HWND;
     DPI.store((native_ppp * 96.0).round() as u32, Relaxed);
     unsafe {
         let ours: unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT = wndproc;
@@ -64,7 +64,7 @@ pub fn install(frame: &eframe::Frame, native_ppp: f32, saved_pos_px: Option<Pos2
             return;
         }
         if let Some(p) = saved_pos_px {
-            SetWindowPos(hwnd, 0, p.x.round() as i32, p.y.round() as i32, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            SetWindowPos(hwnd, std::ptr::null_mut(), p.x.round() as i32, p.y.round() as i32, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         }
         contain(hwnd);
     }
@@ -214,7 +214,7 @@ unsafe fn work_area(monitor: HMONITOR) -> RECT {
 }
 
 unsafe fn set_window_rect(hwnd: HWND, r: RECT) {
-    SetWindowPos(hwnd, 0, r.left, r.top, width(r), height(r), SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(hwnd, std::ptr::null_mut(), r.left, r.top, width(r), height(r), SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 fn width(r: RECT) -> i32 {

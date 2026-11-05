@@ -74,7 +74,7 @@ unsafe extern "system" fn filter(info: *const EXCEPTION_POINTERS) -> i32 {
         at += 1;
     }
     path[at..at + ext.len()].copy_from_slice(&ext);
-    let file = CreateFileW(path.as_ptr(), GENERIC_WRITE, 0, std::ptr::null(), CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    let file = CreateFileW(path.as_ptr(), GENERIC_WRITE, 0, std::ptr::null(), CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, std::ptr::null_mut());
     if file == INVALID_HANDLE_VALUE {
         return EXCEPTION_CONTINUE_SEARCH;
     }

@@ -142,7 +142,7 @@ impl Navigator {
         }
         let visible = view.camera.visible_world(vp).intersect(&scope_r);
 
-        let area = egui::Area::new(ui.id().with("map_navigator_panel")).order(egui::Order::Foreground).fixed_pos(rect.min);
+        let area = egui::Area::new(ui.scope_id().with("map_navigator_panel")).order(egui::Order::Foreground).fixed_pos(rect.min);
         view.navigator.layer = Some(area.layer());
         area.show(ui.ctx(), |ui| {
             let painter = ui.painter();
@@ -227,7 +227,7 @@ fn popup_row(ui: &mut Ui, theme: &Theme, text: &str) -> bool {
 /// either) lives in egui's per-`Id` memory, the same mechanism `ComboBox`
 /// and friends use for exactly this.
 pub fn zoom_control(ui: &mut Ui, theme: &Theme, cam: &mut Camera, vp: Rect) -> bool {
-    let open_id = egui::Id::new("xpr_map_zoom_menu_open");
+    let open_id = egui::Id::unique("xpr_map_zoom_menu_open");
     let mut open = ui.data(|d| d.get_temp::<bool>(open_id)).unwrap_or(false);
     let btn = widgets::StyledButton::new(theme, format!("{:.0}%", cam.zoom * 100.0)).min_size(Vec2::new(46.0, 22.0)).checked(open).show(ui);
     if btn.clicked() {
@@ -237,7 +237,7 @@ pub fn zoom_control(ui: &mut Ui, theme: &Theme, cam: &mut Camera, vp: Rect) -> b
     let mut changed = false;
     if open {
         let pos = Pos2::new(btn.rect.min.x, btn.rect.max.y + 2.0);
-        let area = egui::Area::new(ui.id().with("xpr_map_zoom_menu")).order(egui::Order::Foreground).fixed_pos(pos);
+        let area = egui::Area::new(ui.scope_id().with("xpr_map_zoom_menu")).order(egui::Order::Foreground).fixed_pos(pos);
         let mut chosen: Option<f32> = None;
         let mut fit = false;
         let inner = area.show(ui.ctx(), |ui| {

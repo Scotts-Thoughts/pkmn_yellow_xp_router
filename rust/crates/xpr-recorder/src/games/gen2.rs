@@ -1140,14 +1140,10 @@ impl Gen2Machine {
                         if !final_exp_split.iter().any(|x| *x > 1) {
                             final_exp_split = Vec::new();
                         }
-                        // 1-based, like gens 3/4: mon_order[definition idx] = the position
-                        // the mon came out at (see `EventDefinition::get_pokemon_list`)
-                        let mut sorted = self.battle.enemy_mon_order.clone();
-                        sorted.sort();
-                        let final_mon_order: Vec<i64> = sorted.iter().map(|x| self.battle.enemy_mon_order.iter().position(|y| y == x).unwrap_or(0) as i64 + 1).collect();
                         let mut td = TrainerEventDefinition::new(&self.battle.trainer_name);
                         td.exp_split = final_exp_split;
-                        td.mon_order = final_mon_order;
+                        // the slots seen: `finish_mon_order` makes the real order of them
+                        td.mon_order = self.battle.enemy_mon_order.clone();
                         if self.has_return() {
                             td.custom_move_data = self.return_custom_data(&self.battle.friendship_data);
                         }
@@ -1702,6 +1698,7 @@ fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, cached_lost_tra
                         t.pay_day_amount = Some((t.pay_day_amount.unwrap_or(0) - expected_money).max(0));
                         log::info!("Updating pay day for trainer {} to {:?}", t.trainer_name, t.pay_day_amount);
                     }
+                    finish_mon_order(gen, &mut cur_event, &obj.definition);
                     let id = obj.group_id;
                     let ev = cur_event.clone();
                     ctx.controller.host().call(move |h| h.update_existing_event(id, ev));

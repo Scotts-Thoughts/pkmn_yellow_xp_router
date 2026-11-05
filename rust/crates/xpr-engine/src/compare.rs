@@ -82,6 +82,7 @@ pub enum EntryKind {
     Evolution,
     BagReorder,
     EvOverride,
+    DayCare,
 }
 
 impl EntryKind {
@@ -103,6 +104,7 @@ impl EntryKind {
             EntryKind::Evolution => "EVOLVE",
             EntryKind::BagReorder => "BAG",
             EntryKind::EvOverride => "EV",
+            EntryKind::DayCare => "DAY CARE",
         }
     }
 
@@ -113,7 +115,7 @@ impl EntryKind {
             EntryKind::Wild => DiffFilter::Wild,
             EntryKind::PickUp | EntryKind::Buy | EntryKind::Sell | EntryKind::UseItem | EntryKind::HoldItem | EntryKind::BagReorder => DiffFilter::Items,
             EntryKind::LearnMove => DiffFilter::Moves,
-            EntryKind::RareCandy | EntryKind::Vitamin | EntryKind::EvOverride => DiffFilter::CandyVitamins,
+            EntryKind::RareCandy | EntryKind::Vitamin | EntryKind::EvOverride | EntryKind::DayCare => DiffFilter::CandyVitamins,
             EntryKind::Heal | EntryKind::Save | EntryKind::Blackout | EntryKind::Evolution => DiffFilter::HealsSaves,
         }
     }
@@ -657,6 +659,10 @@ pub fn digest(router: &Router, label: &str, origin: RouteOrigin) -> RouteDigest 
             entry.kind = EntryKind::EvOverride;
             entry.key = "evo".to_string();
             entry.label = "EV Override".to_string();
+        } else if def.day_care.is_some() {
+            entry.kind = EntryKind::DayCare;
+            entry.key = "daycare".to_string();
+            entry.label = "Day Care".to_string();
         } else {
             continue;
         }

@@ -165,7 +165,7 @@ impl Registry {
         }
         if let Some((gen, sources)) = builtin_sources(&self.raw_dir, version) {
             let data = load_gen(gen, &sources, version, None, &self.reader())?;
-            // another thread (the Dex's background preload) may have loaded
+            // another thread may have loaded
             // it meanwhile: keep the first copy so every holder shares one
             let mut cache = self.cache.lock().unwrap();
             return Ok(cache.entry(version.to_string()).or_insert_with(|| Arc::new(data)).clone());

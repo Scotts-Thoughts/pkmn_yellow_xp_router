@@ -189,7 +189,7 @@ fn row(
     let (ea, eb) = (&cmp.a.entries[cp.a], &cmp.b.entries[cp.b]);
     let rect = widgets::table_row(ui, ROW_H, Some(theme.row_divider()));
     let is_open = *expanded == Some(cp.a);
-    let resp = ui.interact(rect, ui.id().with(("cp", cp.a)), Sense::click());
+    let resp = ui.interact(rect, ui.scope_id().with(("cp", cp.a)), Sense::click());
     if resp.hovered() || is_open {
         ui.painter().rect_filled(rect, egui::CornerRadius::ZERO, theme.hover_bg);
     }
@@ -263,7 +263,7 @@ fn row(
             let cell = Cols::cell(cols.vs, W_VS, rect);
             widgets::col_text(ui, cell, &format_delta(delta), theme.body_bold(), shared::time_delta_color(theme, delta), Align::Max);
             let word = if delta > 0.0 { "later" } else { "earlier" };
-            ui.interact(cell, ui.id().with(("cp_time", cp.a)), Sense::hover())
+            ui.interact(cell, ui.scope_id().with(("cp_time", cp.a)), Sense::hover())
                 .on_hover_text(format!("A reached this fight {} {} than B", format_time(delta.abs()), word));
         }
     }

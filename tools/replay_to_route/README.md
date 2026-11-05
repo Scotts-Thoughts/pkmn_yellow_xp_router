@@ -11,8 +11,10 @@ A:\pkmn_yellow_xp_router\rust\target\release\replay_to_route.exe "...\replays\h-
 The route is saved to the router's saved routes folder, named after the replay
 (`--out <file>` saves it somewhere else), with a log in `replay_to_route_logs`
 beside it. The report ends with a check of the route against the game: the solo
-Pokémon's level, experience and moves in the route against what the game's
-party held where recording stopped.
+Pokémon's level, experience and moves in the route against the game's party
+once recording has stopped and the game has left the battle (recording stops at
+the final trainer, but gen 4 only copies a battle's results back to the party
+about 400 frames later, so the check keeps reading until then).
 
 Options (`replay_to_route` with no arguments lists them): `--rom` when the ROM
 is not found by itself, `--accept-current` for a replay that does not start
@@ -93,42 +95,38 @@ as Super Shuckie's `scripts/build-melonds.sh` does).
 directory's folders (`--tools <dir>` or `XPR_REPLAY_TOOLS` otherwise) and the
 mappers in `%APPDATA%\PokeAByte\mappers` (`XPR_MAPPERS_DIR`).
 
-## Mappers
+## Shipping
 
-The mapper comes from the ROM header, the one each recorder was built against:
+A released router needs nothing else installed. The worker, a self-contained
+`pab-host`, the mappers and their licences are one zip of their own (48 MB). It
+is not in the exe, so an update that leaves it alone stays small: the exe is
+built with `rust/replay_tools.json`, which names the bundle it needs, and
+`xpr-app/src/replay_bundle.rs` downloads that bundle at the first import and
+unpacks it into `<config dir>/replay_tools/<bundle>/`. Later imports reuse the
+folder. If a new version names a different bundle, the next import fetches it
+and removes the old one. Only the ROM comes from the user, and the app asks for
+it when it isn't beside the replay or in Super Shuckie's recent ROMs. There is
+no bundle for Mac, because there is no Mac worker yet.
 
-| Game | Mapper |
-|---|---|
-| Red, Blue, Yellow | `STANDARD/gen1/pokemon_red_blue.xml`, `pokemon_yellow.xml` |
-| Crystal | `STANDARD/gen2/pokemon_crystal.xml` |
-| Emerald | `ST/gen3/pokemon_emerald_ne.xml` (finds the STP patch version; the deprecated one reads the save marker at its v1.5 address) |
-| FireRed, LeafGreen | `ST/gen3/pokemon_firered_leafgreen_deprecated_ne.xml` |
-| Platinum, HeartGold, SoulSilver | `ST/gen4/*_ne.xml` |
-| Black, White, Black 2, White 2 | `STANDARD/gen5/*.xml` (with `docs/rust_port/recording/gen5_mappers_save_counter.patch`) |
-
-`--mapper <path>` overrides it.
-
-What the route can be is bounded by the mapper. Gen 5 needs
-`docs/rust_port/recording/gen5_mappers_save_counter.patch`: without it the
-recorder cannot see saves (Black 2/White 2 read a dead byte, Black/White only
-see saves that changed the party), so after a reset it cannot tell which
-events to undo. A White 2 run with 54 resets ended 7 levels ahead of the game.
-
-## Testing
+The bundle can't be built in CI (see `build.sh`'s needs and the local mappers),
+so it is made here and kept on a release, named after its content.
+**Make a new one whenever the worker, `pab-host` or the mappers change**,
+including after any Super Shuckie core change:
 
 ```
-py -3.14 run_corpus.py --exe <replay_to_route.exe> --work <dir> [--only red,crystal] [--ref]
-py -3.14 route_summary.py <a.json> <b.json>
+tools/replay_to_route/build.sh --skip-pab-host     # the worker
+py -3.14 tools/replay_to_route/bundle.py           # also updates rust/replay_tools.json
+gh release upload <tag> <the zip> --repo Scotts-Thoughts/pkmn_yellow_xp_router
 ```
 
-`run_corpus.py` imports one real run per game (the list is at the top of the
-file) and tabulates time, events and the check against the game; `--ref` also
-builds each reference and diffs the two routes. `route_summary.py` prints a
-route one event per line, or diffs two.
+Then commit `rust/replay_tools.json`. The release workflow fails if that file
+is on no release (`rust/check_replay_tools.py`), because every copy of that
+version would then fail to import. Don't delete old releases that hold a
+bundle: older versions still fetch theirs.
 
-`XPR_REPLAY_TRACE=audio.channels.4,meta.state@315000-334000` logs every change
-of a property whose path contains one of those, in that frame range (`@a-b` is
-optional), to the import's log, to see what the recorder was sent.
+## Checking a route
 
-Unit tests: `cargo test -p xpr-replay -p xpr-recorder` (`offline_client.rs`
-covers the offline client and clock).
+The end-of-run check alone does not prove a route is exact: a Rare Candy sets
+exp to its level's minimum in both route and game, which erases any error
+before it. `exp_drift.py <route.json> <log folder>` reads the import's
+`exp check` lines and fails if a candy was used with the two apart. Run it too.

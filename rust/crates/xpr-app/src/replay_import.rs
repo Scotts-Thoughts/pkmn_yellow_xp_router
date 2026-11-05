@@ -14,6 +14,7 @@ use xpr_core::{Config, Paths};
 use xpr_data::Registry;
 use xpr_recorder::clock;
 use xpr_recorder::controller::Session;
+use xpr_recorder::gamehook::{GameHookProperty, PropertyStore, SessionEvents};
 use xpr_recorder::host::{HostHandle, RecorderHost, StartInfo};
 use xpr_recorder::offline::OfflineClient;
 use xpr_recorder::{starter, QuickStartPhase, RecorderController, StarterWatch};
@@ -69,7 +70,8 @@ pub struct ImportReport {
     pub summary: xpr_replay::Summary,
     pub messages: Vec<String>,
     pub stopped_at_final_trainer: bool,
-    /// the route's solo Pokémon against the game's party where recording stopped
+    /// the route's solo Pokémon against the game's party once recording stopped
+    /// and the game finished leaving the battle (`leaving_battle`)
     pub check: Vec<String>,
     pub check_passed: bool,
 }
@@ -78,7 +80,26 @@ enum Phase {
     Waiting,
     Starter(OfflineClient<StarterWatch>),
     Recording(OfflineClient<Session>),
+    /// recording has stopped; the game's values are still followed for the check
+    AfterStop(OfflineClient<AfterStop>),
     Done,
+}
+
+/// Follows the mapper after recording stopped: the client keeps the store
+/// current, nothing reacts to it.
+struct AfterStop;
+
+impl SessionEvents for AfterStop {
+    fn on_connected(&mut self) {}
+    fn on_connection_error(&mut self) {}
+    fn on_disconnected(&mut self) {}
+    fn on_game_hook_error(&mut self, _err: &str) {}
+    fn on_driver_error(&mut self, _err: &str) {}
+    fn on_mapper_loaded(&mut self, _store: &PropertyStore) -> Vec<String> {
+        Vec::new()
+    }
+    fn on_mapper_load_error(&mut self, _err: &str) {}
+    fn on_property_changed(&mut self, _store: &PropertyStore, _new: &GameHookProperty, _old: &GameHookProperty) {}
 }
 
 /// Record `opts.replay` into a new route. Returns the controller holding it
@@ -90,11 +111,17 @@ pub fn import_replay(
     opts: &ImportOptions,
     progress: &mut dyn FnMut(&str, u64, u64),
 ) -> Result<(MainController, ImportReport), String> {
-    let tools = Tools::locate(opts.tools_dir.as_deref())?;
+    let config_dir = paths.global_config_dir.clone();
+    let not_cancelled = std::sync::atomic::AtomicBool::new(false);
+    let cancel_flag = opts.cancel.as_deref().unwrap_or(&not_cancelled);
+    let tools = Tools::locate(opts.tools_dir.as_deref(), &mut || crate::replay_bundle::ensure(&config_dir, cancel_flag, progress))?;
     let info = ReplayInfo::from_json(&xpr_replay::procs::replay_info(&tools.worker, &opts.replay)?)?;
     let rom = match &opts.rom {
         Some(r) => r.clone(),
-        None => xpr_replay::pipeline::locate_rom(&tools, &opts.replay, &xpr_replay::rom_search_dirs(&opts.replay, &opts.rom_dirs))?,
+        None => {
+            let name = if info.rom_filename.is_empty() { &info.rom_name } else { &info.rom_filename };
+            xpr_replay::pipeline::locate_rom(&tools, &opts.replay, name, &xpr_replay::rom_search_dirs(&opts.replay, &opts.rom_dirs))?
+        }
     };
     let rom_bytes = std::fs::read(&rom).map_err(|e| format!("cannot read {}: {e}", rom.display()))?;
     let choice = xpr_replay::choose_game(&rom_bytes);
@@ -237,12 +264,15 @@ pub fn import_replay(
                         c.apply_batch(&json);
                         c.session_mut().pump_events();
                         let mut active = true;
+                        // a Rare Candy overwrites exp, so a check made only when an event is added
+                        // can miss a fight's error for good: also check when the game's exp moves
+                        let exp_moved = changes.iter().any(|c| c.path.starts_with("player.team.") && c.path.to_ascii_lowercase().contains("exp"));
                         let mut trace: Option<(usize, i64, i64)> = None;
                         with_ctrl(&mut |ctrl| {
                             active = ctrl.is_record_mode_active();
-                            // the route's solo exp against the game's, whenever the route changed
+                            // the route's solo exp against the game's, whenever either changed
                             let events = ctrl.router.all_groups().len();
-                            if events != exp_trace.0 {
+                            if events != exp_trace.0 || exp_moved {
                                 exp_trace.0 = events;
                                 if let (Some(state), Some(game)) = (ctrl.get_final_state(), solo_exp(c.store(), &ctrl.get_final_state().map(|s| s.solo_pkmn.species_def.name.clone()).unwrap_or_default())) {
                                     trace = Some((events, state.solo_pkmn.cur_xp, game));
@@ -259,6 +289,24 @@ pub fn import_replay(
                         if !active {
                             log::info!("[Replay Import] recording stopped at frame {frame} (final trainer)");
                             report.stopped_at_final_trainer = true;
+                            let Phase::Recording(c) = std::mem::replace(&mut phase, Phase::Waiting) else { unreachable!() };
+                            let mut c = c;
+                            c.session_mut().pump_events();
+                            let store = c.shutdown();
+                            controller.stop_offline_session();
+                            if !leaving_battle(&store) {
+                                final_store = Some(store);
+                                phase = Phase::Done;
+                                return Err(STOP.to_string());
+                            }
+                            // the check has to wait for the game; recording does not
+                            phase = Phase::AfterStop(OfflineClient::from_store(AfterStop, store));
+                        }
+                    }
+                    Phase::AfterStop(c) => {
+                        c.apply_batch(&json);
+                        if !leaving_battle(c.store()) {
+                            log::info!("[Replay Import] the battle ended at frame {frame}: the check reads the party from here");
                             return Err(STOP.to_string());
                         }
                     }
@@ -290,6 +338,7 @@ pub fn import_replay(
     drop(sink);
     report.summary = summary;
 
+    let mut party_not_back = false;
     // wind down as turning record mode off does
     match std::mem::replace(&mut phase, Phase::Done) {
         Phase::Recording(c) => {
@@ -303,6 +352,11 @@ pub fn import_replay(
             if fatal.is_none() {
                 fatal = Some("the replay ended before the first Pokémon was received (pass --accept-current to start from the party it begins with)".into());
             }
+        }
+        Phase::AfterStop(c) => {
+            let store = c.shutdown();
+            party_not_back = leaving_battle(&store);
+            final_store = Some(store);
         }
         Phase::Done => {}
     }
@@ -324,6 +378,10 @@ pub fn import_replay(
         let (passed, lines) = check_solo_mon(store, &state.solo_pkmn);
         report.check_passed = passed;
         report.check = lines;
+        if party_not_back {
+            report.check_passed = false;
+            report.check.push("the replay ended before the game wrote the battle's results back to the party, so this is the party from before the final fight".into());
+        }
     }
     while let Some(m) = ctrl.get_next_message_info() {
         report.messages.push(m);
@@ -332,6 +390,15 @@ pub fn import_replay(
         report.messages.push(format!("error: {e}"));
     }
     Ok((ctrl, report))
+}
+
+/// The game has left the battle but not yet returned to the overworld. In gens
+/// 4 and 5 a battle runs on its own copy of the party; the copy comes back when
+/// the battle shuts down (Platinum: `battle_main.c:704`, then
+/// `FieldBattleDTO_UpdateFieldSystem`), several hundred frames after this state
+/// begins, so `player.team` still shows the party from before the fight.
+pub fn leaving_battle(store: &PropertyStore) -> bool {
+    store.resolve_case("meta.state").map(|p| store.get_value(Some(&p))).is_some_and(|v| v.as_str() == Some("From Battle"))
 }
 
 /// Party slot `slot` holds `species` (sanitized). The mappers name every
@@ -462,12 +529,15 @@ pub struct ImportStatus {
 pub struct ImportJob {
     pub status: Arc<Mutex<ImportStatus>>,
     cancel: Arc<std::sync::atomic::AtomicBool>,
+    /// the user already chose a ROM for this import: don't ask again
+    pub rom_chosen: bool,
 }
 
 impl ImportJob {
     pub fn spawn(registry: Arc<Registry>, paths: Paths, cfg: Config, mut opts: ImportOptions, out: PathBuf, wake: Arc<dyn Fn() + Send + Sync>) -> ImportJob {
         let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
         opts.cancel = Some(cancel.clone());
+        let rom_chosen = !opts.rom_dirs.is_empty();
         let status = Arc::new(Mutex::new(ImportStatus { replay: opts.replay.clone(), phase: "start".into(), started: Some(std::time::Instant::now()), ..Default::default() }));
         let st = status.clone();
         std::thread::Builder::new()
@@ -496,7 +566,7 @@ impl ImportJob {
                 wake();
             })
             .ok();
-        ImportJob { status, cancel }
+        ImportJob { status, cancel, rom_chosen }
     }
 
     pub fn cancel(&self) {

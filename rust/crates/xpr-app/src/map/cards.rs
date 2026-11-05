@@ -96,7 +96,7 @@ const CARD_CHROME_H: f32 = 100.0;
 pub fn draw_card(ui: &mut Ui, card: &Card, anchor: Pos2, vp: Rect, avoid: Option<Rect>, cx: &mut CardCtx) -> CardOut {
     let mut out = CardOut { close: false, actions: Vec::new(), navigate: None, open_object: None, table_h: 0.0, rect: Rect::NOTHING };
     let theme = cx.theme;
-    let id = ui.id().with("map_card");
+    let id = ui.scope_id().with("map_card");
     let width = match card {
         Card::Object { .. } | Card::Map { .. } => CARD_W,
         Card::Tile { .. } => {
@@ -649,7 +649,7 @@ fn encounter_table(ui: &mut Ui, map: MapId, water: bool, only_terrain: bool, max
             // a seasonal zone (gen 5) has no plain tables, only one per season
             let seasonal = !present.is_empty() && parts.iter().all(|(_, c, _)| c.is_some());
             let default_cond = if seasonal { present.first().map(|(c, _)| c.clone()).unwrap_or_default() } else { String::new() };
-            let id = ui.id().with(("enc_condition", map));
+            let id = ui.scope_id().with(("enc_condition", map));
             let mut cond: String = ui.ctx().data(|d| d.get_temp::<String>(id)).unwrap_or_else(|| default_cond.clone());
             if (!cond.is_empty() || seasonal) && !present.iter().any(|(c, _)| *c == cond) {
                 cond = default_cond.clone();

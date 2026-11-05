@@ -430,12 +430,12 @@ impl<'a> Entry<'a> {
             .background_color(if self.enabled { theme.bg_input } else { theme.bg_darker })
             .margin(margin)
             .interactive(self.enabled)
-            .frame(false)
+            .frame(egui::Frame::NONE.inner_margin(margin))
             .lock_focus(true)
-            .vertical_align(Align::Center);
-        let pad_x = (margin.left + margin.right) as f32;
+            .align(if self.center { egui::Align2::CENTER_CENTER } else { egui::Align2::LEFT_CENTER });
+        // `desired_width` is the outer width, margins included.
         if let Some(w) = self.width {
-            edit = edit.desired_width(w - pad_x);
+            edit = edit.desired_width(w);
         }
         if let Some(h) = self.min_height {
             edit = edit.min_size(Vec2::new(self.width.unwrap_or(0.0), h));
@@ -443,11 +443,8 @@ impl<'a> Entry<'a> {
         if let Some(h) = &self.hint {
             edit = edit.hint_text(egui::RichText::new(h.clone()).color(theme.secondary));
         }
-        if self.center {
-            edit = edit.horizontal_align(Align::Center);
-        }
         let output = edit.show(ui);
-        let response = output.response;
+        let response = output.response.response;
         let has_focus = response.has_focus();
         let stroke = if !self.enabled {
             Stroke::new(1.0_f32, theme.subtle_border)
@@ -533,10 +530,10 @@ pub fn text_area_styled(ui: &mut Ui, theme: &Theme, text: &mut String, id: Id, h
         .desired_width(f32::INFINITY)
         .min_size(Vec2::new(0.0, height))
         .interactive(enabled)
-        .frame(false)
+        .frame(egui::Frame::NONE.inner_margin(margin))
         .lock_focus(false)
         .show(ui);
-    let response = output.response;
+    let response = output.response.response;
     let stroke = if response.has_focus() {
         Stroke::new(1.0_f32, theme.accent)
     } else {
@@ -583,18 +580,7 @@ pub fn option_menu_ex(ui: &mut Ui, theme: &Theme, id: Id, current: &mut String, 
             ui.disable();
         }
         ui.spacing_mut().button_padding.x = pad_x;
-        let visuals = ui.visuals_mut();
-        visuals.widgets.inactive.bg_fill = theme.bg_input;
-        visuals.widgets.inactive.weak_bg_fill = theme.bg_input;
-        visuals.widgets.inactive.corner_radius = CornerRadius::same(2);
-        visuals.widgets.hovered.bg_fill = theme.bg_input;
-        visuals.widgets.hovered.weak_bg_fill = theme.bg_input;
-        visuals.widgets.hovered.corner_radius = CornerRadius::same(2);
-        visuals.widgets.active.bg_fill = theme.bg_input;
-        visuals.widgets.active.weak_bg_fill = theme.bg_input;
-        visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, theme.text);
-        visuals.widgets.active.corner_radius = CornerRadius::same(2);
-        visuals.widgets.open.corner_radius = CornerRadius::same(2);
+        option_menu_visuals(ui, theme);
         let shown = if ellipsis { elide(ui, current, &font, (w - chrome).max(10.0)) } else { truncate_plain(ui, current, &font, (w - chrome).max(10.0)) };
         let selected_text = egui::RichText::new(shown).font(font.clone()).color(if enabled { theme.text } else { theme.disabled_text });
         egui::ComboBox::from_id_salt(id)
@@ -611,6 +597,104 @@ pub fn option_menu_ex(ui: &mut Ui, theme: &Theme, id: Id, current: &mut String, 
                     }
                 }
             });
+    });
+    changed
+}
+
+/// The combo chrome shared by the `option_menu` family.
+fn option_menu_visuals(ui: &mut Ui, theme: &Theme) {
+    let visuals = ui.visuals_mut();
+    visuals.widgets.inactive.bg_fill = theme.bg_input;
+    visuals.widgets.inactive.weak_bg_fill = theme.bg_input;
+    visuals.widgets.inactive.corner_radius = CornerRadius::same(2);
+    visuals.widgets.hovered.bg_fill = theme.bg_input;
+    visuals.widgets.hovered.weak_bg_fill = theme.bg_input;
+    visuals.widgets.hovered.corner_radius = CornerRadius::same(2);
+    visuals.widgets.active.bg_fill = theme.bg_input;
+    visuals.widgets.active.weak_bg_fill = theme.bg_input;
+    visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, theme.text);
+    visuals.widgets.active.corner_radius = CornerRadius::same(2);
+    visuals.widgets.open.corner_radius = CornerRadius::same(2);
+}
+
+/// Side of the picture in an `option_menu_icons` closed button.
+const ICON_MENU_BUTTON_ICON: f32 = 18.0;
+/// Side of the picture in an `option_menu_icons` popup row.
+const ICON_MENU_ROW_ICON: f32 = 26.0;
+/// Height of an `option_menu_icons` popup row.
+const ICON_MENU_ROW_H: f32 = 30.0;
+/// Popup height before it scrolls.
+const ICON_MENU_POPUP_H: f32 = 420.0;
+const ICON_MENU_GAP: f32 = 6.0;
+
+/// Paint `tex` scaled to fit a `side` square centred on `center`, keeping its
+/// aspect ratio.
+pub fn paint_icon_fit(painter: &egui::Painter, tex: &egui::TextureHandle, center: egui::Pos2, side: f32) {
+    let [w, h] = tex.size();
+    let scale = (side / w as f32).min(side / h as f32);
+    let rect = Rect::from_center_size(center, Vec2::new(w as f32 * scale, h as f32 * scale));
+    painter.image(tex.id(), rect, Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
+}
+
+/// `option_menu` with a picture beside each option (the selection's in the
+/// closed button too). `icon` gives an option's picture; an option without
+/// one keeps its text in line with the rest of the list.
+#[allow(clippy::too_many_arguments)]
+pub fn option_menu_icons(ui: &mut Ui, theme: &Theme, id: Id, current: &mut String, options: &[String], width: f32, enabled: bool, mut icon: impl FnMut(&egui::Context, &str) -> Option<egui::TextureHandle>) -> bool {
+    let font = theme.body();
+    let widest = options.iter().map(|o| text_width(ui, o, &font)).fold(0.0f32, f32::max);
+    let pad_x = 5.0_f32;
+    let chrome = {
+        let sp = ui.spacing();
+        2.0 * pad_x + sp.icon_spacing + sp.icon_width
+    };
+    let ctx = ui.ctx().clone();
+    let current_icon = icon(&ctx, current);
+    let mut changed = false;
+    ui.scope(|ui| {
+        if !enabled {
+            ui.disable();
+        }
+        ui.spacing_mut().button_padding.x = pad_x;
+        option_menu_visuals(ui, theme);
+        // The picture is painted over the button afterwards: egui's combo
+        // only takes text, so the text leaves room for it.
+        let leading = if current_icon.is_some() { ICON_MENU_BUTTON_ICON + ICON_MENU_GAP - 2.0 } else { 0.0 };
+        let shown = elide(ui, current, &font, (width - chrome - leading).max(10.0));
+        let color = if enabled { theme.text } else { theme.disabled_text };
+        let mut job = egui::text::LayoutJob::default();
+        job.append(&shown, leading, egui::TextFormat::simple(font.clone(), color));
+        let combo = egui::ComboBox::from_id_salt(id).width(width).height(ICON_MENU_POPUP_H).selected_text(job).show_ui(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 0.0;
+            let row_w = width.max(ICON_MENU_ROW_ICON + ICON_MENU_GAP + widest + 24.0);
+            ui.set_min_width(row_w);
+            for opt in options {
+                let is_sel = *opt == *current;
+                let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width().max(row_w), ICON_MENU_ROW_H), Sense::click());
+                if !ui.is_rect_visible(r) {
+                    continue;
+                }
+                let vis = ui.style().interact_selectable(&resp, is_sel);
+                if is_sel || resp.hovered() {
+                    ui.painter().rect(r, vis.corner_radius, vis.weak_bg_fill, vis.bg_stroke, egui::StrokeKind::Inside);
+                }
+                if let Some(tex) = icon(ui.ctx(), opt) {
+                    paint_icon_fit(ui.painter(), &tex, egui::pos2(r.min.x + 4.0 + ICON_MENU_ROW_ICON / 2.0, r.center().y), ICON_MENU_ROW_ICON);
+                }
+                ui.painter().text(egui::pos2(r.min.x + 4.0 + ICON_MENU_ROW_ICON + ICON_MENU_GAP, r.center().y), egui::Align2::LEFT_CENTER, opt, font.clone(), vis.text_color());
+                if resp.clicked() && !is_sel {
+                    *current = opt.clone();
+                    changed = true;
+                }
+                if resp.clicked() {
+                    ui.close();
+                }
+            }
+        });
+        if let Some(tex) = &current_icon {
+            let r = combo.response.rect;
+            paint_icon_fit(ui.painter(), tex, egui::pos2(r.min.x + pad_x + ICON_MENU_BUTTON_ICON / 2.0 - 1.0, r.center().y), ICON_MENU_BUTTON_ICON);
+        }
     });
     changed
 }
@@ -785,15 +869,15 @@ impl<'a> SearchableDropdown<'a> {
             .margin(egui::Margin::symmetric(6, 2))
             .desired_width(entry_rect.width() - 12.0)
             .interactive(self.enabled)
-            .frame(false)
+            .frame(egui::Frame::NONE.inner_margin(egui::Margin::symmetric(6, 2)))
             .lock_focus(true)
             .clip_text(true)
-            .vertical_align(Align::Center);
+            .align(egui::Align2::LEFT_CENTER);
         if let Some(p) = &self.placeholder {
             edit = edit.hint_text(egui::RichText::new(p.clone()).color(theme.secondary));
         }
         let out = edit.show(&mut child);
-        let response = out.response;
+        let response = out.response.response;
         let mut has_focus = response.has_focus();
 
         // arrow button
@@ -1310,7 +1394,7 @@ pub fn tab_bar(ui: &mut Ui, theme: &Theme, tabs: &[&str], current: &mut usize, t
         let galley = ui.fonts_mut(|f| f.layout_no_wrap(t.to_string(), font, Color32::PLACEHOLDER));
         let w = galley.size().x + 24.0;
         let rect = Rect::from_min_size(Pos2::new(x, strip.min.y), Vec2::new(w, strip.height()));
-        let resp = ui.interact(rect, ui.id().with(("tab", i)), Sense::click());
+        let resp = ui.interact(rect, ui.scope_id().with(("tab", i)), Sense::click());
         if ui.is_rect_visible(rect) {
             let color = if selected {
                 strong

@@ -61,8 +61,9 @@ impl Harness {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
         let mut actions = Vec::new();
         let Harness { ctx, theme, cfg, paths, registry, ctrl, assets, view, dialog, .. } = self;
-        let _ = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        ctx.run_ui(input, |root| {
+            let ctx = &root.ctx().clone();
+            egui::CentralPanel::default().show(root, |ui| {
                 actions = view.ui(ui, theme, cfg, ctrl, assets);
             });
             if let Some(d) = dialog.as_mut() {
@@ -72,7 +73,7 @@ impl Harness {
                     *dialog = None;
                 }
             }
-        });
+        }).drop_without_applying_deltas();
         actions
     }
 
@@ -144,7 +145,7 @@ impl Harness {
 
     pub fn wheel(&mut self, pos: Pos2, dy: f32) {
         self.frame(vec![Event::PointerMoved(pos)]);
-        self.frame(vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, dy), modifiers: Modifiers::NONE }]);
+        self.frame(vec![Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, dy), modifiers: Modifiers::NONE, phase: egui::TouchPhase::Move, source: egui::MouseWheelSource::Unknown }]);
         self.frame(vec![]);
     }
 

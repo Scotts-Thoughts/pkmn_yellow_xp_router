@@ -53,7 +53,7 @@ pub fn pointer_blocked(ui: &Ui) -> bool {
 }
 
 fn popup_open_id() -> Id {
-    Id::new("xpr_ui_kit_popup_open_at_frame_start")
+    Id::unique("xpr_ui_kit_popup_open_at_frame_start")
 }
 
 /// Records [`egui::Popup::is_any_open`] before anything draws each pass.
@@ -65,7 +65,8 @@ impl egui::Plugin for PopupTracker {
         "xpr_popup_tracker"
     }
 
-    fn on_begin_pass(&mut self, ctx: &Context) {
+    fn on_begin_pass(&mut self, ui: &mut Ui) {
+        let ctx = ui.ctx();
         let open = egui::Popup::is_any_open(ctx);
         ctx.data_mut(|d| d.insert_temp(popup_open_id(), open));
     }
@@ -76,7 +77,7 @@ pub const DIALOG_PAD_X: f32 = 20.0;
 
 /// Draw a modal dialog `width` points wide with `title` in its title strip;
 /// `content` draws the body. Every dialog of the app (`xpr-app`'s
-/// `dialogs::modal`) and of the Dex page goes through this, so they share
+/// `dialogs::modal`) goes through this, so they share
 /// one look and egui's modal input blocking.
 pub fn modal<R>(ctx: &Context, theme: &crate::theme::Theme, id: &str, title: &str, width: f32, content: impl FnOnce(&mut Ui) -> R) -> R {
     use egui::{Color32, CornerRadius, Stroke, Vec2};
@@ -85,7 +86,7 @@ pub fn modal<R>(ctx: &Context, theme: &crate::theme::Theme, id: &str, title: &st
         .stroke(Stroke::new(1.0_f32, crate::theme::lighten(theme.bg, 0.14)))
         .corner_radius(CornerRadius::same(10))
         .shadow(egui::Shadow { offset: [0, 12], blur: 40, spread: 0, color: Color32::from_black_alpha(150) });
-    let m = egui::Modal::new(Id::new(id)).frame(frame).backdrop_color(Color32::from_black_alpha(150));
+    let m = egui::Modal::new(Id::unique(id)).frame(frame).backdrop_color(Color32::from_black_alpha(150));
     m.show(ctx, |ui| {
         ui.set_width(width);
         ui.spacing_mut().item_spacing = Vec2::ZERO;

@@ -512,7 +512,7 @@ impl CompareView {
         let just_opened = slot.picker_just_opened;
         let mut chosen: Option<RouteSource> = None;
         let mut close = false;
-        let id = egui::Id::new(("compare_picker", is_a));
+        let id = egui::Id::unique(("compare_picker", is_a));
         // Anchored under its own button, kept inside the window.
         let button = slot.button_rect.unwrap_or_else(|| Rect::from_min_size(ui.max_rect().min, Vec2::new(330.0, 36.0)));
         let screen = ui.ctx().content_rect();

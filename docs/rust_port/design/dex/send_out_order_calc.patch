@@ -1,0 +1,1480 @@
+diff --git a/rust/crates/xpr-dex-ui/src/views/trainers/detail.rs b/rust/crates/xpr-dex-ui/src/views/trainers/detail.rs
+index 2bd31777..eb7b47c8 100644
+--- a/rust/crates/xpr-dex-ui/src/views/trainers/detail.rs
++++ b/rust/crates/xpr-dex-ui/src/views/trainers/detail.rs
+@@ -9,6 +9,7 @@ use xpr_ui_kit::widgets::fmt_thousands;
+ use super::card::{self, effect_label, CardEnv, CardLayout, MIN_CARD_W};
+ use super::data::{TrainerInfo, VersionIndex};
+ use super::order::supported_gen;
++use xpr_data::send_out_order::{self, SendOutMon};
+ use super::order_ui::OrderUi;
+ use crate::palette::{self, px, px_bold};
+ use crate::widgets;
+@@ -332,7 +333,7 @@ pub fn detail_ui(ui: &mut Ui, cx: &mut DexCx, ix: &VersionIndex, selected: Optio
+     // ---- the team order calculator
+     if st.order.is_some() {
+         if let Some(gen_n) = order_gen {
+-            let party: Vec<super::order::OrderMon> = t.trainer.pkmn.iter().map(|p| super::order::OrderMon { species: p.name.clone(), moves: p.move_list.iter().flatten().cloned().collect() }).collect();
++            let party: Vec<SendOutMon> = t.trainer.pkmn.iter().map(|p| send_out_order::send_out_mon(&ix.gen, p)).collect();
+             let close = super::order_ui::show(ui.ctx(), theme, &mut *cx.images, ix, t, &party, gen_n, st.order.get_or_insert_with(OrderUi::default));
+             if close {
+                 st.order = None;
+diff --git a/rust/crates/xpr-dex-ui/src/views/trainers/order.rs b/rust/crates/xpr-dex-ui/src/views/trainers/order.rs
+index c89e1b59..da59ceaf 100644
+--- a/rust/crates/xpr-dex-ui/src/views/trainers/order.rs
++++ b/rust/crates/xpr-dex-ui/src/views/trainers/order.rs
+@@ -1,78 +1,93 @@
+ //! Team order calculator core: predicts the order a trainer sends out their
+-//! party for generations 2-4 (Solodex `utils/teamOrderCalculator.ts`, which
+-//! documents the decomp sources in `docs/team_order_calculator.md`).
++//! party for generations 2-5, one explained step at a time.
+ //!
+-//! Everything here is pure: the type chart, species typings and move types
+-//! come through [`OrderEnv`], so the algorithm is unit-tested without game
+-//! data. [`GenEnv`] feeds it from the router's own tables.
++//! The rules are `xpr_data::send_out_order`, the recorder's: nothing here
++//! decides a matchup. What this adds is the page's constraint, a free-form
++//! player of which only the types are known. The recorder knows the player's
++//! stats, ability, item and moves; here each step asks whether what is known
++//! settles it, and says so when it doesn't.
+ //!
+ //! All generations: the lead is always slot 0. The differences are in the
+ //! replacement logic after each faint.
+ //!
+-//! * Gen 2: every alive slot scores +1 (has a super-effective move and the
+-//!   player is not super-effective against it), 0 (mutual or neither) or -1.
+-//!   Lowest-indexed +1, else lowest-indexed 0, else a random pick.
+-//! * Gen 3: phase 1 picks the alive slot with the highest `typeDmg` (the
+-//!   damage it takes from the player's STAB, an engine quirk) that also has a
+-//!   super-effective move; otherwise a damage-based phase 2 that is not
+-//!   predicted.
+-//! * Gen 4: stage 1 picks the highest 8-bit offensive type score (the `u8`
+-//!   wraparound is reproduced) with a super-effective move; otherwise a
+-//!   damage-based stage 2 that is not predicted.
++//! * Gen 2: settled by types, except when every candidate is bad and the game
++//!   picks at random.
++//! * Gen 3: Pass 1 needs types, and Levitate, which the page only has to
++//!   consider when a species of this typing can have it. Pass 2 needs the base
++//!   damage `D` from the player's stats and knock-out move, so every value `D`
++//!   can take is tried. A step is decided only if they all agree; otherwise the
++//!   slots that came up are the candidates.
++//! * Gen 4: Stage 1 as gen 3's Pass 1. Stage 2 reads the player's Defense, Sp.
++//!   Def and the abilities a species of this typing can have, and is treated
++//!   the same way over all of them.
++//! * Gen 5: settled by types. No stats, abilities or items are read. Black and
++//!   White are inferred from Black 2 and White 2's code.
+ //!
+-//! Move power is never consulted: status moves with a super-effective type
+-//! still count (that matches the games).
++//! The simulation stops at the first step that isn't decided: what comes after
++//! depends on who came out. A neutral field, a single battle and no voluntary
++//! switch are assumed throughout, as they are by the rules. So is no Iron Ball.
+ 
++use xpr_data::send_out_order::{self as rules, MoveCategory, SendOutMon, SendOutPlayer};
+ use xpr_data::GenData;
+ 
+-/// The result of one chart lookup.
+-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+-pub enum Eff {
+-    Super,
+-    NotVery,
+-    Immune,
+-    Neutral,
+-}
+-
+-/// What the algorithm needs to know about the game.
+-pub trait OrderEnv {
+-    /// The chart entry of `atk` against the single type `def`.
+-    fn eff(&self, atk: &str, def: &str) -> Eff;
+-    /// A species' typing: the first type and the second when it differs.
+-    fn species_types(&self, species: &str) -> Option<(String, Option<String>)>;
+-    /// The type of a move by its name in this game.
+-    fn move_type(&self, mv: &str) -> Option<String>;
++/// The abilities that reach a step of the rules from the player's side. Levitate
++/// is the only one in the type passes. The others change gen 4's damage; gen 3's
++/// base damage already takes every value, so they make no difference there.
++const PLAYER_ABILITIES: [&str; 7] = ["Levitate", "Thick Fat", "Heatproof", "Dry Skin", "Filter", "Solid Rock", "Wonder Guard"];
++
++/// The player: all the page knows of it.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct FreePlayer {
++    types: [String; 2],
++    /// Of [`PLAYER_ABILITIES`], what a species of this typing can have in this game.
++    abilities: Vec<String>,
+ }
+ 
+-/// The router's tables as an [`OrderEnv`].
+-pub struct GenEnv<'a>(pub &'a GenData);
+-
+-impl OrderEnv for GenEnv<'_> {
+-    fn eff(&self, atk: &str, def: &str) -> Eff {
+-        match self.0.effectiveness(atk, def) {
+-            Some(xpr_core::consts::SUPER_EFFECTIVE) => Eff::Super,
+-            Some(xpr_core::consts::NOT_VERY_EFFECTIVE) => Eff::NotVery,
+-            Some(xpr_core::consts::IMMUNE) => Eff::Immune,
+-            _ => Eff::Neutral,
++impl FreePlayer {
++    pub fn new(gen: &GenData, type1: &str, type2: Option<&str>) -> FreePlayer {
++        let mut player = FreePlayer::known(type1, type2, &[]);
++        let same = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
++        let (t1, t2) = (&player.types[0], &player.types[1]);
++        let mut abilities: Vec<String> = Vec::new();
++        for s in gen.pkmn_db().iter() {
++            let [a, b] = rules::species_types(gen, &s.name);
++            if !(same(&a, t1) && same(&b, t2) || same(&a, t2) && same(&b, t1)) {
++                continue;
++            }
++            for ability in PLAYER_ABILITIES.iter().filter(|x| s.abilities.iter().any(|y| same(x, y))) {
++                if !abilities.iter().any(|x| x == ability) {
++                    abilities.push(ability.to_string());
++                }
++            }
+         }
++        player.abilities = abilities;
++        player
++    }
++
++    fn known(type1: &str, type2: Option<&str>, abilities: &[&str]) -> FreePlayer {
++        FreePlayer { types: [type1.to_string(), type2.unwrap_or(type1).to_string()], abilities: abilities.iter().map(|s| s.to_string()).collect() }
++    }
++
++    /// The players the rules run against: one with no ability that matters, then
++    /// one per ability this typing can have. The stats are placeholders: no type
++    /// pass reads them, and the damage passes try every value.
++    fn variants(&self) -> Vec<SendOutPlayer> {
++        let base = SendOutPlayer {
++            species: String::new(),
++            types: self.types.clone(),
++            defense: 1,
++            special_defense: 1,
++            ability: None,
++            item: None,
++            ko_move: None,
++            defense_badge: false,
++            special_defense_badge: false,
++            weather: None,
++        };
++        let mut all = vec![base.clone()];
++        all.extend(self.abilities.iter().map(|a| SendOutPlayer { ability: Some(a.clone()), ..base.clone() }));
++        all
+     }
+-
+-    fn species_types(&self, species: &str) -> Option<(String, Option<String>)> {
+-        let s = self.0.pkmn_db().get_pkmn(species)?;
+-        let t2 = (s.second_type != s.first_type && !s.second_type.is_empty()).then(|| s.second_type.clone());
+-        Some((s.first_type.clone(), t2))
+-    }
+-
+-    fn move_type(&self, mv: &str) -> Option<String> {
+-        self.0.move_db().get_move(mv).map(|m| m.move_type.clone())
+-    }
+-}
+-
+-/// One party member as the calculator sees it.
+-#[derive(Clone, Debug, PartialEq)]
+-pub struct OrderMon {
+-    pub species: String,
+-    pub moves: Vec<String>,
+ }
+ 
+ /// Gen 2's per-slot score.
+@@ -88,16 +103,24 @@ pub enum StepReason {
+     Gen3Phase1,
+     Gen3ForcedLinear,
+     Gen3Phase2,
++    /// Phase 2 ran, and every value of the player's stats gives this pick.
++    Gen3Phase2Settled,
+     Gen4Stage1,
+     Gen4ForcedLinear,
+     Gen4Stage2,
++    /// Stage 2 ran, and every value of the player's stats gives this pick.
++    Gen4Stage2Settled,
++    Gen5BestMove,
++    Gen5ForcedLinear,
++    /// Levitate would change this pick, and this typing can have it.
++    DependsOnLevitate,
+ }
+ 
+ impl StepReason {
+-    /// A step the simulation could not decide (the game rolls a random
+-    /// number or runs the damage-based fallback).
++    /// A step the simulation could not decide: the game rolls a random number,
++    /// or the result needs what the page doesn't know about the player.
+     pub fn is_fallback(self) -> bool {
+-        matches!(self, StepReason::Gen2Random | StepReason::Gen3Phase2 | StepReason::Gen4Stage2)
++        matches!(self, StepReason::Gen2Random | StepReason::Gen3Phase2 | StepReason::Gen4Stage2 | StepReason::DependsOnLevitate)
+     }
+ }
+ 
+@@ -116,17 +139,25 @@ pub struct SlotEvaluation {
+     pub gen4_score: Option<i64>,
+     /// gen 4 only: `gen4_score & 0xFF`, the value the engine compares
+     pub gen4_score_8bit: Option<i64>,
++    /// gen 5 only: the score of the best damaging move, and that move
++    pub gen5_power: Option<i64>,
++    pub gen5_move: Option<String>,
+ }
+ 
+ impl SlotEvaluation {
+     fn blank(slot: usize, is_fainted: bool) -> SlotEvaluation {
+-        SlotEvaluation { slot, is_fainted, has_se_move: false, se_move: None, gen2_score: None, player_se_vs_me: None, type_dmg: None, gen4_score: None, gen4_score_8bit: None }
++        SlotEvaluation { slot, is_fainted, has_se_move: false, se_move: None, gen2_score: None, player_se_vs_me: None, type_dmg: None, gen4_score: None, gen4_score_8bit: None, gen5_power: None, gen5_move: None }
++    }
++
++    fn set_se_move(&mut self, mon: &SendOutMon, index: Option<usize>) {
++        self.has_se_move = index.is_some();
++        self.se_move = index.map(|i| mon.moves[i].name.clone());
+     }
+ }
+ 
+ #[derive(Clone, Debug, PartialEq)]
+ pub struct SimStep {
+-    /// `None` when the pick is not deterministic (the candidates are in
++    /// `None` when the pick is not decided (the candidates are in
+     /// `fallback_candidates` and the simulation stops)
+     pub sent_out: Option<usize>,
+     pub reason: StepReason,
+@@ -134,248 +165,230 @@ pub struct SimStep {
+     pub fallback_candidates: Vec<usize>,
+ }
+ 
+-/// The generations the calculator knows (`getSupportedGen`).
++/// The generations the calculator knows.
+ pub fn supported_gen(generation: u8) -> Option<u8> {
+-    matches!(generation, 2..=4).then_some(generation)
++    matches!(generation, 2..=5).then_some(generation)
+ }
+ 
+-// ---- shared type-chart helpers ----------------------------------------------------------------
++// ---- the slots ----------------------------------------------------------------------------------
+ 
+-fn single_type_multiplier(env: &dyn OrderEnv, atk: &str, def: &str) -> f64 {
+-    match env.eff(atk, def) {
+-        Eff::Super => 2.0,
+-        Eff::NotVery => 0.5,
+-        Eff::Immune => 0.0,
+-        Eff::Neutral => 1.0,
+-    }
+-}
+-
+-/// Multiplier of one attacking type against a (possibly dual) defender, with
+-/// the engines' row-iteration model: each chart row that matches fires once.
+-fn combined_multiplier(env: &dyn OrderEnv, atk: &str, def1: &str, def2: Option<&str>) -> f64 {
+-    let mut m = single_type_multiplier(env, atk, def1);
+-    if let Some(d2) = def2 {
+-        if d2 != def1 {
+-            m *= single_type_multiplier(env, atk, d2);
++fn evaluate_slot(generation: u8, mon: &SendOutMon, slot: usize, is_fainted: bool, player: &SendOutPlayer) -> SlotEvaluation {
++    let mut ev = SlotEvaluation::blank(slot, is_fainted);
++    match generation {
++        2 if is_fainted => {
++            ev.gen2_score = Some(-1);
++            ev.player_se_vs_me = Some(false);
+         }
+-    }
+-    m
+-}
+-
+-/// The first of `moves` that is super-effective against the defender.
+-fn first_se_move(env: &dyn OrderEnv, moves: &[String], def1: &str, def2: Option<&str>) -> Option<String> {
+-    for mv in moves {
+-        if mv.is_empty() {
+-            continue;
++        2 => {
++            let m = rules::gen2_match(mon, player);
++            ev.set_se_move(mon, m.se_move);
++            ev.gen2_score = Some(m.score());
++            ev.player_se_vs_me = Some(m.player_se);
+         }
+-        let Some(t) = env.move_type(mv) else { continue };
+-        if combined_multiplier(env, &t, def1, def2) > 1.0 {
+-            return Some(mv.clone());
++        3 => {
++            ev.type_dmg = Some(0);
++            if !is_fainted {
++                ev.set_se_move(mon, rules::gen3_se_move(mon, player));
++                ev.type_dmg = Some(rules::gen3_type_dmg(mon, player));
++            }
+         }
+-    }
+-    None
+-}
+-
+-// ---- gen 2 --------------------------------------------------------------------------------------
+-
+-fn evaluate_slot_gen2(env: &dyn OrderEnv, mon: &OrderMon, slot: usize, p1: &str, p2: Option<&str>, is_fainted: bool) -> SlotEvaluation {
+-    let mut ev = SlotEvaluation::blank(slot, is_fainted);
+-    if is_fainted {
+-        ev.gen2_score = Some(-1);
+-        ev.player_se_vs_me = Some(false);
+-        return ev;
+-    }
+-    let Some((t1, t2)) = env.species_types(&mon.species) else {
+-        ev.gen2_score = Some(0);
+-        ev.player_se_vs_me = Some(false);
+-        return ev;
+-    };
+-    let se_move = first_se_move(env, &mon.moves, p1, p2);
+-    let has_se = se_move.is_some();
+-    let mut player_se = combined_multiplier(env, p1, &t1, t2.as_deref()) > 1.0;
+-    if !player_se {
+-        if let Some(p2) = p2 {
+-            if p2 != p1 {
+-                player_se = combined_multiplier(env, p2, &t1, t2.as_deref()) > 1.0;
++        4 => {
++            let score = if is_fainted { 0 } else { rules::gen4_type_score(mon, player) };
++            ev.gen4_score = Some(score);
++            ev.gen4_score_8bit = Some(score & 0xFF);
++            if !is_fainted {
++                ev.set_se_move(mon, rules::gen4_se_move(mon, player));
+             }
+         }
++        _ if !is_fainted => {
++            let (power, best) = rules::gen5_best_move(mon, player);
++            ev.gen5_power = Some(power);
++            ev.gen5_move = best.map(|i| mon.moves[i].name.clone());
++        }
++        _ => {}
+     }
+-    let score: SlotScore = if has_se && !player_se {
+-        1
+-    } else if !has_se && player_se {
+-        -1
+-    } else {
+-        0
+-    };
+-    ev.has_se_move = has_se;
+-    ev.se_move = se_move;
+-    ev.gen2_score = Some(score);
+-    ev.player_se_vs_me = Some(player_se);
+     ev
+ }
+ 
++// ---- the picks ----------------------------------------------------------------------------------
++
+ struct Pick {
+     slot: Option<usize>,
+     reason: StepReason,
+     fallback: Vec<usize>,
+ }
+ 
+-fn pick_replacement_gen2(evals: &[SlotEvaluation]) -> Pick {
+-    if let Some(s) = evals.iter().find(|s| s.gen2_score == Some(1)) {
+-        return Pick { slot: Some(s.slot), reason: StepReason::Gen2SePick, fallback: Vec::new() };
++impl Pick {
++    fn decided(slot: usize, reason: StepReason) -> Pick {
++        Pick { slot: Some(slot), reason, fallback: Vec::new() }
+     }
+-    if let Some(s) = evals.iter().find(|s| s.gen2_score == Some(0) && !s.is_fainted) {
+-        return Pick { slot: Some(s.slot), reason: StepReason::Gen2NeutralPick, fallback: Vec::new() };
+-    }
+-    let candidates: Vec<usize> = evals.iter().filter(|s| !s.is_fainted).map(|s| s.slot).collect();
+-    if candidates.len() == 1 {
+-        return Pick { slot: Some(candidates[0]), reason: StepReason::Gen2ForcedRandom, fallback: Vec::new() };
++
++    fn undecided(reason: StepReason, fallback: Vec<usize>) -> Pick {
++        Pick { slot: None, reason, fallback }
+     }
+-    Pick { slot: None, reason: StepReason::Gen2Random, fallback: candidates }
+ }
+ 
+-// ---- gen 3 --------------------------------------------------------------------------------------
+-
+-/// One call of `ModulateByTypeEffectiveness`: every chart row matching the
+-/// attacker and one of the (deduplicated) candidate types multiplies the
+-/// running `type_dmg` by `row / 10` with integer division.
+-fn apply_modulate(env: &dyn OrderEnv, atk: &str, def1: &str, def2: &str, mut type_dmg: i64) -> i64 {
+-    let defs: Vec<&str> = if def1 == def2 { vec![def1] } else { vec![def1, def2] };
+-    for dt in defs {
+-        let chart_mult = match env.eff(atk, dt) {
+-            Eff::Super => 20,
+-            Eff::NotVery => 5,
+-            Eff::Immune => 0,
+-            Eff::Neutral => -1,
+-        };
+-        if chart_mult >= 0 {
+-            type_dmg = type_dmg * chart_mult / 10;
+-        }
++fn pick_gen2(party: &[SendOutMon], fainted: usize, left: &[usize], player: &SendOutPlayer) -> Pick {
++    match rules::next_gen2(party, fainted, left, player) {
++        Some(slot) if rules::gen2_match(&party[slot], player).score() == 1 => Pick::decided(slot, StepReason::Gen2SePick),
++        Some(slot) => Pick::decided(slot, StepReason::Gen2NeutralPick),
++        None if left.len() == 1 => Pick::decided(left[0], StepReason::Gen2ForcedRandom),
++        None => Pick::undecided(StepReason::Gen2Random, left.to_vec()),
+     }
+-    type_dmg
+ }
+ 
+-fn evaluate_slot_gen3(env: &dyn OrderEnv, mon: &OrderMon, slot: usize, opp1: &str, opp2: &str, is_fainted: bool) -> SlotEvaluation {
+-    let mut ev = SlotEvaluation::blank(slot, is_fainted);
+-    if is_fainted {
+-        ev.type_dmg = Some(0);
+-        return ev;
+-    }
+-    // gSpeciesInfo gives single-typed species type1 == type2
+-    let (t1, t2) = match env.species_types(&mon.species) {
+-        Some((a, b)) => {
+-            let b = b.unwrap_or_else(|| a.clone());
+-            (a, b)
+-        }
+-        None => (String::new(), String::new()),
+-    };
+-    let mut type_dmg = 10;
+-    type_dmg = apply_modulate(env, opp1, &t1, &t2, type_dmg);
+-    type_dmg = apply_modulate(env, opp2, &t1, &t2, type_dmg);
+-    // the super-effective move check is the ordinary type calculation: a
+-    // single-typed opponent has no second type
+-    let opp2_for_move = if opp2 == opp1 { None } else { Some(opp2) };
+-    let se_move = first_se_move(env, &mon.moves, opp1, opp2_for_move);
+-    ev.has_se_move = se_move.is_some();
+-    ev.se_move = se_move;
+-    ev.type_dmg = Some(type_dmg);
+-    ev
++struct Reasons {
++    type_pass: StepReason,
++    forced: StepReason,
++    damage_pass: StepReason,
++    damage_settled: StepReason,
+ }
+ 
+-fn pick_replacement_gen3(evals: &[SlotEvaluation]) -> Pick {
+-    let mut pool: Vec<&SlotEvaluation> = evals.iter().filter(|e| !e.is_fainted && e.type_dmg.unwrap_or(0) > 0).collect();
+-    pool.sort_by(|a, b| b.type_dmg.unwrap_or(0).cmp(&a.type_dmg.unwrap_or(0)).then(a.slot.cmp(&b.slot)));
+-    if let Some(ev) = pool.iter().find(|e| e.has_se_move) {
+-        return Pick { slot: Some(ev.slot), reason: StepReason::Gen3Phase1, fallback: Vec::new() };
++/// Gens 3-4: combine what each player variant gives. `first_pass` is the type
++/// pass's pick per variant; `damage_pass` is every pick the damage pass can
++/// make for a variant the type pass left without one.
++fn settle(left: &[usize], first_pass: &[Option<usize>], damage_pass: &dyn Fn(usize) -> Vec<usize>, reasons: Reasons) -> Pick {
++    let split = first_pass.iter().any(|p| *p != first_pass[0]);
++    if let (false, Some(slot)) = (split, first_pass[0]) {
++        return Pick::decided(slot, reasons.type_pass);
++    }
++    if left.len() == 1 {
++        return Pick::decided(left[0], reasons.forced);
++    }
++    let mut outcomes: Vec<usize> = Vec::new();
++    for (variant, first) in first_pass.iter().enumerate() {
++        match first {
++            Some(slot) => outcomes.push(*slot),
++            None => outcomes.extend(damage_pass(variant)),
++        }
+     }
+-    let remaining: Vec<usize> = evals.iter().filter(|e| !e.is_fainted).map(|e| e.slot).collect();
+-    if remaining.len() == 1 {
+-        return Pick { slot: Some(remaining[0]), reason: StepReason::Gen3ForcedLinear, fallback: Vec::new() };
++    outcomes.sort();
++    outcomes.dedup();
++    match outcomes[..] {
++        [slot] => Pick::decided(slot, reasons.damage_settled),
++        _ => Pick::undecided(if split { StepReason::DependsOnLevitate } else { reasons.damage_pass }, outcomes),
+     }
+-    Pick { slot: None, reason: StepReason::Gen3Phase2, fallback: remaining }
+ }
+ 
+-// ---- gen 4 --------------------------------------------------------------------------------------
+-
+-/// `BattleSystem_TypeMatchupMultiplier`: starts at 40 (1x) and applies the
+-/// super-effective / not-very-effective chart rows. The immunity rows are
+-/// not in this routine's chart (a Ground attacker against a Flying defender
+-/// contributes x1, not x0).
+-fn gen4_type_matchup_multiplier(env: &dyn OrderEnv, atk: &str, def1: &str, def2: &str) -> i64 {
+-    let mut mul = 40;
+-    let defs: Vec<&str> = if def1 == def2 { vec![def1] } else { vec![def1, def2] };
+-    for dt in defs {
+-        let chart_mult = match env.eff(atk, dt) {
+-            Eff::Super => 20,
+-            Eff::NotVery => 5,
+-            Eff::Immune | Eff::Neutral => -1,
+-        };
+-        if chart_mult >= 0 {
+-            mul = mul * chart_mult / 10;
++/// No Pokémon's stat is below this (level 1, a hindering nature)...
++const MIN_STAT: i64 = 4;
++/// ...or above this: the games' stat screen tops out at three digits.
++const MAX_STAT: i64 = 999;
++
++/// A ceiling on gen 3's base damage for this attacker. It is above what the game
++/// can produce (a bigger range can only widen a result, never settle one wrongly):
++/// four times the stat for Huge Power and the like, and Explosion's power with
++/// Defense halved.
++fn gen3_max_base(attacker: &SendOutMon) -> i64 {
++    attacker.attack.max(attacker.special_attack) * 4 * 250 * (2 * attacker.level / 5 + 2) / (MIN_STAT / 2) / 50 + 2
++}
++
++/// Every pick Pass 2 can make, over every base damage.
++fn gen3_pass_2_outcomes(party: &[SendOutMon], fainted: usize, left: &[usize], player: &SendOutPlayer) -> Vec<usize> {
++    let pass = rules::Gen3Pass2::new(party, fainted, left, player);
++    let mut outcomes: Vec<usize> = Vec::new();
++    for base in 2..=gen3_max_base(&party[fainted]) {
++        if let Some(slot) = pass.pick(base).or(left.first().copied()) {
++            if !outcomes.contains(&slot) {
++                outcomes.push(slot);
++                if outcomes.len() == left.len() {
++                    break;
++                }
++            }
+         }
+     }
+-    mul
++    outcomes
+ }
+ 
+-fn evaluate_slot_gen4(env: &dyn OrderEnv, mon: &OrderMon, slot: usize, def1: &str, def2: &str, is_fainted: bool) -> SlotEvaluation {
+-    let mut ev = SlotEvaluation::blank(slot, is_fainted);
+-    if is_fainted {
+-        ev.gen4_score = Some(0);
+-        ev.gen4_score_8bit = Some(0);
+-        return ev;
+-    }
+-    // the engine treats a single type as type1 == type2: both passes use it
+-    let (m1, m2) = match env.species_types(&mon.species) {
+-        Some((a, b)) => {
+-            let b = b.unwrap_or_else(|| a.clone());
+-            (a, b)
+-        }
+-        None => (String::new(), String::new()),
+-    };
+-    let score = gen4_type_matchup_multiplier(env, &m1, def1, def2) + gen4_type_matchup_multiplier(env, &m2, def1, def2);
+-    let def2_for_move = if def2 == def1 { None } else { Some(def2) };
+-    let se_move = first_se_move(env, &mon.moves, def1, def2_for_move);
+-    ev.has_se_move = se_move.is_some();
+-    ev.se_move = se_move;
+-    ev.gen4_score = Some(score);
+-    ev.gen4_score_8bit = Some(score & 0xFF);
+-    ev
++fn pick_gen3(party: &[SendOutMon], fainted: usize, left: &[usize], variants: &[SendOutPlayer]) -> Pick {
++    let first_pass: Vec<Option<usize>> = variants.iter().map(|p| rules::gen3_pass_1(party, left, p)).collect();
++    let reasons = Reasons { type_pass: StepReason::Gen3Phase1, forced: StepReason::Gen3ForcedLinear, damage_pass: StepReason::Gen3Phase2, damage_settled: StepReason::Gen3Phase2Settled };
++    settle(left, &first_pass, &|v| gen3_pass_2_outcomes(party, fainted, left, &variants[v]), reasons)
+ }
+ 
+-fn pick_replacement_gen4(evals: &[SlotEvaluation]) -> Pick {
+-    // strict `<` against a starting maximum of 0: a candidate whose 8-bit
+-    // score is 0 (a true score of 256 wraps) is never picked
+-    let mut pool: Vec<&SlotEvaluation> = evals.iter().filter(|e| !e.is_fainted && e.gen4_score_8bit.unwrap_or(0) > 0).collect();
+-    pool.sort_by(|a, b| b.gen4_score_8bit.unwrap_or(0).cmp(&a.gen4_score_8bit.unwrap_or(0)).then(a.slot.cmp(&b.slot)));
+-    if let Some(ev) = pool.iter().find(|e| e.has_se_move) {
+-        return Pick { slot: Some(ev.slot), reason: StepReason::Gen4Stage1, fallback: Vec::new() };
++/// Every pick Stage 2 can make, over every Defense and Sp. Def. A move's score reads
++/// one of the two, so each is tried once and only the different score lists are paired.
++fn gen4_stage_2_outcomes(party: &[SendOutMon], fainted: usize, left: &[usize], player: &SendOutPlayer, score: i64) -> Vec<usize> {
++    let rows_at = |stat: i64| rules::gen4_stage_2_rows(party, fainted, left, &SendOutPlayer { defense: stat, special_defense: stat, ..player.clone() });
++    let at_each_stat: Vec<Vec<rules::Gen4Stage2Row>> = (MIN_STAT..=MAX_STAT).map(rows_at).collect();
++    let distinct = |category: MoveCategory| -> Vec<Vec<Option<i64>>> {
++        let mut lists: Vec<Vec<Option<i64>>> = at_each_stat.iter().map(|rows| rows.iter().filter(|r| r.category == Some(category)).map(|r| r.score).collect()).collect();
++        lists.sort();
++        lists.dedup();
++        lists
++    };
++    let (physical, special) = (distinct(MoveCategory::Physical), distinct(MoveCategory::Special));
++    let mut rows = at_each_stat[0].clone();
++    let mut outcomes: Vec<usize> = Vec::new();
++    for d in &physical {
++        for sd in &special {
++            let (mut next_d, mut next_sd) = (d.iter(), sd.iter());
++            for row in rows.iter_mut() {
++                match row.category {
++                    Some(MoveCategory::Physical) => row.score = *next_d.next().unwrap(),
++                    Some(MoveCategory::Special) => row.score = *next_sd.next().unwrap(),
++                    _ => {}
++                }
++            }
++            if let Some(slot) = rules::gen4_stage_2_pick(&rows, left, score) {
++                if !outcomes.contains(&slot) {
++                    outcomes.push(slot);
++                    if outcomes.len() == left.len() {
++                        return outcomes;
++                    }
++                }
++            }
++        }
+     }
+-    let remaining: Vec<usize> = evals.iter().filter(|e| !e.is_fainted).map(|e| e.slot).collect();
+-    if remaining.len() == 1 {
+-        return Pick { slot: Some(remaining[0]), reason: StepReason::Gen4ForcedLinear, fallback: Vec::new() };
++    outcomes
++}
++
++fn pick_gen4(party: &[SendOutMon], fainted: usize, left: &[usize], variants: &[SendOutPlayer]) -> Pick {
++    let first_pass: Vec<Result<usize, i64>> = variants.iter().map(|p| rules::gen4_stage_1(party, left, p)).collect();
++    let picks: Vec<Option<usize>> = first_pass.iter().map(|r| r.ok()).collect();
++    let reasons = Reasons { type_pass: StepReason::Gen4Stage1, forced: StepReason::Gen4ForcedLinear, damage_pass: StepReason::Gen4Stage2, damage_settled: StepReason::Gen4Stage2Settled };
++    settle(left, &picks, &|v| gen4_stage_2_outcomes(party, fainted, left, &variants[v], first_pass[v].err().unwrap_or(0)), reasons)
++}
++
++fn pick_gen5(party: &[SendOutMon], positions: &mut [usize], gone: &[usize], left: &[usize], player: &SendOutPlayer) -> Pick {
++    match rules::next_gen5(party, positions, gone, player) {
++        Some(slot) if left.len() == 1 => Pick::decided(slot, StepReason::Gen5ForcedLinear),
++        Some(slot) => Pick::decided(slot, StepReason::Gen5BestMove),
++        None => Pick::undecided(StepReason::Gen5BestMove, left.to_vec()),
+     }
+-    Pick { slot: None, reason: StepReason::Gen4Stage2, fallback: remaining }
+ }
+ 
+ // ---- simulation ---------------------------------------------------------------------------------
+ 
+ /// Run the send-out order: the lead, then a replacement after each faint,
+-/// stopping at the first step the game decides at random.
+-fn simulate(party: &[OrderMon], evaluate: &dyn Fn(&OrderMon, usize, bool) -> SlotEvaluation, pick: &dyn Fn(&[SlotEvaluation]) -> Pick) -> Vec<SimStep> {
+-    if party.is_empty() {
++/// stopping at the first step that isn't decided. Empty for a generation with
++/// no rule.
++pub fn simulate_order(party: &[SendOutMon], generation: u8, player: &FreePlayer) -> Vec<SimStep> {
++    if party.is_empty() || supported_gen(generation).is_none() {
+         return Vec::new();
+     }
++    let variants = player.variants();
+     let mut steps = vec![SimStep { sent_out: Some(0), reason: StepReason::Lead, evaluations: Vec::new(), fallback_candidates: Vec::new() }];
+     let mut fainted: Vec<bool> = vec![false; party.len()];
++    // gen 5's battle positions
++    let mut positions: Vec<usize> = (0..party.len()).collect();
++    let mut gone: Vec<usize> = Vec::new();
+     let mut current = 0usize;
+     loop {
+         fainted[current] = true;
+-        if fainted.iter().filter(|f| **f).count() >= party.len() {
++        gone.push(current);
++        let left: Vec<usize> = (0..party.len()).filter(|i| !fainted[*i]).collect();
++        if left.is_empty() {
+             break;
+         }
+-        let evals: Vec<SlotEvaluation> = party.iter().enumerate().map(|(i, p)| evaluate(p, i, fainted[i])).collect();
+-        let p = pick(&evals);
+-        steps.push(SimStep { sent_out: p.slot, reason: p.reason, evaluations: evals, fallback_candidates: p.fallback });
++        let evaluations: Vec<SlotEvaluation> = party.iter().enumerate().map(|(i, p)| evaluate_slot(generation, p, i, fainted[i], &variants[0])).collect();
++        let p = match generation {
++            2 => pick_gen2(party, current, &left, &variants[0]),
++            3 => pick_gen3(party, current, &left, &variants),
++            4 => pick_gen4(party, current, &left, &variants),
++            _ => pick_gen5(party, &mut positions, &gone, &left, &variants[0]),
++        };
++        steps.push(SimStep { sent_out: p.slot, reason: p.reason, evaluations, fallback_candidates: p.fallback });
+         match p.slot {
+             Some(s) => current = s,
+             None => break,
+@@ -384,96 +397,65 @@ fn simulate(party: &[OrderMon], evaluate: &dyn Fn(&OrderMon, usize, bool) -> Slo
+     steps
+ }
+ 
+-/// The predicted send-out order of `party` against a player Pokémon of
+-/// `player_type1` / `player_type2` in a generation 2-4 game; empty for any
+-/// other generation.
+-pub fn simulate_order(env: &dyn OrderEnv, party: &[OrderMon], generation: u8, player_type1: &str, player_type2: Option<&str>) -> Vec<SimStep> {
+-    match supported_gen(generation) {
+-        Some(4) => {
+-            // a single-typed player has both type slots the same
+-            let eff2 = player_type2.unwrap_or(player_type1);
+-            simulate(party, &|p, i, f| evaluate_slot_gen4(env, p, i, player_type1, eff2, f), &pick_replacement_gen4)
+-        }
+-        Some(3) => {
+-            // single-typed players have type1 == type2, so the modulate call
+-            // runs twice with the same attacker and the multiplier doubles
+-            let eff2 = player_type2.unwrap_or(player_type1);
+-            simulate(party, &|p, i, f| evaluate_slot_gen3(env, p, i, player_type1, eff2, f), &pick_replacement_gen3)
+-        }
+-        Some(2) => simulate(party, &|p, i, f| evaluate_slot_gen2(env, p, i, player_type1, player_type2, f), &pick_replacement_gen2),
+-        _ => Vec::new(),
+-    }
+-}
+-
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+-    use std::collections::HashMap;
+-
+-    /// A tiny chart, species table and move table.
+-    #[derive(Default)]
+-    struct Mini {
+-        chart: HashMap<(&'static str, &'static str), Eff>,
+-        species: HashMap<&'static str, (&'static str, Option<&'static str>)>,
+-        moves: HashMap<&'static str, &'static str>,
+-    }
+-
+-    impl OrderEnv for Mini {
+-        fn eff(&self, atk: &str, def: &str) -> Eff {
+-            self.chart.iter().find(|((a, d), _)| *a == atk && *d == def).map(|(_, e)| *e).unwrap_or(Eff::Neutral)
+-        }
+-        fn species_types(&self, species: &str) -> Option<(String, Option<String>)> {
+-            self.species.get(species).map(|(a, b)| (a.to_string(), b.map(|s| s.to_string())))
+-        }
+-        fn move_type(&self, mv: &str) -> Option<String> {
+-            self.moves.get(mv).map(|s| s.to_string())
++    use xpr_data::send_out_order::SendOutMove;
++
++    fn mv(name: &str) -> SendOutMove {
++        let (move_type, power, category) = match name {
++            "Ember" => ("Fire", 40, MoveCategory::Special),
++            "Water Gun" => ("Water", 40, MoveCategory::Special),
++            "Vine Whip" => ("Grass", 35, MoveCategory::Special),
++            "Thunderbolt" => ("Electric", 95, MoveCategory::Special),
++            "Tackle" => ("Normal", 35, MoveCategory::Physical),
++            "Mega Kick" => ("Normal", 120, MoveCategory::Physical),
++            "Earthquake" => ("Ground", 100, MoveCategory::Physical),
++            "Rock Throw" => ("Rock", 50, MoveCategory::Physical),
++            "Bite" => ("Dark", 60, MoveCategory::Special),
++            "Sludge" => ("Poison", 65, MoveCategory::Physical),
++            "Wing Attack" => ("Flying", 60, MoveCategory::Physical),
++            "Growl" => ("Normal", 0, MoveCategory::Status),
++            "Stun Spore" => ("Grass", 0, MoveCategory::Status),
++            "Seismic Toss" => ("Fighting", 1, MoveCategory::Physical),
++            other => panic!("{}", other),
++        };
++        SendOutMove { name: name.to_string(), move_type: move_type.to_string(), power, category }
++    }
++
++    fn mon(species: &str, moves: &[&str]) -> SendOutMon {
++        let (a, b) = match species {
++            "Charmander" => ("Fire", "Fire"),
++            "Squirtle" => ("Water", "Water"),
++            "Bulbasaur" => ("Grass", "Poison"),
++            "Pikachu" => ("Electric", "Electric"),
++            "Geodude" | "Onix" => ("Rock", "Ground"),
++            "Pidgey" => ("Normal", "Flying"),
++            "Rattata" => ("Normal", "Normal"),
++            "Sandshrew" => ("Ground", "Ground"),
++            "Aerodactyl" => ("Rock", "Flying"),
++            "Ekans" => ("Poison", "Poison"),
++            other => panic!("{}", other),
++        };
++        SendOutMon {
++            species: species.to_string(),
++            types: [a.to_string(), b.to_string()],
++            moves: moves.iter().map(|m| mv(m)).collect(),
++            level: 20,
++            attack: 40,
++            special_attack: 40,
++            ability: None,
++            item: None,
++            hidden_power_type: None,
+         }
+     }
+ 
+-    fn mini() -> Mini {
+-        let mut m = Mini::default();
+-        use Eff::*;
+-        for (a, d, e) in [
+-            ("Water", "Fire", Super),
+-            ("Water", "Rock", Super),
+-            ("Water", "Grass", NotVery),
+-            ("Fire", "Grass", Super),
+-            ("Fire", "Water", NotVery),
+-            ("Grass", "Water", Super),
+-            ("Grass", "Fire", NotVery),
+-            ("Electric", "Water", Super),
+-            ("Electric", "Flying", Super),
+-            ("Electric", "Ground", Immune),
+-            ("Ground", "Electric", Super),
+-            ("Ground", "Fire", Super),
+-            ("Ground", "Flying", Immune),
+-            ("Rock", "Fire", Super),
+-            ("Rock", "Flying", Super),
+-            ("Rock", "Ground", NotVery),
+-            ("Normal", "Rock", NotVery),
+-        ] {
+-            m.chart.insert((a, d), e);
+-        }
+-        for (s, a, b) in [
+-            ("Charmander", "Fire", None),
+-            ("Squirtle", "Water", None),
+-            ("Bulbasaur", "Grass", Some("Poison")),
+-            ("Pikachu", "Electric", None),
+-            ("Geodude", "Rock", Some("Ground")),
+-            ("Pidgey", "Normal", Some("Flying")),
+-            ("Gyarados", "Water", Some("Flying")),
+-            ("Onix", "Rock", Some("Ground")),
+-        ] {
+-            m.species.insert(s, (a, b));
+-        }
+-        for (mv, t) in [("Ember", "Fire"), ("Water Gun", "Water"), ("Vine Whip", "Grass"), ("Thunderbolt", "Electric"), ("Tackle", "Normal"), ("Earthquake", "Ground"), ("Rock Throw", "Rock"), ("Growl", "Normal")] {
+-            m.moves.insert(mv, t);
+-        }
+-        m
++    fn strong(m: SendOutMon) -> SendOutMon {
++        SendOutMon { level: 100, attack: 400, special_attack: 400, ..m }
+     }
+ 
+-    fn mon(species: &str, moves: &[&str]) -> OrderMon {
+-        OrderMon { species: species.to_string(), moves: moves.iter().map(|s| s.to_string()).collect() }
++    fn you(type1: &str, type2: Option<&str>) -> FreePlayer {
++        FreePlayer::known(type1, type2, &[])
+     }
+ 
+     fn order(steps: &[SimStep]) -> Vec<Option<usize>> {
+@@ -481,18 +463,19 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn supported_gens_are_two_to_four() {
++    fn supported_gens_are_two_to_five() {
+         assert_eq!(supported_gen(1), None);
+         assert_eq!(supported_gen(2), Some(2));
+         assert_eq!(supported_gen(4), Some(4));
+-        assert_eq!(supported_gen(5), None);
+-        assert!(simulate_order(&mini(), &[mon("Pidgey", &[])], 5, "Water", None).is_empty());
+-        assert!(simulate_order(&mini(), &[], 3, "Water", None).is_empty());
++        assert_eq!(supported_gen(5), Some(5));
++        assert_eq!(supported_gen(6), None);
++        assert!(simulate_order(&[mon("Pidgey", &[])], 6, &you("Water", None)).is_empty());
++        assert!(simulate_order(&[], 3, &you("Water", None)).is_empty());
+     }
+ 
+     #[test]
+     fn single_mon_party_only_leads() {
+-        let steps = simulate_order(&mini(), &[mon("Pidgey", &["Tackle"])], 2, "Water", None);
++        let steps = simulate_order(&[mon("Pidgey", &["Tackle"])], 2, &you("Water", None));
+         assert_eq!(steps.len(), 1);
+         assert_eq!(steps[0].reason, StepReason::Lead);
+         assert_eq!(steps[0].sent_out, Some(0));
+@@ -500,12 +483,11 @@ mod tests {
+ 
+     #[test]
+     fn gen2_prefers_super_effective_without_a_counter() {
+-        let m = mini();
+         // player is Water: Charmander (Fire) is SE'd by Water; Pikachu has Thunderbolt (SE vs Water)
+         // and Water is neutral vs Electric -> +1; Bulbasaur has Vine Whip (SE vs Water) but Water
+         // is NVE vs Grass, so the player is not SE against it -> +1 too, but slot 1 comes first
+         let party = [mon("Squirtle", &["Water Gun"]), mon("Pikachu", &["Thunderbolt"]), mon("Bulbasaur", &["Vine Whip"]), mon("Charmander", &["Ember"])];
+-        let steps = simulate_order(&m, &party, 2, "Water", None);
++        let steps = simulate_order(&party, 2, &you("Water", None));
+         assert_eq!(steps[0].reason, StepReason::Lead);
+         assert_eq!(steps[1].sent_out, Some(1));
+         assert_eq!(steps[1].reason, StepReason::Gen2SePick);
+@@ -524,12 +506,11 @@ mod tests {
+ 
+     #[test]
+     fn gen2_mutual_super_effective_collapses_to_neutral() {
+-        let m = mini();
+         // player Water. Charmander has Thunderbolt (SE vs Water) but Water is SE vs Fire: mutual -> 0.
+         // Pikachu has no SE move and Water is neutral vs Electric: neither -> 0.
+         // Geodude (Rock/Ground) has no SE move and Water is SE vs Rock: -1.
+         let party = [mon("Squirtle", &[]), mon("Charmander", &["Thunderbolt"]), mon("Pikachu", &["Tackle"]), mon("Geodude", &["Tackle"])];
+-        let steps = simulate_order(&m, &party, 2, "Water", None);
++        let steps = simulate_order(&party, 2, &you("Water", None));
+         let ev = &steps[1].evaluations;
+         assert_eq!((ev[1].has_se_move, ev[1].player_se_vs_me, ev[1].gen2_score), (true, Some(true), Some(0)));
+         assert_eq!((ev[2].has_se_move, ev[2].player_se_vs_me, ev[2].gen2_score), (false, Some(false), Some(0)));
+@@ -543,10 +524,9 @@ mod tests {
+ 
+     #[test]
+     fn gen2_all_negative_with_several_left_is_a_random_step() {
+-        let m = mini();
+         // Water vs Rock/Ground: SE, and neither has an SE move: both -1 -> the game rolls a random number
+         let party = [mon("Squirtle", &[]), mon("Geodude", &["Tackle"]), mon("Onix", &["Tackle"])];
+-        let steps = simulate_order(&m, &party, 2, "Water", None);
++        let steps = simulate_order(&party, 2, &you("Water", None));
+         assert_eq!(steps.len(), 2, "the simulation stops at a random step");
+         assert_eq!(steps[1].sent_out, None);
+         assert_eq!(steps[1].reason, StepReason::Gen2Random);
+@@ -554,20 +534,18 @@ mod tests {
+         // a dual-typed player is checked with both of its types
+         let party = [mon("Squirtle", &[]), mon("Pikachu", &["Tackle"]), mon("Charmander", &["Tackle"])];
+         // Water/Ground: Ground is SE vs Fire (Charmander) and Electric (Pikachu): both -1
+-        let steps = simulate_order(&m, &party, 2, "Water", Some("Ground"));
++        let steps = simulate_order(&party, 2, &you("Water", Some("Ground")));
+         assert_eq!(steps[1].evaluations[1].player_se_vs_me, Some(true));
+         assert_eq!(steps[1].evaluations[2].player_se_vs_me, Some(true));
+         assert_eq!(steps[1].reason, StepReason::Gen2Random);
+     }
+ 
+     #[test]
+-    fn gen2_mutual_se_scores_zero_and_is_picked_before_negative() {
+-        let m = mini();
+-        // player Grass: Charmander's Ember is SE vs Grass, and Grass is NVE vs Fire -> +1.
+-        // Squirtle with Tackle: no SE move; Grass is SE vs Water -> -1.
+-        // Bulbasaur (Grass/Poison) with Vine Whip: not SE vs Grass; Grass vs Grass neutral -> 0.
++    fn gen2_a_zero_is_picked_before_a_negative() {
++        // player Grass. Squirtle with Tackle: no SE move; Grass is SE vs Water -> -1.
++        // Bulbasaur (Grass/Poison) with Vine Whip: not SE vs Grass, and Grass is NVE on it -> 0.
+         let party = [mon("Pidgey", &["Tackle"]), mon("Squirtle", &["Tackle"]), mon("Bulbasaur", &["Vine Whip"])];
+-        let steps = simulate_order(&m, &party, 2, "Grass", None);
++        let steps = simulate_order(&party, 2, &you("Grass", None));
+         assert_eq!(steps[1].evaluations[1].gen2_score, Some(-1));
+         assert_eq!(steps[1].evaluations[2].gen2_score, Some(0));
+         assert_eq!(steps[1].sent_out, Some(2));
+@@ -579,68 +557,126 @@ mod tests {
+ 
+     #[test]
+     fn gen3_single_typed_player_double_applies_the_modifier() {
+-        let m = mini();
+         // Water player: Charmander (Fire) takes 2x from the first call and 2x again from the
+         // second (single type duplicated) -> 40
+         let party = [mon("Squirtle", &[]), mon("Charmander", &["Ember"])];
+-        let steps = simulate_order(&m, &party, 3, "Water", None);
+-        // Charmander has no SE move vs Water (Ember is NVE): phase 1 finds nothing; one left ->
+-        // forced
++        let steps = simulate_order(&party, 3, &you("Water", None));
++        // Charmander has no SE move vs Water (Ember is NVE): Phase 1 finds nothing; one left -> forced
+         assert_eq!(steps[1].reason, StepReason::Gen3ForcedLinear);
+         assert_eq!(steps[1].evaluations[1].type_dmg, Some(40));
+         // dual-typed player Water/Flying: two different attackers, each applied once: Fire takes 2x
+         // from Water, neutral from Flying -> 20
+-        let steps = simulate_order(&m, &party, 3, "Water", Some("Flying"));
++        let steps = simulate_order(&party, 3, &you("Water", Some("Flying")));
+         assert_eq!(steps[1].evaluations[1].type_dmg, Some(20));
+     }
+ 
+     #[test]
+-    fn gen3_picks_the_highest_type_damage_with_a_se_move_and_ties_go_to_the_lowest_slot() {
+-        let m = mini();
+-        // Water player. Candidates: slot 1 Bulbasaur (Grass/Poison, Water NVE: 10*5/10=5, then 2 -> floor(25/10)=2),
+-        // slot 2 Pikachu (neutral: 10 -> 10), slot 3 Geodude (Rock/Ground: Water SE vs Rock -> 20 -> 40),
+-        // slot 4 Charmander (Fire: 40).
++    fn gen3_picks_the_highest_type_damage_with_a_se_move() {
++        // Water player. Bulbasaur 2 (5, then 2), Pikachu 10, Geodude 160 (Rock and Ground, twice),
++        // Charmander 40.
+         let party = [
+             mon("Squirtle", &[]),
+-            mon("Bulbasaur", &["Vine Whip"]),
++            mon("Bulbasaur", &["Tackle"]),
+             mon("Pikachu", &["Thunderbolt"]),
+             mon("Geodude", &["Tackle"]),
+             mon("Charmander", &["Ember", "Rock Throw"]),
+         ];
+-        let steps = simulate_order(&m, &party, 3, "Water", None);
++        let steps = simulate_order(&party, 3, &you("Water", None));
+         let ev = &steps[1].evaluations;
+         assert_eq!(ev[1].type_dmg, Some(2));
+         assert_eq!(ev[2].type_dmg, Some(10));
+-        assert_eq!(ev[3].type_dmg, Some(40));
++        assert_eq!(ev[3].type_dmg, Some(160));
+         assert_eq!(ev[4].type_dmg, Some(40));
+-        // Geodude and Charmander tie at 40 but neither has an SE move vs Water (Rock Throw is
+-        // neutral vs Water here); Pikachu (10) has Thunderbolt: it is picked
++        // Geodude and Charmander rank higher but have no SE move: Pikachu is picked
+         assert_eq!(steps[1].sent_out, Some(2));
+         assert_eq!(steps[1].reason, StepReason::Gen3Phase1);
+         assert_eq!(ev[2].se_move.as_deref(), Some("Thunderbolt"));
+     }
+ 
++    /// pokeemerald `ModulateDmgByType2` sets the flag only for a move with power.
++    #[test]
++    fn gen3_a_status_move_does_not_qualify_in_pass_1() {
++        // Charmander takes the most from Water (40), and its one Grass move is super effective on
++        // Water by type, but it's a status move. Pikachu (10) has a real one.
++        let party = [mon("Squirtle", &[]), mon("Charmander", &["Stun Spore"]), mon("Pikachu", &["Thunderbolt"])];
++        let steps = simulate_order(&party, 3, &you("Water", None));
++        assert_eq!(steps[1].evaluations[1].type_dmg, Some(40));
++        assert!(!steps[1].evaluations[1].has_se_move);
++        assert_eq!(steps[1].sent_out, Some(2));
++        assert_eq!(steps[1].reason, StepReason::Gen3Phase1);
++        // with no real one, nobody qualifies
++        let party = [mon("Squirtle", &[]), mon("Charmander", &["Stun Spore"]), mon("Pidgey", &["Tackle"])];
++        let steps = simulate_order(&party, 3, &you("Water", None));
++        assert_ne!(steps[1].reason, StepReason::Gen3Phase1);
++        // gen 4 is different: status moves count there
++        let party = [mon("Squirtle", &[]), mon("Charmander", &["Stun Spore"]), mon("Pidgey", &["Tackle"])];
++        let steps = simulate_order(&party, 4, &you("Water", None));
++        assert!(steps[1].evaluations[1].has_se_move);
++    }
++
++    #[test]
++    fn gen3_walks_the_chart_in_rom_order() {
++        // Normal/Grass player. Normal->Rock is 5; the chart then has Grass->Flying before
++        // Grass->Rock, so Aerodactyl goes 5, 2 (truncated), 4. Ekans is 5 (Grass->Poison).
++        // A multiplier product gives Aerodactyl 5 too, and the tie to the lower slot.
++        let party = [mon("Squirtle", &[]), mon("Aerodactyl", &["Wing Attack"]), mon("Ekans", &["Sludge"])];
++        let steps = simulate_order(&party, 3, &you("Normal", Some("Grass")));
++        assert_eq!(steps[1].evaluations[1].type_dmg, Some(4));
++        assert_eq!(steps[1].evaluations[2].type_dmg, Some(5));
++        assert_eq!(steps[1].sent_out, Some(2));
++        assert_eq!(steps[1].reason, StepReason::Gen3Phase1);
++    }
++
+     #[test]
+     fn gen3_immune_candidates_are_never_phase_one_picks() {
+-        let m = mini();
+-        // Electric player vs Geodude (Rock/Ground): Ground is immune -> typeDmg 0
+-        let party = [mon("Squirtle", &[]), mon("Geodude", &["Water Gun", "Rock Throw"]), mon("Charmander", &["Rock Throw"])];
+-        let steps = simulate_order(&m, &party, 3, "Electric", None);
++        // Electric player vs Geodude (Rock/Ground): Ground is immune -> typeDmg 0, so its
++        // Earthquake (SE) doesn't get it through Phase 1
++        let party = [mon("Squirtle", &[]), mon("Geodude", &["Earthquake", "Rock Throw"]), mon("Charmander", &["Rock Throw"])];
++        let steps = simulate_order(&party, 3, &you("Electric", None));
+         assert_eq!(steps[1].evaluations[1].type_dmg, Some(0));
+-        // phase 1: Charmander is eligible but has no SE move vs Electric; Geodude's Water Gun is
+-        // SE but its typeDmg is 0 -> phase 2 fallback with both candidates
++        // Phase 2: which of them wins moves with the base damage, once it wraps in a byte
+         assert_eq!(steps[1].reason, StepReason::Gen3Phase2);
+         assert_eq!(steps[1].sent_out, None);
+         assert_eq!(steps[1].fallback_candidates, vec![1, 2]);
++        assert_eq!(steps.len(), 2, "the simulation stops at an undecided step");
++    }
++
++    #[test]
++    fn gen3_phase_2_settles_when_only_one_candidate_can_score() {
++        // nobody has an SE move; a power 1 move is skipped, so only Pikachu's Tackle scores
++        let party = [mon("Squirtle", &[]), mon("Pidgey", &["Seismic Toss"]), mon("Pikachu", &["Tackle"])];
++        let steps = simulate_order(&party, 3, &you("Water", None));
++        assert_eq!(order(&steps), vec![Some(0), Some(2), Some(1)]);
++        assert_eq!(steps[1].reason, StepReason::Gen3Phase2Settled);
++        assert_eq!(steps[2].reason, StepReason::Gen3ForcedLinear);
++    }
++
++    #[test]
++    fn levitate_splits_a_pick_only_for_a_typing_that_can_have_it() {
++        // Rock/Psychic: Rattata 10, Sandshrew 5 (Rock->Ground). Rattata's only SE move is Ground.
++        let party = [mon("Squirtle", &[]), mon("Rattata", &["Earthquake"]), mon("Sandshrew", &["Bite"])];
++        let steps = simulate_order(&party, 3, &you("Rock", Some("Psychic")));
++        assert_eq!(steps[1].sent_out, Some(1));
++        assert_eq!(steps[1].reason, StepReason::Gen3Phase1);
++        let lunatone = FreePlayer::known("Rock", Some("Psychic"), &["Levitate"]);
++        let steps = simulate_order(&party, 3, &lunatone);
++        assert_eq!(steps[1].sent_out, None);
++        assert_eq!(steps[1].reason, StepReason::DependsOnLevitate);
++        assert_eq!(steps[1].fallback_candidates, vec![1, 2]);
++        assert!(steps[1].reason.is_fallback());
++        // gen 4 scores the other way round: Sandshrew 160 (x2 on Rock, twice), Rattata 40
++        let party = [mon("Squirtle", &[]), mon("Sandshrew", &["Earthquake"]), mon("Rattata", &["Bite"])];
++        assert_eq!(simulate_order(&party, 4, &you("Rock", Some("Psychic")))[1].sent_out, Some(1));
++        let steps = simulate_order(&party, 4, &lunatone);
++        assert_eq!(steps[1].reason, StepReason::DependsOnLevitate);
+     }
+ 
+     #[test]
+     fn gen4_scores_wrap_to_eight_bits() {
+-        let m = mini();
+         // defender (the player) is Water/Flying. Candidate Pikachu (Electric, mono): both passes
+         // compute Electric vs Water (x2) and vs Flying (x2): 40*2*2 = 160 each -> 320; 320 & 255 = 64.
+         let party = [mon("Squirtle", &[]), mon("Pikachu", &["Thunderbolt"]), mon("Charmander", &["Ember"])];
+-        let steps = simulate_order(&m, &party, 4, "Water", Some("Flying"));
++        let steps = simulate_order(&party, 4, &you("Water", Some("Flying")));
+         let p = &steps[1].evaluations[1];
+         assert_eq!(p.gen4_score, Some(320));
+         assert_eq!(p.gen4_score_8bit, Some(64));
+@@ -652,39 +688,54 @@ mod tests {
+         assert_eq!(steps[1].reason, StepReason::Gen4Stage1);
+     }
+ 
++    /// pokeplatinum `BattleSystem_TypeMatchupMultiplier` walks the whole chart, immunity rows too.
+     #[test]
+-    fn gen4_ignores_immunity_rows_in_the_score() {
+-        let m = mini();
+-        // Ground attacker vs Flying defender contributes x1 (no x0): Onix (Rock/Ground) vs a
+-        // Flying/Water player: Rock is SE vs Flying (x2 -> 80), Ground vs Flying immune (skipped)
+-        // vs Water neutral -> 40; so the two passes give 80 and 40
++    fn gen4_scores_use_the_immunity_rows() {
++        // Onix (Rock/Ground) against a Flying/Water player: Rock is 80. Ground is x0 on Flying,
++        // so that pass is 0, not 40.
+         let party = [mon("Squirtle", &[]), mon("Onix", &["Rock Throw"])];
+-        let steps = simulate_order(&m, &party, 4, "Flying", Some("Water"));
++        let steps = simulate_order(&party, 4, &you("Flying", Some("Water")));
+         let o = &steps[1].evaluations[1];
+-        assert_eq!(o.gen4_score, Some(120));
+-        assert_eq!(o.gen4_score_8bit, Some(120));
++        assert_eq!(o.gen4_score, Some(80));
++        assert_eq!(o.gen4_score_8bit, Some(80));
+         assert!(o.has_se_move);
+-        // forced by elimination? no: stage 1 picks it first (it is the only candidate with a score)
+         assert_eq!(steps[1].sent_out, Some(1));
+     }
+ 
+     #[test]
+-    fn gen4_stage_two_fallback_stops_the_simulation() {
+-        let m = mini();
++    fn gen4_stage_two_settles_when_every_stat_agrees() {
++        // Tackle does at least Growl's 2, and it comes first
+         let party = [mon("Squirtle", &[]), mon("Pidgey", &["Tackle"]), mon("Pikachu", &["Growl"])];
+-        let steps = simulate_order(&m, &party, 4, "Grass", None);
++        let steps = simulate_order(&party, 4, &you("Grass", None));
++        assert_eq!(order(&steps), vec![Some(0), Some(1), Some(2)]);
++        assert_eq!(steps[1].reason, StepReason::Gen4Stage2Settled);
++        assert!(!steps[1].reason.is_fallback());
++    }
++
++    #[test]
++    fn gen4_stage_two_stops_when_stats_change_the_pick() {
++        // strong enough that the damage wraps in a byte
++        let party = [strong(mon("Squirtle", &[])), mon("Rattata", &["Mega Kick"]), mon("Pidgey", &["Tackle"])];
++        let steps = simulate_order(&party, 4, &you("Normal", None));
+         assert_eq!(steps.len(), 2);
++        assert_eq!(steps[1].sent_out, None);
+         assert_eq!(steps[1].reason, StepReason::Gen4Stage2);
+         assert_eq!(steps[1].fallback_candidates, vec![1, 2]);
+         assert!(steps[1].reason.is_fallback());
+     }
+ 
+     #[test]
+-    fn full_orders_run_to_the_last_mon() {
+-        let m = mini();
+-        let party = [mon("Squirtle", &["Water Gun"]), mon("Pikachu", &["Thunderbolt"]), mon("Bulbasaur", &["Vine Whip"])];
+-        let steps = simulate_order(&m, &party, 2, "Water", None);
+-        assert_eq!(order(&steps), vec![Some(0), Some(1), Some(2)]);
++    fn gen5_runs_to_the_end_on_types_alone() {
++        let party = [mon("Rattata", &["Tackle"]), mon("Pidgey", &["Tackle"]), mon("Pikachu", &["Rock Throw"]), mon("Squirtle", &["Growl"]), mon("Bulbasaur", &["Water Gun"])];
++        let fire = simulate_order(&party, 5, &you("Fire", None));
++        // Rock Throw 100, Water Gun 80, Tackle 35, Growl none
++        assert_eq!(order(&fire), vec![Some(0), Some(2), Some(4), Some(1), Some(3)]);
++        let ev = &fire[1].evaluations;
++        assert_eq!(ev[2].gen5_power, Some(100));
++        assert_eq!(ev[2].gen5_move.as_deref(), Some("Rock Throw"));
++        assert_eq!((ev[3].gen5_power, ev[3].gen5_move.as_deref()), (Some(0), None));
++        assert_eq!(fire[1].reason, StepReason::Gen5BestMove);
++        assert_eq!(fire[4].reason, StepReason::Gen5ForcedLinear);
+     }
+ }
+ 
+@@ -692,11 +743,10 @@ mod tests {
+ mod data_tests {
+     use super::*;
+     use crate::testkit::test_registry;
++    use std::collections::HashSet;
+ 
+-    fn mon_of(gen: &GenData, trainer: &str, slot: usize) -> OrderMon {
+-        let t = gen.trainer_db().get_trainer(trainer).unwrap();
+-        let p = &t.pkmn[slot];
+-        OrderMon { species: p.name.clone(), moves: p.move_list.iter().flatten().cloned().collect() }
++    fn party_of(gen: &GenData, trainer: &xpr_data::model::Trainer) -> Vec<SendOutMon> {
++        trainer.pkmn.iter().map(|p| rules::send_out_mon(gen, p)).collect()
+     }
+ 
+     /// The router's type charts match the Dex's (Solodex's) for generations 2-5. Gen 1 differs in one
+@@ -704,23 +754,23 @@ mod data_tests {
+     /// calculator is not offered for gen 1).
+     #[test]
+     fn router_charts_match_the_dex_charts() {
++        let multiplier = |gen: &GenData, atk: &str, def: &str| match gen.effectiveness(atk, def) {
++            Some(xpr_core::consts::SUPER_EFFECTIVE) => 2.0,
++            Some(xpr_core::consts::NOT_VERY_EFFECTIVE) => 0.5,
++            Some(xpr_core::consts::IMMUNE) => 0.0,
++            _ => 1.0,
++        };
+         let reg = test_registry();
+         let red = reg.get_version("Red").unwrap();
+-        assert_eq!(GenEnv(&red).eff("Fighting", "Ghost"), Eff::Immune);
++        assert_eq!(multiplier(&red, "Fighting", "Ghost"), 0.0);
+         assert_eq!(xpr_dex::offensive_multiplier("Fighting", "Ghost", "Red and Blue"), 1.0);
+         for (version, dex_game) in [("Crystal", "Crystal"), ("Emerald", "Emerald"), ("Platinum", "Platinum"), ("Black", "Black")] {
+             let gen = reg.get_version(version).unwrap();
+-            let env = GenEnv(&gen);
+             let types: Vec<String> = gen.supported_types().into_iter().filter(|t| t != "none").collect();
+             let mut diffs = Vec::new();
+             for atk in &types {
+                 for def in &types {
+-                    let router = match env.eff(atk, def) {
+-                        Eff::Super => 2.0,
+-                        Eff::NotVery => 0.5,
+-                        Eff::Immune => 0.0,
+-                        Eff::Neutral => 1.0,
+-                    };
++                    let router = multiplier(&gen, atk, def);
+                     let dex = xpr_dex::offensive_multiplier(atk, def, dex_game);
+                     if router != dex {
+                         diffs.push(format!("{} {}->{}: router {} dex {}", version, atk, def, router, dex));
+@@ -735,8 +785,8 @@ mod data_tests {
+     fn crystal_falkner_against_an_electric_player() {
+         let reg = test_registry();
+         let gen = reg.get_version("Crystal").unwrap();
+-        let party: Vec<OrderMon> = (0..2).map(|i| mon_of(&gen, "Leader Falkner", i)).collect();
+-        let steps = simulate_order(&GenEnv(&gen), &party, gen.get_generation(), "Electric", None);
++        let party = party_of(&gen, gen.trainer_db().get_trainer("Leader Falkner").unwrap());
++        let steps = simulate_order(&party, gen.get_generation(), &FreePlayer::new(&gen, "Electric", None));
+         assert_eq!(steps.len(), 2);
+         assert_eq!(steps[1].sent_out, Some(1));
+         // Pidgeotto's Mud Slap (Ground) is super-effective against Electric, and Electric is super-effective
+@@ -749,20 +799,104 @@ mod data_tests {
+         assert_eq!(steps[1].reason, StepReason::Gen2NeutralPick);
+     }
+ 
++    /// In gens 2-4 the ROMs give Curse the `???` type, which the chart never mentions. The router's
++    /// data says Ghost, which would be super effective on a Ghost player.
++    #[test]
++    fn curse_is_never_super_effective_in_gens_2_to_4() {
++        let reg = test_registry();
++        for version in ["Crystal", "Platinum"] {
++            let gen = reg.get_version(version).unwrap();
++            assert_eq!(gen.move_db().get_move("Curse").unwrap().move_type, "Ghost");
++            let cursed = SendOutMon { moves: vec![rules::send_out_move(&gen, "Curse")], ..rules::send_out_mon(&gen, &gen.trainer_db().iter().next().unwrap().pkmn[0]) };
++            let party = [cursed.clone(), cursed];
++            let steps = simulate_order(&party, gen.get_generation(), &FreePlayer::new(&gen, "Ghost", None));
++            assert!(!steps[1].evaluations[1].has_se_move, "{}", version);
++            assert_eq!(steps[1].evaluations[1].se_move, None, "{}", version);
++        }
++    }
++
++    /// Real data: a status move's type doesn't pass Pass 1.
++    #[test]
++    fn real_status_move_in_emerald() {
++        let reg = test_registry();
++        let gen = reg.get_version("Emerald").unwrap();
++        let base = rules::send_out_mon(&gen, &gen.trainer_db().iter().next().unwrap().pkmn[0]);
++        let spore = SendOutMon { moves: vec![rules::send_out_move(&gen, "Stun Spore")], ..base.clone() };
++        let steps = simulate_order(&[base, spore], 3, &FreePlayer::new(&gen, "Water", None));
++        assert!(!steps[1].evaluations[1].has_se_move);
++    }
++
++    #[test]
++    fn levitate_comes_from_the_species_of_that_typing() {
++        let reg = test_registry();
++        let gen = reg.get_version("Emerald").unwrap();
++        let abilities = |t1, t2| FreePlayer::new(&gen, t1, t2).abilities;
++        assert!(abilities("Rock", Some("Psychic")).contains(&"Levitate".to_string()), "Lunatone");
++        assert!(abilities("Psychic", Some("Rock")).contains(&"Levitate".to_string()), "either way round");
++        assert!(!abilities("Fire", None).contains(&"Levitate".to_string()));
++        assert!(abilities("Normal", Some("Ice")).is_empty(), "no such species");
++    }
++
++    /// The point of the page's honesty: whatever the real player's stats, a step the page calls
++    /// decided is what the recorder's rule picks, and an undecided step lists that pick.
++    #[test]
++    fn decided_steps_hold_for_any_stats() {
++        let reg = test_registry();
++        let you = |t1: &str, t2: &str, d: i64, sd: i64, ko: &str, gen: &GenData| SendOutPlayer {
++            species: String::new(),
++            types: [t1.to_string(), t2.to_string()],
++            defense: d,
++            special_defense: sd,
++            ability: None,
++            item: None,
++            ko_move: Some(rules::send_out_move(gen, ko)),
++            defense_badge: false,
++            special_defense_badge: false,
++            weather: None,
++        };
++        let (mut decided, mut undecided) = (0, 0);
++        for version in ["Crystal", "Emerald", "FireRed", "Platinum", "HeartGold", "Black"] {
++            let gen = reg.get_version(version).unwrap();
++            let g = gen.get_generation();
++            for t in gen.trainer_db().iter().filter(|t| t.pkmn.len() >= 2) {
++                let party = party_of(&gen, t);
++                for (t1, t2) in [("Normal", "Normal"), ("Water", "Water"), ("Grass", "Poison"), ("Fire", "Flying"), ("Steel", "Ground"), ("Dark", "Dark")] {
++                    let steps = simulate_order(&party, g, &FreePlayer::new(&gen, t1, (t1 != t2).then_some(t2)));
++                    for (d, sd, ko) in [(7, 200, "Surf"), (45, 60, "Tackle"), (120, 90, "Earthquake"), (350, 20, "Thunderbolt")] {
++                        let order = rules::predict(g, &party, &you(t1, t2, d, sd, ko, &gen)).unwrap();
++                        for (i, s) in steps.iter().enumerate() {
++                            match s.sent_out {
++                                Some(slot) => {
++                                    decided += 1;
++                                    assert_eq!(order[i], slot, "{} {} vs {}/{} def {} sd {} {}", version, t.name, t1, t2, d, sd, ko);
++                                }
++                                None if s.reason == StepReason::Gen2Random => {}
++                                None => {
++                                    undecided += 1;
++                                    assert!(s.fallback_candidates.contains(&order[i]), "{} {} vs {}/{} def {} sd {} {}", version, t.name, t1, t2, d, sd, ko);
++                                }
++                            }
++                        }
++                    }
++                }
++            }
++        }
++        assert!(decided > 1000 && undecided > 100, "{} {}", decided, undecided);
++    }
++
+     #[test]
+-    fn every_gen_2_to_4_gym_runs_through_every_player_type() {
++    fn every_gym_runs_through_every_player_type() {
+         // smoke test over the real data: no panic, the lead is slot 0 and no slot is sent out twice
+         let reg = test_registry();
+-        for version in ["Crystal", "Emerald", "FireRed", "Platinum", "HeartGold"] {
++        for version in ["Crystal", "Emerald", "FireRed", "Platinum", "HeartGold", "Black", "White 2"] {
+             let gen = reg.get_version(version).unwrap();
+-            let env = GenEnv(&gen);
+             for t in gen.trainer_db().iter().filter(|t| gen.get_fight_category(&t.name) == Some("gym_leader")) {
+-                let party: Vec<OrderMon> = (0..t.pkmn.len()).map(|i| mon_of(&gen, &t.name, i)).collect();
++                let party = party_of(&gen, t);
+                 for p1 in ["Normal", "Water", "Ground", "Dark"] {
+                     for p2 in [None, Some("Flying"), Some("Steel")] {
+-                        let steps = simulate_order(&env, &party, gen.get_generation(), p1, p2);
++                        let steps = simulate_order(&party, gen.get_generation(), &FreePlayer::new(&gen, p1, p2));
+                         assert_eq!(steps[0].sent_out, Some(0));
+-                        let mut seen = std::collections::HashSet::new();
++                        let mut seen = HashSet::new();
+                         for s in &steps {
+                             if let Some(slot) = s.sent_out {
+                                 assert!(seen.insert(slot), "{} {} sent slot {} twice", version, t.name, slot);
+diff --git a/rust/crates/xpr-dex-ui/src/views/trainers/order_ui.rs b/rust/crates/xpr-dex-ui/src/views/trainers/order_ui.rs
+index b5e8dbec..3bb08b2c 100644
+--- a/rust/crates/xpr-dex-ui/src/views/trainers/order_ui.rs
++++ b/rust/crates/xpr-dex-ui/src/views/trainers/order_ui.rs
+@@ -6,7 +6,8 @@ use egui::{Align2, Color32, CornerRadius, Id, Pos2, Rect, RichText, Sense, Strok
+ use xpr_ui_kit::theme::{self, Theme};
+ 
+ use super::data::{TrainerInfo, VersionIndex};
+-use super::order::{simulate_order, GenEnv, OrderMon, SimStep, StepReason};
++use super::order::{simulate_order, FreePlayer, SimStep, StepReason};
++use xpr_data::send_out_order::SendOutMon;
+ use crate::images::{self, DexImages, SpriteSize};
+ use crate::palette::{self, px, px_bold};
+ use crate::widgets;
+@@ -15,15 +16,28 @@ use crate::widgets;
+ pub const PRE_FAIRY_TYPES: [&str; 17] = ["Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground", "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel"];
+ 
+ /// The player's typing, as picked in the modal.
+-#[derive(Clone, Debug, PartialEq, Eq)]
++#[derive(Clone, Debug, PartialEq)]
+ pub struct OrderUi {
+     pub type1: String,
+     pub type2: Option<String>,
++    /// The last result and what it was for: trying every stat is too slow to redo each frame.
++    steps: Option<((String, String, String, Option<String>), Vec<SimStep>)>,
++}
++
++impl OrderUi {
++    fn steps_for(&mut self, ix: &VersionIndex, t: &TrainerInfo, party: &[SendOutMon], gen: u8) -> &[SimStep] {
++        let key = (ix.version.clone(), t.trainer.name.clone(), self.type1.clone(), self.type2.clone());
++        if self.steps.as_ref().map(|s| &s.0) != Some(&key) {
++            let steps = simulate_order(party, gen, &FreePlayer::new(&ix.gen, &self.type1, self.type2.as_deref()));
++            self.steps = Some((key, steps));
++        }
++        &self.steps.as_ref().unwrap().1
++    }
+ }
+ 
+ impl Default for OrderUi {
+     fn default() -> OrderUi {
+-        OrderUi { type1: "Normal".to_string(), type2: None }
++        OrderUi { type1: "Normal".to_string(), type2: None, steps: None }
+     }
+ }
+ 
+@@ -51,20 +65,25 @@ pub fn reason_label(step: &SimStep) -> &'static str {
+         StepReason::Lead => "Lead \u{2014} slot 0 is always sent out first",
+         StepReason::Gen2SePick => "Has a super-effective move; player not super-effective vs it",
+         StepReason::Gen2NeutralPick => "Neutral matchup (no SE move, player not SE vs it)",
+-        StepReason::Gen2ForcedRandom | StepReason::Gen3ForcedLinear | StepReason::Gen4ForcedLinear => "Only remaining Pok\u{e9}mon \u{2014} sent out by elimination",
++        StepReason::Gen2ForcedRandom | StepReason::Gen3ForcedLinear | StepReason::Gen4ForcedLinear | StepReason::Gen5ForcedLinear => "Only remaining Pok\u{e9}mon \u{2014} sent out by elimination",
+         StepReason::Gen2Random => "All remaining Pok\u{e9}mon are at a type disadvantage \u{2014} game picks randomly",
+-        StepReason::Gen3Phase1 => "Phase 1: takes the most damage from your STAB and has a super-effective move",
+-        StepReason::Gen3Phase2 => "Phase 2 fallback: damage-based pick that depends on engine quirks (uses the active battler's stats and a u8 wraparound) \u{2014} can't be deterministically predicted",
++        StepReason::Gen3Phase1 => "Phase 1: takes the most damage from your STAB and has a super-effective damaging move",
++        StepReason::Gen3Phase2 => "Nobody qualifies for Phase 1, so the game compares damage. That depends on your Defense or Sp. Def and the move that made the KO, so types alone can't settle it. These can come out next:",
++        StepReason::Gen3Phase2Settled => "Phase 2: nobody qualifies for Phase 1, and the damage comparison picks this one whatever your stats",
+         StepReason::Gen4Stage1 => "Stage 1: highest offensive type score against you AND has a super-effective move",
+-        StepReason::Gen4Stage2 => "Stage 2 fallback: damage-based pick that depends on engine quirks (uses the active battler's stats and a u8 wraparound) \u{2014} can't be deterministically predicted",
++        StepReason::Gen4Stage2 => "Nobody qualifies for Stage 1, so the game compares damage. That depends on your Defense and Sp. Def, so types alone can't settle it. These can come out next:",
++        StepReason::Gen4Stage2Settled => "Stage 2: nobody qualifies for Stage 1, and the damage comparison picks this one whatever your stats",
++        StepReason::Gen5BestMove => "Highest best-move score against your types",
++        StepReason::DependsOnLevitate => "Levitate blocks Ground moves, and a Pok\u{e9}mon of this typing can have it. The pick depends on your ability. These can come out next:",
+     }
+ }
+ 
+ pub fn gen_note(gen: u8) -> &'static str {
+     match gen {
+         2 => "Lead is always slot 0. After each faint, the trainer picks the lowest-slot Pok\u{e9}mon with a super-effective move that you can't super-effectively counter; failing that, the lowest-slot neutral matchup; failing that, a random pick among the remaining. Move power is not consulted.",
+-        3 => "Lead is always slot 0. After each faint, Phase 1 picks the alive Pok\u{e9}mon that takes the *most* damage from your STAB AND has at least one super-effective move (a counter-intuitive defensive scoring quirk in stock Emerald). If no candidate qualifies, the engine falls back to a damage-based estimate (Phase 2) whose result is hard to predict deterministically.",
+-        _ => "Lead is always slot 0. After each faint, Stage 1 picks the alive Pok\u{e9}mon whose offensive type score against you is highest AND that has at least one super-effective move (Gen 4 fixed Gen 3's defensive-scoring direction). The score is summed across both of the candidate's types and is held in a u8 \u{2014} values above 255 wrap silently in stock Platinum, which can flip the winner. If Stage 1 finds nobody, the engine falls back to a damage-based estimate (Stage 2) that can't be deterministically predicted.",
++        3 => "Lead is always slot 0. After each faint, Phase 1 picks the alive Pok\u{e9}mon that takes the *most* damage from your STAB AND has at least one super-effective damaging move (a counter-intuitive defensive scoring quirk in stock Emerald); status moves don't count. If no candidate qualifies, Phase 2 compares damage using your stats, which this calculator doesn't have, so it only names a pick that holds for every stat value.",
++        4 => "Lead is always slot 0. After each faint, Stage 1 picks the alive Pok\u{e9}mon whose offensive type score against you is highest AND that has at least one super-effective move, status moves included (Gen 4 fixed Gen 3's defensive-scoring direction). The score is summed across both of the candidate's types and is held in a u8 \u{2014} values above 255 wrap silently in stock Platinum, which can flip the winner. If Stage 1 finds nobody, Stage 2 compares damage using your stats, which this calculator doesn't have, so it only names a pick that holds for every stat value.",
++        _ => "Lead is always slot 0. After each faint, each remaining Pok\u{e9}mon scores its best damaging move: base power (under 10 counts as 60) times the type chart against you, with no STAB, stats, abilities or items. Each switch-in swaps places in the battle's party order, which settles ties. Read from Black 2 and White 2; Black and White are inferred from them.",
+     }
+ }
+ 
+@@ -130,8 +149,9 @@ fn step_row(ui: &mut Ui, theme: &Theme, images: &mut DexImages, ix: &VersionInde
+     if step.reason.is_fallback() {
+         let heading = match step.reason {
+             StepReason::Gen2Random => "Random fallback",
+-            StepReason::Gen3Phase2 => "Phase 2 fallback",
+-            _ => "Stage 2 fallback",
++            StepReason::Gen3Phase2 => "Phase 2: depends on your stats",
++            StepReason::DependsOnLevitate => "Depends on your ability",
++            _ => "Stage 2: depends on your stats",
+         };
+         egui::Frame::new()
+             .fill(Color32::from_rgba_unmultiplied(0x71, 0x3f, 0x12, 26))
+@@ -219,6 +239,20 @@ fn step_row(ui: &mut Ui, theme: &Theme, images: &mut DexImages, ix: &VersionInde
+                 job.append(mv, 0.0, TextFormat { font_id: px_bold(theme, 12.0), color, ..Default::default() });
+                 line(ui, job);
+             }
++            if let Some(p) = ev.and_then(|e| e.gen5_power) {
++                ui.add_space(2.0);
++                let mut job = LayoutJob::default();
++                job.append("Best move: ", 0.0, fmt(theme, 12.0, palette::GRAY_500));
++                match ev.and_then(|e| e.gen5_move.as_deref()) {
++                    Some(mv) => {
++                        let color = ix.gen.move_db().get_move(mv).map(|m| move_text_color(&m.move_type)).unwrap_or(palette::GRAY_200);
++                        job.append(mv, 0.0, TextFormat { font_id: px_bold(theme, 12.0), color, ..Default::default() });
++                        job.append(&format!(" \u{b7} score {}", p), 0.0, fmt(theme, 12.0, palette::GRAY_300));
++                    }
++                    None => job.append("none (no damaging move)", 0.0, fmt(theme, 12.0, palette::GRAY_300)),
++                }
++                line(ui, job);
++            }
+             if step.reason == StepReason::Gen3Phase1 {
+                 if let Some(d) = ev.and_then(|e| e.type_dmg) {
+                     ui.add_space(2.0);
+@@ -247,7 +281,7 @@ fn step_row(ui: &mut Ui, theme: &Theme, images: &mut DexImages, ix: &VersionInde
+ 
+ /// Show the calculator; returns true when it should close.
+ #[allow(clippy::too_many_arguments)]
+-pub fn show(ctx: &egui::Context, theme: &Theme, images: &mut DexImages, ix: &VersionIndex, t: &TrainerInfo, party: &[OrderMon], gen: u8, st: &mut OrderUi) -> bool {
++pub fn show(ctx: &egui::Context, theme: &Theme, images: &mut DexImages, ix: &VersionIndex, t: &TrainerInfo, party: &[SendOutMon], gen: u8, st: &mut OrderUi) -> bool {
+     let screen = ctx.content_rect();
+     let card_w = (screen.width() - 32.0).min(672.0);
+     let max_body = (screen.height() * 0.9 - 64.0).max(200.0);
+@@ -314,7 +348,7 @@ pub fn show(ctx: &egui::Context, theme: &Theme, images: &mut DexImages, ix: &Ver
+                 ui.add_space(20.0);
+                 caption(ui, theme, "Predicted send-out order");
+                 ui.add_space(8.0);
+-                let steps = simulate_order(&GenEnv(&ix.gen), party, gen, &st.type1, st.type2.as_deref());
++                let steps = st.steps_for(ix, t, party, gen);
+                 for (i, step) in steps.iter().enumerate() {
+                     if i > 0 {
+                         ui.add_space(8.0);
+@@ -327,7 +361,7 @@ pub fn show(ctx: &egui::Context, theme: &Theme, images: &mut DexImages, ix: &Ver
+                 ui.add_space(20.0);
+                 widgets::hairline(ui, palette::GRAY_800);
+                 ui.add_space(12.0);
+-                let note = format!("{} Assumes your active Pok\u{e9}mon does not switch out.", gen_note(gen));
++                let note = format!("{} Assumes a single battle and a neutral field (no stat changes, weather or screens), and that your active Pok\u{e9}mon does not switch out.{}", gen_note(gen), if gen == 4 { " Also assumes you don't hold an Iron Ball." } else { "" });
+                 ui.add(egui::Label::new(RichText::new(note).font(px(theme, 11.0)).color(palette::GRAY_600)).wrap());
+             });
+         });
+@@ -356,6 +390,6 @@ mod tests {
+     fn the_type_list_is_the_pre_fairy_chart() {
+         assert_eq!(PRE_FAIRY_TYPES.len(), 17);
+         assert!(!PRE_FAIRY_TYPES.contains(&"Fairy"));
+-        assert_eq!(OrderUi::default(), OrderUi { type1: "Normal".into(), type2: None });
++        assert_eq!((OrderUi::default().type1.as_str(), OrderUi::default().type2), ("Normal", None));
+     }
+ }
+diff --git a/rust/crates/xpr-dex-ui/tests/trainers.rs b/rust/crates/xpr-dex-ui/tests/trainers.rs
+index 9ef63dd7..70143d52 100644
+--- a/rust/crates/xpr-dex-ui/tests/trainers.rs
++++ b/rust/crates/xpr-dex-ui/tests/trainers.rs
+@@ -200,8 +200,8 @@ fn calc_damage_hands_the_trainer_to_the_damage_tab() {
+ }
+ 
+ #[test]
+-fn team_order_is_offered_for_gens_2_to_4_only() {
+-    for (version, trainer, expect) in [("Crystal", "Leader Falkner", true), ("Emerald", "Leader Roxanne", true), ("Platinum", "Leader Roark", true), ("Red", "Brock 1", false), ("Black 2", "Leader Roxie (157)", false)] {
++fn team_order_is_offered_for_gens_2_to_5_only() {
++    for (version, trainer, expect) in [("Crystal", "Leader Falkner", true), ("Emerald", "Leader Roxanne", true), ("Platinum", "Leader Roark", true), ("Red", "Brock 1", false), ("Black 2", "Leader Roxie (157)", true)] {
+         let d = driver(version, Some(trainer));
+         assert_eq!(d.shows("Team Order"), expect, "{} {}", version, trainer);
+     }
+@@ -227,6 +227,34 @@ fn the_team_order_calculator_predicts_and_closes() {
+     assert!(!d.shows("Team Order Calculator"), "{:?}", d.texts);
+ }
+ 
++#[test]
++fn the_team_order_calculator_runs_gen_5_to_the_end() {
++    let mut d = driver("Black 2", Some("Team Plasma Zinzolin (584)"));
++    d.click(first(&d, "Team Order"));
++    d.frame(3);
++    assert!(d.shows("Team Plasma Zinzolin (584) \u{b7} Gen 5 send-out logic"), "{:?}", d.texts);
++    assert!(d.texts.iter().any(|t| t.starts_with("Highest best-move score")), "{:?}", d.texts);
++    assert!(d.texts.iter().any(|t| t.contains("Best move")), "{:?}", d.texts);
++    assert!(!d.texts.iter().any(|t| t.contains("depends on your")), "{:?}", d.texts);
++}
++
++/// Types alone don't settle these: the dialog says so rather than guessing.
++#[test]
++fn the_team_order_calculator_says_when_it_cannot_tell() {
++    let mut d = driver("Platinum", Some("Hiker Kevin"));
++    d.click(first(&d, "Team Order"));
++    d.frame(3);
++    // the two pickers' labels, each drawn with a shadow: type 2's Rock is last, type 1's Psychic is
++    // fourth from last
++    d.click(last(&d, "Rock"));
++    d.frame(2);
++    let psychic = text_positions(&d, "Psychic");
++    d.click(psychic[psychic.len() - 4]);
++    d.frame(2);
++    assert!(d.shows("Depends on your ability"), "{:?}", d.texts);
++    assert!(d.texts.iter().any(|t| t.starts_with("Levitate blocks Ground moves")), "{:?}", d.texts);
++}
++
+ #[test]
+ fn clicks_behind_the_team_order_dialog_do_nothing() {
+     let mut d = driver("Crystal", Some("Leader Morty"));

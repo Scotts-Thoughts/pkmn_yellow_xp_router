@@ -65,7 +65,6 @@ pub const DEFAULT_SHORTCUTS: &[(&str, &str)] = &[
     ("toggle_tabs", "`"),
     ("toggle_summary", "Ctrl+`"),
     ("toggle_map", "Ctrl+M"),
-    ("toggle_dex", "Ctrl+K"),
     ("show_on_map", "Ctrl+Shift+M"),
     ("export_map", "Ctrl+Shift+P"),
     ("gym_1", "1"),
@@ -160,7 +159,6 @@ pub const SHORTCUT_LABELS: &[(&str, &str)] = &[
     ("toggle_tabs", "Toggle Event Tabs"),
     ("toggle_summary", "Toggle Summary Window"),
     ("toggle_map", "Toggle Map"),
-    ("toggle_dex", "Open / Close the Dex"),
     ("show_on_map", "Show Selected Event on Map"),
     ("export_map", "Export Map Image"),
     ("gym_1", "Select Gym Leader 1"),
@@ -275,7 +273,6 @@ pub const SHORTCUT_CATEGORIES: &[(&str, &[&str])] = &[
             "toggle_tabs",
             "toggle_summary",
             "toggle_map",
-            "toggle_dex",
             "show_on_map",
             "export_map",
             "gym_1",
@@ -482,7 +479,7 @@ pub struct Config {
     map_toggles: Value,
     map_view_state: Value,
     map_texture_budget_mb: Value,
-    /// the Dex page's own settings (tab, selections, list width, move bans ...), owned by `xpr-dex-ui`
+    /// the removed Dex page's settings: unused for now, kept so they survive if it comes back
     dex_settings: Value,
 
     highlight_colors: IndexMap<i64, Value>,

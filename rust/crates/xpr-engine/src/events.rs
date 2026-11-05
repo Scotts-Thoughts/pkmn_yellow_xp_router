@@ -264,6 +264,33 @@ impl VitaminEventDefinition {
     }
 }
 
+/// The solo mon collected from the Day Care. It earns 1 exp per step while it is
+/// there and the game adds them all when it is taken back (pokeemerald
+/// `TakeSelectedPokemonFromDaycare`), so that is where the route adds them.
+/// Moves it learned there are separate level-up move events.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DayCareEventDefinition {
+    pub exp_gained: i64,
+}
+
+impl DayCareEventDefinition {
+    pub fn new(exp_gained: i64) -> Self {
+        DayCareEventDefinition { exp_gained }
+    }
+
+    pub fn serialize(&self) -> Value {
+        Value::from(self.exp_gained)
+    }
+
+    pub fn deserialize(raw: Option<&Value>) -> Option<Self> {
+        Some(DayCareEventDefinition { exp_gained: i64_of(raw?) })
+    }
+
+    pub fn to_string(&self) -> String {
+        format!("Day Care, {} exp", self.exp_gained)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct RareCandyEventDefinition {
     pub amount: i64,
@@ -1150,6 +1177,7 @@ pub struct EventDefinition {
     pub evolution: Option<EvolutionEventDefinition>,
     pub bag_reorder: Option<BagReorderEventDefinition>,
     pub ev_override: Option<EvOverrideEventDefinition>,
+    pub day_care: Option<DayCareEventDefinition>,
     pub tags: Vec<String>,
     pub notes: String,
 }
@@ -1173,6 +1201,7 @@ impl Default for EventDefinition {
             evolution: None,
             bag_reorder: None,
             ev_override: None,
+            day_care: None,
             tags: Vec::new(),
             notes: String::new(),
         }
@@ -1285,6 +1314,13 @@ impl EventDefinition {
     pub fn with_bag_reorder(swaps: Vec<BagSwap>) -> EventDefinition {
         EventDefinition {
             bag_reorder: Some(BagReorderEventDefinition::new(swaps)),
+            ..Default::default()
+        }
+    }
+
+    pub fn with_day_care(exp_gained: i64) -> EventDefinition {
+        EventDefinition {
+            day_care: Some(DayCareEventDefinition::new(exp_gained)),
             ..Default::default()
         }
     }
@@ -1454,6 +1490,8 @@ impl EventDefinition {
             consts::TASK_REORDER_BAG
         } else if self.ev_override.is_some() {
             consts::TASK_EV_OVERRIDE
+        } else if self.day_care.is_some() {
+            consts::TASK_DAY_CARE
         } else {
             consts::TASK_NOTES_ONLY
         }
@@ -1511,6 +1549,8 @@ impl EventDefinition {
             r.to_string()
         } else if let Some(e) = &self.ev_override {
             e.to_string(gen)
+        } else if let Some(d) = &self.day_care {
+            d.to_string()
         } else {
             let _ = gen;
             format!("Notes: {}", self.notes)
@@ -1637,6 +1677,8 @@ impl EventDefinition {
             pairs.push((consts::TASK_REORDER_BAG, r.serialize()));
         } else if let Some(e) = &self.ev_override {
             pairs.push((consts::TASK_EV_OVERRIDE, e.serialize()));
+        } else if let Some(d) = &self.day_care {
+            pairs.push((consts::TASK_DAY_CARE, d.serialize()));
         }
         pyjson::object(pairs)
     }
@@ -1666,6 +1708,7 @@ impl EventDefinition {
             evolution: EvolutionEventDefinition::deserialize(get(raw, consts::TASK_EVOLUTION))?,
             bag_reorder: BagReorderEventDefinition::deserialize(get(raw, consts::TASK_REORDER_BAG))?,
             ev_override: EvOverrideEventDefinition::deserialize(get(raw, consts::TASK_EV_OVERRIDE))?,
+            day_care: DayCareEventDefinition::deserialize(get(raw, consts::TASK_DAY_CARE)),
         };
         if result.wild_pkmn_info.is_some() {
             result.trainer_def = None;

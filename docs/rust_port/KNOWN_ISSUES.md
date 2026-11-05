@@ -7,6 +7,10 @@ the Python tree was changed by the port, so the "Python-first" items of
 `rust_port_plan.md` Appendix B are ported **as-is** (bugs included) instead of
 being fixed on both sides.
 
+Unfixed recorder and replay-check issues from 2026-11-04 are
+written up for pickup in
+[recording/open_issues_2026-11-04.md](recording/open_issues_2026-11-04.md).
+
 ## Carried-over known issues (plan Appendix E)
 
 | Id | Issue | Where |
@@ -261,6 +265,22 @@ do, what the mappers get wrong and the gaps that remain are in
 - **Area names** come from the recorder's own zone table (read from the
   ROMs): the Black/White mappers name zones from the place-name list.
 
+### Day Care (Rust only; added 2026-11-04)
+
+A `"Day Care"` event holds the exp the solo mon earned in the Day Care (one per
+step), stored as a plain number. The route adds it when the mon is collected,
+as the game does, and charges the fee of 100 plus 100 per level gained. Stats
+are recalculated whether or not it levelled, so stat exp is realized either way.
+Things to know:
+
+- Only the gen 3 recorder writes it so far. It compares the mon's exp as it
+  rejoins the party with its exp when last seen in slot 1, so a mon back from
+  the PC records nothing. A stay of no steps also records nothing, so its 100
+  fee is not in the route.
+- Moves learned there are level-up move events with a destination. The game
+  drops the oldest move and shifts the rest up; the route replaces in place, so
+  the same four moves can be in a different slot order.
+
 ### EV Override (all gens, Rust only; added 2026-09-18)
 
 A testing aid with no in-game equivalent: an `"EV Override"` event pins
@@ -353,33 +373,12 @@ selected event. Design and rules: `docs/rust_port/design/pp_tracking/PLAN.md`.
 | Thief / Covet steals, Pay Day, weather / screen moves on the battle page | Their own PP is not charged. |
 | Recorder | Records Ethers and PP Ups without a target (amber until one is picked). No PP data is read from GameHook yet. |
 
-## Dex page vs. Solodex (added 2026-10-03)
+## Rain Badge in Emerald (found 2026-10-03)
 
-The Dex page ports Solodex's views; where it differs on purpose:
-
-- **Damage tab** = the router's battle summary (xpr-calc), not Solodex's own
-  damage pipelines. Its controls are the route editor's (setup moves, weather,
-  screens, test moves, highlight strategies, kill odds). It has none of Solodex's
-  per-side item / ability / condition panels or accuracy-folded KO odds. The
-  player gains experience between enemy Pokémon as in a route.
-- **Trainer data** is the router's (`raw_pkmn_data`), so trainer names are the
-  router's ("Rival1 Squirtle 1", "Pokemon Trainer Cheren (53)"). Trainer colours
-  and grouping use the router's fight categories (`fights_info.json`) instead
-  of Solodex's name / class heuristics. Custom gens get a Trainers and a
-  Damage tab.
-- **Not ported:** the Route tab and the map (the router has its own), graphic
-  exports (PNG cards, bulk export), the Bulbapedia article popovers (Electron
-  only; they are links that open the browser), the issue reporter, the
-  update banner, and rebinding of the Dex's own keys (F1-F9, Space ...).
-  Ctrl+K, which opens the Dex, is a normal router shortcut.
-- **Sprites:** only the 128 px HOME sprites are bundled. Solodex's full-size
-  artwork (35 MB) is not, so large pictures are upscaled HOME sprites.
-- **Data bug found while porting (router data, not the Dex):** gen 3
-  `fights_info.json` gives the Rain Badge to "Leader Wallace" (Ruby /
-  Sapphire). Emerald's leader is "Leader Juan", so an Emerald route never earns
-  the Rain Badge. It carries no stat boost in gen 3, so damage is unaffected;
-  only the route state's badge list is wrong. The Dex's badge list works around
-  it. Not fixed here.
+Gen 3 `fights_info.json` gives the Rain Badge to "Leader Wallace" (Ruby /
+Sapphire). Emerald's leader is "Leader Juan", so an Emerald route never earns
+the Rain Badge. It carries no stat boost in gen 3, so damage is unaffected;
+only the route state's badge list is wrong. Not fixed.
 
 ## UI divergences (egui vs. Qt)
 

@@ -80,7 +80,8 @@ order, so the route's final state is the solo mon going into this battle); the
 rules are `xpr_data::send_out_order`, a port of the unified frontend's
 `core/logic/sendOutOrder.ts`, whose `docs/send-out-order.md` cites the decomps.
 Change the two together. Gen 1, double battles and two-trainer battles stay in
-party order.
+party order. Known misses and other open problems found while building this are
+in [open_issues_2026-11-04.md](open_issues_2026-11-04.md).
 
 ## Gen 6 and later
 

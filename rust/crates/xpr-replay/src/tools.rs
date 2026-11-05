@@ -25,44 +25,48 @@ fn tools_in(dir: &Path) -> Option<(PathBuf, PathBuf)> {
 }
 
 impl Tools {
-    /// `dir` (or `XPR_REPLAY_TOOLS`) when given; otherwise `replay_tools`
-    /// beside the executable, or `tools/replay_to_route/out` in a folder above
-    /// the executable or the working directory (a checkout).
-    pub fn locate(dir: Option<&Path>) -> Result<Tools, String> {
-        let mut candidates: Vec<PathBuf> = Vec::new();
-        if let Some(d) = dir {
-            candidates.push(d.to_path_buf());
-        } else if let Some(d) = std::env::var_os("XPR_REPLAY_TOOLS") {
-            candidates.push(PathBuf::from(d));
-        } else {
-            let mut starts = Vec::new();
-            if let Ok(exe) = std::env::current_exe() {
-                if let Some(p) = exe.parent() {
-                    candidates.push(p.join("replay_tools"));
-                    starts.push(p.to_path_buf());
+    /// `dir` (or `XPR_REPLAY_TOOLS`) when given. Otherwise `replay_tools`
+    /// beside the executable, then `tools/replay_to_route/out` in a folder
+    /// above the executable or the working directory (a checkout), then
+    /// `bundled`, which gets the released tools (`None` when there are none
+    /// for this platform). It runs last because it may download them.
+    ///
+    /// The mappers are `mappers` in the tools' folder when it has one (the
+    /// bundle's, which the recorders were tested against), else Poke-A-Byte's
+    /// own. `XPR_MAPPERS_DIR` overrides both.
+    pub fn locate(dir: Option<&Path>, bundled: &mut dyn FnMut() -> Result<Option<PathBuf>, String>) -> Result<Tools, String> {
+        let explicit = dir.map(Path::to_path_buf).or_else(|| std::env::var_os("XPR_REPLAY_TOOLS").map(PathBuf::from));
+        let found = match explicit {
+            Some(d) => tools_in(&d),
+            None => {
+                let exe_dir = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf));
+                let beside = exe_dir.as_ref().and_then(|d| tools_in(&d.join("replay_tools")));
+                let cwd = std::env::current_dir().ok();
+                let checkout = || exe_dir.iter().chain(cwd.iter()).find_map(|s| s.ancestors().find_map(|a| tools_in(&a.join("tools").join("replay_to_route").join("out"))));
+                match beside.or_else(checkout) {
+                    Some(t) => Some(t),
+                    None => bundled()?.and_then(|d| tools_in(&d)),
                 }
             }
-            if let Ok(cwd) = std::env::current_dir() {
-                starts.push(cwd);
-            }
-            for s in starts {
-                for a in s.ancestors() {
-                    candidates.push(a.join("tools").join("replay_to_route").join("out"));
-                }
-            }
-        }
-        let (worker, pab_host) = candidates
-            .iter()
-            .find_map(|d| tools_in(d))
-            .ok_or_else(|| "The replay tools were not found: build them with tools/replay_to_route/build.sh (or set XPR_REPLAY_TOOLS).".to_string())?;
+        };
+        let (worker, pab_host) = found.ok_or_else(tools_missing_message)?;
+        let bundled_mappers = worker.parent().map(|d| d.join("mappers")).filter(|d| d.is_dir());
         let mappers = match std::env::var_os("XPR_MAPPERS_DIR") {
             Some(d) => PathBuf::from(d),
-            None => default_mappers_dir().ok_or("Poke-A-Byte's mapper folder was not found (set XPR_MAPPERS_DIR)")?,
+            None => bundled_mappers.or_else(default_mappers_dir).ok_or("Poke-A-Byte's mapper folder was not found (set XPR_MAPPERS_DIR)")?,
         };
         if !mappers.is_dir() {
             return Err(format!("The mapper folder {} does not exist", mappers.display()));
         }
         Ok(Tools { worker, pab_host, mappers })
+    }
+}
+
+fn tools_missing_message() -> String {
+    if cfg!(windows) {
+        "The downloaded replay tools are incomplete.".to_string()
+    } else {
+        "Route from Replay is only available in the Windows version of the router for now.".to_string()
     }
 }
 

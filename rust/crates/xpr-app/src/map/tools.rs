@@ -301,7 +301,7 @@ fn floating_toolbar(view: &mut MapView, ui: &Ui, vp: Rect, sel: Selection) {
 
     let browse = view.browse;
     let (mut zoom, mut export, mut copy, mut add, mut clear) = (false, false, false, false, false);
-    egui::Area::new(egui::Id::new("xpr_map_tools_selection_bar")).order(egui::Order::Foreground).fixed_pos(Pos2::new(x, y)).show(&ctx, |ui| {
+    egui::Area::new(egui::Id::unique("xpr_map_tools_selection_bar")).order(egui::Order::Foreground).fixed_pos(Pos2::new(x, y)).show(&ctx, |ui| {
         egui::Frame::popup(ui.style()).corner_radius(6.0).inner_margin(egui::Margin::symmetric(8, 4)).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);

@@ -109,9 +109,9 @@ impl NatureSelector {
     }
 
     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme) {
-        egui::Grid::new(ui.id().with("nature_grid")).spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("nature_grid")).spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
             widgets::label(ui, theme, "Nature:");
-            if self.dropdown.ui(ui, theme, ui.id().with("nature_dd"), Some(120.0), true) {
+            if self.dropdown.ui(ui, theme, ui.scope_id().with("nature_dd"), Some(120.0), true) {
                 self.sync_buttons_from_dropdown();
             }
             ui.end_row();
@@ -310,27 +310,27 @@ impl CustomDvsFrame {
         let mut changed = false;
         ui.horizontal_top(|ui| {
             ui.spacing_mut().item_spacing = Vec2::new(5.0, 5.0);
-            egui::Grid::new(ui.id().with("dv_grid")).spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
+            egui::Grid::new(ui.scope_id().with("dv_grid")).spacing(Vec2::new(5.0, 5.0)).show(ui, |ui| {
                 let hp_enabled = cur_gen > 2;
                 widgets::label(ui, theme, format!("HP {}:", dv_text));
-                changed |= AmountEntry::new(theme, ui.id().with("hp"), &mut self.hp).min(Some(0)).max(Some(dv_max)).enabled(hp_enabled).show(ui).changed;
+                changed |= AmountEntry::new(theme, ui.scope_id().with("hp"), &mut self.hp).min(Some(0)).max(Some(dv_max)).enabled(hp_enabled).show(ui).changed;
                 ui.end_row();
                 widgets::label(ui, theme, format!("Attack {}:", dv_text));
-                changed |= AmountEntry::new(theme, ui.id().with("atk"), &mut self.atk).min(Some(0)).max(Some(dv_max)).show(ui).changed;
+                changed |= AmountEntry::new(theme, ui.scope_id().with("atk"), &mut self.atk).min(Some(0)).max(Some(dv_max)).show(ui).changed;
                 ui.end_row();
                 widgets::label(ui, theme, format!("Defense {}:", dv_text));
-                changed |= AmountEntry::new(theme, ui.id().with("def"), &mut self.def).min(Some(0)).max(Some(dv_max)).show(ui).changed;
+                changed |= AmountEntry::new(theme, ui.scope_id().with("def"), &mut self.def).min(Some(0)).max(Some(dv_max)).show(ui).changed;
                 ui.end_row();
                 widgets::label(ui, theme, format!("Speed {}:", dv_text));
-                changed |= AmountEntry::new(theme, ui.id().with("spd"), &mut self.spd).min(Some(0)).max(Some(dv_max)).show(ui).changed;
+                changed |= AmountEntry::new(theme, ui.scope_id().with("spd"), &mut self.spd).min(Some(0)).max(Some(dv_max)).show(ui).changed;
                 ui.end_row();
                 let spa_label = if cur_gen > 2 { format!("Special Attack {}:", dv_text) } else { format!("Special {}:", dv_text) };
                 widgets::label(ui, theme, spa_label);
-                changed |= AmountEntry::new(theme, ui.id().with("spa"), &mut self.spa).min(Some(0)).max(Some(dv_max)).show(ui).changed;
+                changed |= AmountEntry::new(theme, ui.scope_id().with("spa"), &mut self.spa).min(Some(0)).max(Some(dv_max)).show(ui).changed;
                 ui.end_row();
                 if let Some(sd) = self.spc_def.as_mut() {
                     widgets::label(ui, theme, format!("Special Defense {}:", dv_text));
-                    changed |= AmountEntry::new(theme, ui.id().with("spc_def"), sd).min(Some(0)).max(Some(dv_max)).show(ui).changed;
+                    changed |= AmountEntry::new(theme, ui.scope_id().with("spc_def"), sd).min(Some(0)).max(Some(dv_max)).show(ui).changed;
                     ui.end_row();
                 }
                 if let Some(hp) = &self.hidden_power {
@@ -348,7 +348,7 @@ impl CustomDvsFrame {
                     if let Some(a) = self.ability.as_mut() {
                         ui.horizontal(|ui| {
                             widgets::label(ui, theme, "Ability:");
-                            a.ui(ui, theme, ui.id().with("ability"), Some(120.0), true);
+                            a.ui(ui, theme, ui.scope_id().with("ability"), Some(120.0), true);
                         });
                     }
                 });

@@ -70,6 +70,11 @@ impl OptionMenu {
     pub fn ui(&mut self, ui: &mut Ui, theme: &Theme, id: Id, width: Option<f32>, enabled: bool) -> bool {
         widgets::option_menu(ui, theme, id, &mut self.current, &self.options, width, enabled)
     }
+
+    /// `ui` with a picture beside each option; returns true on change.
+    pub fn ui_icons(&mut self, ui: &mut Ui, theme: &Theme, id: Id, width: f32, enabled: bool, icon: impl FnMut(&egui::Context, &str) -> Option<egui::TextureHandle>) -> bool {
+        widgets::option_menu_icons(ui, theme, id, &mut self.current, &self.options, width, enabled, icon)
+    }
 }
 
 /// What an editor's `ui` reported.
@@ -302,7 +307,7 @@ impl TrainerFightEditor {
                 .margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 4 })
                 .corner_radius(4)
                 .enabled(ctx.enabled)
-                .id(ui.id().with("pay_day"))
+                .id(ui.scope_id().with("pay_day"))
                 .show(ui);
             if r.changed {
                 out.merge(EditorOutput::save());
@@ -432,12 +437,12 @@ impl TrainerFightEditor {
                 ui.set_width(w);
                 ui.spacing_mut().item_spacing.x = 6.0;
                 widgets::label_font(ui, "Order", body.clone(), theme.secondary);
-                if order.ui(ui, theme, ui.id().with(("order", idx)), Some(55.0), ctx.enabled) {
+                if order.ui(ui, theme, ui.scope_id().with(("order", idx)), Some(55.0), ctx.enabled) {
                     reorder = true;
                 }
                 ui.add_space(6.0);
                 widgets::label_font(ui, "Exp split", body.clone(), theme.secondary);
-                if split.ui(ui, theme, ui.id().with(("split", idx)), Some(55.0), ctx.enabled) {
+                if split.ui(ui, theme, ui.scope_id().with(("split", idx)), Some(55.0), ctx.enabled) {
                     out.merge(EditorOutput::save());
                 }
             });
@@ -486,14 +491,14 @@ impl VitaminEditor {
     pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx) -> EditorOutput {
         let theme = ctx.theme;
         let mut out = EditorOutput::default();
-        egui::Grid::new(ui.id().with("vitamin_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("vitamin_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
             widgets::label(ui, theme, "Vitamin Type:");
-            if self.vitamin_types.ui(ui, theme, ui.id().with("vit_type"), None, ctx.enabled) {
+            if self.vitamin_types.ui(ui, theme, ui.scope_id().with("vit_type"), None, ctx.enabled) {
                 out.merge(EditorOutput::save());
             }
             ui.end_row();
             widgets::label(ui, theme, "Num Vitamins:");
-            let r = AmountEntry::new(theme, ui.id().with("vit_amt"), &mut self.amount).min(Some(1)).width(Some(5)).enabled(ctx.enabled).show(ui);
+            let r = AmountEntry::new(theme, ui.scope_id().with("vit_amt"), &mut self.amount).min(Some(1)).width(Some(5)).enabled(ctx.enabled).show(ui);
             if r.changed {
                 if let Ok(v) = self.amount.trim().parse::<i64>() {
                     if v > 0 {
@@ -527,15 +532,49 @@ impl RareCandyEditor {
     pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx) -> EditorOutput {
         let theme = ctx.theme;
         let mut out = EditorOutput::default();
-        egui::Grid::new(ui.id().with("candy_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("candy_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
             widgets::label(ui, theme, "Num Rare Candies:");
-            let r = AmountEntry::new(theme, ui.id().with("candy_amt"), &mut self.amount).min(Some(1)).width(Some(5)).enabled(ctx.enabled).show(ui);
+            let r = AmountEntry::new(theme, ui.scope_id().with("candy_amt"), &mut self.amount).min(Some(1)).width(Some(5)).enabled(ctx.enabled).show(ui);
             if r.changed {
                 if let Ok(v) = self.amount.trim().parse::<i64>() {
                     if v > 0 {
                         out.merge(EditorOutput::save());
                     }
                 }
+            }
+            ui.end_row();
+        });
+        out
+    }
+}
+
+/// The exp a Day Care event adds. Recorded from the game; editable like any
+/// other event's numbers.
+#[derive(Default)]
+pub struct DayCareEditor {
+    exp_gained: String,
+}
+
+impl DayCareEditor {
+    pub fn load_event(&mut self, def: &EventDefinition) {
+        if let Some(d) = &def.day_care {
+            self.exp_gained = d.exp_gained.to_string();
+        }
+    }
+
+    pub fn get_event(&self) -> Result<EventDefinition, String> {
+        let exp: i64 = self.exp_gained.trim().parse().map_err(|_| format!("invalid literal for int() with base 10: '{}'", self.exp_gained))?;
+        Ok(EventDefinition::with_day_care(exp))
+    }
+
+    pub fn ui(&mut self, ui: &mut Ui, ctx: &EditorCtx) -> EditorOutput {
+        let theme = ctx.theme;
+        let mut out = EditorOutput::default();
+        egui::Grid::new(ui.scope_id().with("day_care_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
+            widgets::label(ui, theme, "Exp gained:");
+            let r = AmountEntry::new(theme, ui.scope_id().with("day_care_exp"), &mut self.exp_gained).min(Some(1)).width(Some(7)).enabled(ctx.enabled).show(ui);
+            if r.changed && self.exp_gained.trim().parse::<i64>().map(|v| v > 0).unwrap_or(false) {
+                out.merge(EditorOutput::save());
             }
             ui.end_row();
         });
@@ -739,39 +778,39 @@ impl LearnMoveEditor {
         let mut item_filter_changed = false;
         let mut move_filter_changed = false;
         let mut move_changed = false;
-        egui::Grid::new(ui.id().with("learn_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("learn_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
             widgets::label(ui, theme, self.move_name_label.clone());
             ui.end_row();
             widgets::label(ui, theme, "Move Destination:");
-            if self.destination.ui(ui, theme, ui.id().with("dest"), Some(val_width), ctx.enabled && self.destination_enabled) {
+            if self.destination.ui(ui, theme, ui.scope_id().with("dest"), Some(val_width), ctx.enabled && self.destination_enabled) {
                 out.merge(EditorOutput::save());
             }
             ui.end_row();
             widgets::label(ui, theme, "Move Source");
-            if self.source.ui(ui, theme, ui.id().with("source"), Some(val_width), ctx.enabled && self.source_enabled) {
+            if self.source.ui(ui, theme, ui.scope_id().with("source"), Some(val_width), ctx.enabled && self.source_enabled) {
                 source_changed = true;
             }
             ui.end_row();
             if self.show_tm {
                 widgets::label(ui, theme, "Item Name Filter:");
-                if Entry::new(theme, &mut self.item_filter).width(val_width).enabled(ctx.enabled).id(ui.id().with("item_filter")).show(ui).changed {
+                if Entry::new(theme, &mut self.item_filter).width(val_width).enabled(ctx.enabled).id(ui.scope_id().with("item_filter")).show(ui).changed {
                     item_filter_changed = true;
                 }
                 ui.end_row();
                 widgets::label(ui, theme, "Move:");
-                if self.item_selector.ui(ui, theme, ui.id().with("item_sel"), Some(val_width), ctx.enabled) {
+                if self.item_selector.ui(ui, theme, ui.scope_id().with("item_sel"), Some(val_width), ctx.enabled) {
                     move_changed = true;
                 }
                 ui.end_row();
             }
             if self.show_tutor {
                 widgets::label(ui, theme, "Move Filter:");
-                if Entry::new(theme, &mut self.move_filter).width(val_width).enabled(ctx.enabled).id(ui.id().with("move_filter")).show(ui).changed {
+                if Entry::new(theme, &mut self.move_filter).width(val_width).enabled(ctx.enabled).id(ui.scope_id().with("move_filter")).show(ui).changed {
                     move_filter_changed = true;
                 }
                 ui.end_row();
                 widgets::label(ui, theme, "Move:");
-                if self.move_selector.ui(ui, theme, ui.id().with("move_sel"), Some(val_width), ctx.enabled) {
+                if self.move_selector.ui(ui, theme, ui.scope_id().with("move_sel"), Some(val_width), ctx.enabled) {
                     move_changed = true;
                 }
                 ui.end_row();
@@ -851,24 +890,24 @@ impl WildPkmnEditor {
         let mut out = EditorOutput::default();
         let mut filter_changed = false;
         let mut check_valid = false;
-        egui::Grid::new(ui.id().with("wild_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("wild_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
             widgets::label(ui, theme, "Wild Pokemon Type:");
-            if self.pkmn_types.ui(ui, theme, ui.id().with("types"), Some(140.0), ctx.enabled) {
+            if self.pkmn_types.ui(ui, theme, ui.scope_id().with("types"), Some(140.0), ctx.enabled) {
                 out.merge(EditorOutput::save());
             }
             ui.end_row();
             widgets::label(ui, theme, "Wild Pokemon Type Filter:");
-            if Entry::new(theme, &mut self.pkmn_filter).width(140.0).enabled(ctx.enabled).id(ui.id().with("filter")).show(ui).changed {
+            if Entry::new(theme, &mut self.pkmn_filter).width(140.0).enabled(ctx.enabled).id(ui.scope_id().with("filter")).show(ui).changed {
                 filter_changed = true;
             }
             ui.end_row();
             widgets::label(ui, theme, "Wild Pokemon Level:");
-            if AmountEntry::new(theme, ui.id().with("level"), &mut self.level).min(Some(2)).max(Some(100)).width(Some(5)).enabled(ctx.enabled).show(ui).changed {
+            if AmountEntry::new(theme, ui.scope_id().with("level"), &mut self.level).min(Some(2)).max(Some(100)).width(Some(5)).enabled(ctx.enabled).show(ui).changed {
                 check_valid = true;
             }
             ui.end_row();
             widgets::label(ui, theme, "Num Pkmn:");
-            if AmountEntry::new(theme, ui.id().with("qty"), &mut self.quantity).min(Some(1)).width(Some(5)).enabled(ctx.enabled).show(ui).changed {
+            if AmountEntry::new(theme, ui.scope_id().with("qty"), &mut self.quantity).min(Some(1)).width(Some(5)).enabled(ctx.enabled).show(ui).changed {
                 check_valid = true;
             }
             ui.end_row();
@@ -1089,32 +1128,32 @@ impl InventoryEventEditor {
         let show_hold = et == consts::TASK_HOLD_ITEM;
         let mut filter_changed = false;
         let mut selector_changed = false;
-        egui::Grid::new(ui.id().with("inv_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("inv_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
             widgets::label(ui, theme, "Item Type:");
-            if self.item_type.ui(ui, theme, ui.id().with("type"), Some(val_width), ctx.enabled) {
+            if self.item_type.ui(ui, theme, ui.scope_id().with("type"), Some(val_width), ctx.enabled) {
                 filter_changed = true;
             }
             ui.end_row();
             if show_mart {
                 widgets::label(ui, theme, "Mart:");
-                if self.mart.ui(ui, theme, ui.id().with("mart"), Some(val_width), ctx.enabled) {
+                if self.mart.ui(ui, theme, ui.scope_id().with("mart"), Some(val_width), ctx.enabled) {
                     filter_changed = true;
                 }
                 ui.end_row();
             }
             widgets::label(ui, theme, "Item Name Filter:");
-            if Entry::new(theme, &mut self.item_filter).width(val_width).enabled(ctx.enabled).id(ui.id().with("filter")).show(ui).changed {
+            if Entry::new(theme, &mut self.item_filter).width(val_width).enabled(ctx.enabled).id(ui.scope_id().with("filter")).show(ui).changed {
                 filter_changed = true;
             }
             ui.end_row();
             widgets::label(ui, theme, "Item:");
-            if self.item_selector.ui(ui, theme, ui.id().with("item"), Some(val_width), ctx.enabled) {
+            if self.item_selector.ui(ui, theme, ui.scope_id().with("item"), Some(val_width), ctx.enabled) {
                 selector_changed = true;
             }
             ui.end_row();
             if show_amount {
                 widgets::label(ui, theme, "Num Items:");
-                if AmountEntry::new(theme, ui.id().with("amt"), &mut self.amount).min(Some(1)).width(Some(5)).enabled(ctx.enabled).show(ui).changed {
+                if AmountEntry::new(theme, ui.scope_id().with("amt"), &mut self.amount).min(Some(1)).width(Some(5)).enabled(ctx.enabled).show(ui).changed {
                     selector_changed = true;
                 }
                 ui.end_row();
@@ -1125,7 +1164,7 @@ impl InventoryEventEditor {
             }
             if self.pp_item == Some(true) {
                 widgets::label(ui, theme, "On move:");
-                if self.pp_target.ui(ui, theme, ui.id().with("pp_target"), Some(val_width), ctx.enabled && !self.pp_tossed) {
+                if self.pp_target.ui(ui, theme, ui.scope_id().with("pp_target"), Some(val_width), ctx.enabled && !self.pp_tossed) {
                     out.merge(EditorOutput::save());
                 }
                 ui.end_row();
@@ -1196,9 +1235,9 @@ impl LocationEditor {
             _ => "Black Out back to:",
         };
         let mut out = EditorOutput::default();
-        egui::Grid::new(ui.id().with("loc_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("loc_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
             widgets::label(ui, theme, label);
-            if Entry::new(theme, &mut self.location).width(160.0).enabled(ctx.enabled).id(ui.id().with("loc")).show(ui).changed {
+            if Entry::new(theme, &mut self.location).width(160.0).enabled(ctx.enabled).id(ui.scope_id().with("loc")).show(ui).changed {
                 out.merge(EditorOutput::delayed());
             }
             ui.end_row();
@@ -1251,19 +1290,19 @@ impl EvolutionEditor {
         let theme = ctx.theme;
         let mut out = EditorOutput::default();
         let mut filter_changed = false;
-        egui::Grid::new(ui.id().with("evo_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("evo_grid")).spacing(Vec2::new(4.0, 4.0)).show(ui, |ui| {
             widgets::label(ui, theme, "Pokemon Species:");
-            if self.pkmn_types.ui(ui, theme, ui.id().with("species"), Some(140.0), ctx.enabled) {
+            if self.pkmn_types.ui(ui, theme, ui.scope_id().with("species"), Some(140.0), ctx.enabled) {
                 out.merge(EditorOutput::save());
             }
             ui.end_row();
             widgets::label(ui, theme, "Pokemon Species Filter:");
-            if Entry::new(theme, &mut self.pkmn_filter).width(140.0).enabled(ctx.enabled).id(ui.id().with("filter")).show(ui).changed {
+            if Entry::new(theme, &mut self.pkmn_filter).width(140.0).enabled(ctx.enabled).id(ui.scope_id().with("filter")).show(ui).changed {
                 filter_changed = true;
             }
             ui.end_row();
             widgets::label(ui, theme, "By Stone:");
-            if self.item_selector.ui(ui, theme, ui.id().with("stone"), Some(140.0), ctx.enabled) {
+            if self.item_selector.ui(ui, theme, ui.scope_id().with("stone"), Some(140.0), ctx.enabled) {
                 out.merge(EditorOutput::save());
             }
             ui.end_row();
@@ -1385,7 +1424,7 @@ impl BagReorderEditor {
             let w = ui.available_width();
             for idx in 0..n {
                 let (name, count) = self.order[idx].clone();
-                let row_id = ui.id().with(("bag_row", idx));
+                let row_id = ui.scope_id().with(("bag_row", idx));
                 let row = ui.allocate_ui_with_layout(Vec2::new(w, 30.0), Layout::left_to_right(Align::Center), |ui| {
                     ui.set_width(w);
                     let rect = ui.max_rect();
@@ -1549,14 +1588,14 @@ impl EvOverrideEditor {
         let (unit, cap) = if gen12 { ("Stat Exp", STAT_XP_CAP_GEN12) } else { ("EVs", SINGLE_STAT_EV_CAP) };
         let names = if gen12 { &EV_STAT_NAMES_GEN12 } else { &EV_STAT_NAMES };
         widgets::label_font(ui, format!("{} from this point on (0-{} per stat):", unit, cap), theme.body(), theme.secondary);
-        egui::Grid::new(ui.id().with("ev_grid")).spacing(Vec2::new(8.0, 4.0)).show(ui, |ui| {
+        egui::Grid::new(ui.scope_id().with("ev_grid")).spacing(Vec2::new(8.0, 4.0)).show(ui, |ui| {
             widgets::label_font(ui, "", theme.caption_font(), theme.secondary);
             widgets::label_font(ui, "Override", theme.caption_font(), theme.secondary);
             widgets::label_font(ui, "Before", theme.caption_font(), theme.secondary);
             ui.end_row();
             for &idx in ev_field_indices(gen12) {
                 widgets::label(ui, theme, format!("{}:", names[idx]));
-                let r = AmountEntry::new(theme, ui.id().with(("ev_amt", idx)), &mut self.values[idx]).min(Some(0)).max(Some(cap)).width(Some(6)).enabled(ctx.enabled).show(ui);
+                let r = AmountEntry::new(theme, ui.scope_id().with(("ev_amt", idx)), &mut self.values[idx]).min(Some(0)).max(Some(cap)).width(Some(6)).enabled(ctx.enabled).show(ui);
                 if r.changed {
                     out.merge(EditorOutput::delayed());
                 }
@@ -1688,7 +1727,7 @@ impl NotesEditor {
                 if expanded {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.spacing_mut().item_spacing.x = 10.0;
-                        if self.visibility.ui(ui, theme, ui.id().with("notes_vis"), None, true) {
+                        if self.visibility.ui(ui, theme, ui.scope_id().with("notes_vis"), None, true) {
                             cfg.set_notes_visibility_mode(notes_mode_for_option(self.visibility.get()));
                             mode_changed = true;
                         }
@@ -1707,7 +1746,7 @@ impl NotesEditor {
             });
             if expanded {
                 ui.add_space(8.0);
-                let r = widgets::text_area_styled(ui, theme, &mut self.text, ui.id().with("notes_text"), 100.0, self.enabled, egui::Margin { left: 10, right: 10, top: 8, bottom: 8 }, 6);
+                let r = widgets::text_area_styled(ui, theme, &mut self.text, ui.scope_id().with("notes_text"), 100.0, self.enabled, egui::Margin { left: 10, right: 10, top: 8, bottom: 8 }, 6);
                 if r.changed() {
                     out.merge(EditorOutput::delayed());
                 }
@@ -1733,6 +1772,7 @@ pub struct EventEditors {
     pub evolution: EvolutionEditor,
     pub bag_reorder: BagReorderEditor,
     pub ev_override: EvOverrideEditor,
+    pub day_care: DayCareEditor,
 }
 
 impl EventEditors {
@@ -1764,6 +1804,7 @@ impl EventEditors {
             }
             consts::TASK_REORDER_BAG => self.bag_reorder.load_event(ctx, def),
             consts::TASK_EV_OVERRIDE => self.ev_override.load_event(ctx, def),
+            consts::TASK_DAY_CARE => self.day_care.load_event(def),
             _ => {}
         }
     }
@@ -1780,6 +1821,7 @@ impl EventEditors {
             consts::TASK_EVOLUTION => Ok(self.evolution.get_event()),
             consts::TASK_REORDER_BAG => self.bag_reorder.get_event(),
             consts::TASK_EV_OVERRIDE => self.ev_override.get_event(),
+            consts::TASK_DAY_CARE => self.day_care.get_event(),
             _ => Ok(EventDefinition::default()),
         }
     }
@@ -1875,6 +1917,7 @@ impl EventEditors {
                             consts::TASK_EVOLUTION => (self.evolution.ui(ui, ctx), false),
                             consts::TASK_REORDER_BAG => (self.bag_reorder.ui(ui, ctx), false),
                             consts::TASK_EV_OVERRIDE => (self.ev_override.ui(ui, ctx), false),
+                            consts::TASK_DAY_CARE => (self.day_care.ui(ui, ctx), false),
                             _ => (EditorOutput::default(), false),
                         }
                     })

@@ -5,6 +5,6 @@ edition.workspace = true
 
 [dependencies]
 xpr-core = { path = "../xpr-core" }
-egui = "0.33.3"
+egui = { version = "0.37.0", features = ["default_fonts", "monochrome_emoji_fonts"] }
 log = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png"] }

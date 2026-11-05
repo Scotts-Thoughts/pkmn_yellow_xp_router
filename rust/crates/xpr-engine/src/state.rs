@@ -749,6 +749,36 @@ impl RouteState {
         Ok((RouteState::new(mon, self.badges.clone(), inv), error_message))
     }
 
+    /// The solo mon collected from the Day Care with `exp_gained` steps on it.
+    /// The fee is 100 plus 100 per level gained; the game recalculates the
+    /// mon's stats whether or not it levelled, so stat exp is realized either
+    /// way (pokeemerald `ApplyDaycareExperience`, `GetDaycareCost`).
+    pub fn day_care(&self, exp_gained: i64) -> Result<(RouteState, String), String> {
+        let cur = &self.solo_pkmn;
+        let mon = self.rebuild(
+            SoloPokemonArgs {
+                move_list: Some(cur.move_list.clone()),
+                cur_xp: cur.cur_xp,
+                realized_stat_xp: Some(cur.unrealized_stat_xp),
+                unrealized_stat_xp: Some(cur.unrealized_stat_xp),
+                gained_xp: exp_gained,
+                held_item: cur.held_item.clone(),
+                ..Default::default()
+            },
+            self.badges.clone(),
+            None,
+            None,
+        )?;
+        let fee = 100 + 100 * (mon.cur_level - cur.cur_level);
+        let mut error_message = String::new();
+        if fee > self.inventory.cur_money {
+            error_message = format!("Not enough money for the Day Care fee: need {}, have {}", fee, self.inventory.cur_money);
+        }
+        let mut inv = self.inventory.clone();
+        inv.cur_money -= fee;
+        Ok((RouteState::new(mon, self.badges.clone(), inv), error_message))
+    }
+
     /// `defeat_pkmn(enemy_pkmn, trainer_name, exp_split, pay_day_amount)`
     pub fn defeat_pkmn(&self, gen: &GenData, enemy_pkmn: &EnemyPkmn, trainer_name: Option<&str>, exp_split: i64, pay_day_amount: i64) -> Result<(RouteState, String), String> {
         let new_badges = match trainer_name {

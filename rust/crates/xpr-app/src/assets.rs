@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use egui::{ColorImage, TextureHandle, TextureOptions};
+use egui::{ColorImage, TextureFilter, TextureHandle, TextureOptions};
 use serde_json::Value;
 
 mod embedded {
@@ -43,10 +43,20 @@ impl Assets {
     }
 
     fn load_texture(&mut self, ctx: &egui::Context, key: &str, bytes: &[u8], grayscale: bool) -> Option<TextureHandle> {
+        self.load_texture_with(ctx, key, bytes, grayscale, TextureOptions::LINEAR)
+    }
+
+    /// For art drawn well below its stored size (a 24 px list icon from a
+    /// 160 px box): without mipmaps it shimmers and loses its lettering.
+    fn load_art(&mut self, ctx: &egui::Context, key: &str, bytes: &[u8]) -> Option<TextureHandle> {
+        self.load_texture_with(ctx, key, bytes, false, TextureOptions::LINEAR.with_mipmap_mode(Some(TextureFilter::Linear)))
+    }
+
+    fn load_texture_with(&mut self, ctx: &egui::Context, key: &str, bytes: &[u8], grayscale: bool, options: TextureOptions) -> Option<TextureHandle> {
         if let Some(t) = self.textures.get(key) {
             return t.clone();
         }
-        let tex = load_png(bytes, grayscale).map(|img| ctx.load_texture(key.to_string(), img, TextureOptions::LINEAR));
+        let tex = load_png(bytes, grayscale).map(|img| ctx.load_texture(key.to_string(), img, options));
         self.textures.insert(key.to_string(), tex.clone());
         tex
     }
@@ -60,13 +70,13 @@ impl Assets {
         self.ensure_lookup();
         let dex = *self.dex_lookup.as_ref()?.get(species)? as u32;
         let bytes = embedded::PKMN_ICONS.iter().find(|(n, _)| *n == dex).map(|(_, b)| *b)?;
-        self.load_texture(ctx, &format!("pkmn:{}", dex), bytes, false)
+        self.load_art(ctx, &format!("pkmn:{}", dex), bytes)
     }
 
     /// `box_art.get_box_art(version)`
     pub fn box_art(&mut self, ctx: &egui::Context, version: &str) -> Option<TextureHandle> {
         let bytes = embedded::BOX_ART.iter().find(|(v, _)| *v == version).map(|(_, b)| *b)?;
-        self.load_texture(ctx, &format!("boxart:{}", version), bytes, false)
+        self.load_art(ctx, &format!("boxart:{}", version), bytes)
     }
 
     /// The greyscale filter-bar icon for an event-type constant name.

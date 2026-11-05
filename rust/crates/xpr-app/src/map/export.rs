@@ -408,7 +408,7 @@ fn draw_dialog(view: &mut MapView, ui: &mut Ui, theme: &Theme, cfg: &Config, ctr
         ui.horizontal(|ui| {
             widgets::label_bold(ui, theme, "Scale");
             ui.add_space(6.0);
-            let delta = widgets::stepper_group(ui, theme, ui.id().with("xpr_map_export_scale"), 22.0, view.export.scale > 1, view.export.scale < scale_max, ("Smaller", "Larger"), |ui| {
+            let delta = widgets::stepper_group(ui, theme, ui.scope_id().with("xpr_map_export_scale"), 22.0, view.export.scale > 1, view.export.scale < scale_max, ("Smaller", "Larger"), |ui| {
                 widgets::label_font(ui, format!("{}×", view.export.scale), theme.body_bold(), theme.text_strong());
             });
             if delta != 0 {
@@ -607,8 +607,9 @@ fn render_full(pack: &MapPack, comp: &Compositor, theme: &Theme, spec: &ExportSp
     // one full-scene tessellation; `rasterize` below crops it band by band,
     // so only the (small) vector mesh data lives for the whole image, never
     // a full-resolution f32 canvas (plan §3.4 "B")
-    let prims = off.render(vp.size(), 2, |ctx| {
-        egui::CentralPanel::default().frame(egui::Frame::NONE).show(ctx, |ui| {
+    let prims = off.render(vp.size(), 2, |root| {
+        let ctx = &root.ctx().clone();
+        egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
             let painter = ui.painter_at(vp);
             let oc = OverlayCtx { theme, pack, scope: oc_scope, cam: &cam, vp, ppp: 1.0 };
             overlay::draw_grid(&painter, &oc, &spec.toggles);

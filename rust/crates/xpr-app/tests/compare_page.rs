@@ -65,14 +65,15 @@ impl Harness {
         let mut actions = CompareActions::default();
         let mut esc = false;
         let Harness { ctx, theme, cfg, paths, registry, index, assets, view, .. } = self;
-        let _ = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        ctx.run_ui(input, |root| {
+            let ctx = &root.ctx().clone();
+            egui::CentralPanel::default().show(root, |ui| {
                 view.poll(ctx);
                 let env = CompareEnv { registry: registry.clone(), paths, index, current_route_name: None };
                 actions = view.ui(ui, theme, cfg, assets, &env);
                 esc = ctx.input(|i| i.key_pressed(Key::Escape));
             });
-        });
+        }).drop_without_applying_deltas();
         self.esc_reached_the_app = esc;
         actions
     }

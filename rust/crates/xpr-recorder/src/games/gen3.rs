@@ -50,6 +50,9 @@ pub struct Gen3Keys {
     pub mon_friendship: String,
     pub team_species: Vec<String>,
     pub team_level: Vec<String>,
+    pub team_exp: Vec<String>,
+    /// four per party slot, in slot order
+    pub team_moves: Vec<String>,
     pub team_iv_attack: Vec<String>,
     pub team_iv_defense: Vec<String>,
     pub team_iv_speed: Vec<String>,
@@ -116,6 +119,8 @@ impl Gen3Keys {
             mon_friendship: "player.team.0.friendship".into(),
             team_species: team("species"),
             team_level: team("level"),
+            team_exp: team("expPoints"),
+            team_moves: (0..6).flat_map(|i| (1..=4).map(move |m| format!("player.team.{}.move{}", i, m))).collect(),
             team_iv_attack: team("ivAttack"),
             team_iv_defense: team("ivDefense"),
             team_iv_speed: team("ivSpeed"),
@@ -273,6 +278,8 @@ impl Gen3Keys {
         for list in [
             &mut self.team_species,
             &mut self.team_level,
+            &mut self.team_exp,
+            &mut self.team_moves,
             &mut self.team_iv_attack,
             &mut self.team_iv_defense,
             &mut self.team_iv_speed,
@@ -533,6 +540,11 @@ pub struct Gen3Machine {
     cached_moves: [Option<String>; 4],
     cached_money: i64,
     solo_mon_key: MonKey,
+    /// The solo mon's exp and level the last time it was seen in slot 1 (see
+    /// `on_idle`): once it has left the party the mapper no longer has them,
+    /// and they are what a Day Care stay is measured against.
+    last_solo_exp: i64,
+    last_solo_level: i64,
 
     cur_state: GameState,
     active: ActiveFlag,
@@ -583,6 +595,8 @@ impl Gen3Machine {
             cached_moves: [None, None, None, None],
             cached_money: 0,
             solo_mon_key: mon_key_from(info.dvs.as_ref(), info.solo_species.clone()),
+            last_solo_exp: 0,
+            last_solo_level: 0,
             cur_state: GameState::Uninitialized,
             active: new_active_flag(),
             queue: EventQueue::new(),
@@ -711,6 +725,7 @@ impl Gen3Machine {
                     self.valid_solo_mon = true;
                     self.load_level_up_moves();
                     self.solo_mon_key = found_matches[0].clone();
+                    self.solo_mon_rejoined(store, &found_matches[0]);
                 } else if !found_evolutions.is_empty() {
                     if found_evolutions.len() > 1 {
                         let err_msg = format!("Found multiple new valid solo mons, just taking the first one from the list: {}", repr_team(&found_evolutions));
@@ -732,6 +747,47 @@ impl Gen3Machine {
         }
         log::info!("after team cache update, valid_solo_mon: {}", self.valid_solo_mon);
         self.cached_team = new_cache;
+    }
+
+    /// The solo mon has come back to the party. From the PC it comes back as it
+    /// left. From the Day Care it comes back with one exp per step on it, any
+    /// levels that bought, and the moves of those levels: the game adds them all
+    /// as it hands the mon over, pushing out the oldest move when all four slots
+    /// are full, so the player never sees a prompt
+    /// (pokeemerald `ApplyDaycareExperience`).
+    fn solo_mon_rejoined(&mut self, store: &PropertyStore, mon: &MonKey) {
+        let Some(slot) = (0..6).find(|i| self.mon_key(store, *i).same_key(mon)) else { return };
+        let exp = store_i64(store, &self.keys.team_exp[slot]);
+        let exp_gained = exp - self.last_solo_exp;
+        if self.last_solo_exp <= 0 || exp_gained <= 0 {
+            return;
+        }
+        let level = store_i64(store, &self.keys.team_level[slot]);
+        log::info!("collected from the Day Care: exp {} to {}, level {} to {}", self.last_solo_exp, exp, self.last_solo_level, level);
+        self.queue_new_event(EventDefinition::with_day_care(exp_gained));
+        let levels = (self.last_solo_level + 1)..=level;
+        for new_level in levels.clone() {
+            self.solo_mon_levelup(new_level);
+        }
+        let new_moves: [Option<String>; 4] = std::array::from_fn(|i| self.conv.move_name_convert(store.str_of(&self.keys.team_moves[slot * 4 + i]).as_deref()));
+        let old_moves: Vec<&String> = self.cached_moves.iter().flatten().collect();
+        let in_new: Vec<&String> = new_moves.iter().flatten().collect();
+        // both lists are oldest first, which is the order the game replaces in
+        let mut deleted = old_moves.iter().filter(|m| !in_new.contains(m)).map(|m| (*m).clone());
+        let learned: Vec<String> = in_new.iter().filter(|m| !old_moves.contains(m)).map(|m| (*m).clone()).collect();
+        let species = self.solo_mon_key.species.clone().unwrap_or_default();
+        for name in learned {
+            let learned_at = levels.clone().find(|l| self.level_up_moves.get(&(species.clone(), *l)).map(|m| m.contains(&name)).unwrap_or(false));
+            if learned_at.is_none() {
+                log::error!("{} came back from the Day Care with {}, which it does not learn between levels {} and {}", species, name, self.last_solo_level + 1, level);
+            }
+            let mut lm = LearnMoveEventDefinition::new(Some(&name), None, consts::MOVE_SOURCE_LEVELUP, LevelVal::Int(learned_at.unwrap_or(level)), Some(&species), false);
+            lm.destination_name = deleted.next();
+            self.queue_new_event(EventDefinition::with_learn_move(lm));
+        }
+        self.cached_moves = new_moves;
+        self.last_solo_exp = exp;
+        self.last_solo_level = level;
     }
 
     fn update_all_cached_info(&mut self, store: &PropertyStore) {
@@ -1199,13 +1255,11 @@ impl Gen3Machine {
                         if !final_exp_split.iter().any(|x| *x > 1) {
                             final_exp_split = Vec::new();
                         }
-                        let mut sorted = self.battle.enemy_mon_order.clone();
-                        sorted.sort();
-                        let final_mon_order: Vec<i64> = sorted.iter().map(|x| self.battle.enemy_mon_order.iter().position(|y| y == x).unwrap_or(0) as i64 + 1).collect();
                         let mut td = TrainerEventDefinition::new(&py_str(&self.battle.trainer_name));
                         td.second_trainer_name = self.battle.second_trainer_name.clone();
                         td.exp_split = final_exp_split;
-                        td.mon_order = final_mon_order;
+                        // the slots seen: `finish_mon_order` makes the real order of them
+                        td.mon_order = self.battle.enemy_mon_order.clone();
                         td.thief_mons = self.battle.thief_mons.clone();
                         if self.has_return() {
                             td.custom_move_data = Self::return_custom_data(&self.battle.friendship_data);
@@ -1762,6 +1816,7 @@ fn process_one(ctx: &ProcessCtx, mut cur_event: EventDefinition, conv: &Gen3Conv
                     if let Some(t) = cur_event.trainer_def.as_mut() {
                         t.pay_day_amount = Some((t.pay_day_amount.unwrap_or(0) - expected_money).max(0));
                     }
+                    finish_mon_order(gen, &mut cur_event, &obj.definition);
                     let id = obj.group_id;
                     let ev = cur_event.clone();
                     ctx.controller.host().call(move |h| h.update_existing_event(id, ev));
@@ -1958,6 +2013,15 @@ impl GameRecorder for Gen3Machine {
     }
 
     fn on_idle(&mut self, store: &PropertyStore) {
+        // here, not on the exp change: a whole batch is in, so slot 1's species,
+        // IVs and exp all belong to the same mon even part way through a deposit
+        if self.valid_solo_mon {
+            let slot_1 = self.mon_key(store, 0);
+            if slot_1.species == self.solo_mon_key.species && slot_1.same_dvs(&self.solo_mon_key) {
+                self.last_solo_exp = store_i64(store, &self.keys.mon_exppoints);
+                self.last_solo_level = store_i64(store, &self.keys.mon_level);
+            }
+        }
         if self.cur_state != GameState::Battle || !self.battle.init_after_batch {
             return;
         }

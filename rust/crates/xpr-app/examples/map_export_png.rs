@@ -58,8 +58,8 @@ fn main() {
     let mut off = Offscreen::new(&theme, 1.0, 2048);
     let size = Vec2::new(800.0, 600.0);
     let mut draw = |off: &mut Offscreen, view: &mut MapView| {
-        off.render(size, 1, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        off.render(size, 1, |root| {
+            egui::CentralPanel::default().show(root, |ui| {
                 view.ui(ui, &theme, &mut cfg, &ctrl, &mut assets);
             });
         });

@@ -1,6 +1,6 @@
 //! Data too big to ship inside the executable, published as release assets
 //! of their own so an update downloads them only when they changed: the
-//! gen 4/5 map pictures (one zip per game, 50–95 MB each).
+//! gen 4/5 map pictures (one zip per game, 50–95 MB each) and the replay tools.
 //!
 //! An asset is named after its content, `imagery_<game>_<sha256 prefix>.zip`
 //! (the sha256 is the one the game's map pack manifest records), so:
@@ -74,17 +74,26 @@ pub fn find_asset_in(releases: &Value, name: &str) -> Option<(String, u64)> {
 /// once the new one is in place, the game's other cached versions are removed.
 pub fn download_imagery(game: &str, sha256: &str, bytes: u64, cache_dir: &Path, cancel: &AtomicBool, progress: &mut dyn FnMut(u64, Option<u64>)) -> Result<PathBuf, String> {
     let name = imagery_asset_name(game, sha256);
-    let dest = cache_dir.join(&name);
+    let dest = fetch_asset(&name, sha256, bytes, cache_dir, cancel, progress)?;
+    prune_imagery(cache_dir, game, &name);
+    Ok(dest)
+}
+
+/// Download the asset called `name` (`bytes` long, `sha256`) from whichever
+/// release has it into `dir` and return the file. A copy already there that
+/// checks out is reused.
+pub fn fetch_asset(name: &str, sha256: &str, bytes: u64, dir: &Path, cancel: &AtomicBool, progress: &mut dyn FnMut(u64, Option<u64>)) -> Result<PathBuf, String> {
+    let dest = dir.join(name);
     if dest.is_file() && check_file(&dest, sha256, bytes).is_ok() {
         return Ok(dest);
     }
-    std::fs::create_dir_all(cache_dir).map_err(|e| format!("could not create {}: {}", cache_dir.display(), e))?;
-    let (url, _) = find_asset(&name)?;
-    log::info!("downloading the {} map pictures from {}", game, url);
+    std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {}", dir.display(), e))?;
+    let (url, _) = find_asset(name)?;
+    log::info!("downloading {}", url);
     // a unique partial name, so a cancelled download still winding down
     // never shares a file with the retry
     let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
-    let part = cache_dir.join(format!("{}.{}.part", name, nonce));
+    let part = dir.join(format!("{}.{}.part", name, nonce));
     let result = download(&url, &part, cancel, progress).and_then(|()| check_file(&part, sha256, bytes)).and_then(|()| {
         if dest.exists() {
             let _ = std::fs::remove_file(&dest);
@@ -95,7 +104,6 @@ pub fn download_imagery(game: &str, sha256: &str, bytes: u64, cache_dir: &Path, 
         let _ = std::fs::remove_file(&part);
         return Err(e);
     }
-    prune_imagery(cache_dir, game, &name);
     Ok(dest)
 }
 

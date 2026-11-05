@@ -72,14 +72,14 @@ impl Offscreen {
     /// tessellated result. egui settles a fresh layout over a couple of
     /// passes (scroll bars, first-frame sizes), so the canvas is drawn
     /// `passes` times and the last pass is what comes back.
-    pub fn render(&mut self, size: Vec2, passes: usize, draw: impl FnMut(&egui::Context)) -> Vec<ClippedPrimitive> {
+    pub fn render(&mut self, size: Vec2, passes: usize, draw: impl FnMut(&mut egui::Ui)) -> Vec<ClippedPrimitive> {
         self.render_with_events(size, passes, Vec::new(), draw)
     }
 
     /// [`Offscreen::render`] with input `events` (pointer moves / clicks,
     /// keys) delivered in the first pass, for pictures of hover and popup
     /// states.
-    pub fn render_with_events(&mut self, size: Vec2, passes: usize, events: Vec<egui::Event>, mut draw: impl FnMut(&egui::Context)) -> Vec<ClippedPrimitive> {
+    pub fn render_with_events(&mut self, size: Vec2, passes: usize, events: Vec<egui::Event>, mut draw: impl FnMut(&mut egui::Ui)) -> Vec<ClippedPrimitive> {
         let mut prims = Vec::new();
         let mut events = Some(events);
         for _ in 0..passes.max(1) {
@@ -92,15 +92,18 @@ impl Offscreen {
             };
             input.viewports.insert(ViewportId::ROOT, ViewportInfo { native_pixels_per_point: Some(self.ppp), ..Default::default() });
             self.frame += 1;
-            let out = self.ctx.run(input, |ctx| draw(ctx));
-            for (id, delta) in &out.textures_delta.set {
-                self.set_texture(*id, delta);
+            let mut out = self.ctx.run_ui(input, |ui| draw(ui));
+            for (id, deltas) in &out.textures_delta.set {
+                for delta in deltas {
+                    self.set_texture(*id, delta);
+                }
             }
             self.last_shapes = out.shapes.clone();
             prims = self.ctx.tessellate(out.shapes, out.pixels_per_point);
             for id in &out.textures_delta.free {
                 self.textures.remove(id);
             }
+            out.textures_delta.clear();
         }
         prims
     }
@@ -458,8 +461,8 @@ mod tests {
     #[test]
     fn rect_on_transparent_canvas() {
         let mut off = Offscreen::with_default_fonts(1.0);
-        let prims = off.render(Vec2::new(100.0, 60.0), 2, |ctx| {
-            egui::CentralPanel::default().frame(egui::Frame::NONE).show(ctx, |ui| {
+        let prims = off.render(Vec2::new(100.0, 60.0), 2, |root| {
+            egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
                 ui.painter().rect(Rect::from_min_max(Pos2::new(10.0, 10.0), Pos2::new(90.0, 50.0)), CornerRadius::same(6), Color32::from_rgb(40, 40, 40), Stroke::NONE, egui::StrokeKind::Inside);
             });
         });
@@ -496,8 +499,8 @@ mod tests {
     #[test]
     fn text_is_rasterised() {
         let mut off = Offscreen::with_default_fonts(2.0);
-        let prims = off.render(Vec2::new(120.0, 40.0), 2, |ctx| {
-            egui::CentralPanel::default().frame(egui::Frame::NONE).show(ctx, |ui| {
+        let prims = off.render(Vec2::new(120.0, 40.0), 2, |root| {
+            egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
                 ui.painter().text(Pos2::new(4.0, 4.0), egui::Align2::LEFT_TOP, "Damage", egui::FontId::proportional(14.0), Color32::WHITE);
             });
         });

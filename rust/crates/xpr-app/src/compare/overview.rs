@@ -349,7 +349,7 @@ fn exp_sources_card(ui: &mut Ui, c: &Cmp, cmp: &RouteComparison) {
             widgets::stacked_bar(ui, theme, bar, &segments);
             widgets::col_text(ui, rect, &pct, theme.caption_font(), theme.secondary, Align::Max);
 
-            ui.interact(bar, ui.id().with(("xp_tip", side.letter())), Sense::hover()).on_hover_text(format!(
+            ui.interact(bar, ui.scope_id().with(("xp_tip", side.letter())), Sense::hover()).on_hover_text(format!(
                 "Trainers {}\nWild {}\nRare Candy {}",
                 widgets::fmt_thousands(parts[0]),
                 widgets::fmt_thousands(parts[1]),
@@ -614,7 +614,7 @@ fn trainers_card(ui: &mut Ui, c: &Cmp, cmp: &RouteComparison) -> Option<String> 
             if names.is_some() && *count == 0 {
                 continue;
             }
-            let id = ui.id().with(("trainer_set", i));
+            let id = ui.scope_id().with(("trainer_set", i));
             let mut open = ui.ctx().data(|d| d.get_temp::<bool>(id).unwrap_or(false));
             let rect = widgets::table_row(ui, 30.0, None);
             let clickable = names.is_some();

@@ -6,8 +6,9 @@ app) for the Rust app:
 1. ``cargo build --release -p xpr-app`` — one exe with the Pokémon data and
    the image assets embedded (``xpr-data``'s ``embed-data`` feature and
    ``xpr-app/build.rs``) and the MSVC CRT linked statically (``.cargo/config.toml``).
-   The gen 4/5 map pictures are not in it: they are separate release
-   assets the app downloads when needed (step 5).
+   The gen 4/5 map pictures and the replay tools are not in it: they are
+   separate release assets the app downloads when needed (step 5;
+   ``replay_tools.json``).
 2. Checks the exe imports nothing but Windows system DLLs.
 3. Copies it to ``dist/rust/pkmn_xp_router.exe`` and zips it as
    ``dist/rust/windows_pkmn_xp_router_<version>.zip`` — one exe at the top

@@ -18,7 +18,7 @@ use crate::controller::MainController;
 /// Side of the square filter toggles; "Clear Filters" matches its height.
 const TOGGLE_SIZE: f32 = 26.0;
 
-const TOGGLE_ORDER: [&str; 19] = [
+const TOGGLE_ORDER: [&str; 20] = [
     consts::MAJOR_BATTLE_FILTER,
     consts::TASK_TRAINER_BATTLE,
     consts::TASK_RARE_CANDY,
@@ -36,6 +36,7 @@ const TOGGLE_ORDER: [&str; 19] = [
     consts::TASK_HEAL,
     consts::TASK_EVOLUTION,
     consts::TASK_EV_OVERRIDE,
+    consts::TASK_DAY_CARE,
     consts::TASK_NOTES_ONLY,
     consts::ERROR_SEARCH,
 ];
@@ -61,6 +62,7 @@ fn short_label(et: &str) -> &'static str {
         consts::TASK_EVOLUTION => "Ev",
         consts::TASK_LEARN_MOVE_TM => "TM",
         consts::TASK_EV_OVERRIDE => "EV",
+        consts::TASK_DAY_CARE => "DC",
         consts::ERROR_SEARCH => "Er",
         _ => "??",
     }
@@ -111,6 +113,7 @@ fn tooltip(et: &str) -> &'static str {
         consts::TASK_EVOLUTION => "Evolution",
         consts::TASK_LEARN_MOVE_TM => "TM / HM",
         consts::TASK_EV_OVERRIDE => "EV Override",
+        consts::TASK_DAY_CARE => "Day Care",
         consts::ERROR_SEARCH => "Invalid Events",
         _ => "",
     }
@@ -229,7 +232,7 @@ impl FilterBar {
                 if widgets::StyledButton::new(theme, egui::RichText::new("Clear Filters").font(theme.font(8.25))).padding(Vec2::new(4.0, 2.0)).min_size(Vec2::new(0.0, TOGGLE_SIZE)).show(ui).clicked() {
                     ctrl.set_route_filter_types(Vec::new());
                 }
-                let r = Entry::new(theme, &mut self.search_text).width(200.0).hint("Search events...").id(ui.id().with("route_search")).clearable().show(ui);
+                let r = Entry::new(theme, &mut self.search_text).width(200.0).hint("Search events...").id(ui.scope_id().with("route_search")).clearable().show(ui);
                 if r.cleared {
                     // no debounce: clearing should show the full list at once
                     self.search_deadline = None;

@@ -50,7 +50,8 @@ impl Harness {
     fn frame(&mut self, events: Vec<Event>) -> Option<MsgChoice> {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1000.0, 700.0))), events, ..Default::default() };
         let mut choice = None;
-        let out = self.ctx.run(input, |ctx| choice = self.mb.ui(ctx, &self.theme));
+        let mut out = self.ctx.run_pass(input, |ctx| choice = self.mb.ui(ctx, &self.theme));
+        out.textures_delta.clear();
         self.texts.clear();
         for clipped in &out.shapes {
             collect_texts(&clipped.shape, &mut self.texts);
@@ -126,10 +127,10 @@ fn the_labels_replace_yes_and_no() {
 fn every_unsaved_prompt_names_its_buttons_and_fits_them() {
     for (idx, (_, save, discard, tag)) in PROMPTS.iter().enumerate() {
         let h = Harness::prompt(idx);
-        let dialog = h.ctx.memory(|m| m.area_rect(egui::Id::new("xpr_message_box"))).expect("the prompt is on screen");
+        let dialog = h.ctx.memory(|m| m.area_rect(egui::Id::unique("xpr_message_box"))).expect("the prompt is on screen");
         let (d, c, s) = (h.button(discard), h.button("Cancel"), h.button(save));
         assert!(d.max.x < c.min.x && c.max.x < s.min.x, "{tag:?}: discard | … | cancel, save on one row");
-        assert!((d.center().y - s.center().y).abs() < 1.0, "{tag:?}: one row");
+        assert!((d.min.y - s.min.y).abs() < 1.0, "{tag:?}: one row");
         assert!(dialog.contains_rect(d) && dialog.contains_rect(s), "{tag:?}: the buttons fit inside the dialog");
         for (label, want) in [(*save, MsgChoice::Yes), (*discard, MsgChoice::No), ("Cancel", MsgChoice::Cancel)] {
             let mut h = Harness::prompt(idx);

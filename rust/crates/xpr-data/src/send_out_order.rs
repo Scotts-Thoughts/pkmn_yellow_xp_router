@@ -15,14 +15,12 @@
 //!
 //! A prediction is a chain: the lead faints, the rule picks the next Pokémon
 //! with the lead as the one that fainted, and so on. It assumes a neutral field
-//! (no stat stages, screens or weather, nobody statused) and no voluntary
-//! switch; those can change the real order, and voluntary switches are random.
+//! (no stat stages or screens, nobody statused) and no voluntary switch; those
+//! can change the real order, and voluntary switches are random. Weather counts
+//! in gen 4 only, when the caller knows it ([`SendOutPlayer::weather`]).
 //! Where a rule is itself random (gen 2's "every candidate is bad"), the rest
 //! stay in party order. The recorder overwrites the prediction with what it saw
 //! when the battle ends, so a wrong guess only lasts for the fight.
-//!
-//! The Dex page's calculator (`xpr-dex-ui`, Solodex's) is a different thing: it
-//! explains each step of gens 2-4 and stops where the damage passes begin.
 
 use crate::gen_data::GenData;
 use crate::model::EnemyPkmn;
@@ -146,6 +144,9 @@ pub struct SendOutPlayer {
     /// Gen 3: badge stat boosts on the player's side (badges 5 and 7).
     pub defense_badge: bool,
     pub special_defense_badge: bool,
+    /// Gen 4: the battle's weather as the mapper names it ("Rain", "Sun",
+    /// "Sandstorm", "Hail", "Fog"); `None` for clear.
+    pub weather: Option<String>,
 }
 
 /// One rule: the slot sent out after `fainted` faints, given who is still to
@@ -208,25 +209,35 @@ fn chain(party: &[SendOutMon], player: &SendOutPlayer, next: NextRule) -> Vec<us
 /// type 1 (or, failing that, type 2) is super effective on its species types;
 /// both cancel. The lowest good slot, else the lowest not-bad slot, else random.
 pub fn next_gen2(party: &[SendOutMon], _fainted: usize, left: &[usize], player: &SendOutPlayer) -> Option<usize> {
+    let score: Vec<(usize, i8)> = left.iter().map(|&i| (i, gen2_match(&party[i], player).score())).collect();
+    score.iter().find(|s| s.1 == 1).or_else(|| score.iter().find(|s| s.1 == 0)).map(|s| s.0)
+}
+
+/// What [`next_gen2`] reads about one candidate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Gen2Match {
+    /// Index in `moves` of the first super-effective move, power ignored.
+    pub se_move: Option<usize>,
+    /// The player's type 1 or 2 is super effective on the candidate.
+    pub player_se: bool,
+}
+
+impl Gen2Match {
+    /// +1 good, 0 neither or both, -1 bad.
+    pub fn score(&self) -> i8 {
+        match (self.se_move.is_some(), self.player_se) {
+            (true, false) => 1,
+            (false, true) => -1,
+            _ => 0,
+        }
+    }
+}
+
+pub fn gen2_match(mon: &SendOutMon, player: &SendOutPlayer) -> Gen2Match {
     let (p1, p2) = normal_types(&player.types);
-    let score: Vec<(usize, bool, bool)> = left
-        .iter()
-        .map(|&i| {
-            let mon = &party[i];
-            let (t1, t2) = normal_types(&mon.types);
-            let mut good = mon.moves.iter().any(|m| type_product(&normal_type(&m.move_type), &p1, &p2) > 1.0);
-            let mut bad = false;
-            if type_product(&p1, &t1, &t2) > 1.0 || type_product(&p2, &t1, &t2) > 1.0 {
-                if good {
-                    good = false;
-                } else {
-                    bad = true;
-                }
-            }
-            (i, good, bad)
-        })
-        .collect();
-    score.iter().find(|s| s.1).or_else(|| score.iter().find(|s| !s.2)).map(|s| s.0)
+    let (t1, t2) = normal_types(&mon.types);
+    let se_move = mon.moves.iter().position(|m| type_product(&normal_type(&m.move_type), &p1, &p2) > 1.0);
+    Gen2Match { se_move, player_se: type_product(&p1, &t1, &t2) > 1.0 || type_product(&p2, &t1, &t2) > 1.0 }
 }
 
 pub fn predict_gen2(party: &[SendOutMon], player: &SendOutPlayer) -> Vec<usize> {
@@ -266,53 +277,62 @@ fn gen3_type_item(item: &str) -> Option<(&'static str, i64)> {
     })
 }
 
-struct Gen3TypeCalc {
-    damage: i64,
-    super_effective: bool,
+/// The chart multipliers `TypeCalc` applies for a move type, in table order. None
+/// against Levitate, whose check comes first.
+fn gen3_chart_steps(move_type: &str, player: &SendOutPlayer) -> Vec<i64> {
+    let (d1, d2) = normal_types(&player.types);
+    let mut steps = Vec::new();
+    if opt_key(&player.ability) == "levitate" && move_type == "Ground" {
+        return steps;
+    }
+    for &(a, d, m) in TYPE_MATCHUPS {
+        if a == FORESIGHT || a != move_type {
+            continue;
+        }
+        if d == d1 {
+            steps.push(m);
+        }
+        if d == d2 && d1 != d2 {
+            steps.push(m);
+        }
+    }
+    steps
 }
 
-/// `ModulateDmgByType2` over the chart, in table order (pokeemerald `TypeCalc`).
-fn gen3_type_calc(mut damage: i64, move_type: &str, power: i64, player: &SendOutPlayer) -> Gen3TypeCalc {
-    let (d1, d2) = normal_types(&player.types);
-    if opt_key(&player.ability) == "levitate" && move_type == "Ground" {
-        return Gen3TypeCalc { damage, super_effective: false };
-    }
-    let (mut se, mut nve, mut no_effect) = (false, false, false);
-    let mut apply = |m: i64| {
+/// The damage side of `ModulateDmgByType2`.
+fn gen3_modulate(mut damage: i64, steps: &[i64]) -> i64 {
+    for &m in steps {
         damage = damage * m / 10;
         if damage == 0 && m != 0 {
             damage = 1;
         }
+    }
+    damage
+}
+
+/// The flag side of `ModulateDmgByType2`: a status move never sets the flag.
+fn gen3_super_effective(mv: &SendOutMove, player: &SendOutPlayer) -> bool {
+    let (mut se, mut nve, mut no_effect) = (false, false, false);
+    for m in gen3_chart_steps(&normal_type(&mv.move_type), player) {
         if m == 0 {
             no_effect = true;
             se = false;
             nve = false;
-        } else if m == 5 && power != 0 && !no_effect {
+        } else if m == 5 && mv.power != 0 && !no_effect {
             if se {
                 se = false;
             } else {
                 nve = true;
             }
-        } else if m == 20 && power != 0 && !no_effect {
+        } else if m == 20 && mv.power != 0 && !no_effect {
             if nve {
                 nve = false;
             } else {
                 se = true;
             }
         }
-    };
-    for &(a, d, m) in TYPE_MATCHUPS {
-        if a == FORESIGHT || a != move_type {
-            continue;
-        }
-        if d == d1 {
-            apply(m);
-        }
-        if d == d2 && d1 != d2 {
-            apply(m);
-        }
     }
-    Gen3TypeCalc { damage, super_effective: se }
+    se
 }
 
 /// pokeemerald `CalculateBaseDamage`, the fainted enemy attacking the player
@@ -406,7 +426,42 @@ pub fn gen3_base_damage(attacker: &SendOutMon, player: &SendOutPlayer, mv: Optio
 /// damage is `gCurrentMove`'s from the fainted Pokémon, times STAB on the fainted
 /// Pokémon's types and the candidate move's type chart, kept in a byte.
 pub fn next_gen3(party: &[SendOutMon], fainted: usize, left: &[usize], player: &SendOutPlayer) -> Option<usize> {
+    gen3_pass_1(party, left, player).or_else(|| {
+        let base = gen3_base_damage(&party[fainted], player, player.ko_move.as_ref());
+        Gen3Pass2::new(party, fainted, left, player).pick(base).or(left.first().copied())
+    })
+}
+
+/// How hard the player's types hit a candidate's species types, in tenths
+/// (`typeDmg`): `ModulateByTypeEffectiveness` for each player type in turn, so a
+/// single-typed player counts twice.
+pub fn gen3_type_dmg(mon: &SendOutMon, player: &SendOutPlayer) -> i64 {
     let (p1, p2) = normal_types(&player.types);
+    let (t1, t2) = normal_types(&mon.types);
+    let mut t = 10;
+    for atk in [&p1, &p2] {
+        for &(a, d, m) in TYPE_MATCHUPS {
+            if a == FORESIGHT || a != atk.as_str() {
+                continue;
+            }
+            if d == t1 {
+                t = u8_of(t * m / 10);
+            }
+            if d == t2 && t1 != t2 {
+                t = u8_of(t * m / 10);
+            }
+        }
+    }
+    t
+}
+
+/// Index in `moves` of the candidate's first super-effective damaging move.
+pub fn gen3_se_move(mon: &SendOutMon, player: &SendOutPlayer) -> Option<usize> {
+    mon.moves.iter().position(|m| gen3_super_effective(m, player))
+}
+
+/// Pass 1 of [`next_gen3`]; `None` when nobody qualifies.
+pub fn gen3_pass_1(party: &[SendOutMon], left: &[usize], player: &SendOutPlayer) -> Option<usize> {
     let mut invalid: Vec<usize> = Vec::new();
     loop {
         let (mut best, mut best_mon) = (0, None);
@@ -414,54 +469,60 @@ pub fn next_gen3(party: &[SendOutMon], fainted: usize, left: &[usize], player: &
             if invalid.contains(&i) {
                 continue;
             }
-            let (t1, t2) = normal_types(&party[i].types);
-            let mut t = 10;
-            for atk in [&p1, &p2] {
-                for &(a, d, m) in TYPE_MATCHUPS {
-                    if a == FORESIGHT || a != atk.as_str() {
-                        continue;
-                    }
-                    if d == t1 {
-                        t = u8_of(t * m / 10);
-                    }
-                    if d == t2 && t1 != t2 {
-                        t = u8_of(t * m / 10);
-                    }
-                }
-            }
+            let t = gen3_type_dmg(&party[i], player);
             if best < t {
                 best = t;
                 best_mon = Some(i);
             }
         }
-        let Some(mon) = best_mon else { break };
-        if party[mon].moves.iter().any(|m| gen3_type_calc(0, &normal_type(&m.move_type), m.power, player).super_effective) {
+        let mon = best_mon?;
+        if gen3_se_move(&party[mon], player).is_some() {
             return Some(mon);
         }
         invalid.push(mon);
     }
-    let attacker = &party[fainted];
-    let base = gen3_base_damage(attacker, player, player.ko_move.as_ref());
-    let (a1, a2) = normal_types(&attacker.types);
-    let (mut best_dmg, mut best_mon) = (0, None);
-    for &i in left {
-        for j in 0..4 {
-            let mut damage = 0;
-            if let Some(mv) = party[i].moves.get(j).filter(|m| m.power != 1) {
+}
+
+/// Pass 2 of [`next_gen3`] up to the one number it needs from the player's side:
+/// the base damage `D`, [`gen3_base_damage`]'s result. Everything else about the
+/// player here is its types and Levitate.
+pub struct Gen3Pass2 {
+    /// One (candidate, move) with power != 1, in the order the game tries them.
+    rows: Vec<Gen3Pass2Row>,
+}
+
+struct Gen3Pass2Row {
+    slot: usize,
+    stab: bool,
+    steps: Vec<i64>,
+}
+
+impl Gen3Pass2 {
+    pub fn new(party: &[SendOutMon], fainted: usize, left: &[usize], player: &SendOutPlayer) -> Gen3Pass2 {
+        let (a1, a2) = normal_types(&party[fainted].types);
+        let mut rows = Vec::new();
+        for &i in left {
+            for mv in party[i].moves.iter().take(4).filter(|m| m.power != 1) {
                 let t = normal_type(&mv.move_type);
-                damage = base;
-                if a1 == t || a2 == t {
-                    damage = damage * 15 / 10;
-                }
-                damage = gen3_type_calc(damage, &t, mv.power, player).damage;
-            }
-            if best_dmg < damage {
-                best_dmg = u8_of(damage);
-                best_mon = Some(i);
+                rows.push(Gen3Pass2Row { slot: i, stab: a1 == t || a2 == t, steps: gen3_chart_steps(&t, player) });
             }
         }
+        Gen3Pass2 { rows }
     }
-    best_mon.or(left.first().copied())
+
+    /// The best (candidate, move) for base damage `base`, kept in a byte; `None`
+    /// when no move scores (the game then takes the first living Pokémon).
+    pub fn pick(&self, base: i64) -> Option<usize> {
+        let (mut best_dmg, mut best_mon) = (0, None);
+        for row in &self.rows {
+            let damage = gen3_modulate(if row.stab { base * 15 / 10 } else { base }, &row.steps);
+            if best_dmg < damage {
+                best_dmg = u8_of(damage);
+                best_mon = Some(row.slot);
+            }
+        }
+        best_mon
+    }
 }
 
 pub fn predict_gen3(party: &[SendOutMon], player: &SendOutPlayer) -> Vec<usize> {
@@ -499,11 +560,31 @@ const GEN4_PUNCHES: &[&str] = &[
     "drainpunch", "bulletpunch", "skyuppercut",
 ];
 
-/// `Move_CalcVariableType`: Hidden Power from the IVs, Judgment from the plate;
-/// everything else is the move's own type here (Natural Gift's berry type is not
-/// modelled; Weather Ball has no weather in a neutral field).
-fn gen4_move_type(mon: &SendOutMon, mv: &SendOutMove) -> String {
+/// The weather as the battle engine feels it: `NO_CLOUD_NINE` counts living
+/// battlers, so of the two here only the player's ability can switch it off.
+fn gen4_weather(player: &SendOutPlayer) -> String {
+    let ability = opt_key(&player.ability);
+    if ability == "cloudnine" || ability == "airlock" {
+        String::new()
+    } else {
+        opt_key(&player.weather)
+    }
+}
+
+/// `Move_CalcVariableType`: Hidden Power from the IVs, Judgment from the plate,
+/// Weather Ball from the weather; everything else is the move's own type here
+/// (Natural Gift's berry type is not modelled).
+fn gen4_move_type(mon: &SendOutMon, mv: &SendOutMove, weather: &str) -> String {
     let move_key = key(&mv.name);
+    if move_key == "weatherball" {
+        match weather {
+            "rain" => return "Water".to_string(),
+            "sandstorm" => return "Rock".to_string(),
+            "sun" => return "Fire".to_string(),
+            "hail" => return "Ice".to_string(),
+            _ => {}
+        }
+    }
     if move_key == "hiddenpower" {
         if let Some(t) = &mon.hidden_power_type {
             return normal_type(t);
@@ -538,7 +619,7 @@ fn gen4_type_matchup_multiplier(attack: &str, defend1: &str, defend2: &str) -> i
 /// the player (status moves too)?
 fn gen4_super_effective(mon: &SendOutMon, mv: &SendOutMove, player: &SendOutPlayer) -> bool {
     let ability = opt_key(&mon.ability);
-    let move_type = if ability == "normalize" { "Normal".to_string() } else { gen4_move_type(mon, mv) };
+    let move_type = if ability == "normalize" { "Normal".to_string() } else { gen4_move_type(mon, mv, &gen4_weather(player)) };
     let (d1, d2) = normal_types(&player.types);
     if ability != "moldbreaker" && opt_key(&player.ability) == "levitate" && move_type == "Ground" && opt_key(&player.item) != "ironball" {
         return false;
@@ -596,8 +677,10 @@ fn divide(dividend: i64, divisor: i64) -> i64 {
 /// pokeplatinum `BattleSystem_CalcMoveDamage` then `BattleSystem_ApplyTypeChart`,
 /// as `BattleAI_PostKOSwitchIn` calls them: the FAINTED enemy attacks the player
 /// with a candidate's move, crit multiplier 1, power multiplier 10, no random
-/// roll, neutral stages, no status, weather or screens. Its HP is 0, so the pinch
-/// abilities apply and Slow Start always halves. Returns the damage and whether
+/// roll, neutral stages, no status or screens, and `player.weather`. Its HP is 0,
+/// so the pinch abilities apply, Slow Start always halves and its own Flower Gift
+/// doesn't count. `CalcMoveDamage` is given no type, so Weather Ball only turns at
+/// the type chart. Returns the damage and whether
 /// the player is immune. The caller keeps the byte after each step.
 pub fn gen4_ai_damage(attacker: &SendOutMon, player: &SendOutPlayer, mv: &SendOutMove) -> (i64, bool) {
     let (atk_ability, def_ability) = (opt_key(&attacker.ability), opt_key(&player.ability));
@@ -680,6 +763,17 @@ pub fn gen4_ai_damage(attacker: &SendOutMon, player: &SendOutPlayer, mv: &SendOu
     if atk_ability == "ironfist" && GEN4_PUNCHES.contains(&move_key.as_str()) {
         power = power * 12 / 10;
     }
+    let weather = gen4_weather(player);
+    let (d1, d2) = normal_types(&player.types);
+    if weather == "sun" && atk_ability == "solarpower" {
+        sp_attack = sp_attack * 15 / 10;
+    }
+    if weather == "sandstorm" && (d1 == "Rock" || d2 == "Rock") {
+        sp_defense = sp_defense * 15 / 10;
+    }
+    if weather == "sun" && def_has("flowergift") {
+        sp_defense = sp_defense * 15 / 10;
+    }
     if move_key == "explosion" || move_key == "selfdestruct" {
         defense /= 2;
     }
@@ -691,18 +785,25 @@ pub fn gen4_ai_damage(attacker: &SendOutMon, player: &SendOutPlayer, mv: &SendOu
         MoveCategory::Special => sp_attack * power * level_factor / sp_defense.max(1) / 50,
         MoveCategory::Status => 0,
     };
+    if ["rain", "sandstorm", "hail", "fog"].contains(&weather.as_str()) && move_key == "solarbeam" {
+        damage /= 2;
+    }
+    match (weather.as_str(), t) {
+        ("rain", "Fire") | ("sun", "Water") => damage /= 2,
+        ("rain", "Water") | ("sun", "Fire") => damage = damage * 15 / 10,
+        _ => {}
+    }
     damage = u8_of(damage + 2);
 
     // ApplyTypeChart
     if move_key == "struggle" {
         return (damage, false);
     }
-    let chart_type = if atk_ability == "normalize" { "Normal".to_string() } else { gen4_move_type(attacker, mv) };
+    let chart_type = if atk_ability == "normalize" { "Normal".to_string() } else { gen4_move_type(attacker, mv, &weather) };
     let (a1, a2) = normal_types(&attacker.types);
     if a1 == chart_type || a2 == chart_type {
         damage = if atk_ability == "adaptability" { damage * 2 } else { damage * 15 / 10 };
     }
-    let (d1, d2) = normal_types(&player.types);
     let (mut se, mut nve, mut immune) = (false, false, false);
     if def_has("levitate") && chart_type == "Ground" && def_item != "ironball" {
         immune = true;
@@ -774,7 +875,29 @@ pub fn gen4_ai_damage(attacker: &SendOutMon, player: &SendOutPlayer, mv: &SendOu
 /// between moves or between the stages (a skipped move compares the previous
 /// value again): reproduced on purpose.
 pub fn next_gen4(party: &[SendOutMon], fainted: usize, left: &[usize], player: &SendOutPlayer) -> Option<usize> {
+    match gen4_stage_1(party, left, player) {
+        Ok(pick) => Some(pick),
+        Err(score) => gen4_stage_2(party, fainted, left, player, score),
+    }
+}
+
+/// The true sum of the candidate's two types attacking the player; the game
+/// keeps it in a byte.
+pub fn gen4_type_score(mon: &SendOutMon, player: &SendOutPlayer) -> i64 {
     let (p1, p2) = normal_types(&player.types);
+    let (t1, t2) = normal_types(&mon.types);
+    gen4_type_matchup_multiplier(&t1, &p1, &p2) + gen4_type_matchup_multiplier(&t2, &p1, &p2)
+}
+
+/// Index in `moves` of the candidate's first super-effective move, status moves
+/// included.
+pub fn gen4_se_move(mon: &SendOutMon, player: &SendOutPlayer) -> Option<usize> {
+    mon.moves.iter().position(|m| gen4_super_effective(mon, m, player))
+}
+
+/// Stage 1 of [`next_gen4`]; when nobody qualifies, `Err` with the score variable
+/// as it enters Stage 2.
+pub fn gen4_stage_1(party: &[SendOutMon], left: &[usize], player: &SendOutPlayer) -> Result<usize, i64> {
     let mut disregarded: Vec<usize> = Vec::new();
     let mut score = 0;
     loop {
@@ -783,32 +906,63 @@ pub fn next_gen4(party: &[SendOutMon], fainted: usize, left: &[usize], player: &
             if disregarded.contains(&i) {
                 continue;
             }
-            let (t1, t2) = normal_types(&party[i].types);
-            score = u8_of(gen4_type_matchup_multiplier(&t1, &p1, &p2) + gen4_type_matchup_multiplier(&t2, &p1, &p2));
+            score = u8_of(gen4_type_score(&party[i], player));
             if max_score < score {
                 max_score = score;
                 picked = Some(i);
             }
         }
-        let Some(pick) = picked else { break };
-        let mon = &party[pick];
-        if mon.moves.iter().any(|m| gen4_super_effective(mon, m, player)) {
-            return Some(pick);
+        let Some(pick) = picked else { return Err(score) };
+        if gen4_se_move(&party[pick], player).is_some() {
+            return Ok(pick);
         }
         disregarded.push(pick);
     }
+}
+
+/// Stage 2 of [`next_gen4`], from the score Stage 1 left behind.
+pub fn gen4_stage_2(party: &[SendOutMon], fainted: usize, left: &[usize], player: &SendOutPlayer, score: i64) -> Option<usize> {
+    gen4_stage_2_pick(&gen4_stage_2_rows(party, fainted, left, player), left, score)
+}
+
+/// One of a candidate's four move slots in Stage 2.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Gen4Stage2Row {
+    pub slot: usize,
+    /// What the damage reads: physical moves the player's Defense, special moves
+    /// its Sp. Def, status moves neither.
+    pub category: Option<MoveCategory>,
+    /// `None` for an empty slot or a power 1 move, which keeps the previous score.
+    pub score: Option<i64>,
+}
+
+pub fn gen4_stage_2_rows(party: &[SendOutMon], fainted: usize, left: &[usize], player: &SendOutPlayer) -> Vec<Gen4Stage2Row> {
     let attacker = &party[fainted];
-    let (mut max_score, mut picked) = (0, None);
+    let mut rows = Vec::new();
     for &i in left {
         for j in 0..4 {
-            if let Some(mv) = party[i].moves.get(j).filter(|m| m.power != 1) {
-                let (damage, immune) = gen4_ai_damage(attacker, player, mv);
-                score = if immune { 0 } else { u8_of(damage) };
-            }
-            if max_score < score {
-                max_score = score;
-                picked = Some(i);
-            }
+            let row = match party[i].moves.get(j).filter(|m| m.power != 1) {
+                Some(mv) => {
+                    let (damage, immune) = gen4_ai_damage(attacker, player, mv);
+                    Gen4Stage2Row { slot: i, category: Some(mv.category), score: Some(if immune { 0 } else { u8_of(damage) }) }
+                }
+                None => Gen4Stage2Row { slot: i, category: None, score: None },
+            };
+            rows.push(row);
+        }
+    }
+    rows
+}
+
+pub fn gen4_stage_2_pick(rows: &[Gen4Stage2Row], left: &[usize], mut score: i64) -> Option<usize> {
+    let (mut max_score, mut picked) = (0, None);
+    for row in rows {
+        if let Some(s) = row.score {
+            score = s;
+        }
+        if max_score < score {
+            max_score = score;
+            picked = Some(row.slot);
         }
     }
     picked.or(left.first().copied())
@@ -830,55 +984,68 @@ pub fn predict_gen5(party: &[SendOutMon], player: &SendOutPlayer) -> Vec<usize> 
     if party.is_empty() {
         return Vec::new();
     }
-    let (p1, p2) = normal_types(&player.types);
-    let score_of = |mon: &SendOutMon| -> i64 {
-        let mut best = 0;
-        for mv in &mon.moves {
-            if mv.category == MoveCategory::Status {
-                continue;
-            }
-            let mut power = if mv.power < 10 { 60 } else { mv.power };
-            let product = type_product(&normal_type(&mv.move_type), &p1, &p2);
-            if product == 4.0 {
-                power *= 4;
-            } else if product == 2.0 {
-                power *= 2;
-            } else if product == 0.5 {
-                power /= 2;
-            } else if product == 0.25 {
-                power /= 4;
-            } else if product == 0.0 {
-                power = 0;
-            }
-            if best < power {
-                best = power;
-            }
-        }
-        best
-    };
     // positions[p] = party slot at battle position p
     let mut positions: Vec<usize> = (0..party.len()).collect();
     let mut fainted: Vec<usize> = Vec::new();
     let mut order = vec![positions[0]];
     while order.len() < party.len() {
         fainted.push(positions[0]);
-        let mut list: Vec<usize> = (1..positions.len()).filter(|p| !fainted.contains(&positions[*p])).collect();
-        if list.is_empty() {
-            break;
+        match next_gen5(party, &mut positions, &fainted, player) {
+            Some(slot) => order.push(slot),
+            None => break,
         }
-        let mut power: Vec<i64> = list.iter().map(|p| score_of(&party[positions[*p]])).collect();
-        for i in 0..list.len() {
-            for j in (i + 1)..list.len() {
-                if power[i] < power[j] {
-                    power.swap(i, j);
-                    list.swap(i, j);
-                }
-            }
-        }
-        positions.swap(0, list[0]);
-        order.push(positions[0]);
     }
     order
+}
+
+/// A candidate's score in [`predict_gen5`] and the index in `moves` of the first
+/// move that reaches it (`None` with no damaging move).
+pub fn gen5_best_move(mon: &SendOutMon, player: &SendOutPlayer) -> (i64, Option<usize>) {
+    let (p1, p2) = normal_types(&player.types);
+    let (mut best, mut best_move) = (0, None);
+    for (i, mv) in mon.moves.iter().enumerate() {
+        if mv.category == MoveCategory::Status {
+            continue;
+        }
+        let mut power = if mv.power < 10 { 60 } else { mv.power };
+        let product = type_product(&normal_type(&mv.move_type), &p1, &p2);
+        if product == 4.0 {
+            power *= 4;
+        } else if product == 2.0 {
+            power *= 2;
+        } else if product == 0.5 {
+            power /= 2;
+        } else if product == 0.25 {
+            power /= 4;
+        } else if product == 0.0 {
+            power = 0;
+        }
+        if best < power {
+            best = power;
+            best_move = Some(i);
+        }
+    }
+    (best, best_move)
+}
+
+/// One round of [`predict_gen5`]: the party slot sent out after `positions[0]`
+/// fainted, with `positions` (party slot at each battle position) updated.
+pub fn next_gen5(party: &[SendOutMon], positions: &mut [usize], fainted: &[usize], player: &SendOutPlayer) -> Option<usize> {
+    let mut list: Vec<usize> = (1..positions.len()).filter(|p| !fainted.contains(&positions[*p])).collect();
+    if list.is_empty() {
+        return None;
+    }
+    let mut power: Vec<i64> = list.iter().map(|p| gen5_best_move(&party[positions[*p]], player).0).collect();
+    for i in 0..list.len() {
+        for j in (i + 1)..list.len() {
+            if power[i] < power[j] {
+                power.swap(i, j);
+                list.swap(i, j);
+            }
+        }
+    }
+    positions.swap(0, list[0]);
+    Some(positions[0])
 }
 
 // ---- from the router's data --------------------------------------------------------------------
@@ -1020,6 +1187,7 @@ mod tests {
             ko_move: None,
             defense_badge: false,
             special_defense_badge: false,
+            weather: None,
         }
     }
 
@@ -1109,6 +1277,67 @@ mod tests {
         assert_eq!(predict_gen4(&party, &player("Gyarados", "Water", "Flying", 79, 100)), [0, 2, 1, 3]);
     }
 
+    /// Platinum, Fisherman Travis on Route 212 against a level 56 Eevee (Def 85,
+    /// SpD 96), read from the replay `p-eevee-1-22928` at frames 1175331-1177735:
+    /// the route's rain gives Barboach's Water Pulse 6 * 1.5 = 9, past Thrash's 8,
+    /// and the game sent Barboach, Gyarados, Barboach.
+    #[test]
+    fn gen4_stage_2_rain_on_a_real_fight() {
+        let barboach = |attack, special_attack, level| SendOutMon {
+            level,
+            attack,
+            special_attack,
+            ..mon(
+                "Barboach",
+                "Water",
+                "Ground",
+                vec![sp("Water Gun", "Water", 40), sp("Mud Bomb", "Ground", 65), mv("Amnesia", "Psychic", 0), sp("Water Pulse", "Water", 60)],
+            )
+        };
+        let gyarados = SendOutMon {
+            level: 26,
+            attack: 70,
+            special_attack: 36,
+            ..mon("Gyarados", "Water", "Flying", vec![mv("Thrash", "Normal", 90), mv("Bite", "Dark", 60), sp("Dragon Rage", "Dragon", 1), mv("Leer", "Normal", 0)])
+        };
+        let party = vec![barboach(30, 24, 24), barboach(29, 25, 25), gyarados, barboach(29, 25, 25)];
+        let eevee = player("Eevee", "Normal", "Normal", 85, 96);
+        assert_eq!(predict_gen4(&party, &eevee), vec![0, 2, 1, 3]);
+        let rain = SendOutPlayer { weather: Some("Rain".into()), ..eevee.clone() };
+        assert_eq!(predict_gen4(&party, &rain), vec![0, 1, 2, 3]);
+        assert_eq!(gen4_ai_damage(&party[0], &rain, &sp("Water Pulse", "Water", 60)).0, 9);
+        assert_eq!(gen4_ai_damage(&party[0], &rain, &mv("Thrash", "Normal", 90)).0, 8);
+        // Cloud Nine on the player's side turns the weather off
+        let cloud_nine = SendOutPlayer { ability: Some("Cloud Nine".into()), ..rain };
+        assert_eq!(predict_gen4(&party, &cloud_nine), vec![0, 2, 1, 3]);
+    }
+
+    #[test]
+    fn gen4_weather_steps() {
+        let attacker = stats(mon("Attacker", "Normal", "Normal", vec![]), 50, 100);
+        let target = player("Target", "Normal", "Normal", 100, 100);
+        let with = |w: &str| SendOutPlayer { weather: Some(w.into()), ..target.clone() };
+        // 100 * 100 * 22 / 100 / 50 = 44, and 44 + 2 before the chart
+        assert_eq!(gen4_ai_damage(&attacker, &target, &sp("Surf", "Water", 100)).0, 46);
+        assert_eq!(gen4_ai_damage(&attacker, &with("Rain"), &sp("Surf", "Water", 100)).0, 68);
+        assert_eq!(gen4_ai_damage(&attacker, &with("Sun"), &sp("Surf", "Water", 100)).0, 24);
+        assert_eq!(gen4_ai_damage(&attacker, &with("Rain"), &sp("Flamethrower", "Fire", 100)).0, 24);
+        assert_eq!(gen4_ai_damage(&attacker, &with("Sun"), &sp("Flamethrower", "Fire", 100)).0, 68);
+        for w in ["Rain", "Sandstorm", "Hail", "Fog"] {
+            assert_eq!(gen4_ai_damage(&attacker, &with(w), &sp("Solar Beam", "Grass", 100)).0, 24, "{w}");
+        }
+        assert_eq!(gen4_ai_damage(&attacker, &with("Sun"), &sp("Solar Beam", "Grass", 100)).0, 46);
+        // Rock types take special hits on 1.5x Sp. Def in a sandstorm: 100 * 100 * 22 / 150 / 50 = 29
+        let rock = SendOutPlayer { weather: Some("Sandstorm".into()), ..player("Target", "Rock", "Rock", 100, 100) };
+        assert_eq!(gen4_ai_damage(&attacker, &rock, &sp("Thunderbolt", "Electric", 100)).0, 31);
+        // Weather Ball turns for the chart, not for the damage step
+        let ball = mon("Castform", "Normal", "Normal", vec![sp("Weather Ball", "Normal", 50)]);
+        let fire = player("Target", "Fire", "Fire", 100, 100);
+        let fire_in_rain = SendOutPlayer { weather: Some("Rain".into()), ..fire.clone() };
+        assert!(gen4_super_effective(&ball, &ball.moves[0], &fire_in_rain));
+        assert!(!gen4_super_effective(&ball, &ball.moves[0], &fire));
+    }
+
     #[test]
     fn gen4_stage_2_wraps_in_a_byte() {
         // Lv50 Atk 400 vs Def 100. Mega Kick: 211 + 2 = 213, STAB 319 -> 63. Tackle: 61 + 2, STAB 94.
@@ -1157,6 +1386,63 @@ mod tests {
     fn registry() -> Registry {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
         Registry::new(root.join("raw_pkmn_data"), PathBuf::new())
+    }
+
+    /// The ROM-order chart says the same as the router's tables, entry by entry.
+    #[test]
+    fn the_rom_chart_matches_the_router_tables() {
+        let reg = registry();
+        for version in ["Crystal", "Emerald", "Platinum", "Black"] {
+            let gen = reg.get_version(version).unwrap();
+            let types: Vec<String> = gen.supported_types().into_iter().filter(|t| t != "none").collect();
+            for atk in &types {
+                for def in &types {
+                    let router = match gen.effectiveness(atk, def) {
+                        Some(xpr_core::consts::SUPER_EFFECTIVE) => 2.0,
+                        Some(xpr_core::consts::NOT_VERY_EFFECTIVE) => 0.5,
+                        Some(xpr_core::consts::IMMUNE) => 0.0,
+                        _ => 1.0,
+                    };
+                    assert_eq!(type_product(&normal_type(atk), &normal_type(def), &normal_type(def)), router, "{} {} -> {}", version, atk, def);
+                }
+            }
+        }
+    }
+
+    /// A status move never sets gen 3's flag, whatever its type.
+    #[test]
+    fn gen3_se_move_skips_status_moves() {
+        let you = player("Squirtle", "Water", "Water", 0, 0);
+        let m = mon("A", "Grass", "Grass", vec![mv("Stun Spore", "Grass", 0), sp("Absorb", "Grass", 20)]);
+        assert_eq!(gen3_se_move(&m, &you), Some(1));
+        let m = mon("B", "Grass", "Grass", vec![mv("Stun Spore", "Grass", 0)]);
+        assert_eq!(gen3_se_move(&m, &you), None);
+    }
+
+    /// Gen 3's typeDmg walks the chart in ROM order, so each truncation lands where the ROM's does.
+    #[test]
+    fn gen3_type_dmg_follows_the_chart_order() {
+        // Normal/Grass on Rock/Flying. Normal->Rock 5. The chart has Grass->Flying before Grass->Rock:
+        // 5 x 0.5 truncates to 2, x 2 = 4. A multiplier product says 5.
+        let you = player("", "Normal", "Grass", 0, 0);
+        assert_eq!(gen3_type_dmg(&mon("Aerodactyl", "Rock", "Flying", vec![]), &you), 4);
+        // four halvings reach 0: 5, 2, 1, 0
+        let you = player("Bulbasaur", "Grass", "Grass", 0, 0);
+        assert_eq!(gen3_type_dmg(&mon("Beautifly", "Bug", "Flying", vec![]), &you), 0);
+    }
+
+    #[test]
+    fn gen3_pass_2_keeps_the_best_damage_in_a_byte() {
+        let party = [
+            mon("Lead", "Normal", "Normal", vec![]),
+            mon("Gunner", "Normal", "Normal", vec![sp("Water Gun", "Water", 40)]),
+            mon("Tackler", "Normal", "Normal", vec![mv("Tackle", "Normal", 35)]),
+        ];
+        let pass = Gen3Pass2::new(&party, 0, &[1, 2], &player("Charmander", "Fire", "Fire", 50, 50));
+        // D 3: Water Gun x2 = 6 beats Tackle's STAB 4
+        assert_eq!(pass.pick(3), Some(1));
+        // D 130: Water Gun 260 is kept as 4, so Tackle's 195 beats it
+        assert_eq!(pass.pick(130), Some(2));
     }
 
     #[test]

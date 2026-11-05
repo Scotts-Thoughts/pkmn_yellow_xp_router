@@ -429,7 +429,7 @@ impl MapView {
         let pos = Pos2::new(vp.center().x - width / 2.0, vp.min.y + 8.0);
         let mut cancel = false;
         let mut retry = false;
-        egui::Area::new(egui::Id::new(("map_imagery_banner", game))).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
+        egui::Area::new(egui::Id::unique(("map_imagery_banner", game))).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
             egui::Frame::new().fill(theme.card_bg()).stroke(theme.border_stroke()).corner_radius(6.0).inner_margin(egui::Margin::symmetric(10, 6)).show(ui, |ui| {
                 ui.set_width(width - 20.0);
                 ui.spacing_mut().item_spacing = Vec2::new(8.0, 4.0);
@@ -742,7 +742,7 @@ impl MapView {
         };
         widgets::label_font(ui, widgets::elide(ui, &title, &theme.body_bold(), 140.0), theme.body_bold(), theme.text_strong());
         // search / map list
-        let er = Entry::new(theme, &mut self.list.search).width(150.0).hint("Find a map…").id(ui.id().with("map_search")).show(ui);
+        let er = Entry::new(theme, &mut self.list.search).width(150.0).hint("Find a map…").id(ui.scope_id().with("map_search")).show(ui);
         let anchor = er.response.as_ref().map(|r| r.rect);
         if er.changed || er.has_focus && ui.input(|i| i.pointer.any_click()) {
             self.list.open = true;
@@ -757,7 +757,7 @@ impl MapView {
         }
         // item search (`item_search.rs`): Enter picks the top match, then steps
         // through its instances
-        let ir = Entry::new(theme, &mut self.item_search.query).width(130.0).hint("Find an item…").id(ui.id().with("map_item_search")).show(ui);
+        let ir = Entry::new(theme, &mut self.item_search.query).width(130.0).hint("Find an item…").id(ui.scope_id().with("map_item_search")).show(ui);
         let item_anchor = ir.response.as_ref().map(|r| r.rect);
         if ir.changed || ir.has_focus && ui.input(|i| i.pointer.any_click()) {
             self.item_search.open = true;
@@ -1158,7 +1158,7 @@ impl MapView {
             let mut close = false;
             let mut select = false;
             let banner_rect = Rect::from_min_size(Pos2::new(vp.min.x + 8.0, vp.max.y - 40.0), Vec2::new(vp.width() - 16.0, 32.0));
-            egui::Area::new(ui.id().with("map_focus_banner")).order(egui::Order::Foreground).fixed_pos(banner_rect.min).show(&ctx, |ui| {
+            egui::Area::new(ui.scope_id().with("map_focus_banner")).order(egui::Order::Foreground).fixed_pos(banner_rect.min).show(&ctx, |ui| {
                 egui::Frame::new().fill(theme.card_bg()).stroke(theme.border_stroke()).corner_radius(6.0).inner_margin(egui::Margin::symmetric(10, 5)).show(ui, |ui| {
                     ui.set_width(banner_rect.width() - 20.0);
                     ui.horizontal(|ui| {

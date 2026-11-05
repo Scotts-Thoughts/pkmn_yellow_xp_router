@@ -105,14 +105,15 @@ impl Harness {
     fn frame(&mut self, events: Vec<Event>) {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1400.0, 900.0))), events, ..Default::default() };
         let Harness { ctx, theme, cfg, ctrl, details, assets, .. } = self;
-        let out = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let mut out = ctx.run_ui(input, |root| {
+            egui::CentralPanel::default().show(root, |ui| {
                 widgets::show_scroll(ui, egui::ScrollArea::vertical().id_salt("battle_scroll").auto_shrink([false, false]), |ui| {
                     let mut actions = BattleUiActions::default();
                     details.battle_ui.ui(ui, theme, cfg, &mut details.bc, ctrl, assets, &mut actions);
                 });
             });
         });
+        out.textures_delta.clear();
         self.texts.clear();
         self.vlines.clear();
         for cs in &out.shapes {

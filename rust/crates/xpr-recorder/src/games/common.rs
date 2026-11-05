@@ -15,6 +15,46 @@ use crate::controller::{ActiveFlag, EventQueue, RecorderController};
 use crate::gamehook::PropertyStore;
 
 /// Python `str(value)` for the JSON values GameHook sends.
+/// The `mon_order` of a trainer fight: `result[party slot]` is the 1-based position
+/// that slot came out at. `seen` is the party slots in the order the battle showed
+/// them, and the slots a missed send-out left out follow in the order of `predicted`
+/// (a `mon_order`, party order if it is empty). The player won, so every mon was
+/// fought and every slot gets a position: `get_pokemon_list` stops at the list's
+/// length, and a short one drops a mon and its exp from the route.
+///
+/// Nothing seen leaves `predicted` as it is. That is also how a two-trainer battle
+/// keeps its empty order: their recorders pass no slots and nothing is predicted.
+pub fn full_mon_order(seen: &[i64], team_len: usize, predicted: &[i64]) -> Vec<i64> {
+    let mut order: Vec<usize> = Vec::new();
+    for slot in seen.iter().filter_map(|s| usize::try_from(*s).ok()).filter(|s| *s < team_len) {
+        if !order.contains(&slot) {
+            order.push(slot);
+        }
+    }
+    if order.is_empty() {
+        return predicted.to_vec();
+    }
+    let predicted = if predicted.len() == team_len { predicted } else { &[] };
+    let mut left: Vec<usize> = (0..team_len).filter(|s| !order.contains(s)).collect();
+    left.sort_by_key(|s| predicted.get(*s).copied().unwrap_or(0));
+    order.extend(left);
+    let mut result = vec![0; team_len];
+    for (position, slot) in order.iter().enumerate() {
+        result[*slot] = position as i64 + 1;
+    }
+    result
+}
+
+/// The end-of-battle (ROAR) update: `update` carries the slots seen in its
+/// `mon_order`, and `opening`, the event it replaces, carries the prediction.
+pub fn finish_mon_order(gen: &GenData, update: &mut EventDefinition, opening: &EventDefinition) {
+    let team_len = update.get_pokemon_list(gen, true).map(|list| list.len()).unwrap_or(0);
+    let predicted = opening.trainer_def.as_ref().map(|t| t.mon_order.clone()).unwrap_or_default();
+    if let Some(td) = update.trainer_def.as_mut() {
+        td.mon_order = full_mon_order(&td.mon_order, team_len, &predicted);
+    }
+}
+
 pub fn py_str(v: &Value) -> String {
     match v {
         Value::Null => "None".to_string(),
@@ -331,4 +371,45 @@ pub fn resolve_tm_name(gen: &GenData, prefix: &str) -> Option<String> {
 
 pub fn store_i64(store: &PropertyStore, key: &str) -> i64 {
     store.i64_of(key).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod mon_order_tests {
+    use super::full_mon_order;
+
+    #[test]
+    fn every_slot_seen_is_the_order_seen() {
+        assert_eq!(full_mon_order(&[0, 1, 2], 3, &[]), vec![1, 2, 3]);
+        assert_eq!(full_mon_order(&[0, 2, 1], 3, &[]), vec![1, 3, 2]);
+        // what the game did beats the prediction
+        assert_eq!(full_mon_order(&[2, 0, 1], 3, &[1, 2, 3]), vec![2, 3, 1]);
+    }
+
+    #[test]
+    fn a_slot_not_seen_goes_after_the_seen_ones() {
+        assert_eq!(full_mon_order(&[0, 2], 3, &[]), vec![1, 3, 2]);
+        assert_eq!(full_mon_order(&[0, 1], 3, &[]), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn slots_not_seen_keep_the_predicted_order() {
+        // predicted out: slots 0, 2, 4, 3, 1
+        assert_eq!(full_mon_order(&[0, 4], 5, &[1, 5, 2, 4, 3]), vec![1, 5, 3, 4, 2]);
+    }
+
+    #[test]
+    fn a_prediction_of_the_wrong_length_is_ignored() {
+        assert_eq!(full_mon_order(&[0, 2], 3, &[1, 2]), vec![1, 3, 2]);
+    }
+
+    #[test]
+    fn slots_outside_the_team_and_repeats_do_not_count() {
+        assert_eq!(full_mon_order(&[0, 5, 0, -1, 1], 2, &[]), vec![1, 2]);
+    }
+
+    #[test]
+    fn nothing_seen_leaves_the_prediction() {
+        assert_eq!(full_mon_order(&[], 3, &[1, 3, 2]), vec![1, 3, 2]);
+        assert!(full_mon_order(&[], 3, &[]).is_empty());
+    }
 }

@@ -124,6 +124,8 @@ pub struct RecorderController {
     /// the running machine's `_active` flag (see `deactivate`)
     machine_active: Mutex<Option<ActiveFlag>>,
     wake: Arc<dyn Fn() + Send + Sync>,
+    /// What the last prediction read, for [`Self::repredict_send_out`]
+    last_send_out: Mutex<Option<SendOutInputs>>,
 }
 
 impl RecorderController {
@@ -138,6 +140,7 @@ impl RecorderController {
             client: Mutex::new(None),
             machine_active: Mutex::new(None),
             wake,
+            last_send_out: Mutex::new(None),
         })
     }
 
@@ -323,6 +326,38 @@ impl RecorderController {
         }
     }
 
+    /// The weather of the trainer battle in progress is known, which it wasn't
+    /// when the battle's event went in: predict its order again. The route's solo
+    /// mon has had the fight's experience by now, so this reuses what the first
+    /// prediction read.
+    pub fn repredict_send_out(&self, trainer_name: &str, weather: Option<String>) {
+        let mut inputs = match &*self.last_send_out.lock().unwrap() {
+            Some(i) if i.trainer_name == trainer_name => i.clone(),
+            _ => return,
+        };
+        inputs.player.weather = weather;
+        let mon_order = inputs.mon_order();
+        let mut event = self.host.call(|h| h.get_previous_event(None));
+        let mut search_count = 0;
+        while !Self::is_trainer_event(event.as_ref(), trainer_name) {
+            let Some(id) = event.as_ref().map(|e| e.group_id) else { return };
+            event = self.host.call(move |h| h.get_previous_event(Some(id)));
+            search_count += 1;
+            if search_count > 20 {
+                return;
+            }
+        }
+        let Some(event) = event else { return };
+        let mut def = event.definition;
+        let Some(td) = def.trainer_def.as_mut() else { return };
+        if td.mon_order != mon_order {
+            log::info!("predicted send-out order for {}: {:?}", trainer_name, mon_order);
+            td.mon_order = mon_order;
+            let id = event.group_id;
+            self.host.call(move |h| h.update_existing_event(id, def));
+        }
+    }
+
     /// `lost_trainer_battle`: remove the event of the trainer we lost to.
     pub fn lost_trainer_battle(&self, trainer_name: &str) {
         if !self.is_active() {
@@ -448,8 +483,10 @@ impl RecorderController {
             // the game really used.
             if td.mon_order.is_empty() && event_def.notes.is_empty() {
                 if let (Some(gen), Some(solo)) = (self.host.call(|h| h.gen()), self.host.call(|h| h.final_solo_pkmn())) {
-                    td.mon_order = predicted_mon_order(&gen, td, &solo);
+                    let inputs = send_out_inputs(&gen, td, &solo);
+                    td.mon_order = inputs.as_ref().map(|i| i.mon_order()).unwrap_or_default();
                     log::info!("predicted send-out order for {}: {:?}", td.trainer_name, td.mon_order);
+                    *self.last_send_out.lock().unwrap() = inputs;
                 }
             }
         } else if let Some(lm) = event_def.learn_move.as_mut() {
@@ -531,17 +568,32 @@ impl RecorderController {
     }
 }
 
-/// The order `td`'s team will come out in against `solo`, as a `mon_order`.
-/// Empty (party order) for gen 1, where party order is the rule, and for battles
-/// the rules don't cover: two trainers interleave their mons, and a double battle
-/// picks against a random target.
-fn predicted_mon_order(gen: &GenData, td: &TrainerEventDefinition, solo: &SoloPokemon) -> Vec<i64> {
-    if xpr_core::pyjson::truthy(&td.second_trainer_name) {
-        return Vec::new();
+/// What a send-out prediction reads.
+#[derive(Clone)]
+struct SendOutInputs {
+    trainer_name: String,
+    generation: u8,
+    party: Vec<SendOutMon>,
+    player: SendOutPlayer,
+}
+
+impl SendOutInputs {
+    /// The order the team will come out in, as a `mon_order`. Empty (party order)
+    /// for gen 1, where party order is the rule.
+    fn mon_order(&self) -> Vec<i64> {
+        send_out_order::predict(self.generation, &self.party, &self.player).map(|order| send_out_order::mon_order_of(&order)).unwrap_or_default()
     }
-    let Some(trainer) = gen.trainer_db().get_trainer(&td.trainer_name) else { return Vec::new() };
+}
+
+/// `None` for battles the rules don't cover: two trainers interleave their mons,
+/// and a double battle picks against a random target.
+fn send_out_inputs(gen: &GenData, td: &TrainerEventDefinition, solo: &SoloPokemon) -> Option<SendOutInputs> {
+    if xpr_core::pyjson::truthy(&td.second_trainer_name) {
+        return None;
+    }
+    let trainer = gen.trainer_db().get_trainer(&td.trainer_name)?;
     if trainer.double_battle {
-        return Vec::new();
+        return None;
     }
     let party: Vec<SendOutMon> = trainer.pkmn.iter().map(|m| send_out_order::send_out_mon(gen, m)).collect();
     let moves: Vec<SendOutMove> = solo.move_list.iter().flatten().filter(|m| !m.is_empty()).map(|m| send_out_order::send_out_move(gen, m)).collect();
@@ -557,8 +609,9 @@ fn predicted_mon_order(gen: &GenData, td: &TrainerEventDefinition, solo: &SoloPo
         ko_move: send_out_order::strongest_move(&moves),
         defense_badge: false,
         special_defense_badge: false,
+        weather: None,
     };
-    send_out_order::predict(gen.get_generation(), &party, &player).map(|order| send_out_order::mon_order_of(&order)).unwrap_or_default()
+    Some(SendOutInputs { trainer_name: td.trainer_name.clone(), generation: gen.get_generation(), party, player })
 }
 
 /// A game-specific recorder (the FSM `Machine` of one generation).

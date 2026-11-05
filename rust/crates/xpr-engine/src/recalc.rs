@@ -326,6 +326,9 @@ impl Router {
             let (st, warnings) = cur_state.override_evs(&gen, e.values())?;
             warning_message = warnings;
             (Arc::new(st), String::new())
+        } else if let Some(d) = &item.event_definition.day_care {
+            let (st, e) = cur_state.day_care(d.exp_gained)?;
+            (Arc::new(st), e)
         } else {
             // notes / save / heal: the state passes through unchanged
             (cur_state, String::new())

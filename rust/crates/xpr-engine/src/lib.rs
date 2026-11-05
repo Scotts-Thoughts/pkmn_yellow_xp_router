@@ -12,7 +12,7 @@ pub mod view;
 
 pub use compare::{compare, digest, RouteComparison, RouteDigest, RouteOrigin};
 pub use events::{
-    swaps_between, BagReorderEventDefinition, BagSwap, EvOverrideEventDefinition, EvolutionEventDefinition, EventDefinition,
+    swaps_between, BagReorderEventDefinition, BagSwap, DayCareEventDefinition, EvOverrideEventDefinition, EvolutionEventDefinition, EventDefinition,
     HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelUpKey, LevelVal,
     LocationEventDefinition, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition,
     WildPkmnEventDefinition,

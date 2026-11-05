@@ -15,6 +15,9 @@
 //!
 //! And the send-out prediction: a trainer event opens in the order the AI
 //! will use, and the ROAR update replaces it with the order the game really used.
+//!
+//! And the Day Care: the exp, levels and moves a mon picks up there arrive all
+//! at once as it is handed back, while it is not in slot 1.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -36,6 +39,8 @@ use xpr_recorder::{PropertyStore, RecorderController};
 struct Log {
     events: Vec<(NodeId, EventDefinition)>,
     next_id: NodeId,
+    /// the level-up moves the recorder set a destination or an "ignore" on
+    levelup: Vec<LearnMoveEventDefinition>,
 }
 
 struct FakeHost {
@@ -85,9 +90,11 @@ impl RecorderHost for FakeHost {
         Vec::new()
     }
     fn get_move_idx(&self, _move_name: &str) -> Option<i64> {
-        None
+        Some(0)
     }
-    fn update_levelup_move(&mut self, _def: LearnMoveEventDefinition) {}
+    fn update_levelup_move(&mut self, def: LearnMoveEventDefinition) {
+        self.log.lock().unwrap().levelup.push(def);
+    }
     fn update_existing_event(&mut self, id: NodeId, def: EventDefinition) {
         for e in self.log.lock().unwrap().events.iter_mut() {
             if e.0 == id {
@@ -201,8 +208,14 @@ fn mapper() -> Value {
         }
         add(&k.enemy_team_species[i], Value::Null);
     }
-    for (i, m) in [json!("BITE"), json!("EMBER"), json!("THIEF"), Value::Null].iter().enumerate() {
+    for i in 1..6 {
+        add(&k.team_exp[i], json!(0));
+    }
+    for (i, m) in [json!("BITE"), json!("EMBER"), json!("THIEF"), json!("ROAR")].iter().enumerate() {
         add(&k.player_moves[i], m.clone());
+    }
+    for path in &k.team_moves[4..] {
+        add(path, Value::Null);
     }
     for path in &k.stat_exp {
         add(path, json!(0));
@@ -230,6 +243,8 @@ struct Sim {
     keys: Gen3Keys,
     seconds: i64,
     exp: i64,
+    /// `fight_and_win`: the enemy mons whose send-out the feed drops
+    missed_send_outs: Vec<usize>,
 }
 
 impl Sim {
@@ -253,6 +268,49 @@ impl Sim {
             let k = self.keys.gametime_seconds.clone();
             self.set(&k, json!(self.seconds));
         }
+    }
+
+    /// `slot` of the party holding this mon (an empty species clears the slot).
+    fn party_slot(&self, slot: usize, species: Value, level: i64, exp: i64, ivs: i64, moves: [Value; 4]) -> Vec<(String, Value)> {
+        let k = &self.keys;
+        let mut out = vec![
+            (k.team_species[slot].clone(), species),
+            (k.team_level[slot].clone(), json!(level)),
+            (k.team_exp[slot].clone(), json!(exp)),
+            (k.team_iv_attack[slot].clone(), json!(ivs)),
+            (k.team_iv_defense[slot].clone(), json!(ivs + 1)),
+            (k.team_iv_speed[slot].clone(), json!(ivs + 1)),
+            (k.team_iv_special_attack[slot].clone(), json!(ivs)),
+            (k.team_iv_special_defense[slot].clone(), json!(ivs + 1)),
+        ];
+        out.extend(moves.iter().enumerate().map(|(i, m)| (k.team_moves[slot * 4 + i].clone(), m.clone())));
+        out
+    }
+
+    fn apply(&mut self, changes: Vec<(String, Value)>) {
+        self.batch(&changes.iter().map(|(p, v)| (p.as_str(), v.clone())).collect::<Vec<_>>());
+    }
+
+    /// The solo mon goes to the Day Care or the PC, leaving a Poochyena in slot 1.
+    fn leave_party(&mut self) {
+        let lead = self.party_slot(0, json!("Poochyena"), 4, 64, 10, [json!("TACKLE"), Value::Null, Value::Null, Value::Null]);
+        self.apply(lead);
+        self.tick(4);
+    }
+
+    /// The game puts a mon coming back in the last party slot, here slot 2.
+    fn rejoin(&mut self, level: i64, exp: i64, moves: [Value; 4]) {
+        let back = self.party_slot(1, json!("Houndoom"), level, exp, 30, moves);
+        self.apply(back);
+        self.tick(4);
+    }
+
+    /// The player swaps the two, which puts the solo mon back in slot 1.
+    fn back_to_slot_1(&mut self, level: i64, exp: i64, moves: [Value; 4]) {
+        let mut swap = self.party_slot(0, json!("Houndoom"), level, exp, 30, moves);
+        swap.extend(self.party_slot(1, json!("Poochyena"), 4, 64, 10, [json!("TACKLE"), Value::Null, Value::Null, Value::Null]));
+        self.apply(swap);
+        self.tick(4);
     }
 
     /// The trainer's team as the game leaves it in `gEnemyParty`.
@@ -286,7 +344,7 @@ impl Sim {
     fn fight_and_win(&mut self, team: &[(&str, i64)], eat_at: Option<usize>, steal_from: Option<(usize, &str)>) {
         let k = self.keys.clone();
         for (i, (species, level)) in team.iter().enumerate() {
-            if i > 0 {
+            if i > 0 && !self.missed_send_outs.contains(&i) {
                 self.batch(&[
                     (&k.battle_first_enemy_party_pos, json!(i)),
                     (&k.battle_first_enemy_species, json!(species)),
@@ -402,7 +460,7 @@ fn record(gen: &Arc<GenData>, solo: Option<SoloPokemon>) -> (Sim, Arc<Mutex<Log>
     assert!(invalid.is_empty(), "invalid keys: {:?}", invalid);
     machine.startup(&store);
     let keys = Gen3Keys::configure(false);
-    let mut sim = Sim { store, machine, keys, seconds: 0, exp: 21012 };
+    let mut sim = Sim { store, machine, keys, seconds: 0, exp: 21012, missed_send_outs: Vec::new() };
     sim.tick(4); // UNINITIALIZED -> OVERWORLD
     assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Overworld));
     (sim, log)
@@ -491,5 +549,107 @@ fn a_trainer_event_opens_in_the_predicted_order_and_ends_in_the_real_one() {
     let events = wait_for_events(&log, 1);
     let closed = events.iter().find(|d| d.trainer_def.is_some()).expect("trainer event");
     assert_eq!(team_of(&gen, closed), ["Swablu", "Tropius", "Pelipper", "Skarmory", "Altaria"]);
+    sim.machine.shutdown();
+}
+
+/// Frames 1142160-1159419 of `e-nosepass-2-35147`, on a Houndoom: in with four
+/// moves at level 31; out with 12,000 exp from steps, level 35, and Odor Sleuth
+/// (learned at 35) in place of the oldest move, with nothing to accept.
+#[test]
+fn a_day_care_stay_records_its_exp_and_the_moves_it_pushed_out() {
+    let gen = emerald();
+    let (mut sim, log) = record(&gen, None);
+    sim.tick(1);
+
+    sim.leave_party();
+    assert!(log.lock().unwrap().events.is_empty(), "leaving the party records nothing");
+
+    let moves = [json!("EMBER"), json!("THIEF"), json!("ROAR"), json!("ODOR SLEUTH")];
+    sim.rejoin(35, 33012, moves.clone());
+    let events = wait_for_events(&log, 1);
+    assert_eq!(events.len(), 1, "{:?}", events.iter().map(|e| e.get_event_type()).collect::<Vec<_>>());
+    assert_eq!(events[0].day_care.map(|d| d.exp_gained), Some(12000));
+    let levelup = log.lock().unwrap().levelup.clone();
+    let learned = levelup.iter().find(|l| l.destination == Some(0)).expect("Odor Sleuth over Bite");
+    assert_eq!(learned.move_to_learn.as_deref(), Some("Odor Sleuth"));
+    assert_eq!(learned.level.display(), "35");
+
+    // swapping it to the front adds nothing: the same stay is not counted twice
+    sim.back_to_slot_1(35, 33012, moves);
+    sim.tick(4);
+    let events = wait_for_events(&log, 1);
+    assert_eq!(events.len(), 1, "{:?}", events.iter().map(|e| e.get_event_type()).collect::<Vec<_>>());
+    sim.machine.shutdown();
+}
+
+/// A mon back from the PC comes back as it left, and whatever the mon that took
+/// over slot 1 earned is not the solo mon's.
+#[test]
+fn a_mon_back_from_the_pc_records_no_day_care_exp() {
+    let gen = emerald();
+    let (mut sim, log) = record(&gen, None);
+    sim.tick(1);
+
+    sim.leave_party();
+    let k = sim.keys.clone();
+    sim.set(&k.mon_exppoints, json!(21900));
+    sim.tick(1);
+    sim.rejoin(31, 21012, [json!("BITE"), json!("EMBER"), json!("THIEF"), json!("ROAR")]);
+    sim.tick(4);
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(log.lock().unwrap().events.is_empty(), "{:?}", log.lock().unwrap().events.iter().map(|(_, e)| e.get_event_type()).collect::<Vec<_>>());
+    sim.machine.shutdown();
+}
+
+/// The trainer event once the ROAR update has given it `order`.
+fn wait_for_order(log: &Arc<Mutex<Log>>, order: &[i64]) -> EventDefinition {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let got = log.lock().unwrap().events.iter().map(|(_, d)| d.clone()).find(|d| d.trainer_def.is_some());
+        if let Some(d) = &got {
+            if d.trainer_def.as_ref().unwrap().mon_order == order {
+                return d.clone();
+            }
+        }
+        assert!(Instant::now() < deadline, "mon_order is {:?}", got.map(|d| d.trainer_def.unwrap().mon_order));
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+#[test]
+fn a_missed_send_out_keeps_the_whole_team() {
+    let gen = emerald();
+    let (mut sim, log) = record(&gen, None);
+    // Numel out, Slugma's send-out dropped, then Camerupt and Torkoal: seen slots
+    // first, then what is left in party order
+    sim.missed_send_outs = vec![1];
+    sim.start_flag_first(FLANNERY.0, FLANNERY.1);
+    sim.fight_and_win(FLANNERY.1, None, None);
+    let closed = wait_for_order(&log, &[1, 4, 2, 3]);
+    assert_eq!(team_of(&gen, &closed), ["Numel", "Camerupt", "Torkoal", "Slugma"]);
+    sim.machine.shutdown();
+
+    // the last send-out dropped
+    let (mut sim, log) = record(&gen, None);
+    sim.missed_send_outs = vec![3];
+    sim.start_flag_first(FLANNERY.0, FLANNERY.1);
+    sim.fight_and_win(FLANNERY.1, None, None);
+    let closed = wait_for_order(&log, &[1, 2, 3, 4]);
+    assert_eq!(team_of(&gen, &closed), ["Numel", "Slugma", "Camerupt", "Torkoal"]);
+    sim.machine.shutdown();
+}
+
+/// Winona opens as [Swablu, Pelipper, Altaria, Skarmory, Tropius]. The game then
+/// shows only Swablu and Altaria: those are facts, and the three the feed lost
+/// keep the prediction's order.
+#[test]
+fn a_missed_send_out_keeps_the_prediction_for_the_mons_not_seen() {
+    let gen = emerald();
+    let (mut sim, log) = record(&gen, Some(houndoom(&gen)));
+    sim.missed_send_outs = vec![1, 2, 3];
+    sim.start_flag_first(WINONA.0, WINONA.1);
+    sim.fight_and_win(WINONA.1, None, None);
+    let closed = wait_for_order(&log, &[1, 5, 3, 4, 2]);
+    assert_eq!(team_of(&gen, &closed), ["Swablu", "Altaria", "Pelipper", "Skarmory", "Tropius"]);
     sim.machine.shutdown();
 }

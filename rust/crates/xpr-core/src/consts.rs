@@ -3,8 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
-pub const APP_VERSION: &str = "v6.2e";
-pub const APP_RELEASE_DATE: &str = "2026-Oct-28";
+pub const APP_VERSION: &str = "v6.3a";
+pub const APP_RELEASE_DATE: &str = "2026-Nov-05";
 
 pub const APP_NAME: &str = "pkmn_xp_router";
 pub const APP_DATA_FOLDER_DEFAULT_NAME: &str = "pkmn_xp_router_data";
@@ -223,11 +223,13 @@ pub const TASK_REORDER_BAG: &str = "Reorder Bag";
 /// Testing aid: sets the solo mon's EVs / stat exp to fixed values from
 /// that point of the route on (no in-game equivalent).
 pub const TASK_EV_OVERRIDE: &str = "EV Override";
+/// Collecting the solo mon from the Day Care, with the exp it earned there
+pub const TASK_DAY_CARE: &str = "Day Care";
 pub const TASK_NOTES_ONLY: &str = "Just Notes";
 pub const ERROR_SEARCH: &str = "Invalid Events";
 pub const MAJOR_BATTLE_FILTER: &str = "Major Battles";
 
-pub const ROUTE_EVENT_TYPES: [&str; 19] = [
+pub const ROUTE_EVENT_TYPES: [&str; 20] = [
     TASK_TRAINER_BATTLE,
     TASK_LEARN_MOVE_LEVELUP,
     TASK_SELL_ITEM,
@@ -246,6 +248,7 @@ pub const ROUTE_EVENT_TYPES: [&str; 19] = [
     TASK_EVOLUTION,
     TASK_LEARN_MOVE_TM,
     TASK_EV_OVERRIDE,
+    TASK_DAY_CARE,
     ERROR_SEARCH,
 ];
 

@@ -2,7 +2,7 @@
 //! the route editor splitter, status bar, dialogs, secondary windows,
 //! recorder wiring, startup sequencing and the update flow.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -25,7 +25,6 @@ use crate::assets::Assets;
 use crate::battle_ui::ScreenshotMode;
 use crate::compare::{CompareEnv, CompareView, RouteSource};
 use crate::controller::MainController;
-use crate::dex_damage::DexDamage;
 use crate::dialogs::{
     AppConfigDialog, AssignMoveDialog, BattleConfigDialog, ColorConfigDialog, CustomDvsDialog, CustomGenDialog, Dialog, EvOverrideDialog,
     DialogCtx, DialogOutcome, FinalTrainersDialog, HighlightColorDialog, LoadRouteDialog, MatchupExportDialog, MessageBox,
@@ -51,8 +50,6 @@ pub enum Page {
     Compare,
     /// the landing page's "View Map" (`pages::MapViewerPage`)
     MapViewer,
-    /// the Dex: Solodex's reference views (`xpr_dex_ui::DexView`)
-    Dex,
 }
 
 /// What `main` needs to know after the window closes.
@@ -158,14 +155,6 @@ pub struct XprApp {
     /// "View Map" from the landing page; kept so the picked game survives
     /// going back and forth
     map_viewer: Option<MapViewerPage>,
-    /// the Dex page, built on first open and kept (its tabs keep their state)
-    dex: Option<xpr_dex_ui::DexView>,
-    /// the Dex's Damage tab (the router's battle summary on a route-less controller)
-    dex_damage: Option<DexDamage>,
-    /// the page the Dex was opened from, returned to by Back / Ctrl+K
-    dex_return: Page,
-    /// the Dex is shown in its own window (`DexSettings::windowed`)
-    dex_window_open: bool,
     quick_add: QuickAddPopover,
     dialog: Option<Dialog>,
     message: Option<MessageBox>,
@@ -199,6 +188,10 @@ pub struct XprApp {
     /// live in a cloud-synced folder whose reads can stall for many seconds
     custom_gens_rx: Option<Receiver<Result<(), String>>>,
     first_frame: bool,
+    /// see `App::logic`
+    hidden_paint_requested: bool,
+    /// the smoke test's screenshot, delivered by eframe's callback
+    smoke_image: std::sync::Arc<std::sync::Mutex<Option<std::sync::Arc<egui::ColorImage>>>>,
     /// (display scale, monitor size) the window was last checked against;
     /// a change means it landed on another monitor
     window_monitor: Option<(f32, Vec2)>,
@@ -282,10 +275,6 @@ impl XprApp {
             details,
             map,
             map_viewer: None,
-            dex: None,
-            dex_damage: None,
-            dex_return: Page::Landing,
-            dex_window_open: false,
             quick_add: QuickAddPopover::new(),
             dialog: None,
             message: None,
@@ -309,6 +298,8 @@ impl XprApp {
             deferred_post_init: None,
             custom_gens_rx: Some(ctx_rx),
             first_frame: true,
+            hidden_paint_requested: false,
+            smoke_image: Default::default(),
             window_monitor: None,
             restore_position_px,
             update: UpdateState { rx: Some(urx), startup_check: true, available: None, previous: update_previous, pending_swap: None, check_button_enabled: true },
@@ -650,18 +641,6 @@ impl XprApp {
             }
             false
         };
-        if fire("toggle_dex") {
-            self.toggle_dex();
-            return;
-        }
-        // On the Dex page its own keys (F1-F9, Space, arrows) take over;
-        // only saving the route stays available.
-        if self.page == Page::Dex {
-            if fire("save_route") {
-                self.save_route();
-            }
-            return;
-        }
         // File
         if fire("customize_dvs") {
             self.open_customize_dvs_window();
@@ -815,7 +794,7 @@ impl XprApp {
         if fire("show_on_map") {
             self.show_selected_on_map();
         }
-        if fire("export_map") {
+        if fire("export_map") && self.map_available() {
             // the dialog is drawn by the map itself, so it must be shown first
             self.open_map();
             self.map.export.request_open();
@@ -1085,10 +1064,11 @@ impl XprApp {
         }
     }
 
-    /// Whether the open route's game has a map pack (gens 1-3); without one
-    /// the Map tab, the map window and the map menu items are unavailable.
+    /// Whether the map can be shown: the open route's game has a map pack
+    /// (gens 1-3) and it isn't recording. Otherwise the Map tab, the map
+    /// window and the map menu items are unavailable.
     fn map_available(&self) -> bool {
-        MapView::game_of(&self.ctrl).is_some()
+        MapView::game_of(&self.ctrl).is_some() && !self.ctrl.is_record_mode_active()
     }
 
     /// Show the map: the Map tab of the right pane, or its own window.
@@ -1112,6 +1092,9 @@ impl XprApp {
     }
 
     fn toggle_map(&mut self) {
+        if !self.map_available() {
+            return;
+        }
         if self.map_is_shown() {
             self.close_map();
         } else {
@@ -1154,118 +1137,6 @@ impl XprApp {
         self.show_landing_page();
     }
 
-    // ---- the Dex ----------------------------------------------------------------------------
-
-    /// What the Dex sees of the open route.
-    fn dex_route_context(&self) -> xpr_dex_ui::RouteContext {
-        xpr_dex_ui::RouteContext { version: self.ctrl.get_version().map(str::to_string), solo_species: self.ctrl.get_init_state().map(|s| s.solo_pkmn.name.clone()) }
-    }
-
-    /// Open the Dex (on `tab` when given) as a page or in its own window,
-    /// starting on the open route's game and solo Pokémon.
-    fn open_dex(&mut self, tab: Option<xpr_dex_ui::DexTab>) {
-        let route = self.dex_route_context();
-        let registry = self.registry.clone();
-        let dex = self.dex.get_or_insert_with(|| {
-            // parse the Dex tables and the router's versions (the Trainers
-            // tab and its search read every version) off the UI thread
-            xpr_dex::preload_all();
-            std::thread::Builder::new().name("dex-versions".into()).spawn(move || drop(registry.load_all_builtin())).ok();
-            xpr_dex_ui::DexView::new(self.cfg.get_dex_settings())
-        });
-        let windowed = dex.state.settings.windowed;
-        let already_open = if windowed { self.dex_window_open } else { self.page == Page::Dex };
-        if !already_open {
-            dex.sync_to_route(&route, &self.registry);
-        }
-        if let Some(t) = tab {
-            dex.set_tab(t, &self.registry);
-        }
-        if windowed {
-            self.dex_window_open = true;
-        } else if self.page != Page::Dex {
-            self.dex_return = self.page;
-            self.page = Page::Dex;
-        }
-    }
-
-    fn dex_is_shown(&self) -> bool {
-        self.page == Page::Dex || self.dex_window_open
-    }
-
-    /// Move the Dex between a page of the main window and a window of its own.
-    fn set_dex_windowed(&mut self, windowed: bool) {
-        let shown = self.dex_is_shown();
-        self.close_dex();
-        self.dex_window_open = false;
-        self.edit_dex_settings(Box::new(move |s| s.windowed = windowed));
-        if shown || windowed {
-            self.open_dex(None);
-        }
-    }
-
-    /// The Dex's settings (from the config while the page was never opened).
-    fn dex_settings(&self) -> xpr_dex_ui::DexSettings {
-        match &self.dex {
-            Some(d) => d.state.settings.clone(),
-            None => serde_json::from_value(self.cfg.get_dex_settings()).unwrap_or_default(),
-        }
-    }
-
-    /// Change a Dex setting from the menu bar and save it.
-    fn edit_dex_settings(&mut self, f: Box<dyn FnOnce(&mut xpr_dex_ui::DexSettings)>) {
-        let dex = self.dex.get_or_insert_with(|| xpr_dex_ui::DexView::new(self.cfg.get_dex_settings()));
-        f(&mut dex.state.settings);
-        dex.state.touch();
-        let _ = dex.take_settings_dirty();
-        self.cfg.set_dex_settings(dex.settings_json());
-    }
-
-    fn close_dex(&mut self) {
-        self.dex_window_open = false;
-        if self.page == Page::Dex {
-            self.page = if self.dex_return == Page::Dex { Page::Landing } else { self.dex_return };
-        }
-    }
-
-    fn toggle_dex(&mut self) {
-        if self.dex_is_shown() {
-            self.close_dex();
-        } else {
-            self.open_dex(None);
-        }
-    }
-
-    fn apply_dex_actions(&mut self, ctx: &egui::Context, actions: Vec<xpr_dex_ui::DexAction>) {
-        use xpr_dex_ui::DexAction;
-        for a in actions {
-            match a {
-                DexAction::Close => self.close_dex(),
-                DexAction::AddTrainerToRoute { version, trainer } => {
-                    if self.ctrl.get_version() != Some(version.as_str()) {
-                        self.toast.show("Open a route of that game to add its trainers", 3000, None);
-                    } else if self.ctrl.add_trainer_fight_from_map(&trainer).is_some() {
-                        self.toast.show(format!("Added {} to the route", trainer), 3000, None);
-                    } else {
-                        self.toast.show(format!("Could not add {}", trainer), 3000, None);
-                    }
-                }
-                DexAction::Toast(text) => self.toast.show(text, 3000, None),
-                DexAction::OpenUrl(url) => ctx.open_url(egui::OpenUrl::new_tab(url)),
-            }
-        }
-        if let Some(dex) = self.dex.as_mut() {
-            if dex.take_settings_dirty() {
-                self.cfg.set_dex_settings(dex.settings_json());
-            }
-        }
-        if let Some(d) = self.dex_damage.as_mut() {
-            if std::mem::take(&mut d.open_battle_config) {
-                self.dialog = Some(Dialog::BattleConfig(BattleConfigDialog::new(&self.cfg)));
-            }
-        }
-    }
-
     /// "Show on map": focus the selected event's trainer / item pickup / species.
     fn show_selected_on_map(&mut self) {
         let Some(id) = self.ctrl.get_single_selected_event_id(true) else {
@@ -1278,6 +1149,10 @@ impl XprApp {
         };
         if MapView::game_of(&self.ctrl).is_none() {
             self.toast.show("No map data for this game (gens 1\u{2013}3 only)", 3000, None);
+            return;
+        }
+        if !self.map_available() {
+            self.toast.show("The map isn't available while recording", 2500, None);
             return;
         }
         self.open_map();
@@ -1398,10 +1273,14 @@ impl XprApp {
         }
         let dialog = rfd::FileDialog::new().set_title("Select a Super Shuckie replay").add_filter("Super Shuckie replays", &["replay"]).add_filter("All Files", &["*"]);
         let Some(replay) = dialog.pick_file() else { return };
+        self.start_replay_import(replay, Vec::new(), ctx);
+    }
+
+    fn start_replay_import(&mut self, replay: PathBuf, rom_dirs: Vec<PathBuf>, ctx: &egui::Context) {
         let stem = replay.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "replay".into());
         let _ = std::fs::create_dir_all(&self.paths.saved_routes_dir);
         let out = xpr_core::io_utils::get_safe_path_no_collision(&self.paths.saved_routes_dir, &stem, ".json");
-        let opts = crate::replay_import::ImportOptions { replay, ..Default::default() };
+        let opts = crate::replay_import::ImportOptions { replay, rom_dirs, ..Default::default() };
         let wake_ctx = ctx.clone();
         let wake: Arc<dyn Fn() + Send + Sync> = Arc::new(move || wake_ctx.request_repaint());
         log::info!("[Replay Import] {} -> {}", opts.replay.display(), out.display());
@@ -1413,15 +1292,36 @@ impl XprApp {
     fn poll_replay_import(&mut self, ctx: &egui::Context) {
         let Some(job) = &self.replay_import else { return };
         let status = job.snapshot();
+        let rom_chosen = job.rom_chosen;
         let Some(done) = status.done else {
             ctx.request_repaint_after(Duration::from_millis(250));
             return;
         };
         self.replay_import = None;
+        // the ROM isn't beside the replay: ask for it (the folder is searched
+        // by checksum, so a wrong pick is reported rather than recorded from)
+        if let Err(e) = &done {
+            if let (false, Some(name)) = (rom_chosen, xpr_replay::pipeline::missing_rom_name(e)) {
+                let rom = rfd::FileDialog::new()
+                    .set_title(format!("Select the ROM this replay was recorded with: {name}"))
+                    .add_filter("ROMs", &["gb", "gbc", "gba", "nds"])
+                    .add_filter("All Files", &["*"])
+                    .pick_file();
+                if let Some(dir) = rom.as_deref().and_then(Path::parent) {
+                    self.start_replay_import(status.replay.clone(), vec![dir.to_path_buf()], ctx);
+                }
+                return;
+            }
+        }
         match done {
             Ok((path, report)) => {
                 self.ctrl.load_route(&path);
                 self.show_route_controls();
+                // open on the route, not on the map from the last session
+                self.map_restore_pending = false;
+                let mut da = DetailsActions::default();
+                self.details.show_default_tab(&self.cfg, &self.ctrl, &mut da);
+                self.apply_details_actions(ctx, da);
                 let title = if report.check_passed { "Route from Replay" } else { "Route from Replay: check the route" };
                 self.show_message(title, &format!("{}
 
@@ -1490,7 +1390,7 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
         let Some(species) = gen.pkmn_db().get_pkmn(&info.species).cloned() else {
             self.show_message(
                 "Start Recording",
-                &format!("The game reports your first Pokémon as '{}', which is not in the {} data set, so no route could be created. Use Create New Route instead.", info.species, version),
+                &format!("The game reports your first Pokémon as '{}', which is not in the {} data set, so no route could be created. Use the Create button instead.", info.species, version),
                 MsgButtons::Ok,
                 MsgTag::NewRouteError,
             );
@@ -1777,8 +1677,8 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                 let size = self.event_list_rect.ok_or("no event list on screen")?.size();
                 let route_list = &mut self.route_list;
                 let (cfg, ctrl) = (&self.cfg, &mut self.ctrl);
-                let prims = off.render(size, 3, |c| {
-                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(c, |ui| {
+                let prims = off.render(size, 3, |root| {
+                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
                         ui.spacing_mut().item_spacing = Vec2::new(2.0, 2.0);
                         route_list.export_ui(ui, &theme, cfg, ctrl);
                     });
@@ -1798,8 +1698,8 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                 let (cfg, ctrl) = (&mut self.cfg, &mut self.ctrl);
                 details.battle_ui.screenshot_mode = Some(mode);
                 let mut assets = Assets::new();
-                let prims = off.render(size, 2, |c| {
-                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(c, |ui| {
+                let prims = off.render(size, 2, |root| {
+                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
                         let mut actions = BattleUiActions::default();
                         details.battle_ui.ui(ui, &theme, cfg, &mut details.bc, ctrl, &mut assets, &mut actions);
                     });
@@ -1838,8 +1738,8 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                 // the gradient grid alone (no toolbar), whatever its size
                 let rs = self.run_summary.as_ref().ok_or("no run summary open")?;
                 let mut grid_rect = Rect::NOTHING;
-                let prims = off.render(Vec2::new(8_000.0, 8_000.0), 2, |c| {
-                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(c, |ui| {
+                let prims = off.render(Vec2::new(8_000.0, 8_000.0), 2, |root| {
+                    egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
                         grid_rect = rs.grid(ui, &theme);
                     });
                 });
@@ -1849,8 +1749,8 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                 // the window's text at its on-screen size, on the window background
                 let size = self.setup_summary_rect.map(|r| r.size()).unwrap_or(Vec2::new(420.0, 300.0));
                 let text = setup_summary_text(&self.ctrl);
-                let prims = off.render(size, 2, |c| {
-                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg).inner_margin(egui::Margin::same(15))).show(c, |ui| {
+                let prims = off.render(size, 2, |root| {
+                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg).inner_margin(egui::Margin::same(15))).show(root, |ui| {
                         ui.add(egui::Label::new(egui::RichText::new(&text).font(theme.body()).color(theme.text)).wrap());
                     });
                 });
@@ -1865,8 +1765,8 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                 let cfg = &self.cfg;
                 let mut assets = Assets::new();
                 let mut content = Rect::NOTHING;
-                let prims = off.render(size, 2, |c| {
-                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(c, |ui| {
+                let prims = off.render(size, 2, |root| {
+                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(root, |ui| {
                         content = compare.export_ui(ui, &theme, cfg, &mut assets);
                     });
                 });
@@ -2204,7 +2104,7 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                     self.show_selected_on_map();
                 }
                 widgets::menu_separator(ui, &theme);
-                let map_ready = self.map.is_ready();
+                let map_ready = has_route && self.map.is_ready();
                 if widgets::menu_item(ui, &theme, "Export Map Image\u{2026}", &label("export_map"), map_ready) {
                     // the dialog is drawn by the map itself, so it must be shown first
                     self.open_map();
@@ -2223,64 +2123,6 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                         self.undock_map();
                     } else {
                         self.dock_map();
-                    }
-                }
-            });
-            ui.menu_button("Dex", |ui| {
-                ui.set_min_width(280.0);
-                if widgets::menu_check_item(ui, &theme, "Show the Dex", &label("toggle_dex"), self.dex_is_shown(), true) {
-                    self.toggle_dex();
-                }
-                let windowed = self.dex_settings().windowed;
-                if widgets::menu_item(ui, &theme, if windowed { "Show the Dex in the Main Window" } else { "Open the Dex in Its Own Window" }, "", true) {
-                    self.set_dex_windowed(!windowed);
-                }
-                widgets::menu_separator(ui, &theme);
-                for tab in xpr_dex_ui::DexTab::ALL {
-                    let key = format!("{:?}", tab.key());
-                    if widgets::menu_item(ui, &theme, tab.label(), &key, true) {
-                        self.open_dex(Some(tab));
-                    }
-                }
-                widgets::menu_separator(ui, &theme);
-                let s = self.dex_settings();
-                let mut changed: Option<Box<dyn FnOnce(&mut xpr_dex_ui::DexSettings)>> = None;
-                if widgets::menu_check_item(ui, &theme, "Cross Out Banned Moves", "", s.cross_out_banned, true) {
-                    changed = Some(Box::new(|s| s.cross_out_banned = !s.cross_out_banned));
-                }
-                if widgets::menu_check_item(ui, &theme, "Cross Out Postgame Moves", "", s.cross_out_postgame, true) {
-                    changed = Some(Box::new(|s| s.cross_out_postgame = !s.cross_out_postgame));
-                }
-                if widgets::menu_check_item(ui, &theme, "Cross Out Conditional Moves", "", s.cross_out_conditional, true) {
-                    changed = Some(Box::new(|s| s.cross_out_conditional = !s.cross_out_conditional));
-                }
-                if widgets::menu_item(ui, &theme, "Edit Banned Moves\u{2026}", "", true) {
-                    self.open_dex(Some(xpr_dex_ui::DexTab::Pokedex));
-                    if let Some(d) = self.dex.as_mut() {
-                        d.open_banned_moves_editor();
-                    }
-                }
-                widgets::menu_separator(ui, &theme);
-                if widgets::menu_check_item(ui, &theme, "Show Movepool Differences", "", s.show_movepool_diff, true) {
-                    changed = Some(Box::new(|s| s.show_movepool_diff = !s.show_movepool_diff));
-                }
-                if widgets::menu_check_item(ui, &theme, "Show Bulk", "", s.show_bulk, true) {
-                    changed = Some(Box::new(|s| s.show_bulk = !s.show_bulk));
-                }
-                if widgets::menu_check_item(ui, &theme, "Show WBST (Gen 1)", "", s.show_wbst, true) {
-                    changed = Some(Box::new(|s| s.show_wbst = !s.show_wbst));
-                }
-                if widgets::menu_check_item(ui, &theme, "Show UBST (Gen 1)", "", s.show_ubst, true) {
-                    changed = Some(Box::new(|s| s.show_ubst = !s.show_ubst));
-                }
-                if let Some(f) = changed {
-                    self.edit_dex_settings(f);
-                }
-                widgets::menu_separator(ui, &theme);
-                if widgets::menu_item(ui, &theme, "Dex Keyboard Shortcuts\u{2026}", "", true) {
-                    self.open_dex(None);
-                    if let Some(d) = self.dex.as_mut() {
-                        d.open_shortcuts_help();
                     }
                 }
             });
@@ -2435,13 +2277,13 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
             }
             ui.add_space(6.0);
             widgets::label_colored(ui, &theme, "Route Name:", theme.secondary);
-            let r = Entry::new(&theme, &mut self.route_name_text).width(200.0).min_height(h).corner_radius(3).id(ui.id().with("route_name")).show(ui);
+            let r = Entry::new(&theme, &mut self.route_name_text).width(200.0).min_height(h).corner_radius(3).id(ui.scope_id().with("route_name")).show(ui);
             if r.changed && self.route_name_text != self.ctrl.get_current_route_name() {
                 let n = self.route_name_text.clone();
                 self.ctrl.set_current_route_name(&n);
             }
             widgets::label_colored(ui, &theme, "Image Path:", theme.secondary);
-            let r = Entry::new(&theme, &mut self.image_path_text).width(200.0).min_height(h).corner_radius(3).id(ui.id().with("image_path")).show(ui);
+            let r = Entry::new(&theme, &mut self.image_path_text).width(200.0).min_height(h).corner_radius(3).id(ui.scope_id().with("image_path")).show(ui);
             if r.changed {
                 let p = self.image_path_text.clone();
                 self.ctrl.set_custom_image_path(&p);
@@ -2482,13 +2324,13 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
         if self.map_restore_pending {
             // reopen the map tab when it was open at the last exit
             self.map_restore_pending = false;
-            if self.map.open && self.map.docked {
+            if self.map.open && self.map.docked && self.map_available() {
                 let mut da = DetailsActions::default();
                 self.details.set_tab(&self.cfg, MAP_TAB, &mut da);
             }
         }
         if (self.details.is_map_tab() || self.details.is_map_home()) && !self.map_available() {
-            // the route's game has no map pack: the Map tab is gone
+            // no map pack for the route's game, or it's recording: the Map tab is gone
             let mut da = DetailsActions::default();
             self.details.leave_map(&self.cfg, &mut da);
         }
@@ -2541,7 +2383,7 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
             });
         }
         // splitter handle
-        let resp = ui.interact(handle_rect, ui.id().with("splitter"), Sense::drag());
+        let resp = ui.interact(handle_rect, ui.scope_id().with("splitter"), Sense::drag());
         // a hairline at rest, the full accent grip while hovered / dragged
         if resp.hovered() || resp.dragged() {
             ui.painter().rect_filled(handle_rect, CornerRadius::ZERO, theme.accent);
@@ -2789,25 +2631,6 @@ impl XprApp {
                 }
                 log::info!("smoke: update dialog");
             }
-            // `XPR_SMOKE_ACTION=dex`: open the Dex (from whatever page the
-            // start-up reached) on `XPR_SMOKE_DEX_TAB` (pokedex | evs |
-            // trainers | stats | damage | movedex | natures | misc).
-            if !self.smoke_action_done && std::env::var("XPR_SMOKE_ACTION").as_deref() == Ok("dex") && self.deferred_post_init.is_none() && Instant::now() >= at - Duration::from_millis(2500) {
-                self.smoke_action_done = true;
-                use xpr_dex_ui::DexTab;
-                let tab = match std::env::var("XPR_SMOKE_DEX_TAB").unwrap_or_default().to_lowercase().as_str() {
-                    "evs" => DexTab::Evs,
-                    "trainers" => DexTab::Trainers,
-                    "stats" => DexTab::Stats,
-                    "damage" => DexTab::Damage,
-                    "movedex" => DexTab::Movedex,
-                    "natures" => DexTab::Natures,
-                    "misc" => DexTab::Misc,
-                    _ => DexTab::Pokedex,
-                };
-                self.open_dex(Some(tab));
-                log::info!("smoke: dex page ({:?})", tab);
-            }
             // `XPR_SMOKE_ACTION` drives the window into a state before the capture.
             if !self.smoke_action_done && Instant::now() >= at - Duration::from_millis(1500) && self.page == Page::Editor {
                 self.smoke_action_done = true;
@@ -2972,16 +2795,16 @@ impl XprApp {
                     }
                 }
                 self.smoke = Some((path, at, true));
-                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new("smoke")));
+                let slot = self.smoke_image.clone();
+                let repaint = ctx.clone();
+                ctx.request_screenshot(move |image| {
+                    *slot.lock().unwrap() = Some(image);
+                    repaint.request_repaint();
+                });
             }
             return;
         }
-        let image = ctx.input(|i| {
-            i.events.iter().find_map(|e| match e {
-                egui::Event::Screenshot { viewport_id, image, user_data, .. } if *viewport_id == egui::ViewportId::ROOT && user_data.data.as_ref().and_then(|d| d.downcast_ref::<&str>()).copied() == Some("smoke") => Some(image.clone()),
-                _ => None,
-            })
-        });
+        let image = self.smoke_image.lock().unwrap().take();
         if let Some(img) = image {
             let full = Rect::from_min_size(Pos2::ZERO, egui::Vec2::new(img.size[0] as f32, img.size[1] as f32));
             if let Err(e) = save_cropped(&img, 1.0, full, &path) {
@@ -3012,14 +2835,32 @@ fn smoke_http_get(url: &str) -> Option<String> {
 }
 
 impl eframe::App for XprApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    /// eframe stops calling `ui` while the window is hidden unless asked, once
+    /// a frame. The recorder, timers and background jobs all run from `ui`,
+    /// and a route has to keep recording behind a minimized window.
+    ///
+    /// The command requests a repaint itself, so sending it every frame would
+    /// spin. It is sent once per wake-up (timer or thread): the frame it causes
+    /// clears the flag and runs `ui`, and the next `logic` is the next wake-up.
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let hidden = ctx.input(|i| i.viewport().visible()) == Some(false);
+        if hidden && !self.hidden_paint_requested {
+            ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaintWhileHidden);
+            self.hidden_paint_requested = true;
+        } else {
+            self.hidden_paint_requested = false;
+        }
+    }
+
+    fn ui(&mut self, root: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = &root.ctx().clone();
         let frame_start = Instant::now();
         #[cfg(windows)]
         if self.first_frame {
             let native_ppp = ctx.input(|i| i.viewport().native_pixels_per_point).unwrap_or(1.0);
             crate::win_monitor::install(_frame, native_ppp, self.restore_position_px.take());
         }
-        self.update_inner(ctx);
+        self.update_inner(root);
         if self.frame_log {
             let dt = frame_start.elapsed();
             if dt > Duration::from_millis(1) {
@@ -3039,7 +2880,8 @@ impl eframe::App for XprApp {
 }
 
 impl XprApp {
-    fn update_inner(&mut self, ctx: &egui::Context) {
+    fn update_inner(&mut self, root: &mut egui::Ui) {
+        let ctx = &root.ctx().clone();
         // background results (their threads wake the UI; the timers are a fallback)
         if let Some(rx) = &self.index_rx {
             let mut done = false;
@@ -3111,18 +2953,21 @@ impl XprApp {
             }
         }
 
-        egui::TopBottomPanel::top("menu_bar").frame(egui::Frame::new().fill(theme.bg_darker).inner_margin(egui::Margin::symmetric(0, 1)).stroke(Stroke::new(1.0_f32, theme.border))).show(ctx, |ui| {
+        egui::Panel::top("menu_bar").frame(egui::Frame::new().fill(theme.bg_darker).inner_margin(egui::Margin::symmetric(0, 1)).stroke(Stroke::new(1.0_f32, theme.border))).show(root, |ui| {
             self.menu_bar(ui, ctx);
         });
-        egui::TopBottomPanel::bottom("status_bar").frame(egui::Frame::new().fill(theme.bg_darker).inner_margin(egui::Margin::symmetric(4, 3)).stroke(Stroke::new(1.0_f32, theme.border))).show(ctx, |ui| {
-            self.status_bar(ui);
-        });
+        // Everything in the status bar is about the open route.
+        if self.page != Page::Landing && self.ctrl.get_version().is_some() {
+            egui::Panel::bottom("status_bar").frame(egui::Frame::new().fill(theme.bg_darker).inner_margin(egui::Margin::symmetric(4, 3)).stroke(Stroke::new(1.0_f32, theme.border))).show(root, |ui| {
+                self.status_bar(ui);
+            });
+        }
         // docked run summary above the status bar
         if self.run_summary.as_ref().map(|r| r.docked).unwrap_or(false) && self.page == Page::Editor {
             let mut toggled = false;
             let mut closed = false;
             let mut export = false;
-            egui::TopBottomPanel::bottom("docked_summary").frame(egui::Frame::new().fill(theme.bg)).resizable(false).show(ctx, |ui| {
+            egui::Panel::bottom("docked_summary").frame(egui::Frame::new().fill(theme.bg)).resizable(false).show(root, |ui| {
                 if let Some(rs) = self.run_summary.as_mut() {
                     let (t, c, e) = rs.ui(ui, &theme, &self.ctrl);
                     toggled = t;
@@ -3142,9 +2987,8 @@ impl XprApp {
         }
         let mut event_list_rect: Option<Rect> = None;
         let mut compare_actions: Option<crate::compare::CompareActions> = None;
-        let mut dex_actions: Vec<xpr_dex_ui::DexAction> = Vec::new();
         self.map.browse = self.page == Page::MapViewer;
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(ctx, |ui| match self.page {
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(root, |ui| match self.page {
             Page::Landing => {
                 if let Some(job) = &self.replay_import {
                     let mut cancel = false;
@@ -3167,7 +3011,7 @@ impl XprApp {
                 } else {
                     let mut actions = LandingActions::default();
                     let t0 = Instant::now();
-                    self.landing.ui(ui, &theme, &mut self.cfg, &self.paths, &self.registry, &self.index, &mut actions);
+                    self.landing.ui(ui, &theme, &mut self.cfg, &self.paths, &self.registry, &self.index, &mut self.assets, &mut actions);
                     if self.frame_log {
                         let dt = t0.elapsed();
                         if dt > Duration::from_millis(1) {
@@ -3185,9 +3029,6 @@ impl XprApp {
                     }
                     if actions.view_map {
                         self.open_map_viewer();
-                    }
-                    if actions.open_dex {
-                        self.open_dex(None);
                     }
                     if let Some(p) = actions.load_route {
                         self.ctrl.load_route(&p);
@@ -3223,16 +3064,6 @@ impl XprApp {
                 self.compare_width = Some(ui.available_width());
                 compare_actions = Some(self.compare_page(ui));
             }
-            Page::Dex => {
-                let route = self.dex_route_context();
-                let Some(dex) = self.dex.as_mut() else {
-                    self.page = Page::Landing;
-                    return;
-                };
-                let damage = self.dex_damage.get_or_insert_with(|| DexDamage::new(self.registry.clone(), self.paths.clone()));
-                let mut host = AppDexHost { damage, cfg: &mut self.cfg, assets: &mut self.assets, route: &self.ctrl };
-                dex_actions = dex.ui(ui, &theme, &self.registry, &route, &mut host);
-            }
             Page::MapViewer => {
                 if let Some(viewer) = self.map_viewer.as_mut() {
                     let actions = viewer.ui(ui, &theme, &mut self.cfg, &mut self.map, &mut self.assets);
@@ -3246,9 +3077,6 @@ impl XprApp {
                 }
             }
         });
-        if self.page == Page::Dex || !dex_actions.is_empty() {
-            self.apply_dex_actions(ctx, dex_actions);
-        }
         if let Some(actions) = compare_actions {
             if actions.back {
                 self.page = self.compare_return;
@@ -3280,13 +3108,14 @@ impl XprApp {
             ctx.show_viewport_immediate(
                 egui::ViewportId::from_hash_of("setup_summary"),
                 egui::ViewportBuilder::default().with_title("Setup Summary").with_inner_size([420.0, 300.0]),
-                |ctx, _class| {
-                    egui::TopBottomPanel::top("setup_menu").frame(egui::Frame::new().fill(theme2.bg_darker)).show(ctx, |ui| {
+                |root, _class| {
+                    let ctx = &root.ctx().clone();
+                    egui::Panel::top("setup_menu").frame(egui::Frame::new().fill(theme2.bg_darker)).show(root, |ui| {
                         if widgets::button(ui, &theme2, "Export Screenshot (Ctrl+P)").clicked() || (!behind_modal(ui) && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::P))) {
                             export = true;
                         }
                     });
-                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(15))).show(ctx, |ui| {
+                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(15))).show(root, |ui| {
                         ui.add(egui::Label::new(egui::RichText::new(&text).font(theme2.body()).color(theme2.text)).wrap());
                         setup_summary_rect = Some(ctx.content_rect());
                     });
@@ -3316,8 +3145,9 @@ impl XprApp {
             ctx.show_viewport_immediate(
                 egui::ViewportId::from_hash_of("run_summary"),
                 egui::ViewportBuilder::default().with_title("Route Summary").with_inner_size([size.x.max(300.0), size.y.max(120.0)]),
-                |ctx, _class| {
-                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg)).show(ctx, |ui| {
+                |root, _class| {
+                    let ctx = &root.ctx().clone();
+                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg)).show(root, |ui| {
                         let (t, c, e) = run_summary.ui(ui, &theme2, ctrl);
                         toggled = t;
                         closed = c;
@@ -3356,8 +3186,9 @@ impl XprApp {
                 ctx.show_viewport_immediate(
                     egui::ViewportId::from_hash_of("world_map"),
                     egui::ViewportBuilder::default().with_title("Map").with_inner_size([960.0, 720.0]),
-                    |ctx, _class| {
-                        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(0))).show(ctx, |ui| {
+                    |root, _class| {
+                        let ctx = &root.ctx().clone();
+                        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(0))).show(root, |ui| {
                             map_actions = map.ui(ui, &theme2, cfg, ctrl, assets);
                         });
                         if main_modal {
@@ -3374,64 +3205,10 @@ impl XprApp {
             }
             self.apply_map_actions(ctx, map_actions);
         }
-        if self.dex_window_open {
-            let theme2 = theme.clone();
-            let route = self.dex_route_context();
-            let mut closed = false;
-            let mut actions: Vec<xpr_dex_ui::DexAction> = Vec::new();
-            if let Some(dex) = self.dex.as_mut() {
-                let damage = self.dex_damage.get_or_insert_with(|| DexDamage::new(self.registry.clone(), self.paths.clone()));
-                let cfg = &mut self.cfg;
-                let assets = &mut self.assets;
-                let ctrl = &self.ctrl;
-                let registry = &self.registry;
-                ctx.show_viewport_immediate(
-                    egui::ViewportId::from_hash_of("dex_window"),
-                    egui::ViewportBuilder::default().with_title("Dex").with_inner_size([1500.0, 950.0]),
-                    |ctx, _class| {
-                        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(0))).show(ctx, |ui| {
-                            let mut host = AppDexHost { damage, cfg, assets, route: ctrl };
-                            actions = dex.ui(ui, &theme2, registry, &route, &mut host);
-                        });
-                        if main_modal {
-                            crate::dialogs::block_secondary_window(ctx, &theme2);
-                        }
-                        if ctx.input(|i| i.viewport().close_requested()) {
-                            closed = true;
-                        }
-                    },
-                );
-            } else {
-                closed = true;
-            }
-            if closed {
-                self.dex_window_open = false;
-            }
-            self.apply_dex_actions(ctx, actions);
-        }
         self.event_list_rect = event_list_rect;
         self.setup_summary_rect = setup_summary_rect;
         self.dispatch_signals(ctx);
         self.smoke_tick(ctx);
-    }
-}
-
-/// The app side of the Dex page: its Damage tab (the router's battle
-/// summary) and the open route.
-struct AppDexHost<'a> {
-    damage: &'a mut DexDamage,
-    cfg: &'a mut Config,
-    assets: &'a mut Assets,
-    route: &'a MainController,
-}
-
-impl xpr_dex_ui::DexHost for AppDexHost<'_> {
-    fn damage_ui(&mut self, ui: &mut Ui, cx: &mut xpr_dex_ui::DexCx) {
-        self.damage.ui(ui, cx, self.cfg, self.assets, self.route);
-    }
-
-    fn can_add_to_route(&self, version: &str) -> bool {
-        self.route.get_version() == Some(version)
     }
 }
 

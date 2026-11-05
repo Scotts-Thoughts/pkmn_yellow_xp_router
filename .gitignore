@@ -140,3 +140,4 @@ tools/replay_to_route/.target/
 tools/replay_to_route/out/
 tools/replay_to_route/pab-host/bin/
 tools/replay_to_route/pab-host/obj/
+rust/replay_tools/

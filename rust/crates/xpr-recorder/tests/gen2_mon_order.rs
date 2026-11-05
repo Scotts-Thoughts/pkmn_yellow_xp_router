@@ -381,6 +381,27 @@ fn crystal_mon_order_is_one_based_with_or_without_the_sentinel() {
 }
 
 #[test]
+fn crystal_a_missed_send_out_keeps_the_whole_team() {
+    // Sage Li: slots 0 and 1 are Bellsprout, slot 2 is Hoothoot
+    let team = [("Bellsprout", 7), ("Bellsprout", 7), ("Hoothoot", 10)];
+    // the second send-out or the last one never shows up as a position change:
+    // seen slots first, in the order seen, then what is left in party order
+    for (positions, order, expect) in [
+        ([Some(0), None, Some(2)], vec![1, 3, 2], ["Bellsprout", "Hoothoot", "Bellsprout"]),
+        ([Some(0), Some(1), None], vec![1, 2, 3], ["Bellsprout", "Bellsprout", "Hoothoot"]),
+    ] {
+        let (mut sim, log, gen, _controller) = start(DEPRECATED);
+        sim.trainer_battle("SAGE", 9, &team, true, &positions);
+        let events = wait_for_events(&log, 1);
+        let def = events.iter().find(|d| d.trainer_def.is_some()).expect("trainer event");
+        assert_eq!(def.trainer_def.as_ref().unwrap().mon_order, order);
+        let names: Vec<String> = def.pokemon_list(&gen).expect("pokemon list").iter().map(|p| p.name.clone()).collect();
+        assert_eq!(names, expect);
+        sim.machine.shutdown();
+    }
+}
+
+#[test]
 fn crystal_wild_mons_are_recorded_at_their_real_level() {
     for game_name in [STANDARD, DEPRECATED] {
         let (mut sim, log, _gen, _controller) = start(game_name);

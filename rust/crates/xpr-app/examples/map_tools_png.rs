@@ -44,12 +44,14 @@ use xpr_ui_kit::theme::Theme;
 
 #[allow(clippy::too_many_arguments)]
 fn run_frame(ctx: &egui::Context, size: Vec2, time: f64, events: Vec<Event>, modifiers: Modifiers, view: &mut MapView, theme: &Theme, cfg: &mut Config, ctrl: &MainController, assets: &mut Assets) {
-    let input = egui::RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)), time: Some(time), events, modifiers, ..Default::default() };
-    let _ = ctx.run(input, |ctx| {
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(ctx, |ui| {
+    let mut events = events;
+    events.insert(0, egui::Event::ModifiersChanged(modifiers));
+    let input = egui::RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)), time: Some(time), events, ..Default::default() };
+    ctx.run_ui(input, |root| {
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(root, |ui| {
             let _ = view.ui(ui, theme, cfg, ctrl, assets);
         });
-    });
+    }).drop_without_applying_deltas();
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -78,11 +80,12 @@ fn press(ctx: &egui::Context, size: Vec2, time: f64, key: Key, view: &mut MapVie
 #[allow(clippy::too_many_arguments)]
 fn draw_via_offscreen(off: &mut Offscreen, size: Vec2, view: &mut MapView, captured: &mut Option<egui::Context>, frame_n: &mut u64, theme: &Theme, cfg: &mut Config, ctrl: &MainController, assets: &mut Assets, passes: usize) -> Vec<egui::epaint::ClippedPrimitive> {
     *frame_n += passes as u64;
-    off.render(size, passes, |ctx| {
+    off.render(size, passes, |root| {
+        let ctx = &root.ctx().clone();
         if captured.is_none() {
             *captured = Some(ctx.clone());
         }
-        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(ctx, |ui| {
+        egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg)).show(root, |ui| {
             let _ = view.ui(ui, theme, cfg, ctrl, assets);
         });
     })

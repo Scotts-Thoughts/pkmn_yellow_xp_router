@@ -57,14 +57,16 @@ impl Harness {
     /// A frame with `modifiers` held (egui reads them from the raw input,
     /// not from the pointer events).
     fn frame_with(&mut self, events: Vec<Event>, modifiers: Modifiers) {
-        let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, modifiers, ..Default::default() };
+        let mut events = events;
+        events.insert(0, egui::Event::ModifiersChanged(modifiers));
+        let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
         let Harness { ctx, theme, cfg, ctrl, list, .. } = self;
-        let _ = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        ctx.run_ui(input, |root| {
+            egui::CentralPanel::default().show(root, |ui| {
                 let mut actions = ListActions::default();
                 list.ui(ui, theme, cfg, ctrl, &mut actions, true);
             });
-        });
+        }).drop_without_applying_deltas();
         // the app rebuilds the list's rows when the route changes
         if self.ctrl.take_signals().route_changed {
             self.list.mark_dirty();

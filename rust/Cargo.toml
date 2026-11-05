@@ -6,8 +6,6 @@ members = [
     "crates/xpr-engine",
     "crates/xpr-calc",
     "crates/xpr-map",
-    "crates/xpr-dex",
-    "crates/xpr-dex-ui",
     "crates/xpr-recorder",
     "crates/xpr-replay",
     "crates/xpr-update",

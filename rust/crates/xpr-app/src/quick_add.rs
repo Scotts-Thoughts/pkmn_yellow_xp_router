@@ -140,17 +140,17 @@ impl QuickTrainerAdd {
             let mut trainer_changed = false;
             egui::Grid::new("quick_trainer_grid").spacing(Vec2::new(5.0, 1.0)).show(ui, |ui| {
                 widgets::label(ui, theme, "Location:");
-                if self.loc.ui(ui, theme, ui.id().with("loc"), Some(200.0), !self.multi_setup_mode) {
+                if self.loc.ui(ui, theme, ui.scope_id().with("loc"), Some(200.0), !self.multi_setup_mode) {
                     filter_changed = true;
                 }
                 ui.end_row();
                 widgets::label(ui, theme, "Trainer Class:");
-                if self.class.ui(ui, theme, ui.id().with("cls"), Some(200.0), true) {
+                if self.class.ui(ui, theme, ui.scope_id().with("cls"), Some(200.0), true) {
                     filter_changed = true;
                 }
                 ui.end_row();
                 widgets::label(ui, theme, "Trainer:");
-                if self.trainers.ui(ui, theme, ui.id().with("trainer"), Some(200.0), true) {
+                if self.trainers.ui(ui, theme, ui.scope_id().with("trainer"), Some(200.0), true) {
                     trainer_changed = true;
                 }
                 ui.end_row();
@@ -373,31 +373,31 @@ impl QuickItemAdd {
             let mut sel_changed = false;
             egui::Grid::new("quick_item_grid").spacing(Vec2::new(2.0, 1.0)).show(ui, |ui| {
                 widgets::label(ui, theme, "Search:");
-                if Entry::new(theme, &mut self.filter).width(120.0).id(ui.id().with("filter")).show(ui).changed {
+                if Entry::new(theme, &mut self.filter).width(120.0).id(ui.scope_id().with("filter")).show(ui).changed {
                     filter_changed = true;
                 }
                 widgets::label(ui, theme, "Item Type:");
-                if self.item_type.ui(ui, theme, ui.id().with("type"), Some(140.0), true) {
+                if self.item_type.ui(ui, theme, ui.scope_id().with("type"), Some(140.0), true) {
                     filter_changed = true;
                 }
                 ui.end_row();
                 widgets::label(ui, theme, "Item:");
-                if self.items.ui(ui, theme, ui.id().with("item"), Some(120.0), true) {
+                if self.items.ui(ui, theme, ui.scope_id().with("item"), Some(120.0), true) {
                     sel_changed = true;
                 }
                 widgets::label(ui, theme, "Mart:");
-                if self.mart.ui(ui, theme, ui.id().with("mart"), Some(140.0), true) {
+                if self.mart.ui(ui, theme, ui.scope_id().with("mart"), Some(140.0), true) {
                     filter_changed = true;
                 }
                 ui.end_row();
                 widgets::label(ui, theme, "Quantity:");
-                if AmountEntry::new(theme, ui.id().with("amount"), &mut self.amount).min(Some(1)).show(ui).changed {
+                if AmountEntry::new(theme, ui.scope_id().with("amount"), &mut self.amount).min(Some(1)).show(ui).changed {
                     sel_changed = true;
                 }
                 ui.end_row();
                 if pp_needs_target {
                     widgets::label(ui, theme, "On move:");
-                    self.pp_move.ui(ui, theme, ui.id().with("pp_move"), Some(120.0), !self.pp_move.options.is_empty());
+                    self.pp_move.ui(ui, theme, ui.scope_id().with("pp_move"), Some(120.0), !self.pp_move.options.is_empty());
                     ui.end_row();
                 }
                 widgets::label(ui, theme, "Purchase:");
@@ -505,18 +505,18 @@ impl QuickWildPkmn {
             let mut filter_changed = false;
             egui::Grid::new("quick_wild_grid").spacing(Vec2::new(5.0, 1.0)).show(ui, |ui| {
                 widgets::label(ui, theme, "Filter:");
-                if Entry::new(theme, &mut self.filter).width(160.0).id(ui.id().with("filter")).show(ui).changed {
+                if Entry::new(theme, &mut self.filter).width(160.0).id(ui.scope_id().with("filter")).show(ui).changed {
                     filter_changed = true;
                 }
                 ui.end_row();
                 widgets::label(ui, theme, "Wild Pkmn:");
-                self.pkmn.ui(ui, theme, ui.id().with("pkmn"), Some(160.0), true);
+                self.pkmn.ui(ui, theme, ui.scope_id().with("pkmn"), Some(160.0), true);
                 ui.end_row();
                 widgets::label(ui, theme, "Pkmn Level:");
-                AmountEntry::new(theme, ui.id().with("level"), &mut self.level).min(Some(2)).max(Some(100)).show(ui);
+                AmountEntry::new(theme, ui.scope_id().with("level"), &mut self.level).min(Some(2)).max(Some(100)).show(ui);
                 ui.end_row();
                 widgets::label(ui, theme, "Quantity:");
-                AmountEntry::new(theme, ui.id().with("qty"), &mut self.quantity).min(Some(1)).show(ui);
+                AmountEntry::new(theme, ui.scope_id().with("qty"), &mut self.quantity).min(Some(1)).show(ui);
                 ui.end_row();
             });
             if filter_changed {
@@ -668,7 +668,7 @@ impl QuickAddPopover {
             }
         });
         let screen = ctx.content_rect();
-        let area = egui::Area::new(egui::Id::new("quick_add_popover")).order(egui::Order::Foreground).fixed_pos(self.anchor).pivot(egui::Align2::CENTER_BOTTOM).constrain_to(screen);
+        let area = egui::Area::new(egui::Id::unique("quick_add_popover")).order(egui::Order::Foreground).fixed_pos(self.anchor).pivot(egui::Align2::CENTER_BOTTOM).constrain_to(screen);
         let inner = area.show(ctx, |ui| {
             egui::Frame::new()
                 .fill(theme.bg)

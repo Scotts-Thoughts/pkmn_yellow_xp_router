@@ -73,9 +73,10 @@ impl Harness {
     fn frame(&mut self, events: Vec<Event>) {
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, self.size)), events, ..Default::default() };
         let Harness { ctx, theme, cfg, paths, registry, ctrl, list, quick_add, assets, dialog, outcome, menu_bar, menu_button, .. } = self;
-        let _ = ctx.run(input, |ctx| {
+        ctx.run_ui(input, |root| {
+            let ctx = &root.ctx().clone();
             if *menu_bar {
-                egui::TopBottomPanel::bottom("menu_bar").show(ctx, |ui| {
+                egui::Panel::bottom("menu_bar").show(root, |ui| {
                     egui::MenuBar::new().ui(ui, |ui| {
                         let r = ui.menu_button("File", |ui| {
                             for i in 0..8 {
@@ -86,7 +87,7 @@ impl Harness {
                     });
                 });
             }
-            egui::CentralPanel::default().show(ctx, |ui| {
+            egui::CentralPanel::default().show(root, |ui| {
                 let mut actions = ListActions::default();
                 list.ui(ui, theme, cfg, ctrl, &mut actions, true);
             });
@@ -99,7 +100,7 @@ impl Harness {
                     *dialog = None;
                 }
             }
-        });
+        }).drop_without_applying_deltas();
     }
 
     /// Open the "Assign Move to Slot 1" dialog and let it settle.
@@ -119,7 +120,7 @@ impl Harness {
     }
 
     fn dialog_rect(&self) -> Rect {
-        self.ctx.memory(|m| m.area_rect(egui::Id::new("xpr_assign_move"))).expect("the dialog is on screen")
+        self.ctx.memory(|m| m.area_rect(egui::Id::unique("xpr_assign_move"))).expect("the dialog is on screen")
     }
 
     fn click(&mut self, pos: Pos2) {
@@ -354,8 +355,9 @@ fn a_secondary_window_is_covered_while_a_dialog_is_up() {
         let button = |pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
         for events in [vec![], vec![], vec![], vec![Event::PointerMoved(pos), button(true)], vec![button(false)]] {
             let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(400.0, 300.0))), events, ..Default::default() };
-            let _ = ctx.run(input, |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
+            ctx.run_ui(input, |root| {
+                let ctx = &root.ctx().clone();
+                egui::CentralPanel::default().show(root, |ui| {
                     if ui.button("Add trainer").clicked() {
                         clicks += 1;
                     }
@@ -363,98 +365,12 @@ fn a_secondary_window_is_covered_while_a_dialog_is_up() {
                 if blocked {
                     block_secondary_window(ctx, &theme);
                 }
-            });
+            }).drop_without_applying_deltas();
         }
         clicks
     };
     assert_eq!(clicks(true), 0, "the window's own widgets are covered");
     assert_eq!(clicks(false), 1, "and work again once the dialog is gone");
-}
-
-/// The Dex page reads raw keys (F1-F9 switch its tabs, Space / Shift+Space
-/// open its searches, the arrows walk the species list): under a dialog
-/// they belong to the dialog.
-#[test]
-fn dex_page_keys_stand_down_under_a_dialog() {
-    let cfg = Config::load(&xpr_app::scratch_config_path());
-    let ctx = egui::Context::default();
-    let mut theme = Theme::from_config(&cfg);
-    theme.install_fonts(&ctx);
-    theme.apply(&ctx);
-    let registry = Arc::new(Registry::new(repo_root().join("raw_pkmn_data"), PathBuf::new()));
-    let mut dex = xpr_dex_ui::DexView::new(serde_json::json!({ "tab": "Pokedex", "selected": "Pikachu", "game": "Emerald" }));
-    let route = xpr_dex_ui::RouteContext::default();
-    let run = |dex: &mut xpr_dex_ui::DexView, events: Vec<Event>, dialog: bool| {
-        let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1400.0, 900.0))), events, ..Default::default() };
-        let _ = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                let _ = dex.ui(ui, &theme, &registry, &route, &mut xpr_dex_ui::NoHost);
-            });
-            if dialog {
-                egui::Modal::new(egui::Id::new("dex_test_dialog")).show(ctx, |ui| ui.label("A dialog"));
-            }
-        });
-    };
-    let key = |k: Key, mods: Modifiers| vec![Event::Key { key: k, physical_key: None, pressed: true, repeat: false, modifiers: mods }];
-    for _ in 0..3 {
-        run(&mut dex, vec![], true);
-    }
-    run(&mut dex, key(Key::F3, Modifiers::NONE), true);
-    run(&mut dex, key(Key::Space, Modifiers::NONE), true);
-    run(&mut dex, key(Key::Space, Modifiers::SHIFT), true);
-    run(&mut dex, key(Key::ArrowDown, Modifiers::NONE), true);
-    assert_eq!(dex.tab(), xpr_dex_ui::DexTab::Pokedex, "F3 went to the dialog");
-    assert_eq!(dex.state.spotlight, None, "Space / Shift+Space went to the dialog");
-    assert_eq!(dex.state.selected(), Some("Pikachu"), "Down went to the dialog");
-    // with the dialog gone the keys work
-    run(&mut dex, vec![], false);
-    run(&mut dex, vec![], false);
-    run(&mut dex, key(Key::F3, Modifiers::NONE), false);
-    assert_eq!(dex.tab(), xpr_dex_ui::DexTab::Trainers);
-}
-
-/// The Movedex's Space ("Jump to move") is a raw key read on a Dex tab:
-/// under a dialog it belongs to the dialog.
-#[test]
-fn movedex_space_stands_down_under_a_dialog() {
-    let cfg = Config::load(&xpr_app::scratch_config_path());
-    let ctx = egui::Context::default();
-    let mut theme = Theme::from_config(&cfg);
-    theme.install_fonts(&ctx);
-    theme.apply(&ctx);
-    let registry = Arc::new(Registry::new(repo_root().join("raw_pkmn_data"), PathBuf::new()));
-    let mut dex = xpr_dex_ui::DexView::new(serde_json::json!({ "tab": "Movedex", "game": "Platinum" }));
-    let route = xpr_dex_ui::RouteContext::default();
-    let run = |dex: &mut xpr_dex_ui::DexView, events: Vec<Event>, dialog: bool| -> Vec<String> {
-        let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1400.0, 900.0))), events, ..Default::default() };
-        let out = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                let _ = dex.ui(ui, &theme, &registry, &route, &mut xpr_dex_ui::NoHost);
-            });
-            if dialog {
-                egui::Modal::new(egui::Id::new("dex_test_dialog")).show(ctx, |ui| ui.label("A dialog"));
-            }
-        });
-        let mut texts = Vec::new();
-        for cs in &out.shapes {
-            if let egui::Shape::Text(t) = &cs.shape {
-                texts.push(t.galley.text().to_string());
-            }
-        }
-        texts
-    };
-    let space = || vec![Event::Key { key: Key::Space, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }];
-    for _ in 0..3 {
-        run(&mut dex, vec![], true);
-    }
-    run(&mut dex, space(), true);
-    let texts = run(&mut dex, vec![], true);
-    assert!(!texts.iter().any(|t| t.contains("Jump to move")), "Space went to the dialog");
-    run(&mut dex, vec![], false);
-    run(&mut dex, vec![], false);
-    run(&mut dex, space(), false);
-    let texts = run(&mut dex, vec![], false);
-    assert!(texts.iter().any(|t| t.contains("Jump to move")), "without a dialog Space opens the jump search");
 }
 
 /// The landing page's "Route from Replay" panel cancels on Escape, but not
@@ -470,8 +386,9 @@ fn escape_under_a_dialog_does_not_cancel_the_replay_import() {
     let run = |with_dialog: bool, events: Vec<Event>| -> bool {
         let mut cancel = false;
         let input = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1000.0, 700.0))), events, ..Default::default() };
-        let _ = ctx.run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        ctx.run_ui(input, |root| {
+            let ctx = &root.ctx().clone();
+            egui::CentralPanel::default().show(root, |ui| {
                 xpr_app::pages::replay_import_ui(ui, &theme, &status, &mut cancel);
             });
             if with_dialog {
@@ -479,7 +396,7 @@ fn escape_under_a_dialog_does_not_cancel_the_replay_import() {
                     ui.label("on top");
                 });
             }
-        });
+        }).drop_without_applying_deltas();
         cancel
     };
     let escape = || vec![Event::Key { key: Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }];

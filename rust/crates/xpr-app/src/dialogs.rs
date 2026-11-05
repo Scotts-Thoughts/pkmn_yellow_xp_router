@@ -502,10 +502,10 @@ impl LoadRouteDialog {
         modal(ctx, theme, "xpr_load_route", "Load Route", 460.0, |ui| {
             form(ui, "load_route_grid", |ui| {
                 form_label(ui, theme, "Route");
-                self.routes.ui(ui, theme, ui.id().with("routes"), Some(FIELD_W), true);
+                self.routes.ui(ui, theme, ui.scope_id().with("routes"), Some(FIELD_W), true);
                 ui.end_row();
                 form_label(ui, theme, "Filter");
-                if field(theme, &mut self.filter).width(FIELD_W).hint("Filter by name").id(ui.id().with("filter")).show(ui).changed {
+                if field(theme, &mut self.filter).width(FIELD_W).hint("Filter by name").id(ui.scope_id().with("filter")).show(ui).changed {
                     refilter = true;
                 }
                 ui.end_row();
@@ -562,7 +562,7 @@ impl NewFolderDialog {
         modal(ctx, theme, "xpr_new_folder", title, 380.0, |ui| {
             let valid = !self.name.is_empty() && !self.folder_names.contains(&self.name);
             form_label(ui, theme, "Folder name");
-            let id = ui.id().with("folder_name");
+            let id = ui.scope_id().with("folder_name");
             if !self.focused {
                 ui.memory_mut(|m| m.request_focus(id));
                 self.focused = true;
@@ -639,20 +639,20 @@ impl TransferDialog {
             let enabled = if existing { self.dest.get() != consts::NO_FOLDERS } else { !self.all_folders.contains(&self.new_folder) };
             form(ui, "transfer_grid", |ui| {
                 form_label(ui, theme, "Transfer to");
-                self.transfer_type.ui(ui, theme, ui.id().with("type"), Some(FIELD_W), true);
+                self.transfer_type.ui(ui, theme, ui.scope_id().with("type"), Some(FIELD_W), true);
                 ui.end_row();
                 if existing {
                     form_label(ui, theme, "Destination");
-                    self.dest.ui(ui, theme, ui.id().with("dest"), Some(FIELD_W), true);
+                    self.dest.ui(ui, theme, ui.scope_id().with("dest"), Some(FIELD_W), true);
                     ui.end_row();
                     form_label(ui, theme, "Filter");
-                    if field(theme, &mut self.filter).width(FIELD_W).hint("Filter folders").id(ui.id().with("filter")).show(ui).changed {
+                    if field(theme, &mut self.filter).width(FIELD_W).hint("Filter folders").id(ui.scope_id().with("filter")).show(ui).changed {
                         refilter = true;
                     }
                     ui.end_row();
                 } else {
                     form_label(ui, theme, "New folder");
-                    field(theme, &mut self.new_folder).width(FIELD_W).hint("Folder name").id(ui.id().with("new_folder")).show(ui);
+                    field(theme, &mut self.new_folder).width(FIELD_W).hint("Folder name").id(ui.scope_id().with("new_folder")).show(ui);
                     ui.end_row();
                 }
             });
@@ -760,7 +760,7 @@ impl CustomGenDialog {
             let mut done: Option<bool> = None;
             modal(ctx, theme, "xpr_backport_species", "Species Name", 360.0, |ui| {
                 form_label(ui, theme, "Enter the species name");
-                let r = field(theme, &mut bp.species).width(ui.available_width()).id(ui.id().with("species")).show(ui);
+                let r = field(theme, &mut bp.species).width(ui.available_width()).id(ui.scope_id().with("species")).show(ui);
                 footer(ui, theme, |ui| {
                     if action_button(ui, theme, "OK", Tone::Primary, true).clicked() || r.enter_pressed {
                         done = Some(true);
@@ -799,10 +799,10 @@ impl CustomGenDialog {
             let valid = self.verify_name(d.registry, &self.custom_name);
             form(ui, "custom_gen_grid", |ui| {
                 form_label(ui, theme, "Base version");
-                self.base_version.ui(ui, theme, ui.id().with("base"), Some(FIELD_W), true);
+                self.base_version.ui(ui, theme, ui.scope_id().with("base"), Some(FIELD_W), true);
                 ui.end_row();
                 form_label(ui, theme, "Custom version name");
-                field(theme, &mut self.custom_name).width(FIELD_W).hint("Name of the new version").id(ui.id().with("custom_name")).show(ui);
+                field(theme, &mut self.custom_name).width(FIELD_W).hint("Name of the new version").id(ui.scope_id().with("custom_name")).show(ui);
                 ui.end_row();
                 ui.label("");
                 if (action_button(ui, theme, "Create Custom Version", Tone::Primary, valid).clicked() || enter_pressed(ui)) && valid {
@@ -898,7 +898,7 @@ impl BattleConfigDialog {
                 section(ui, theme, "Damage calculation", None);
                 form(ui, "battle_cfg_calc", |ui| {
                     form_label(ui, theme, "Search depth (turns)");
-                    if widgets::AmountEntry::new(theme, ui.id().with("depth"), &mut self.search_depth).min(Some(1)).max(Some(99)).show(ui).changed {
+                    if widgets::AmountEntry::new(theme, ui.scope_id().with("depth"), &mut self.search_depth).min(Some(1)).max(Some(99)).show(ui).changed {
                         let v = self.search_depth.trim().parse::<i64>().unwrap_or(xpr_core::config::DEFAULT_DAMAGE_SEARCH_DEPTH);
                         d.cfg.set_damage_search_depth(v);
                     }
@@ -915,17 +915,17 @@ impl BattleConfigDialog {
                 section(ui, theme, "Highlighting", None);
                 form(ui, "battle_cfg_highlight", |ui| {
                     form_label(ui, theme, "Player strategy");
-                    if self.player_strat.ui(ui, theme, ui.id().with("pstrat"), Some(200.0), true) {
+                    if self.player_strat.ui(ui, theme, ui.scope_id().with("pstrat"), Some(200.0), true) {
                         d.cfg.set_player_highlight_strategy(self.player_strat.get());
                     }
                     ui.end_row();
                     form_label(ui, theme, "Enemy strategy");
-                    if self.enemy_strat.ui(ui, theme, ui.id().with("estrat"), Some(200.0), true) {
+                    if self.enemy_strat.ui(ui, theme, ui.scope_id().with("estrat"), Some(200.0), true) {
                         d.cfg.set_enemy_highlight_strategy(self.enemy_strat.get());
                     }
                     ui.end_row();
                     form_label(ui, theme, "Consistency threshold (%)");
-                    if widgets::AmountEntry::new(theme, ui.id().with("thresh"), &mut self.consistent_threshold).min(Some(1)).max(Some(99)).show(ui).changed {
+                    if widgets::AmountEntry::new(theme, ui.scope_id().with("thresh"), &mut self.consistent_threshold).min(Some(1)).max(Some(99)).show(ui).changed {
                         let v = self.consistent_threshold.trim().parse::<i64>().unwrap_or(xpr_core::config::DEFAULT_CONSISTENT_THRESHOLD);
                         d.cfg.set_consistent_threshold(v);
                     }
@@ -1022,7 +1022,7 @@ impl ColorConfigDialog {
                 section(ui, theme, "Font", None);
                 ui.horizontal(|ui| {
                     ui.spacing_mut().interact_size.y = 28.0;
-                    self.fonts.ui(ui, theme, ui.id().with("font"), Some(FIELD_W), true);
+                    self.fonts.ui(ui, theme, ui.scope_id().with("font"), Some(FIELD_W), true);
                     if small_button(ui, theme, "Apply Font", true).clicked() {
                         d.cfg.set_custom_font_name(self.fonts.get());
                         self.changed = true;
@@ -1449,7 +1449,7 @@ impl ShortcutsDialog {
         let mut export = false;
         let mut import = false;
         modal(ctx, theme, "xpr_shortcuts", "Keyboard Shortcuts", 680.0, |ui| {
-            field(theme, &mut self.search).width(ui.available_width()).hint("Search actions or keys").id(ui.id().with("search")).show(ui);
+            field(theme, &mut self.search).width(ui.available_width()).hint("Search actions or keys").id(ui.scope_id().with("search")).show(ui);
             let needle = self.search.to_lowercase();
             list_well(ui, theme, fit_h(ui, 440.0, 290.0), |ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
@@ -1610,12 +1610,12 @@ impl FinalTrainersDialog {
             ui.add_space(2.0);
             form(ui, "final_trainers_form", |ui| {
                 form_label(ui, theme, "Game version");
-                if self.versions.ui(ui, theme, ui.id().with("version"), Some(FIELD_W + 40.0), true) {
+                if self.versions.ui(ui, theme, ui.scope_id().with("version"), Some(FIELD_W + 40.0), true) {
                     repopulate = true;
                 }
                 ui.end_row();
                 form_label(ui, theme, "Filter");
-                field(theme, &mut self.filter).width(FIELD_W + 40.0).hint("Filter trainers by name").id(ui.id().with("filter")).show(ui);
+                field(theme, &mut self.filter).width(FIELD_W + 40.0).hint("Filter trainers by name").id(ui.scope_id().with("filter")).show(ui);
                 ui.end_row();
             });
             let sel = self.trainers.iter().filter(|(_, c)| *c).count();
@@ -1722,7 +1722,7 @@ impl AssignMoveDialog {
         let mut close = false;
         let mut outcome = None;
         modal(ctx, theme, "xpr_assign_move", &format!("Assign Move to Slot {}", self.slot_idx + 1), 380.0, |ui| {
-            let filter_id = ui.id().with("filter");
+            let filter_id = ui.scope_id().with("filter");
             if !self.focused {
                 ui.memory_mut(|m| m.request_focus(filter_id));
             }
@@ -1818,10 +1818,10 @@ impl EvOverrideDialog {
             help(ui, theme, &format!("{} from this point on, 0 to {} per stat.", unit, cap));
             ui.add_space(2.0);
             let mut enter = false;
-            egui::Grid::new(ui.id().with("ev_grid")).num_columns(2).spacing(Vec2::new(24.0, 8.0)).show(ui, |ui| {
+            egui::Grid::new(ui.scope_id().with("ev_grid")).num_columns(2).spacing(Vec2::new(24.0, 8.0)).show(ui, |ui| {
                 for &idx in ev_field_indices(self.gen12) {
                     form_label(ui, theme, names[idx]);
-                    let r = AmountEntry::new(theme, ui.id().with(("ev_amt", idx)), &mut self.values[idx]).min(Some(0)).max(Some(cap)).width(Some(6)).show(ui);
+                    let r = AmountEntry::new(theme, ui.scope_id().with(("ev_amt", idx)), &mut self.values[idx]).min(Some(0)).max(Some(cap)).width(Some(6)).show(ui);
                     enter |= r.enter_pressed;
                     ui.end_row();
                 }
@@ -1884,19 +1884,19 @@ mod focus_tests {
     fn naive_one_shot_request_never_lands() {
         let ctx = Context::default();
         ctx.set_fonts(FontDefinitions::empty());
-        let id = Id::new("xpr_assign_move_test").with("filter");
+        let id = Id::unique("xpr_assign_move_test").with("filter");
         let mut text = String::new();
         let mut focused = false;
         for _ in 0..2 {
-            let _ = ctx.run(RawInput::default(), |ctx| {
-                Modal::new(Id::new("xpr_assign_move_test")).show(ctx, |ui| {
+            ctx.run_pass(RawInput::default(), |ctx| {
+                Modal::new(Id::unique("xpr_assign_move_test")).show(ctx, |ui| {
                     if !focused {
                         ui.memory_mut(|m| m.request_focus(id));
                         focused = true;
                     }
                     TextEdit::singleline(&mut text).id(id).show(ui);
                 });
-            });
+            }).drop_without_applying_deltas();
         }
         assert!(!ctx.memory(|m| m.has_focus(id)), "the naive one-shot request was expected to lose the race against the sizing pass");
     }
@@ -1905,12 +1905,12 @@ mod focus_tests {
     fn retrying_until_it_sticks_lands_focus() {
         let ctx = Context::default();
         ctx.set_fonts(FontDefinitions::empty());
-        let id = Id::new("xpr_assign_move_test_fixed").with("filter");
+        let id = Id::unique("xpr_assign_move_test_fixed").with("filter");
         let mut text = String::new();
         let mut focused = false;
         for _ in 0..2 {
-            let _ = ctx.run(RawInput::default(), |ctx| {
-                Modal::new(Id::new("xpr_assign_move_test_fixed")).show(ctx, |ui| {
+            ctx.run_pass(RawInput::default(), |ctx| {
+                Modal::new(Id::unique("xpr_assign_move_test_fixed")).show(ctx, |ui| {
                     if !focused {
                         ui.memory_mut(|m| m.request_focus(id));
                     }
@@ -1919,7 +1919,7 @@ mod focus_tests {
                         focused = true;
                     }
                 });
-            });
+            }).drop_without_applying_deltas();
         }
         assert!(ctx.memory(|m| m.has_focus(id)), "expected focus to have been (re)acquired by the second frame");
     }

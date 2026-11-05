@@ -24,7 +24,7 @@ use xpr_ui_kit::widgets;
 use super::Toggles;
 
 fn popup_open_id(ui: &Ui) -> egui::Id {
-    ui.id().with("xpr_map_layers_menu_open")
+    ui.scope_id().with("xpr_map_layers_menu_open")
 }
 
 /// The "Layers" button and, while open, its popup. Persists through `cfg`
@@ -50,7 +50,7 @@ pub fn show(ui: &mut Ui, theme: &Theme, toggles: &mut Toggles, cfg: &mut Config,
     let anchor = r.rect;
     let pos = Pos2::new(anchor.min.x, anchor.max.y + 2.0);
     let mut changed = false;
-    let area = egui::Area::new(ui.id().with("xpr_map_layers_popup")).order(egui::Order::Foreground).fixed_pos(pos);
+    let area = egui::Area::new(ui.scope_id().with("xpr_map_layers_popup")).order(egui::Order::Foreground).fixed_pos(pos);
     let inner = area.show(ui.ctx(), |ui| {
         egui::Frame::new().fill(theme.bg_darker).stroke(theme.border_stroke()).corner_radius(6.0).inner_margin(8.0).show(ui, |ui| {
             ui.set_width(210.0);

@@ -65,6 +65,8 @@ pub struct EventDetails {
     allow_updates: bool,
     ignore_tab_switching: bool,
     suppress_battle_summary: bool,
+    /// record mode as of the last `handle_selection`, to spot it starting
+    was_recording: bool,
     cur_delayed_event_id: Option<NodeId>,
     cur_delayed_deadline: Option<Instant>,
     deferred_show_at: Option<Instant>,
@@ -72,6 +74,22 @@ pub struct EventDetails {
     /// the Pre-Event State cards-row height the user dragged / expanded to
     bag_h: Option<f32>,
     editor_reload_pending: bool,
+}
+
+/// Whether the selected event `id` shows a battle: an item without a learn
+/// move shows its parent group's.
+fn selected_has_battle(ctrl: &MainController, id: NodeId) -> bool {
+    let mut battle_id = id;
+    if ctrl.router.obj_kind(id) == Some(ObjKind::Item) {
+        if let Some(item) = ctrl.router.item(id).filter(|i| i.event_definition.learn_move.is_none()) {
+            battle_id = item.parent;
+        }
+    }
+    let def = match ctrl.router.obj_kind(battle_id) {
+        Some(ObjKind::Group) => ctrl.router.group(battle_id).map(|g| &g.event_definition),
+        _ => ctrl.router.item(battle_id).map(|i| &i.event_definition),
+    };
+    def.is_some_and(|d| d.trainer_def.is_some() || d.wild_pkmn_info.is_some())
 }
 
 impl EventDetails {
@@ -89,6 +107,7 @@ impl EventDetails {
             allow_updates: false,
             ignore_tab_switching: false,
             suppress_battle_summary: false,
+            was_recording: false,
             cur_delayed_event_id: None,
             cur_delayed_deadline: None,
             deferred_show_at: None,
@@ -151,6 +170,16 @@ impl EventDetails {
 
     pub fn is_map_home(&self) -> bool {
         self.home_tab == MAP_TAB
+    }
+
+    /// Leave the map for the tab that suits the selected event: the Battle
+    /// Summary for a battle, otherwise the Pre-Event State. For when a route
+    /// starts recording or a replay's route opens, whatever auto-switch says.
+    pub fn show_default_tab(&mut self, cfg: &Config, ctrl: &MainController, actions: &mut DetailsActions) {
+        self.leave_map(cfg, actions);
+        let has_battle = ctrl.get_single_selected_event_id(true).is_some_and(|id| selected_has_battle(ctrl, id));
+        let tab = if has_battle && !self.suppress_battle_summary { BATTLE_SUMMARY_TAB } else { PRE_STATE_TAB };
+        self.set_tab(cfg, tab, actions);
     }
 
     /// `_update_notes_visibility`
@@ -232,10 +261,12 @@ impl EventDetails {
         // without auto-switch the Map tab stays put: the map is a working
         // surface, not a per-event view. With it, the map is the home tab
         // that battles switch away from and other events switch back to.
-        let on_map = self.tab == MAP_TAB && !self.auto_switch;
-        if ctrl.is_record_mode_active() && self.tab != MAP_TAB {
-            self.set_tab(cfg, BATTLE_SUMMARY_TAB, actions);
+        let recording = ctrl.is_record_mode_active();
+        if recording && !self.was_recording {
+            self.show_default_tab(cfg, ctrl, actions);
         }
+        self.was_recording = recording;
+        let on_map = self.tab == MAP_TAB && !self.auto_switch;
         let sel = ctrl.get_single_selected_event_id(true);
         match sel {
             None => {
@@ -260,18 +291,13 @@ impl EventDetails {
                     if kind == ObjKind::Item && def.learn_move.is_none() {
                         trainer_group_id = ctrl.router.item(id).map(|i| i.parent).unwrap_or(id);
                     }
-                    let trainer_def = match ctrl.router.obj_kind(trainer_group_id) {
-                        Some(ObjKind::Group) => ctrl.router.group(trainer_group_id).map(|g| g.event_definition.clone()),
-                        _ => ctrl.router.item(trainer_group_id).map(|i| i.event_definition.clone()),
-                    }
-                    .unwrap_or_default();
-                    let has_battle = trainer_def.trainer_def.is_some() || trainer_def.wild_pkmn_info.is_some();
+                    let has_battle = selected_has_battle(ctrl, id);
                     if on_map {
                         // keep the map
                     } else if force_pre {
                         self.set_tab(cfg, self.home_tab, actions);
                     } else if self.ignore_tab_switching || self.auto_switch {
-                        if ctrl.is_record_mode_active() {
+                        if recording {
                             if has_battle {
                                 self.set_tab(cfg, BATTLE_SUMMARY_TAB, actions);
                             }
@@ -465,8 +491,8 @@ impl EventDetails {
             let mut tab = self.tab;
             let mut auto = self.auto_switch;
             let mut auto_toggled = false;
-            // no Map tab for games without a map pack (gens 1-3 only)
-            let tabs: &[&str] = if crate::map::MapView::game_of(ctrl).is_some() { &["Pre-Event State", "Battle Summary", "Map"] } else { &["Pre-Event State", "Battle Summary"] };
+            // no Map tab for games without a map pack (gens 1-3 only), or while recording
+            let tabs: &[&str] = if crate::map::MapView::game_of(ctrl).is_some() && !ctrl.is_record_mode_active() { &["Pre-Event State", "Battle Summary", "Map"] } else { &["Pre-Event State", "Battle Summary"] };
             if widgets::tab_bar(ui, theme, tabs, &mut tab, |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 let r = ui.add(egui::Label::new(egui::RichText::new("Auto-switch tabs").font(theme.body()).color(theme.secondary)).sense(egui::Sense::click()));

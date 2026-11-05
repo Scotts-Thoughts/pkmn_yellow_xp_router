@@ -67,7 +67,7 @@ impl ShotKind {
 pub const CARD_RADIUS: f32 = 6.0;
 
 // The offscreen context and its software rasteriser live in xpr-ui-kit so
-// other crates (the Dex page's examples) can render PNGs headless too.
+// other crates can render PNGs headless too.
 pub use xpr_ui_kit::offscreen::{rect_to_pixels, Canvas, Offscreen};
 
 // ---------------------------------------------------------------------------

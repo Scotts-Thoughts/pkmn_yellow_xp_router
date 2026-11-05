@@ -465,7 +465,7 @@ impl RouteList {
     fn show_inline_creator(&mut self, ctrl: &MainController, insert_after: Option<NodeId>, dest_folder_name: Option<String>, inside_folder_id: Option<NodeId>, actions: &mut ListActions) {
         actions.suppress_battle_summary = Some(true);
         self.inline_counter += 1;
-        let id = Id::new(("inline_creator", self.inline_counter));
+        let id = Id::unique(("inline_creator", self.inline_counter));
         self.inline_inside_folder_id = inside_folder_id;
         self.inline = Some(InlineEventCreator::new(id, insert_after, dest_folder_name, None, ctrl));
         self.dirty = true;
@@ -526,7 +526,7 @@ impl RouteList {
             g.set_enabled_status(false);
         }
         ctrl.update_existing_event(group_id, disabled);
-        let id = Id::new(("inline_edit", group_id));
+        let id = Id::unique(("inline_edit", group_id));
         let mut creator = InlineEventCreator::new(id, Some(group_id), None, Some((group_id, &def)), ctrl);
         creator.focus_primary_field();
         self.inline_inside_folder_id = None;
@@ -780,7 +780,7 @@ impl RouteList {
             // No drag-to-scroll: a drag on the rows moves events, and the
             // rows only sense hover, so egui would hand the drag to the
             // scroll area and scroll the list along with the pointer.
-            let mut area = egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h).scroll_source(egui::scroll_area::ScrollSource { drag: false, ..egui::scroll_area::ScrollSource::ALL });
+            let mut area = egui::ScrollArea::both().id_salt("route_list_scroll").auto_shrink([false, false]).max_height(avail_h).scroll_source(egui::scroll_area::ScrollSource { drag: egui::scroll_area::DragScroll::Never, ..egui::scroll_area::ScrollSource::ALL });
             if let Some(offset) = self.export_scroll {
                 area = area.scroll_offset(offset);
             }
@@ -1067,7 +1067,7 @@ impl RouteList {
                         ry += if r.kind == RowKind::InlineSpacer { inline_h } else { ROW_HEIGHT };
                     }
                     let prect = plus_rect_at(ry);
-                    let resp = ui.interact(prect, ui.id().with("plus_btn"), Sense::click());
+                    let resp = ui.interact(prect, ui.scope_id().with("plus_btn"), Sense::click());
                     let fill = if resp.hovered() { theme.accent_hover } else { theme.accent };
                     ui.painter().circle_filled(prect.center(), 8.0, fill);
                     ui.painter().text(prect.center(), Align2::CENTER_CENTER, "+", theme.font_bold(9.0), Color32::WHITE);
@@ -1186,7 +1186,7 @@ impl RouteList {
                 }
                 // quantity editor overlay
                 if let Some(qe) = self.quantity_editor.as_mut() {
-                    let id = ui.id().with("quantity_editor");
+                    let id = ui.scope_id().with("quantity_editor");
                     if qe.opened_frame {
                         ui.memory_mut(|m| m.request_focus(id));
                         let mut tes = egui::TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
@@ -1207,9 +1207,9 @@ impl RouteList {
                     }
                 }
             });
-            self.scroll_offset = scroll.state.offset;
+            self.scroll_offset = scroll.state.clamped_offset();
             let painter = ui.painter().with_clip_rect(header_rect);
-            let mut x = header_rect.min.x - scroll.state.offset.x;
+            let mut x = header_rect.min.x - scroll.state.clamped_offset().x;
             for (i, (title, _)) in COLUMN_DEFS.iter().enumerate() {
                 let w = widths[i];
                 let r = Rect::from_min_size(Pos2::new(x, header_rect.min.y), Vec2::new(w, HEADER_HEIGHT));
@@ -1217,7 +1217,7 @@ impl RouteList {
                 // resizable name & levels-up columns
                 if i <= 1 {
                     let handle = Rect::from_min_size(Pos2::new(r.max.x - 3.0, r.min.y), Vec2::new(6.0, HEADER_HEIGHT)).intersect(header_rect);
-                    let resp = ui.interact(handle, ui.id().with(("col_resize", i)), Sense::drag());
+                    let resp = ui.interact(handle, ui.scope_id().with(("col_resize", i)), Sense::drag());
                     if resp.hovered() || resp.dragged() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
                     }

@@ -16,33 +16,44 @@ pub fn calc_xp_yield(base_yield: i64, level: i64, is_trainer_battle: bool, exp_s
     result
 }
 
-/// `floor(x^2.5)` exactly: `floor(sqrt(x^5))`.
-fn pow_2_5(x: i64) -> i64 {
-    let x5 = (x.max(0) as u128).pow(5);
-    let mut r = (x5 as f64).sqrt() as u128;
-    while r * r > x5 {
+/// `FX_Sqrt(FX32_CONST(n))`: the DS's square root in 20.12 fixed point. The
+/// hardware floors the root of `x << 32`, then `FX_GetSqrtResult` rounds it.
+fn fx_sqrt(n: i64) -> i64 {
+    let x = (n.max(0) as u64) << 44;
+    let mut r = (x as f64).sqrt() as u64;
+    while r * r > x {
         r -= 1;
     }
-    while (r + 1) * (r + 1) <= x5 {
+    while (r + 1) * (r + 1) <= x {
         r += 1;
     }
-    r as i64
+    ((r + 0x200) >> 10) as i64
 }
 
 /// Gen 5's experience for defeating a Pokémon: scaled by its level against
 /// the level of the Pokémon gaining it (Black/White and Black 2/White 2;
 /// earlier generations' trainer data holds the amount itself).
 ///
-/// `((a * b * L) / (5 * s) * (2L + 10)^2.5 / (L + Lp + 10)^2.5 + 1) * e`
-/// with `a` 1.5 in trainer battles, `b` the base yield, `L` the defeated
-/// level, `s` the participants, `Lp` the gaining Pokémon's level and `e` 1.5
-/// with a Lucky Egg; each step rounds down, each power is `floor(x^2.5)`.
-/// Cress's Lillipup Lv12 and Panpour Lv14 give a Lv11 Pokémon 214 and 325.
+/// From `AddExpAndEVs` and `ScaleExpGainedByLevel` (pokebw2,
+/// `src/ov167/btl_server_flow_sub.c`, and `CalcBaseExpGain` in `btl_calc.c`);
+/// Black's own gains in `b-victini-1-12015` match every step:
+/// `b * L / 5`, then `* 15 / 10` in a trainer battle, then `/ s` (at least 1),
+/// each rounding down, with `b` the base yield, `L` the defeated level and `s`
+/// the participants. The level scaling `((2L + 10) / (L + Lp + 10))^2.5` is done
+/// in 20.12 fixed point with the numerator and denominator rounded apart, so it
+/// is not the same as a floored power: use the game's steps. Then `+ 1`, and a
+/// Lucky Egg's `* 3 / 2`, rounding down.
 pub fn calc_xp_yield_gen5(base_yield: i64, level: i64, player_level: i64, is_trainer_battle: bool, participants: i64, lucky_egg: bool) -> i64 {
-    let s = participants.max(1);
-    let mut value = if is_trainer_battle { floor_div(3 * base_yield * level, 10 * s) } else { floor_div(base_yield * level, 5 * s) };
-    value = floor_div(value * pow_2_5(2 * level + 10), pow_2_5(level + player_level + 10).max(1));
-    value += 1;
+    let mut value = floor_div(base_yield * level, 5);
+    if is_trainer_battle {
+        value = floor_div(value * 15, 10);
+    }
+    value = floor_div(value, participants.max(1)).max(1);
+    let num = 2 * level + 10;
+    let den = level + player_level + 10;
+    let num_fx = (fx_sqrt(num) * (num * num)) >> 12;
+    let den_fx = ((den * den) * fx_sqrt(den)) >> 12;
+    value = floor_div(value * num_fx, den_fx.max(1)) + 1;
     if lucky_egg {
         value = floor_div(value * 3, 2);
     }
@@ -224,7 +235,11 @@ mod gen5_tests {
         assert_eq!(calc_xp_yield_gen5(51, 7, 7, false, 1, false), 72);
         assert_eq!(calc_xp_yield_gen5(51, 7, 7, false, 2, false), 36);
         assert_eq!(calc_xp_yield_gen5(51, 7, 7, false, 1, true), 108);
-        assert_eq!(pow_2_5(16), 1024);
-        assert_eq!(pow_2_5(20), 1788);
+        // the ally takes half: Patrat Lv12 at Lv13, Herdier Lv26 at Lv30
+        assert_eq!(calc_xp_yield_gen5(51, 12, 13, true, 2, false), 85);
+        assert_eq!(calc_xp_yield_gen5(130, 26, 30, true, 2, false), 434);
+        assert_eq!(fx_sqrt(16), 4 << 12);
+        // FX_Sqrt rounds: sqrt(30) is 5.4772..., 22434.7 in 20.12
+        assert_eq!(fx_sqrt(30), 22435);
     }
 }

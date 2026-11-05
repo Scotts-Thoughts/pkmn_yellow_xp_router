@@ -105,8 +105,9 @@ fn main() {
         let mut off = Offscreen::new(&theme, 2.0, 8192);
         let mut list = RouteList::new(&cfg);
         let mut dialog_rect = None;
-        let prims = off.render(size, 6, |ctx| {
-            egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg).inner_margin(8)).show(ctx, |ui| {
+        let prims = off.render(size, 6, |root| {
+            let ctx = &root.ctx().clone();
+            egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.bg).inner_margin(8)).show(root, |ui| {
                 let mut actions = ListActions::default();
                 list.ui(ui, &theme, &cfg, &mut ctrl, &mut actions, false);
             });
@@ -125,7 +126,7 @@ fn main() {
                     block_secondary_window(ctx, &theme);
                 }
             }
-            dialog_rect = ctx.memory(|m| m.area_rect(Id::new(area_id)));
+            dialog_rect = ctx.memory(|m| m.area_rect(Id::unique(area_id)));
         });
         let full = Rect::from_min_size(Pos2::ZERO, size);
         let crop = dialog_rect.map(|r| r.expand(28.0).intersect(full)).unwrap_or(full);
