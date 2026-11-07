@@ -123,6 +123,8 @@ pub struct RouteList {
     plus_hide_deadline: Option<Instant>,
     scroll_target: Option<ScrollTarget>,
     quantity_editor: Option<QuantityEditor>,
+    /// Where each visible row's quantity can be clicked, this frame.
+    quantity_hits: Vec<(NodeId, Rect)>,
     inline: Option<InlineEventCreator>,
     inline_inside_folder_id: Option<NodeId>,
     editing_group_id: Option<NodeId>,
@@ -166,6 +168,7 @@ impl RouteList {
             plus_hide_deadline: None,
             scroll_target: None,
             quantity_editor: None,
+            quantity_hits: Vec::new(),
             inline: None,
             inline_inside_folder_id: None,
             editing_group_id: None,
@@ -293,6 +296,16 @@ impl RouteList {
 
     pub fn scroll_to_bottom(&mut self) {
         self.scroll_target = Some(ScrollTarget::Bottom);
+    }
+
+    /// The clickable quantity of an event's row, if the row is on screen.
+    pub fn quantity_hit_rect(&self, id: NodeId) -> Option<Rect> {
+        self.quantity_hits.iter().find(|(i, _)| *i == id).map(|(_, r)| *r)
+    }
+
+    /// The text of the open quantity editor.
+    pub fn quantity_editor_text(&self) -> Option<&str> {
+        self.quantity_editor.as_ref().map(|q| q.text.as_str())
     }
 
     pub fn mark_dirty(&mut self) {
@@ -798,10 +811,17 @@ impl RouteList {
                 // selects the row under it (and moves where a dialog's event
                 // lands).
                 let pointer = if blocked { None } else { ui.input(|i| i.pointer.interact_pos()) };
-                let primary_clicked = !blocked && ui.input(|i| i.pointer.primary_clicked());
-                let secondary_clicked = !blocked && ui.input(|i| i.pointer.secondary_clicked());
+                // The open quantity editor is a real widget over the row: its
+                // clicks place the caret, and must not reach the row as well.
+                let on_quantity_editor = match (&self.quantity_editor, pointer) {
+                    (Some(qe), Some(p)) => qe.rect.contains(p),
+                    _ => false,
+                };
+                let rows_blocked = blocked || on_quantity_editor;
+                let primary_clicked = !rows_blocked && ui.input(|i| i.pointer.primary_clicked());
+                let secondary_clicked = !rows_blocked && ui.input(|i| i.pointer.secondary_clicked());
                 // A drag starts on the press: egui reports a click on release.
-                let primary_pressed = !blocked && ui.input(|i| i.pointer.primary_pressed());
+                let primary_pressed = !rows_blocked && ui.input(|i| i.pointer.primary_pressed());
                 let primary_down = ui.input(|i| i.pointer.primary_down());
                 let dragging = self.drag.as_ref().map(|d| d.active).unwrap_or(false);
                 if dragging {
@@ -816,6 +836,7 @@ impl RouteList {
                 let mut toggle_check: Option<NodeId> = None;
                 let mut toggle_expand: Option<usize> = None;
                 let mut quantity_click: Option<(NodeId, Rect, i64)> = None;
+                self.quantity_hits.clear();
                 let mut plus_rect: Option<(NodeId, Rect)> = None;
                 let mut inline_outcome: Option<crate::inline_creator::InlineOutcome> = None;
                 let mut scroll_to_rect: Option<Rect> = None;
@@ -957,6 +978,7 @@ impl RouteList {
                             let srect = ui.painter().text(Pos2::new(sx, rect.center().y), Align2::LEFT_CENTER, s, font.clone(), suffix_color);
                             ui.painter().line_segment([Pos2::new(srect.min.x, srect.max.y - 1.0), Pos2::new(srect.max.x, srect.max.y - 1.0)], Stroke::new(1.0_f32, suffix_color));
                             let hit = srect.expand2(Vec2::new(6.0, 2.0));
+                            self.quantity_hits.push((row.id, hit));
                             if primary_clicked && pointer.map(|p| hit.contains(p)).unwrap_or(false) {
                                 quantity_click = Some((row.id, srect, quantity.unwrap_or(1)));
                             }
@@ -1187,7 +1209,14 @@ impl RouteList {
                 // quantity editor overlay
                 if let Some(qe) = self.quantity_editor.as_mut() {
                     let id = ui.scope_id().with("quantity_editor");
-                    if qe.opened_frame {
+                    // Focus waits for the frame after the click that opened
+                    // the editor: on a click's frame egui takes focus from any
+                    // widget the pointer wasn't over last frame, and the
+                    // editor wasn't there last frame.
+                    let clicking = ui.input(|i| i.pointer.any_click());
+                    if qe.opened_frame && clicking {
+                        ui.ctx().request_repaint();
+                    } else if qe.opened_frame {
                         ui.memory_mut(|m| m.request_focus(id));
                         let mut tes = egui::TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
                         tes.cursor.set_char_range(Some(egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(qe.text.chars().count()))));
@@ -1197,10 +1226,14 @@ impl RouteList {
                     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(erect).layout(egui::Layout::left_to_right(egui::Align::Center)));
                     let r = widgets::Entry::new(theme, &mut qe.text).id(id).width(erect.width()).centered().show(&mut child);
                     let was_opened = qe.opened_frame;
-                    qe.opened_frame = false;
+                    qe.opened_frame = qe.opened_frame && clicking;
+                    // egui drops focus on Escape before the frame starts, so
+                    // the entry can't report it: read the key here, or the
+                    // lost focus below would keep the edit
+                    let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
                     if r.enter_pressed {
                         self.accept_quantity_edit(ctrl);
-                    } else if r.escape_pressed {
+                    } else if r.escape_pressed || escape {
                         self.quantity_editor = None;
                     } else if !was_opened && !r.has_focus {
                         self.accept_quantity_edit(ctrl);
