@@ -53,6 +53,12 @@ impl BattleController {
         handled
     }
 
+    /// Record that the coming `route_changed` for `group_id` needs no reload
+    /// (the summary already shows the state that was just written).
+    pub fn mark_handled_route_change(&mut self, group_id: NodeId) {
+        self.handled_route_change = Some(group_id);
+    }
+
     pub fn take_signals(&mut self) -> BattleSignals {
         std::mem::take(&mut self.signals)
     }

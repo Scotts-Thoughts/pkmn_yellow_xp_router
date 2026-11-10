@@ -1,0 +1,21 @@
+[package]
+name = "xpr-mobile"
+version.workspace = true
+edition.workspace = true
+description = "C ABI over the router's controllers for the native iOS app (ios/)"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+xpr-core = { path = "../xpr-core" }
+xpr-data = { path = "../xpr-data", features = ["embed-data"] }
+xpr-engine = { path = "../xpr-engine" }
+xpr-calc = { path = "../xpr-calc" }
+xpr-map = { path = "../xpr-map", features = ["embed-map-data"] }
+serde_json = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
+indexmap = { workspace = true }
+log = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png"] }

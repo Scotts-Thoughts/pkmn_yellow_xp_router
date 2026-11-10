@@ -40,6 +40,15 @@ which changed where the move event was inserted.
 - Cover new raw-input code with a case in
   `rust/crates/xpr-app/tests/modal_input.rs`.
 
+## iOS app (ios/)
+
+A SwiftUI app over `rust/crates/xpr-mobile`, which compiles the desktop's
+UI-free controllers from `xpr-app/src` by `#[path]` (controller.rs, battle.rs,
+pp_ledger.rs, route_index.rs, map/state.rs). Keep those files free of egui so
+both apps build. Logic changes belong in the Rust crates; the Swift side only
+renders JSON view models. See `ios/README.md`; `cargo test -p xpr-mobile`
+exercises the whole command API.
+
 ## Rust app: the Dex page was removed
 
 The Dex page (Solodex folded into the router) was removed on 2026-11-05. Its

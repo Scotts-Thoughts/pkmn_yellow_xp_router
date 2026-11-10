@@ -12,6 +12,7 @@ members = [
     "crates/xpr-golden",
     "crates/xpr-ui-kit",
     "crates/xpr-app",
+    "crates/xpr-mobile",
 ]
 
 [workspace.package]

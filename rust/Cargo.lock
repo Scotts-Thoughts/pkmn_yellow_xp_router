@@ -4618,6 +4618,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "xpr-mobile"
+version = "6.0.0"
+dependencies = [
+ "chrono",
+ "image",
+ "indexmap",
+ "log",
+ "serde",
+ "serde_json",
+ "xpr-calc",
+ "xpr-core",
+ "xpr-data",
+ "xpr-engine",
+ "xpr-map",
+]
+
+[[package]]
 name = "xpr-recorder"
 version = "6.0.0"
 dependencies = [
