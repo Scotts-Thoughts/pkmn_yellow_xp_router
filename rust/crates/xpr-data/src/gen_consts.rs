@@ -255,6 +255,22 @@ pub const WONDER_GUARD: &str = "Wonder Guard";
 pub const BATTLE_ARMOR: &str = "Battle Armor";
 pub const SHELL_ARMOR: &str = "Shell Armor";
 pub const HUSTLE: &str = "Hustle";
+pub const OVERGROW: &str = "Overgrow";
+pub const BLAZE: &str = "Blaze";
+pub const TORRENT: &str = "Torrent";
+pub const SWARM: &str = "Swarm";
+/// The "HP <= 1/3" pinch abilities (gens 3+) and the move type each boosts
+/// by 1.5x: power in gens 3/4 (`CalculateBaseDamage`,
+/// `BattleSystem_CalcMoveDamage`), Atk/SpA from gen 5.
+pub fn pinch_ability_type(ability: &str) -> Option<&'static str> {
+    match ability {
+        OVERGROW => Some(consts::TYPE_GRASS),
+        BLAZE => Some(consts::TYPE_FIRE),
+        TORRENT => Some(consts::TYPE_WATER),
+        SWARM => Some(consts::TYPE_BUG),
+        _ => None,
+    }
+}
 pub const SAND_VEIL: &str = "Sand Veil";
 pub const HUGE_POWER: &str = "Huge Power";
 pub const PURE_POWER: &str = "Pure Power";

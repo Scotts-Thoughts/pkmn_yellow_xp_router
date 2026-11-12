@@ -628,6 +628,10 @@ fn calculate_damage_impl(gen: &GenData, a: &DamageArgs, single_hit: bool) -> Opt
     if attacking_pkmn.ability == gc::HUSTLE {
         atk.attack = floor_mul_ratio(atk.attack, 3, 2);
     }
+    // Overgrow / Blaze / Torrent / Swarm: `gBattleMovePower = 150 * power / 100`
+    if crate::pinch_boost_applies(a, &move_type) {
+        base_power = floor_div(150 * base_power, 100);
+    }
     if mv.name == consts::EXPLOSION_MOVE_NAME || mv.name == consts::SELFDESTRUCT_MOVE_NAME {
         def.defense = floor_div(def.defense, 2);
     }

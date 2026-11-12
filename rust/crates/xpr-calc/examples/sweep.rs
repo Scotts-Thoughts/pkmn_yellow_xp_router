@@ -179,6 +179,7 @@ fn main() {
             defending_battle_stats: None,
             attacker_is_enemy,
             is_wild_battle: case["wild"].as_bool().unwrap_or(false),
+            attacker_pinch: false,
         };
         let normal = calculate_damage(&gen, &dargs);
         dargs.is_crit = true;

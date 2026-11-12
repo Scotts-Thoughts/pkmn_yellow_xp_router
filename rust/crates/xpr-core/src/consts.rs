@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-pub const APP_VERSION: &str = "v6.3a";
+pub const APP_VERSION: &str = "v6.3b";
 pub const APP_RELEASE_DATE: &str = "2026-Nov-05";
 
 pub const APP_NAME: &str = "pkmn_xp_router";

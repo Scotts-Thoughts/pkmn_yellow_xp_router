@@ -574,6 +574,11 @@ fn calculate_damage_impl(gen: &GenData, a: &DamageArgs, single_hit: bool) -> Opt
     if held == gc::CHOICE_SPECS && attacking_ability != gc::KLUTZ {
         atk.special_attack = floor_mul_ratio(atk.special_attack, 3, 2);
     }
+    // Overgrow / Blaze / Torrent / Swarm: Atk / SpA x1.5 from gen 5 on
+    if crate::pinch_boost_applies(a, &move_type) {
+        atk.attack = floor_mul_ratio(atk.attack, 3, 2);
+        atk.special_attack = floor_mul_ratio(atk.special_attack, 3, 2);
+    }
     if defending_ability == gc::THICK_FAT && (move_type == consts::TYPE_FIRE || move_type == consts::TYPE_ICE) {
         atk.special_attack = floor_div(atk.special_attack, 2);
         atk.attack = floor_div(atk.attack, 2);
@@ -794,6 +799,7 @@ fn calculate_damage_impl(gen: &GenData, a: &DamageArgs, single_hit: bool) -> Opt
                 defending_battle_stats: None,
                 attacker_is_enemy: false,
                 is_wild_battle: a.is_wild_battle,
+                attacker_pinch: a.attacker_pinch,
             };
             calculate_damage_impl(gen, &sub, true)?
         } else {

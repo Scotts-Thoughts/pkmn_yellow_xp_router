@@ -37,6 +37,10 @@ pub struct DamageArgs<'a> {
     /// Wild encounter (Ruby/Sapphire only apply the Atk/Def/SpA/SpD badge
     /// boosts in trainer battles).
     pub is_wild_battle: bool,
+    /// The attacker is at HP <= max HP / 3 (the move's "Blaze (HP <= 1/3)"
+    /// style option), so Overgrow / Blaze / Torrent / Swarm boost a move of
+    /// their type. Eruption / Water Spout read it from their HP % instead.
+    pub attacker_pinch: bool,
 }
 
 impl<'a> DamageArgs<'a> {
@@ -57,8 +61,27 @@ impl<'a> DamageArgs<'a> {
             defending_battle_stats: None,
             attacker_is_enemy: false,
             is_wild_battle: false,
+            attacker_pinch: false,
         }
     }
+}
+
+/// Whether the attacker's pinch ability (Overgrow / Blaze / Torrent / Swarm)
+/// boosts this use, `move_type` being the resolved type (Hidden Power,
+/// Weather Ball, ...). The game test is `curHP <= maxHP / 3`; Eruption and
+/// Water Spout take the HP from their own HP % dropdown.
+pub fn pinch_boost_applies(args: &DamageArgs, move_type: &str) -> bool {
+    use xpr_data::gen_consts as gc;
+    if gc::pinch_ability_type(&args.attacking.ability) != Some(move_type) {
+        return false;
+    }
+    if args.mv.name == gc::ERUPTION_MOVE || args.mv.name == gc::WATER_SPOUT_MOVE {
+        if let Some(pct) = damage::py_int(args.custom_move_data) {
+            let max_hp = args.attacking.cur_stats.hp;
+            return xpr_core::floor_div(max_hp * pct, 100) <= xpr_core::floor_div(max_hp, 3);
+        }
+    }
+    args.attacker_pinch
 }
 
 /// `CurrentGen.calculate_damage`

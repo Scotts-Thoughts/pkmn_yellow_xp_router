@@ -191,6 +191,7 @@ fn replay_python_damage_cases() {
                     defending_battle_stats: d_stats.as_ref(),
                     attacker_is_enemy: case["attacker_is_enemy"].as_bool().unwrap_or(false),
                     is_wild_battle: false,
+                    attacker_pinch: false,
                 };
                 let ours = calculate_damage(&gen, &args);
                 let expected = &case["result"];
@@ -301,6 +302,7 @@ fn replay_python_damage_cases() {
                             defending_battle_stats: d_stats.as_ref(),
                             attacker_is_enemy: case["attacker_is_enemy"].as_bool().unwrap_or(false),
                             is_wild_battle: false,
+                            attacker_pinch: false,
                         };
                         match calculate_damage(&gen, &args) {
                             None => Value::Null,

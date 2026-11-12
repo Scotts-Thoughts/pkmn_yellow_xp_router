@@ -935,6 +935,16 @@ impl BattleSummary {
         if custom_data_options.is_none() && mv.has_flavor(consts::FLAVOR_MULTI_HIT) {
             custom_data_options = Some(consts::MULTI_HIT_CUSTOM_DATA.iter().map(|s| s.to_string()).collect());
         }
+        // the move's own options, without the pinch-ability copies
+        let base_data_options = custom_data_options.clone();
+        let pinch_label = if metronome_selection.is_some() {
+            None
+        } else {
+            pinch_option_label(gen, &mv, &attacking_mon, &defending_mon, &current_weather)
+        };
+        if let Some(label) = &pinch_label {
+            custom_data_options = Some(with_pinch_options(custom_data_options.as_deref(), label));
+        }
         match &custom_data_options {
             None => custom_data_selection = None,
             Some(opts) => {
@@ -943,7 +953,11 @@ impl BattleSummary {
                 }
             }
         }
-        let custom_str = custom_data_selection.clone().unwrap_or_default();
+        let (mut custom_str, attacker_pinch) = split_pinch_selection(custom_data_selection.as_deref().unwrap_or_default(), pinch_label.as_deref());
+        if base_data_options.is_none() {
+            // only the pinch dropdown: the move itself has no custom data
+            custom_str.clear();
+        }
 
         let (normal_ranges, crit_ranges): (Option<DamageRange>, Option<DamageRange>);
         let mut hits: Option<crate::HitModel> = None;
@@ -961,6 +975,7 @@ impl BattleSummary {
                 weather: &current_weather,
                 is_double_battle: self.double_battle_flag,
                 is_wild_battle: self.is_wild_battle,
+                attacker_pinch,
             };
             if is_player {
                 let tanky = common.calc(&attacking_mon, wild_max, false, attacking_mon_stats.as_ref(), None);
@@ -998,6 +1013,7 @@ impl BattleSummary {
                 // Python's summary never passes attacker_is_enemy (always False)
                 attacker_is_enemy: false,
                 is_wild_battle: self.is_wild_battle,
+                attacker_pinch,
             };
             normal_ranges = calculate_damage(gen, &args);
             // multi-hit moves (gens 2+): every hit rolls its own crit and
@@ -1026,6 +1042,7 @@ impl BattleSummary {
             defending_battle_stats: defending_mon_stats.as_ref(),
             attacker_is_enemy: false,
             is_wild_battle: self.is_wild_battle,
+            attacker_pinch,
         };
         let kill_ranges: Vec<KillRange> = match (&normal_ranges, &crit_ranges) {
             (Some(n), Some(c)) => {
@@ -1055,7 +1072,7 @@ impl BattleSummary {
 
         let pp_turns = if is_player {
             let page_min = hits.as_ref().map(|h| h.min_damage()).or(normal_ranges.as_ref().map(|r| r.min_damage));
-            let min = match pp_hit_count_option(&mv, custom_data_options.as_deref()).filter(|c| *c != custom_str) {
+            let min = match pp_hit_count_option(&mv, base_data_options.as_deref()).filter(|c| *c != custom_str) {
                 None => page_min,
                 Some(pp_custom) => {
                     if self.is_wild_battle && mon_idx < self.wild_min_dv_mons.len() {
@@ -1070,6 +1087,7 @@ impl BattleSummary {
                             weather: &current_weather,
                             is_double_battle: self.double_battle_flag,
                             is_wild_battle: self.is_wild_battle,
+                            attacker_pinch,
                         };
                         let tanky = common.calc(&attacking_mon, &self.wild_max_dv_mons[mon_idx], false, attacking_mon_stats.as_ref(), None);
                         let squishy = common.calc(&attacking_mon, &self.wild_min_dv_mons[mon_idx], false, attacking_mon_stats.as_ref(), None);
@@ -2096,6 +2114,7 @@ struct CommonArgs<'a> {
     weather: &'a str,
     is_double_battle: bool,
     is_wild_battle: bool,
+    attacker_pinch: bool,
 }
 
 impl<'a> CommonArgs<'a> {
@@ -2116,6 +2135,7 @@ impl<'a> CommonArgs<'a> {
             defending_battle_stats: d_stats,
             attacker_is_enemy: false,
             is_wild_battle: self.is_wild_battle,
+            attacker_pinch: self.attacker_pinch,
         };
         calculate_damage(self.gen, &args)
     }
@@ -2237,6 +2257,58 @@ pub fn is_move_better(new_move: &MoveRenderInfo, prev_move: Option<&MoveRenderIn
 /// Triple Kick as all 3 kicks (its count only varies through misses, which
 /// the guaranteed KO ignores). `None` for every other move, whose PP uses
 /// the page's own numbers.
+/// The dropdown option that turns on the attacker's pinch ability
+/// ("Blaze (HP <= 1/3)") when it boosts this move: gens 3+, a damaging move
+/// whose resolved type matches. Eruption / Water Spout already pick the HP.
+pub fn pinch_option_label(gen: &GenData, mv: &xpr_data::model::Move, attacking: &EnemyPkmn, defending: &EnemyPkmn, weather: &str) -> Option<String> {
+    use xpr_data::gen_consts as gc;
+    if matches!(gen.gen, xpr_data::model::Gen::One | xpr_data::model::Gen::Two) {
+        return None;
+    }
+    let boosted = gc::pinch_ability_type(&attacking.ability)?;
+    if mv.base_power_or_zero() <= 0 || mv.name == gc::ERUPTION_MOVE || mv.name == gc::WATER_SPOUT_MOVE {
+        return None;
+    }
+    let move_type = if mv.name == consts::HIDDEN_POWER_MOVE_NAME {
+        gen.get_hidden_power(&attacking.dvs).0
+    } else if mv.name == consts::NATURAL_GIFT_MOVE_NAME {
+        gen.get_natural_gift(attacking.held_item.as_deref())?.0
+    } else if mv.name == consts::WEATHER_BALL_MOVE_NAME {
+        let active = damage::is_weather_active(&attacking.ability, &defending.ability, weather);
+        damage::get_weather_ball_type(weather, active, &mv.move_type).to_string()
+    } else {
+        mv.move_type.clone()
+    };
+    (move_type == boosted).then(|| format!("{} {}", attacking.ability, PINCH_SUFFIX))
+}
+
+const PINCH_SUFFIX: &str = "(HP <= 1/3)";
+const PINCH_JOIN: &str = " + ";
+
+/// The move's options, each also offered with the pinch boost on. A move
+/// with no options of its own gets "No Bonus" / the pinch label.
+pub fn with_pinch_options(base: Option<&[String]>, label: &str) -> Vec<String> {
+    let base: Vec<String> = match base {
+        Some(b) if !b.is_empty() => b.to_vec(),
+        _ => vec![xpr_data::gen_consts::NO_BONUS.to_string()],
+    };
+    let boosted = base.iter().map(|o| if o == xpr_data::gen_consts::NO_BONUS { label.to_string() } else { format!("{o}{PINCH_JOIN}{label}") });
+    base.iter().cloned().chain(boosted).collect()
+}
+
+/// Splits a dropdown selection into the move's own custom data and whether
+/// the pinch boost is on.
+pub fn split_pinch_selection(selection: &str, label: Option<&str>) -> (String, bool) {
+    let Some(label) = label else { return (selection.to_string(), false) };
+    if selection == label {
+        return (xpr_data::gen_consts::NO_BONUS.to_string(), true);
+    }
+    match selection.strip_suffix(label).and_then(|rest| rest.strip_suffix(PINCH_JOIN)) {
+        Some(base) => (base.to_string(), true),
+        None => (selection.to_string(), false),
+    }
+}
+
 pub fn pp_hit_count_option(mv: &xpr_data::model::Move, options: Option<&[String]>) -> Option<String> {
     let opts = options?;
     if mv.name == xpr_data::gen_consts::TRIPLE_KICK_MOVE {

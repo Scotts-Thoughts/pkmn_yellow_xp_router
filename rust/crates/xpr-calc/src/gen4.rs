@@ -721,6 +721,10 @@ fn calculate_damage_impl(gen: &GenData, a: &DamageArgs, single_hit: bool) -> Opt
     if attacking_ability == gc::HUSTLE {
         atk.attack = floor_mul_ratio(atk.attack, 3, 2);
     }
+    // Overgrow / Blaze / Torrent / Swarm (after Mud/Water Sport, before Heatproof)
+    if crate::pinch_boost_applies(a, &move_type) {
+        power = floor_div(power * 150, 100);
+    }
     if move_type == consts::TYPE_FIRE && defending_ability == gc::HEATPROOF {
         power = floor_div(power, 2);
     }
