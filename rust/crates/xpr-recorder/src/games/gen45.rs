@@ -142,6 +142,14 @@ pub struct Gen45Keys {
     pub tmhm_type: Vec<String>,
     pub tmhm_quantity: Vec<String>,
     pub all_item_fields: HashSet<String>,
+    /// HGSS heal detection (see `party_healed`): every party slot's max HP,
+    /// and its moves and PP (slot * 4 + move). Empty for the other games,
+    /// which see a heal by its sound.
+    pub party_hp_max: Vec<String>,
+    pub party_moves: Vec<String>,
+    pub party_pp: Vec<String>,
+    /// the paths registered only for HGSS heal detection
+    pub party_heal_paths: HashSet<String>,
 }
 
 impl Gen45Keys {
@@ -226,9 +234,39 @@ impl Gen45Keys {
             tmhm_type: bag("tmhm", "item", tmhm_n),
             tmhm_quantity: bag("tmhm", "quantity", tmhm_n),
             all_item_fields: HashSet::new(),
+            party_hp_max: Vec::new(),
+            party_moves: Vec::new(),
+            party_pp: Vec::new(),
+            party_heal_paths: HashSet::new(),
         };
+        if flavor.is_hgss() {
+            // HGSS's audio.heal_sound is a cursor into the playing sound
+            // data, with no value of its own for the heal jingle (it passes
+            // through the same values in marts and on routes): HGSS sees a
+            // heal by the party instead (`party_healed`)
+            k.audio_sound_effect_2 = None;
+            k.party_hp_max = team("stats.hp_max");
+            let per_move = |field: &str| -> Vec<String> { (0..6).flat_map(|i| (0..4).map(move |m| (i, m))).map(|(i, m)| format!("player.team.{}.moves.{}.{}", i, m, field)).collect() };
+            k.party_moves = per_move("move");
+            k.party_pp = per_move("pp");
+        }
         k.rebuild_item_fields();
+        k.rebuild_party_heal_paths();
         k
+    }
+
+    fn rebuild_party_heal_paths(&mut self) {
+        let mut set: HashSet<String> = HashSet::new();
+        if self.flavor.is_hgss() {
+            for list in [&self.team_hp, &self.party_hp_max, &self.party_moves, &self.party_pp] {
+                set.extend(list.iter().filter(|p| !p.is_empty()).cloned());
+            }
+            // slot 1's moves already have their own handling
+            for p in &self.player_moves {
+                set.remove(p);
+            }
+        }
+        self.party_heal_paths = set;
     }
 
     fn rebuild_item_fields(&mut self) {
@@ -308,6 +346,7 @@ impl Gen45Keys {
         v.extend(self.battle_enemy_2_level.iter().cloned());
         v.push(self.battle_player_mon_pid.clone());
         v.push(self.meta_state.clone());
+        v.extend(self.party_heal_paths.iter().cloned());
         v
     }
 
@@ -405,7 +444,13 @@ impl Gen45Keys {
         for list in self.team_ev.iter_mut() {
             fix_keys(store, list, &mut invalid);
         }
+        for list in [&mut self.party_hp_max, &mut self.party_moves, &mut self.party_pp] {
+            for k in list.iter_mut() {
+                crate::controller::fix_optional_key(store, k);
+            }
+        }
         self.rebuild_item_fields();
+        self.rebuild_party_heal_paths();
         dedupe(invalid)
     }
 }
@@ -722,6 +767,14 @@ struct OverworldData {
     save_delay: i64,
     heal_detected: bool,
     heal_delay: i64,
+    /// HGSS: the party as of the last game second with no HP/PP change
+    /// pending, compared with the party `HEAL_DELAY` seconds after one
+    party_baseline: Option<PartySnapshot>,
+    party_heal_check: bool,
+    party_heal_delay: i64,
+    /// seconds after a battle while the game copies the battle's HP and PP
+    /// back to the party (Leftovers or Recover can top a Pokémon up there)
+    party_heal_quiet: i64,
     waiting_for_new_file: bool,
     new_file_delay: i64,
     wrong_mon_delay: i64,
@@ -748,6 +801,46 @@ const BATTLE_DELAY: i64 = 3;
 const ERROR_DELAY: i64 = 5;
 const SAVE_DELAY: i64 = 2;
 const HEAL_DELAY: i64 = 3;
+/// gen 4 copies a battle's results back to the party about 400 frames after it
+const POST_BATTLE_HEAL_QUIET: i64 = 10;
+
+#[derive(Clone, Debug, PartialEq)]
+struct PartyMon {
+    species: Value,
+    level: Value,
+    hp: i64,
+    hp_max: i64,
+    moves: Vec<Value>,
+    pp: Vec<i64>,
+}
+
+#[derive(Clone, Debug)]
+struct PartySnapshot {
+    mons: Vec<PartyMon>,
+    items: ItemCache,
+}
+
+/// A full heal (Pokémon Center, Mom, a bed): the same party, every member
+/// at full HP where one was not, or with PP back, and nothing left the bag
+/// (a Potion or an Elixir is not a heal). A heal of a party already at full
+/// HP and PP changes nothing and is not seen.
+fn party_healed(before: &PartySnapshot, now: &PartySnapshot) -> bool {
+    let same_party = !now.mons.is_empty()
+        && before.mons.len() == now.mons.len()
+        && before.mons.iter().zip(&now.mons).all(|(a, b)| a.species == b.species && a.level == b.level && a.hp_max == b.hp_max && a.moves == b.moves);
+    if !same_party {
+        return false;
+    }
+    let all_full = now.mons.iter().all(|m| m.hp_max > 0 && m.hp == m.hp_max);
+    // everyone fainted before: the blackout's heal, part of the blackout
+    let all_fainted = before.mons.iter().all(|m| m.hp <= 0);
+    let hp_restored = before.mons.iter().any(|m| m.hp < m.hp_max);
+    let pp_restored = before.mons.iter().zip(&now.mons).any(|(a, b)| a.pp.iter().zip(&b.pp).any(|(x, y)| y > x));
+    let pp_lost = before.mons.iter().zip(&now.mons).any(|(a, b)| a.pp.iter().zip(&b.pp).any(|(x, y)| y < x));
+    let lost_nothing = before.items.iter().all(|(name, count)| now.items.get(name).copied().unwrap_or(0) >= *count);
+    all_full && !all_fainted && (hp_restored || pp_restored) && !pp_lost && lost_nothing
+}
+
 const EV_NAMES: [&str; 6] = ["hp", "attack", "defense", "speed", "special_attack", "special_defense"];
 
 pub struct Gen45Machine {
@@ -1129,6 +1222,64 @@ impl Gen45Machine {
             }
         }
         self.cached_moves = new_cache;
+    }
+
+    fn party_snapshot(&self, store: &PropertyStore) -> PartySnapshot {
+        let k = &self.keys;
+        let int = |p: &String| if p.is_empty() { 0 } else { store_i64(store, p) };
+        let val = |p: &String| if p.is_empty() { Value::Null } else { store.get_value(Some(p)) };
+        let mut mons = Vec::new();
+        for i in 0..k.team_species.len().min(6) {
+            let species = store.get_value(Some(&k.team_species[i]));
+            if !xpr_core::pyjson::truthy(&species) {
+                break;
+            }
+            let at = |list: &Vec<String>, j: usize| list.get(j).cloned().unwrap_or_default();
+            mons.push(PartyMon {
+                species,
+                level: k.team_level.get(i).map(val).unwrap_or(Value::Null),
+                hp: k.team_hp.get(i).map(int).unwrap_or(0),
+                hp_max: k.party_hp_max.get(i).map(int).unwrap_or(0),
+                moves: (0..4).map(|m| val(&at(&k.party_moves, i * 4 + m))).collect(),
+                pp: (0..4).map(|m| int(&at(&k.party_pp, i * 4 + m))).collect(),
+            });
+        }
+        PartySnapshot { mons, items: self.item_cache(store) }
+    }
+
+    /// HGSS heal detection, once a game second in the overworld: a party HP
+    /// or PP change is judged `HEAL_DELAY` seconds later against the party
+    /// before it (`party_healed`).
+    fn party_heal_tick(&mut self, store: &PropertyStore) {
+        let now = self.party_snapshot(store);
+        let o = &mut self.overworld;
+        if o.party_heal_quiet > 0 {
+            o.party_heal_quiet -= 1;
+            o.party_heal_check = false;
+            o.party_baseline = Some(now);
+            return;
+        }
+        if !o.party_heal_check {
+            o.party_baseline = Some(now);
+            return;
+        }
+        if o.party_heal_delay > 0 {
+            o.party_heal_delay -= 1;
+            return;
+        }
+        o.party_heal_check = false;
+        let before = o.party_baseline.replace(now.clone());
+        let Some(before) = before else { return };
+        if !party_healed(&before, &now) {
+            return;
+        }
+        if self.blackout.potential_flag {
+            log::info!("the party was healed while a blackout is pending: part of the blackout");
+            return;
+        }
+        let map = store.get_value(Some(&self.keys.overworld_map));
+        log::info!("the party was healed in {}", py_str(&map));
+        self.queue_new_event(EventDefinition::with_heal_value(&map));
     }
 
     fn item_cache(&self, store: &PropertyStore) -> ItemCache {
@@ -1781,7 +1932,12 @@ impl Gen45Machine {
                 let species_raw = store.get_value(Some(&self.keys.mon_species));
                 let species_conv = self.convert_slot_1_species(store, species_raw.as_str());
                 let save_count = self.opt_value(store, &self.keys.save_count);
+                // on_enter runs before cur_state changes: this is the state left
+                let from_battle = self.cur_state == GameState::Battle;
                 let o = &mut self.overworld;
+                o.party_baseline = None;
+                o.party_heal_check = false;
+                o.party_heal_quiet = if from_battle { POST_BATTLE_HEAL_QUIET } else { 0 };
                 o.waiting_for_registration = false;
                 o.register_delay = BASE_DELAY;
                 o.waiting_for_new_file = false;
@@ -1970,6 +2126,10 @@ impl Gen45Machine {
             if let Some(r) = self.watch_for_reset(store, new) {
                 return r;
             }
+        }
+        // registered for HGSS heal detection only: the other states never saw them
+        if state != GameState::Overworld && self.keys.party_heal_paths.contains(&new.path) {
+            return state;
         }
         match state {
             GameState::Uninitialized => {
@@ -2497,6 +2657,11 @@ impl Gen45Machine {
                 self.overworld.heal_detected = true;
                 self.overworld.heal_delay = HEAL_DELAY;
             }
+        } else if k.party_heal_paths.contains(&new.path) {
+            if !self.overworld.party_heal_check {
+                self.overworld.party_heal_check = true;
+                self.overworld.party_heal_delay = HEAL_DELAY;
+            }
         } else if new.path == k.gametime_seconds {
             if self.overworld.waiting_for_registration {
                 if self.overworld.register_delay <= 0 {
@@ -2529,6 +2694,9 @@ impl Gen45Machine {
                 } else {
                     self.overworld.heal_delay -= 1;
                 }
+            }
+            if self.flavor.is_hgss() {
+                self.party_heal_tick(store);
             }
             if self.overworld.propagate_held_item_flag {
                 if self.overworld.held_item_delay <= 0 {
@@ -2873,5 +3041,50 @@ impl GameRecorder for Gen45Machine {
     fn shutdown(&mut self) {
         log::info!("Shutting down {} recording FSM", if self.flavor.is_hgss() { "HG/SS" } else { "Platinum" });
         crate::controller::deactivate(&self.active);
+    }
+}
+
+#[cfg(test)]
+mod party_heal_tests {
+    use super::*;
+
+    fn mon(hp: i64, pp: [i64; 4]) -> PartyMon {
+        PartyMon {
+            species: Value::from("Lickitung"),
+            level: Value::from(9),
+            hp,
+            hp_max: 38,
+            moves: vec![Value::from("Lick"), Value::from("Supersonic"), Value::from("Defense Curl"), Value::Null],
+            pp: pp.to_vec(),
+        }
+    }
+
+    fn snap(mons: Vec<PartyMon>, potions: i64) -> PartySnapshot {
+        let mut items: ItemCache = IndexMap::new();
+        items.insert(Value::from("Potion"), potions);
+        PartySnapshot { mons, items }
+    }
+
+    #[test]
+    fn pokemon_center_heal() {
+        assert!(party_healed(&snap(vec![mon(20, [30, 20, 40, 0])], 3), &snap(vec![mon(38, [30, 20, 40, 0])], 3)));
+        // full HP already, only PP back
+        assert!(party_healed(&snap(vec![mon(38, [25, 20, 40, 0])], 3), &snap(vec![mon(38, [30, 20, 40, 0])], 3)));
+    }
+
+    #[test]
+    fn not_a_heal() {
+        // a Potion
+        assert!(!party_healed(&snap(vec![mon(20, [30, 20, 40, 0])], 3), &snap(vec![mon(38, [30, 20, 40, 0])], 2)));
+        // not back to full
+        assert!(!party_healed(&snap(vec![mon(20, [30, 20, 40, 0])], 3), &snap(vec![mon(30, [30, 20, 40, 0])], 3)));
+        // nothing changed
+        assert!(!party_healed(&snap(vec![mon(38, [30, 20, 40, 0])], 3), &snap(vec![mon(38, [30, 20, 40, 0])], 3)));
+        // a blackout's heal
+        assert!(!party_healed(&snap(vec![mon(0, [30, 20, 40, 0])], 3), &snap(vec![mon(38, [30, 20, 40, 0])], 3)));
+        // a different party
+        let mut other = mon(38, [30, 20, 40, 0]);
+        other.species = Value::from("Lickilicky");
+        assert!(!party_healed(&snap(vec![mon(20, [30, 20, 40, 0])], 3), &snap(vec![other], 3)));
     }
 }

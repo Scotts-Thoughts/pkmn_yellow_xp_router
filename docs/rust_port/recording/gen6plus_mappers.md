@@ -146,7 +146,7 @@ the ST prefix means the property only exists in the project's own mapper fork
 | C5 | Level-up (battle, Rare Candy) | level-up move learn / ignore events per level gained | `player.team.0.level` change (in battle: delayed 3 ticks; overworld: `RareCandy` state) | same | pre/post level in the snapshots, every level walked | yes |
 | C6 | Which move a level-up move replaced | `destination_name` | slot diff of `player.team.0.move1..4` | `player.team.0.moves.M.move` | same | yes |
 | C7 | Late forget-a-move prompt | the "not learned" event is replaced when the move appears later | - | `pending_evolution_level_check` | `pending_levelup` (after a Rare Candy / evolution the prompt comes ~900 frames after the level) | yes |
-| C8 | Heal | Heal event | ST `pointers.sStpTracking == "HEAL"` (ROM patch) | ST `audio.heal_sound == 36335692` | every `stats.hp == stats.hp_max` with nothing leaving the bag (`healed && lost_nothing`) | yes |
+| C8 | Heal | Heal event | ST `pointers.sStpTracking == "HEAL"` (ROM patch) | ST `audio.heal_sound == 36335692` (Platinum, DP); HGSS: the gen 5 rule plus PP back, judged 3 s after a party HP/PP change, not within 10 s of a battle (HGSS's `heal_sound` is a sound-data cursor with no heal value) | every `stats.hp == stats.hp_max` with nothing leaving the bag (`healed && lost_nothing`) | yes |
 | C9 | Quick start (first Pokémon) | the new route's version, species, IVs, nature, ability | `player.teamCount`, `player.team.0.{species, level, ivHp, ivAttack, ..., nature, ability(bool)}` | `player.team_count`, `player.team.0.{species, level, ivs.*, nature (index), ability (name)}` | same as gen 4 | yes |
 
 ### D. Moves from items and people
