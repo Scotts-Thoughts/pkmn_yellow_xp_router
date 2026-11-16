@@ -436,6 +436,10 @@ fn main() {
     if !allow_mismatch && blake3_hash(&rom_bytes) != player.get_replay_metadata().rom_checksum {
         fail(&mut out, format!("{} is not the ROM this replay was recorded with", rom_path.display()));
     }
+    // format-v11 Nintendo DS keyframes copy bytes from the ROM, so the player needs it to
+    // materialise them
+    let mut player = player;
+    player.set_rom(Arc::new(rom_bytes.clone()));
     let keyframes: Vec<u64> = player.all_keyframes().keys().copied().collect();
     let emu = match make_core(&rom_bytes, &player) {
         Ok(c) => c,

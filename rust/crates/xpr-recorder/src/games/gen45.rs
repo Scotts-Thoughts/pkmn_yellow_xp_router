@@ -787,6 +787,8 @@ struct OverworldData {
 struct BlackoutData {
     potential_flag: bool,
     all_team_fainted: bool,
+    /// party slots seen fainted in the battle (by `battle.player.team.N.stats.hp`)
+    fainted_slots: HashSet<usize>,
     cached_first_mon_species: String,
     cached_first_mon_level: i64,
     cached_second_mon_species: String,
@@ -865,6 +867,8 @@ pub struct Gen45Machine {
     pending_evolution_level_check: Option<i64>,
     pre_evolution_moves: Option<HashSet<String>>,
     pre_evolution_move_list: Option<Vec<Option<String>>>,
+    /// the species the solo mon evolved from, while `pending_evolution_level_check` is set
+    pre_evolution_species: Option<String>,
     solo_mon_key: MonKey,
 
     cur_state: GameState,
@@ -923,6 +927,7 @@ impl Gen45Machine {
             pending_evolution_level_check: None,
             pre_evolution_moves: None,
             pre_evolution_move_list: None,
+            pre_evolution_species: None,
             solo_mon_key: mon_key_from(info.dvs.as_ref(), info.solo_species.clone()),
             cur_state: GameState::Uninitialized,
             active: new_active_flag(),
@@ -1091,13 +1096,7 @@ impl Gen45Machine {
         }
         // moves learned during an evolution that happened while already in the overworld
         if self.pending_evolution_level_check.is_some() && generate_events && self.controller.get_game_state() == Some(GameState::Overworld) {
-            self.move_cache_update(store, false, None, false, false, false);
-            let pre_moves = self.pre_evolution_moves.clone().unwrap_or_default();
-            let level = self.pending_evolution_level_check.unwrap();
-            self.solo_mon_levelup(level, Some(&pre_moves));
-            self.pending_evolution_level_check = None;
-            self.pre_evolution_moves = None;
-            self.pre_evolution_move_list = None;
+            self.evolution_level_check(store);
         }
         log::info!("after team cache update, valid_solo_mon: {}", self.valid_solo_mon);
         self.cached_team = new_cache;
@@ -1124,21 +1123,7 @@ impl Gen45Machine {
             if current_moves.contains(&move_name) {
                 if !pre_moves.contains(&move_name) {
                     log::info!("move {} was learned during evolution/level-up, creating learn event", move_name);
-                    let mut replaced_move: Option<String> = None;
-                    if let Some(pre_move_list) = &self.pre_evolution_move_list {
-                        if !pre_move_list.is_empty() {
-                            for idx in 0..4 {
-                                if idx < pre_move_list.len() && idx < current_move_list.len() {
-                                    let pre_move = &pre_move_list[idx];
-                                    let post_move = &current_move_list[idx];
-                                    if pre_move != post_move && post_move.as_deref() == Some(move_name.as_str()) {
-                                        replaced_move = pre_move.clone();
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    let replaced_move = self.replaced_since_evolution(&current_move_list, &move_name);
                     let mut lm = LearnMoveEventDefinition::new(Some(&move_name), None, consts::MOVE_SOURCE_LEVELUP, LevelVal::Int(new_level), Some(&species), false);
                     lm.destination_name = replaced_move;
                     self.queue_new_event(EventDefinition::with_learn_move(lm));
@@ -1159,6 +1144,72 @@ impl Gen45Machine {
         }
     }
 
+    /// The move `move_name` took the place of, from the move list before the evolution.
+    fn replaced_since_evolution(&self, current_move_list: &[Option<String>], move_name: &str) -> Option<String> {
+        let pre_move_list = self.pre_evolution_move_list.as_ref()?;
+        for idx in 0..4 {
+            if idx < pre_move_list.len() && idx < current_move_list.len() {
+                let pre_move = &pre_move_list[idx];
+                let post_move = &current_move_list[idx];
+                if pre_move != post_move && post_move.as_deref() == Some(move_name) {
+                    return pre_move.clone();
+                }
+            }
+        }
+        None
+    }
+
+    /// Moves learned around an evolution, once the party data is back in the overworld.
+    ///
+    /// A level-up move the old species learned in the battle that set off the
+    /// evolution reaches the party in the same write as the new species (HGSS:
+    /// species, level and moves change in one frame), so the overworld never
+    /// sees it as a move change of its own. Moves of the new species at the
+    /// evolution level go to `solo_mon_levelup`; any other move that is new
+    /// since before the evolution is the old species' level-up move (Pidgeotto's
+    /// Wing Attack at 37, evolving into Pidgeot at 37 right after).
+    fn evolution_level_check(&mut self, store: &PropertyStore) {
+        let Some(level) = self.pending_evolution_level_check else { return };
+        self.move_cache_update(store, false, None, false, false, false);
+        let pre_moves = self.pre_evolution_moves.clone().unwrap_or_default();
+        self.solo_mon_levelup(level, Some(&pre_moves));
+        let new_species = self.solo_mon_key.species.clone().unwrap_or_default();
+        let new_species_moves: HashSet<String> = self
+            .gen
+            .pkmn_db()
+            .get_pkmn(&new_species)
+            .map(|m| m.levelup_moves.iter().filter(|(l, _)| *l == level).map(|(_, mv)| mv.clone()).collect())
+            .unwrap_or_default();
+        let current_move_list: Vec<Option<String>> = self.cached_moves.to_vec();
+        let learned: Vec<String> = current_move_list
+            .iter()
+            .flatten()
+            .filter(|m| !pre_moves.contains(*m) && !new_species_moves.contains(*m))
+            .cloned()
+            .collect();
+        if !learned.is_empty() {
+            let pre_species = self.pre_evolution_species.clone().unwrap_or_default();
+            let pre_table: Vec<(i64, String)> = self.gen.pkmn_db().get_pkmn(&pre_species).map(|m| m.levelup_moves.clone()).unwrap_or_default();
+            for move_name in learned {
+                // the latest level up to the evolution level the old species learns it at
+                let learned_at = pre_table.iter().filter(|(l, mv)| *mv == move_name && *l <= level).map(|(l, _)| *l).max();
+                match learned_at {
+                    Some(lvl) => {
+                        log::info!("move {} was learned by {} at level {} just before evolving, creating learn event", move_name, pre_species, lvl);
+                        let mut lm = LearnMoveEventDefinition::new(Some(&move_name), None, consts::MOVE_SOURCE_LEVELUP, LevelVal::Int(lvl), Some(&pre_species), false);
+                        lm.destination_name = self.replaced_since_evolution(&current_move_list, &move_name);
+                        self.queue_new_event(EventDefinition::with_learn_move(lm));
+                    }
+                    None => log::warn!("move {} appeared during the evolution into {}, but {} does not learn it by level up", move_name, new_species, pre_species),
+                }
+            }
+        }
+        self.pending_evolution_level_check = None;
+        self.pre_evolution_moves = None;
+        self.pre_evolution_move_list = None;
+        self.pre_evolution_species = None;
+    }
+
     fn trigger_evolution(&mut self, new_mon_key: MonKey) {
         log::info!("Evolving into: {}", new_mon_key.species.as_deref().unwrap_or("None"));
         let form_change = match (self.solo_mon_key.species.as_deref(), new_mon_key.species.as_deref()) {
@@ -1167,6 +1218,7 @@ impl Gen45Machine {
         };
         self.pre_evolution_moves = Some(self.cached_moves.iter().flatten().cloned().collect());
         self.pre_evolution_move_list = Some(self.cached_moves.to_vec());
+        self.pre_evolution_species = self.solo_mon_key.species.clone();
         self.solo_mon_key = new_mon_key.clone();
         self.load_level_up_moves();
         // moves are checked when back in the overworld (party data may lag);
@@ -1921,13 +1973,8 @@ impl Gen45Machine {
             GameState::Overworld => {
                 self.money_cache_update(store);
                 self.update_team_cache(store, true, false);
-                if let Some(level) = self.pending_evolution_level_check {
-                    self.move_cache_update(store, false, None, false, false, false);
-                    let pre_moves = self.pre_evolution_moves.clone().unwrap_or_default();
-                    self.solo_mon_levelup(level, Some(&pre_moves));
-                    self.pending_evolution_level_check = None;
-                    self.pre_evolution_moves = None;
-                    self.pre_evolution_move_list = None;
+                if self.pending_evolution_level_check.is_some() {
+                    self.evolution_level_check(store);
                 }
                 let species_raw = store.get_value(Some(&self.keys.mon_species));
                 let species_conv = self.convert_slot_1_species(store, species_raw.as_str());
@@ -2010,6 +2057,16 @@ impl Gen45Machine {
                         log::info!("[BLACKOUT DEBUG] Passing blackout detection to OVERWORLD state");
                         self.blackout.potential_flag = true;
                         self.blackout.all_team_fainted = self.battle.team_hp_zero;
+                        // slots already down when the battle state ends: the solo, and
+                        // teammates that fainted before it
+                        self.blackout.fainted_slots = self
+                            .keys
+                            .battle_team_hp
+                            .iter()
+                            .enumerate()
+                            .filter(|(i, hp_key)| *i == 0 || store.get_value(Some(hp_key)).as_i64().map(|hp| hp <= 0).unwrap_or(false))
+                            .map(|(i, _)| i)
+                            .collect();
                         self.blackout.cached_first_mon_species = self.battle.cached_first_mon_species.clone();
                         self.blackout.cached_first_mon_level = self.battle.cached_first_mon_level;
                         self.blackout.cached_second_mon_species = self.battle.cached_second_mon_species.clone();
@@ -2572,6 +2629,28 @@ impl Gen45Machine {
             if check_for_battle && self.in_battle_now(store) {
                 log::info!("tranitioning into battle pre-emptively");
                 return GameState::Battle;
+            }
+            return state;
+        } else if self.blackout.potential_flag && k.battle_team_hp.contains(&new.path) {
+            // The mapper's game state is "Battle" only while the slot-1 mon is the
+            // active one: once the solo faints and a teammate comes out, the state
+            // reads "Overworld" for the rest of the fight. So teammates fainting are
+            // watched here. By the time the map changes the game has already
+            // healed the party (HGSS: party HP goes 0 -> full 4 frames before
+            // the map name), so the party HP alone can't tell a blackout.
+            if let Some(slot) = k.battle_team_hp.iter().position(|p| *p == new.path) {
+                let fainted = new.as_i64().map(|hp| hp <= 0).unwrap_or(false) && prev.as_i64().map(|hp| hp > 0).unwrap_or(false);
+                // the battle data is cleared after the battle: only a faint of the
+                // mon on the field counts
+                if fainted && store_i64(store, &k.battle_player_mon_party_pos) == slot as i64 {
+                    self.blackout.fainted_slots.insert(slot);
+                    let party_size = self.cached_team.len().max(1);
+                    log::info!("[BLACKOUT DEBUG] party slot {} fainted after the solo mon (fainted: {:?} of {})", slot, self.blackout.fainted_slots, party_size);
+                    if !self.blackout.all_team_fainted && (0..party_size).all(|i| self.blackout.fainted_slots.contains(&i)) {
+                        log::info!("[BLACKOUT DEBUG] the whole party fainted, watching for map change");
+                        self.blackout.all_team_fainted = true;
+                    }
+                }
             }
             return state;
         } else if new.path == k.overworld_map {
