@@ -20,8 +20,11 @@ use crate::editors::slot_template;
 pub const INLINE_ROW_HEIGHT: f32 = 34.0;
 
 /// (display name, internal key)
-pub const EVENT_TYPES: [(&str, &str); 19] = [
+pub const EVENT_TYPES: [(&str, &str); 21] = [
     ("Fight Trainer", "trainer"),
+    // a new folder of the whole league, for routes that grind it repeatedly
+    ("Elite 4", "elite4"),
+    ("Elite 4 + Champion", "elite4_champ"),
     ("Get Item", "get_item"),
     ("Buy Item", "buy_item"),
     ("Sell Item", "sell_item"),
@@ -145,6 +148,10 @@ pub struct InlineEventCreator {
     all_pkmn: Vec<String>,
     all_moves: Vec<String>,
     all_items: Vec<String>,
+    /// the fights "Elite 4" / "Elite 4 + Champion" would add; `None` hides
+    /// the type (no league in this version, or editing an existing event)
+    league: Option<Vec<String>>,
+    league_champ: Option<Vec<String>>,
 }
 
 impl InlineEventCreator {
@@ -165,7 +172,13 @@ impl InlineEventCreator {
             all_pkmn: Vec::new(),
             all_moves: Vec::new(),
             all_items: Vec::new(),
+            league: None,
+            league_champ: None,
         };
+        if editing.is_none() {
+            c.league = ctrl.league_lineup(false);
+            c.league_champ = ctrl.league_lineup(true);
+        }
         if let Some(g) = &gen {
             let mut locs = g.trainer_db().get_all_locations();
             locs.sort();
@@ -441,7 +454,8 @@ impl InlineEventCreator {
     fn fields(&self) -> Vec<Field> {
         let mut f = vec![Field::Type];
         match self.type_key {
-            Some("trainer") => f.extend([Field::Loc, Field::Cls, Field::Trainer]),
+            // the trainer first: the filters are the less likely stop
+            Some("trainer") => f.extend([Field::Trainer, Field::Loc, Field::Cls]),
             Some("use_item") if self.cfg.pp_needs_target => f.extend([Field::Item, Field::Qty, Field::PpMove]),
             Some("get_item") | Some("buy_item") | Some("sell_item") | Some("use_item") => f.extend([Field::Item, Field::Qty]),
             Some("hold_item") => f.push(Field::Item),
@@ -457,7 +471,19 @@ impl InlineEventCreator {
     }
 
     /// `_advance_focus`: Enter on the last field creates; Tab wraps.
+    /// A trainer is the exception: Enter on the trainer creates, and Enter on
+    /// a filter after it (location, class) goes back to the trainer.
     fn advance(&mut self, from: Field, forward: bool, trigger_create_at_end: bool) -> bool {
+        if forward && trigger_create_at_end && self.type_key == Some("trainer") {
+            match from {
+                Field::Trainer => return true,
+                Field::Loc | Field::Cls => {
+                    self.focus_request = Some(Field::Trainer);
+                    return false;
+                }
+                _ => {}
+            }
+        }
         let fields = self.fields();
         let Some(cur) = fields.iter().position(|f| *f == from) else { return false };
         if forward && trigger_create_at_end && cur == fields.len() - 1 {
@@ -594,6 +620,13 @@ impl InlineEventCreator {
 
     /// `_on_create`
     fn on_create(&mut self, ctrl: &mut MainController, outcome: &mut InlineOutcome) {
+        if let Some(k @ ("elite4" | "elite4_champ")) = self.type_key {
+            if self.editing_group_id.is_none() {
+                ctrl.add_league_folder_at(k == "elite4_champ", self.insert_after_id, self.dest_folder_name.as_deref());
+                outcome.created = true;
+            }
+            return;
+        }
         match self.build(ctrl) {
             Ok(Some(ev)) => {
                 if self.editing_group_id.is_some() {
@@ -630,7 +663,12 @@ impl InlineEventCreator {
                 let gen1 = ctrl.gen().map(|g| g.supports_bag_reorder()).unwrap_or(false) || self.type_key == Some("reorder_bag");
                 // only a species with forms (Shaymin) can change form
                 let forms = self.type_key == Some("change_form") || self.first_other_form(ctrl).is_some();
-                let names: Vec<String> = EVENT_TYPES.iter().filter(|(_, k)| (gen1 || *k != "reorder_bag") && (forms || *k != "change_form")).map(|(d, _)| d.to_string()).collect();
+                let (league, league_champ) = (self.league.is_some(), self.league_champ.is_some());
+                let names: Vec<String> = EVENT_TYPES
+                    .iter()
+                    .filter(|(_, k)| (gen1 || *k != "reorder_bag") && (forms || *k != "change_form") && (league || *k != "elite4") && (league_champ || *k != "elite4_champ"))
+                    .map(|(d, _)| d.to_string())
+                    .collect();
                 let before = self.type_text.clone();
                 let r = SearchableDropdown::new(theme, self.id.with("type"), &mut self.type_text, &names)
                     .widths(110.0, 140.0)
@@ -654,6 +692,10 @@ impl InlineEventCreator {
                 let key = self.type_key;
                 match key {
                     Some("trainer") => {
+                        widgets::label(ui, theme, "Trainer:");
+                        let trainers = self.cfg.trainers.clone();
+                        let r = SearchableDropdown::new(theme, self.id.with("trainer"), &mut self.cfg.trainer, &trainers).widths(160.0, 200.0).request_focus(focus == Some(Field::Trainer)).show(ui);
+                        self.handle_nav(&r, Field::Trainer, &mut create_now);
                         widgets::label(ui, theme, "Loc:");
                         let locs = self.locations.clone();
                         let r = SearchableDropdown::new(theme, self.id.with("loc"), &mut self.cfg.loc, &locs).widths(110.0, 200.0).request_focus(focus == Some(Field::Loc)).show(ui);
@@ -668,10 +710,6 @@ impl InlineEventCreator {
                             self.refresh_trainers(ctrl);
                         }
                         self.handle_nav(&r, Field::Cls, &mut create_now);
-                        widgets::label(ui, theme, "Trainer:");
-                        let trainers = self.cfg.trainers.clone();
-                        let r = SearchableDropdown::new(theme, self.id.with("trainer"), &mut self.cfg.trainer, &trainers).widths(160.0, 200.0).request_focus(focus == Some(Field::Trainer)).show(ui);
-                        self.handle_nav(&r, Field::Trainer, &mut create_now);
                     }
                     Some("get_item") | Some("buy_item") | Some("sell_item") | Some("use_item") => {
                         widgets::label(ui, theme, "Item:");
@@ -749,6 +787,12 @@ impl InlineEventCreator {
                         let opts = self.cfg.dest_options.clone();
                         let r = SearchableDropdown::new(theme, self.id.with("dest"), &mut self.cfg.dest, &opts).widths(140.0, 200.0).request_focus(focus == Some(Field::Dest)).show(ui);
                         self.handle_nav(&r, Field::Dest, &mut create_now);
+                    }
+                    Some(k @ ("elite4" | "elite4_champ")) => {
+                        let names = if k == "elite4" { &self.league } else { &self.league_champ };
+                        if let Some(names) = names {
+                            widgets::label(ui, theme, &format!("New folder: {}", names.join(", ")));
+                        }
                     }
                     Some("notes") => {
                         widgets::label(ui, theme, "Note:");

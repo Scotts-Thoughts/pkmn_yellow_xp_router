@@ -467,7 +467,9 @@ fn calculate_damage_impl(gen: &GenData, a: &DamageArgs, single_hit: bool) -> Opt
             base_power = v;
         }
     } else if mv.name == gc::ERUPTION_MOVE || mv.name == gc::WATER_SPOUT_MOVE {
-        if let Some(v) = py_int(custom) {
+        if let Some(hp) = a.attacker_cur_hp {
+            base_power = crate::hp_scaled_power(base_power, hp, a.attacking.cur_stats.hp);
+        } else if let Some(v) = py_int(custom) {
             base_power = floor_div(base_power * v, 100).max(1);
         }
     } else if mv.name == gc::PRESENT_MOVE {

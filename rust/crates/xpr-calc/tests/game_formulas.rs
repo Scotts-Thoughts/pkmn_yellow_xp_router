@@ -1437,6 +1437,7 @@ fn game_formula_cases() {
             attacker_is_enemy: case.attacker_is_enemy,
             is_wild_battle: case.wild,
             attacker_pinch: false,
+            attacker_cur_hp: None,
         };
         let normal = range_pairs(&calculate_damage(&gen, &args));
         args.is_crit = true;

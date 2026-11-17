@@ -80,6 +80,12 @@ pub struct BattleSummaryUi {
     held_item_options: Vec<String>,
     held_item_text: String,
     held_item_apply_in_flight: bool,
+    /// The HP chip's current-HP text while it is being typed in.
+    hp_edit: Option<String>,
+    /// The HP % popup's entry.
+    hp_pct_text: String,
+    /// The popup just opened: focus its entry once it is on screen.
+    hp_pct_focus: bool,
 
     player_setup: SetupMovesState,
     enemy_setup: SetupMovesState,
@@ -129,6 +135,9 @@ impl BattleSummaryUi {
             held_item_options: Vec::new(),
             held_item_text: String::new(),
             held_item_apply_in_flight: false,
+            hp_edit: None,
+            hp_pct_text: String::new(),
+            hp_pct_focus: false,
             player_setup: SetupMovesState::default(),
             enemy_setup: SetupMovesState::default(),
             weather: OptionMenu::new(vec![consts::WEATHER_NONE.to_string()], None),
@@ -391,11 +400,151 @@ impl BattleSummaryUi {
                     ui.painter().galley(Pos2::new(r.min.x + 4.0, r.center().y - galley.size().y / 2.0), galley, theme.text);
                     resp.on_hover_text(tip);
                 };
-                chip(ui, format!("HP {}", bc.summary.get_player_battle_hp()), "Player HP entering this battle");
+                if let Some(hp) = self.hp_chip(ui, theme, bc) {
+                    bc.update_player_cur_hp(cfg, ctrl, hp);
+                }
                 chip(ui, format!("Spe {}", bc.summary.get_player_battle_speed()), "Player Speed entering this battle");
             });
         });
         });
+    }
+
+    /// The "HP cur / max" chip. Clicking the current HP types a new one;
+    /// clicking "HP" or the max opens a popup that sets it as a % of max.
+    /// Returns the new HP (`None` = full) when it changed.
+    fn hp_chip(&mut self, ui: &mut Ui, theme: &Theme, bc: &BattleController) -> Option<Option<i64>> {
+        let max = bc.summary.get_player_battle_hp();
+        let cur = bc.summary.get_player_cur_hp();
+        let is_set = cur < max;
+        let mut result: Option<Option<i64>> = None;
+        // full HP is stored as "not set"; a set HP is at least 1
+        let to_setting = |hp: i64| -> Option<i64> { if hp >= max { None } else { Some(hp.max(1)) } };
+        let font = theme.body();
+        let pad = 4.0;
+        let label_w = widgets::text_width(ui, "HP", &font);
+        let max_s = format!("/ {}", max);
+        let max_w = widgets::text_width(ui, &max_s, &font);
+        let cur_s = cur.to_string();
+        let cur_w = widgets::text_width(ui, &cur_s, &theme.body_bold()).max(14.0) + 4.0;
+        let edit_w = 44.0;
+        let mid_w = if self.hp_edit.is_some() { edit_w } else { cur_w };
+        let height = ui.fonts_mut(|f| f.row_height(&font)) + 4.0;
+        let (rect, _) = ui.allocate_exact_size(Vec2::new(pad + label_w + 4.0 + mid_w + 4.0 + max_w + pad, height), Sense::hover());
+        ui.painter().rect_stroke(rect, CornerRadius::same(3), Stroke::new(1.0_f32, theme::rgba(255, 255, 255, 0.15)), egui::StrokeKind::Inside);
+        let y = rect.center().y;
+        let label_rect = Rect::from_min_max(rect.min, Pos2::new(rect.min.x + pad + label_w + 2.0, rect.max.y));
+        let mid_rect = Rect::from_min_size(Pos2::new(label_rect.max.x + 2.0, rect.min.y), Vec2::new(mid_w, rect.height()));
+        let max_rect = Rect::from_min_max(Pos2::new(mid_rect.max.x + 2.0, rect.min.y), rect.max);
+        ui.painter().text(Pos2::new(rect.min.x + pad, y), Align2::LEFT_CENTER, "HP", font.clone(), theme.text);
+        ui.painter().text(Pos2::new(max_rect.min.x + 2.0, y), Align2::LEFT_CENTER, &max_s, font.clone(), theme.text);
+
+        let id = ui.scope_id().with("player_hp_chip");
+        if let Some(text) = self.hp_edit.as_mut() {
+            let entry_id = id.with("edit");
+            let mut child = ui.new_child(egui::UiBuilder::new().max_rect(mid_rect));
+            let first_frame = !child.memory(|m| m.has_focus(entry_id)) && child.data(|d| d.get_temp::<bool>(entry_id).is_none());
+            if first_frame {
+                child.memory_mut(|m| m.request_focus(entry_id));
+                child.data_mut(|d| d.insert_temp(entry_id, true));
+            }
+            let r = widgets::Entry::new(theme, text).id(entry_id).width(edit_w).centered().margin(egui::Margin::symmetric(2, 0)).show(&mut child);
+            // egui drops the focus on Escape before the entry runs, so the
+            // entry can't report it (read only while this edit is open)
+            let escape = r.escape_pressed || child.input(|i| i.key_pressed(egui::Key::Escape));
+            let done = escape || r.enter_pressed || r.lost_focus || (!first_frame && !r.has_focus);
+            if done {
+                if !escape {
+                    if let Ok(v) = text.trim().parse::<i64>() {
+                        let new = to_setting(v);
+                        if new != bc.summary.player_cur_hp {
+                            result = Some(new);
+                        }
+                    }
+                }
+                child.data_mut(|d| d.remove::<bool>(entry_id));
+                self.hp_edit = None;
+            }
+        } else {
+            let cur_resp = ui
+                .interact(mid_rect, id.with("cur"), Sense::click())
+                .on_hover_cursor(egui::CursorIcon::Text)
+                .on_hover_text("Player's current HP for the calc: Eruption, Water Spout, Flail, Reversal, Blaze-style abilities and the enemy's hits to KO. Click to type a value.");
+            if cur_resp.hovered() {
+                ui.painter().rect_filled(mid_rect.shrink2(Vec2::new(0.0, 2.0)), CornerRadius::same(2), theme.hover_bg);
+            }
+            let color = if is_set { theme.warning } else { theme.text };
+            ui.painter().text(Pos2::new(mid_rect.center().x, y), Align2::CENTER_CENTER, &cur_s, theme.body_bold(), color);
+            if cur_resp.clicked() {
+                self.hp_edit = Some(cur_s.clone());
+            }
+        }
+
+        let pct_tip = "Click to set the player's HP as a % of max HP";
+        let label_resp = ui.interact(label_rect, id.with("label"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(pct_tip);
+        let max_resp = ui.interact(max_rect, id.with("max"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(pct_tip);
+        let opener = label_resp.union(max_resp);
+        let pct_entry_id = id.with("pct_entry");
+        if opener.clicked() {
+            self.hp_pct_text = if max > 0 { format!("{}", (cur * 100 + max / 2) / max) } else { String::new() };
+            self.hp_pct_focus = true;
+        }
+        let pct_text = &mut self.hp_pct_text;
+        let pct_focus = &mut self.hp_pct_focus;
+        let popup = egui::Popup::from_toggle_button_response(&opener)
+            .id(id.with("pct_popup"))
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .show(|ui| {
+                ui.set_min_width(200.0);
+                let mut picked: Option<i64> = None;
+                widgets::label(ui, theme, "Set HP to a % of max HP");
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    if *pct_focus {
+                        ui.memory_mut(|m| m.request_focus(pct_entry_id));
+                    }
+                    let r = widgets::Entry::new(theme, pct_text).id(pct_entry_id).width(52.0).centered().show(ui);
+                    if r.has_focus {
+                        *pct_focus = false;
+                    }
+                    widgets::label(ui, theme, "%");
+                    let pct = pct_text.trim().trim_end_matches('%').trim().parse::<f64>().ok().filter(|p| p.is_finite() && *p >= 0.0);
+                    // rounded down, so 33 % stays at or under a third
+                    let preview = pct.map(|p| ((max as f64 * p / 100.0).floor() as i64).clamp(1, max.max(1)));
+                    let set = widgets::button(ui, theme, "Set").clicked();
+                    if let Some(hp) = preview {
+                        widgets::label_colored(ui, theme, format!("= {} / {}", hp, max), theme.secondary);
+                        if set || r.enter_pressed {
+                            picked = Some(hp);
+                        }
+                    }
+                });
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    if widgets::button(ui, theme, "Full").clicked() {
+                        picked = Some(max);
+                    }
+                    if widgets::button(ui, theme, "50%").clicked() {
+                        picked = Some(max / 2);
+                    }
+                    if widgets::button(ui, theme, "1/3").on_hover_text("The highest HP at which Blaze, Torrent, Overgrow and Swarm apply").clicked() {
+                        picked = Some(max / 3);
+                    }
+                    if widgets::button(ui, theme, "1 HP").clicked() {
+                        picked = Some(1);
+                    }
+                });
+                if picked.is_some() {
+                    ui.close();
+                }
+                picked
+            });
+        if let Some(hp) = popup.and_then(|p| p.inner) {
+            let new = to_setting(hp);
+            if new != bc.summary.player_cur_hp {
+                result = Some(new);
+            }
+        }
+        result
     }
 
     fn legacy_section(&mut self, ui: &mut Ui, theme: &Theme, cfg: &Config, bc: &mut BattleController, ctrl: &mut MainController, actions: &mut BattleUiActions) {

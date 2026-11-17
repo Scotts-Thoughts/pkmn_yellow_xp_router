@@ -36,6 +36,9 @@ fn walk(router: &Router, id: NodeId, path: &mut Vec<String>, idx: &mut usize) {
                     println!("#{idx} {} bag: {}", g.name, bag.join(", "));
                 }
             }
+            if let (Ok(_), Some(s)) = (std::env::var("XPR_DUMP_EXP"), g.final_state.as_ref()) {
+                println!("#{idx} exp {} Lv{} [{}] {}", s.solo_pkmn.cur_xp, s.solo_pkmn.cur_level, path[1..].join("/"), g.name);
+            }
             for m in &g.error_messages {
                 println!("#{idx} ERROR [{}] {} {lvl}: {m}", path[1..].join("/"), g.name);
             }

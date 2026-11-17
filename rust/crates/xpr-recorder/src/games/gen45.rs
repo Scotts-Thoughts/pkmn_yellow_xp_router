@@ -647,6 +647,10 @@ struct BattleData {
     init_held_item: Value,
     original_level: i64,
     solo_hp_zero: bool,
+    /// The solo mon left the field alive (Roar, Whirlwind, a switch): the
+    /// mapper's game state reads "Overworld" until it is back, but the battle
+    /// goes on.
+    solo_off_field: bool,
     team_hp_zero: bool,
     watching_for_map_change: bool,
     initial_map: Value,
@@ -700,6 +704,7 @@ impl Default for BattleData {
             init_held_item: Value::Null,
             original_level: 0,
             solo_hp_zero: false,
+            solo_off_field: false,
             team_hp_zero: false,
             watching_for_map_change: false,
             initial_map: Value::Null,
@@ -2339,7 +2344,21 @@ impl Gen45Machine {
         }
     }
 
+    /// The battle's data is still loaded: the mon on our side of the field is a
+    /// party slot. The game clears it (255) once the battle is over.
+    fn battle_still_loaded(&self, store: &PropertyStore) -> bool {
+        store.i64_of(&self.keys.battle_player_mon_party_pos).map(|p| (0..6).contains(&p)).unwrap_or(false)
+    }
+
     fn battle_end_check(&self, store: &PropertyStore) -> Option<GameState> {
+        if self.battle.solo_off_field && !self.meta_is_battle(store) {
+            if self.battle_still_loaded(store) {
+                return None;
+            }
+            // a teammate finished the battle: no exp left to wait for
+            log::info!("the battle ended with the solo mon off the field");
+            return Some(GameState::Overworld);
+        }
         if !self.meta_is_battle(store) {
             if self.battle.watching_for_map_change {
                 return Some(GameState::Overworld);
@@ -2404,9 +2423,10 @@ impl Gen45Machine {
             } else {
                 log::error!("Solo mon gained experience, but we didn't properly cache which enemy mon was defeated... This is normal if the a different pokemon has been pulled into player's slot 1");
             }
-            // battle ended (but never while tracking a blackout)
+            // battle ended (but never while tracking a blackout, or while the solo
+            // mon, which gets a participant's share, is off the field)
             if !self.meta_is_battle(store) {
-                if self.battle.solo_hp_zero {
+                if self.battle.solo_hp_zero || (self.battle.solo_off_field && self.battle_still_loaded(store)) {
                     return state;
                 }
                 return GameState::Overworld;
@@ -2588,10 +2608,31 @@ impl Gen45Machine {
                 return next;
             }
         } else if new.path == k.meta_state {
-            if !new.eq_str("Battle") {
+            if new.eq_str("Battle") {
+                if self.battle.solo_off_field {
+                    log::info!("the solo mon is back on the field");
+                    self.battle.solo_off_field = false;
+                }
+            } else {
                 if self.battle.watching_for_map_change {
                     log::info!("META_STATE changed to '{}', transitioning to OVERWORLD for blackout detection", py_str(&new.value));
                     return GameState::Overworld;
+                }
+                // The mapper's game state is "Battle" only while the slot-1 mon is the
+                // active one, and "From Battle" when the battle is won with it out. A
+                // Roar or a switch makes it "No Pokemon", then "Overworld", while the
+                // fight goes on (h-typhlosion-line-2-23925: Leader Blue's Arcanine
+                // roared the solo out, and the rest of the fight became a second
+                // Leader Blue event).
+                // A teammate is the active mon (the mapper sets the party position
+                // before the game state); running away keeps it at 0.
+                let teammate_out = store.i64_of(&k.battle_player_mon_party_pos).map(|p| (1..6).contains(&p)).unwrap_or(false);
+                if !new.eq_str("From Battle") && !self.battle.solo_hp_zero && store_i64(store, &k.battle_solo_hp) > 0 && (teammate_out || (self.battle.solo_off_field && self.battle_still_loaded(store))) {
+                    if !self.battle.solo_off_field {
+                        log::info!("the solo mon left the field with HP left (game state '{}'): the battle goes on", py_str(&new.value));
+                        self.battle.solo_off_field = true;
+                    }
+                    return state;
                 }
                 if self.battle.cached_first_mon_species.is_empty() && self.battle.cached_second_mon_species.is_empty() {
                     return GameState::Overworld;

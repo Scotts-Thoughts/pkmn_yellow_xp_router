@@ -33,7 +33,7 @@ fn crystal_league_folders_are_in_battle_order_and_undo_in_one_step() {
 
     let last = ctrl.add_league_folder(false).expect("folder added");
     assert_eq!(folder_trainers(&ctrl, last), ("Elite Four".to_string(), ["Elite Four Will", "Elite Four Koga", "Elite Four Bruno", "Elite Four Karen"].map(String::from).to_vec()));
-    assert_eq!(ctrl.get_single_selected_event_id(true), Some(last));
+    assert_eq!(ctrl.get_single_selected_event_id(true), ctrl.router.parent_of(last), "the folder is selected, not its last fight");
     ctrl.undo();
     assert_eq!(ctrl.router.save_bytes(), before, "one undo removes the whole folder");
 
@@ -58,4 +58,31 @@ fn a_starter_dependent_champion_is_the_one_the_route_fights() {
     ctrl.select_new_events(vec![anchor]);
     ctrl.add_trainer_fight_from_map("Rival3 Vaporeon").unwrap();
     assert_eq!(ctrl.league_lineup(true).unwrap()[4], "Rival3 Vaporeon");
+}
+
+/// The space-key creator's "Elite 4" types insert at its own spot: after
+/// the event it opened on, or inside the folder it opened in.
+#[test]
+fn league_folder_at_an_explicit_spot() {
+    let mut ctrl = setup("c-porygon-1-.json");
+    let groups = ctrl.router.all_groups();
+    let (first, second) = (groups[0], groups[1]);
+    // selection elsewhere must not matter
+    ctrl.select_new_events(vec![second]);
+    let last = ctrl.add_league_folder_at(true, Some(first), None).expect("folder added");
+    let folder = ctrl.router.parent_of(last).unwrap();
+    let (name, names) = folder_trainers(&ctrl, last);
+    assert_eq!(name, "Elite Four + Champion");
+    assert_eq!(names.len(), 5);
+    let parent = ctrl.router.parent_of(first).unwrap();
+    let siblings = &ctrl.router.folder(parent).unwrap().children;
+    let at = siblings.iter().position(|c| *c == first).unwrap();
+    assert_eq!(siblings.get(at + 1), Some(&folder), "right after the anchor");
+
+    // inside a folder, with nothing to insert after: appended to it
+    let last = ctrl.add_league_folder_at(false, None, Some("Elite Four + Champion")).unwrap();
+    let inner = ctrl.router.parent_of(last).unwrap();
+    assert_eq!(ctrl.router.parent_of(inner), Some(folder));
+    assert_eq!(ctrl.router.folder(folder).unwrap().children.last(), Some(&inner));
+    assert_eq!(folder_trainers(&ctrl, last).0, "Elite Four");
 }

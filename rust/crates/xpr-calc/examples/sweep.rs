@@ -180,6 +180,7 @@ fn main() {
             attacker_is_enemy,
             is_wild_battle: case["wild"].as_bool().unwrap_or(false),
             attacker_pinch: false,
+            attacker_cur_hp: None,
         };
         let normal = calculate_damage(&gen, &dargs);
         dargs.is_crit = true;

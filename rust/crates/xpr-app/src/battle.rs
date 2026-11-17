@@ -170,6 +170,14 @@ impl BattleController {
         self.after_full();
     }
 
+    /// The solo mon's current HP for the calc (`None` = full HP).
+    pub fn update_player_cur_hp(&mut self, cfg: &Config, ctrl: &MainController, hp: Option<i64>) {
+        let Some(gen) = ctrl.gen() else { return };
+        let sc = BattleController::summary_config(cfg, ctrl);
+        self.summary.update_player_cur_hp(&gen, &sc, hp);
+        self.after_full();
+    }
+
     pub fn update_player_transform(&mut self, cfg: &Config, ctrl: &MainController, is_transformed: bool) {
         let Some(gen) = ctrl.gen() else { return };
         let sc = BattleController::summary_config(cfg, ctrl);

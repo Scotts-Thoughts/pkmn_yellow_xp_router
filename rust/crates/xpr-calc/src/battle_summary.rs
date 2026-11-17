@@ -176,6 +176,7 @@ pub struct TransientState {
     mimic: String,
     transformed: bool,
     double: bool,
+    player_cur_hp: Option<i64>,
 }
 
 #[derive(Clone, Debug)]
@@ -190,6 +191,9 @@ pub struct BattleSummary {
     pub player_setup_move_list: Vec<String>,
     pub player_field_move_list: Vec<String>,
     pub is_player_transformed: bool,
+    /// The solo mon's current HP set on the battle page (`None` = full HP);
+    /// see `TrainerEventDefinition::player_cur_hp`.
+    pub player_cur_hp: Option<i64>,
     pub transformed_mon_list: Vec<EnemyPkmn>,
     pub original_enemy_mon_list: Vec<EnemyPkmn>,
     pub enemy_setup_move_list: Vec<String>,
@@ -247,6 +251,7 @@ impl Default for BattleSummary {
             player_setup_move_list: Vec::new(),
             player_field_move_list: Vec::new(),
             is_player_transformed: false,
+            player_cur_hp: None,
             transformed_mon_list: Vec::new(),
             original_enemy_mon_list: Vec::new(),
             enemy_setup_move_list: Vec::new(),
@@ -326,6 +331,7 @@ impl BattleSummary {
         self.double_battle_flag = false;
         self.mimic_selection = String::new();
         self.is_player_transformed = false;
+        self.player_cur_hp = None;
         self.is_wild_battle = false;
         self.wild_min_dv_mons.clear();
         self.wild_max_dv_mons.clear();
@@ -402,6 +408,7 @@ impl BattleSummary {
         self.double_battle_flag = trainer_obj.double_battle || second_trainer_obj.is_some();
         self.mimic_selection = td.mimic_selection.clone();
         self.is_player_transformed = td.is_transformed();
+        self.player_cur_hp = td.player_cur_hp;
         self.is_wild_battle = false;
         self.wild_min_dv_mons.clear();
         self.wild_max_dv_mons.clear();
@@ -498,6 +505,7 @@ impl BattleSummary {
         self.enemy_intimidate = None;
         self.mimic_selection = String::new();
         self.is_player_transformed = false;
+        self.player_cur_hp = None;
         self.player_setup_move_list.clear();
         self.player_field_move_list.clear();
         self.enemy_setup_move_list.clear();
@@ -568,6 +576,7 @@ impl BattleSummary {
         self.enemy_intimidate = None;
         self.mimic_selection = String::new();
         self.is_player_transformed = false;
+        self.player_cur_hp = None;
         self.player_setup_move_list.clear();
         self.player_field_move_list.clear();
         self.enemy_setup_move_list.clear();
@@ -935,9 +944,16 @@ impl BattleSummary {
         if custom_data_options.is_none() && mv.has_flavor(consts::FLAVOR_MULTI_HIT) {
             custom_data_options = Some(consts::MULTI_HIT_CUSTOM_DATA.iter().map(|s| s.to_string()).collect());
         }
+        // A set player HP drives the HP-based moves and the pinch abilities
+        // of the player's attacks, so their HP dropdowns go away.
+        let attacker_cur_hp = if is_player { self.player_cur_hp.map(|hp| hp.min(attacking_mon.cur_stats.hp)) } else { None };
+        let hp_flail = attacker_cur_hp.is_some() && (mv.name == consts::FLAIL_MOVE_NAME || mv.name == consts::REVERSAL_MOVE_NAME);
+        if attacker_cur_hp.is_some() && (hp_flail || mv.name == xpr_data::gen_consts::ERUPTION_MOVE || mv.name == xpr_data::gen_consts::WATER_SPOUT_MOVE) {
+            custom_data_options = None;
+        }
         // the move's own options, without the pinch-ability copies
         let base_data_options = custom_data_options.clone();
-        let pinch_label = if metronome_selection.is_some() {
+        let pinch_label = if metronome_selection.is_some() || attacker_cur_hp.is_some() {
             None
         } else {
             pinch_option_label(gen, &mv, &attacking_mon, &defending_mon, &current_weather)
@@ -958,6 +974,11 @@ impl BattleSummary {
             // only the pinch dropdown: the move itself has no custom data
             custom_str.clear();
         }
+        if let (true, Some(hp)) = (hp_flail, attacker_cur_hp) {
+            custom_str = crate::flail_option_for_hp(hp, attacking_mon.cur_stats.hp).to_string();
+        }
+        // the enemy's turns to KO count from the player's set HP
+        let kill_hp = if is_player { defending_mon.cur_stats.hp } else { self.player_cur_hp.map(|hp| hp.min(defending_mon.cur_stats.hp)).unwrap_or(defending_mon.cur_stats.hp) };
 
         let (normal_ranges, crit_ranges): (Option<DamageRange>, Option<DamageRange>);
         let mut hits: Option<crate::HitModel> = None;
@@ -976,6 +997,7 @@ impl BattleSummary {
                 is_double_battle: self.double_battle_flag,
                 is_wild_battle: self.is_wild_battle,
                 attacker_pinch,
+                attacker_cur_hp,
             };
             if is_player {
                 let tanky = common.calc(&attacking_mon, wild_max, false, attacking_mon_stats.as_ref(), None);
@@ -1014,6 +1036,7 @@ impl BattleSummary {
                 attacker_is_enemy: false,
                 is_wild_battle: self.is_wild_battle,
                 attacker_pinch,
+                attacker_cur_hp,
             };
             normal_ranges = calculate_damage(gen, &args);
             // multi-hit moves (gens 2+): every hit rolls its own crit and
@@ -1043,6 +1066,7 @@ impl BattleSummary {
             attacker_is_enemy: false,
             is_wild_battle: self.is_wild_battle,
             attacker_pinch,
+            attacker_cur_hp,
         };
         let kill_ranges: Vec<KillRange> = match (&normal_ranges, &crit_ranges) {
             (Some(n), Some(c)) => {
@@ -1054,13 +1078,13 @@ impl BattleSummary {
                 let accuracy = accuracy / 100.0;
                 let crit_rate = get_crit_rate(gen, &kill_args);
                 match &hits {
-                    Some(model) => find_kill_hits(model, crit_rate, accuracy, defending_mon.cur_stats.hp, cfg.calc.damage_search_depth, 0.1),
+                    Some(model) => find_kill_hits(model, crit_rate, accuracy, kill_hp, cfg.calc.damage_search_depth, 0.1),
                     None => find_kill(
                         n,
                         c,
                         crit_rate,
                         accuracy,
-                        defending_mon.cur_stats.hp,
+                        kill_hp,
                         cfg.calc.damage_search_depth,
                         0.1,
                         cfg.calc.force_full_search,
@@ -1088,6 +1112,7 @@ impl BattleSummary {
                             is_double_battle: self.double_battle_flag,
                             is_wild_battle: self.is_wild_battle,
                             attacker_pinch,
+                            attacker_cur_hp,
                         };
                         let tanky = common.calc(&attacking_mon, &self.wild_max_dv_mons[mon_idx], false, attacking_mon_stats.as_ref(), None);
                         let squishy = common.calc(&attacking_mon, &self.wild_min_dv_mons[mon_idx], false, attacking_mon_stats.as_ref(), None);
@@ -1236,6 +1261,21 @@ impl BattleSummary {
         self.full_refresh(Some(gen), cfg);
     }
 
+    /// Sets the solo mon's current HP for the calc. `None`, or the battle's
+    /// starting max HP or more, means full HP.
+    pub fn update_player_cur_hp(&mut self, gen: &GenData, cfg: &SummaryConfig, hp: Option<i64>) {
+        let max = self.get_player_battle_hp();
+        self.player_cur_hp = hp.map(|h| h.max(0)).filter(|h| *h < max);
+        self.full_refresh(Some(gen), cfg);
+    }
+
+    /// The solo mon's current HP shown on the battle page (its max HP when
+    /// none is set).
+    pub fn get_player_cur_hp(&self) -> i64 {
+        let max = self.get_player_battle_hp();
+        self.player_cur_hp.map(|h| h.min(max)).unwrap_or(max)
+    }
+
     pub fn update_player_transform(&mut self, gen: &GenData, cfg: &SummaryConfig, is_transformed: bool) {
         self.is_player_transformed = is_transformed;
         self.full_refresh(Some(gen), cfg);
@@ -1259,6 +1299,7 @@ impl BattleSummary {
             mimic: self.mimic_selection.clone(),
             transformed: self.is_player_transformed,
             double: self.double_battle_flag,
+            player_cur_hp: self.player_cur_hp,
         }
     }
 
@@ -1279,6 +1320,7 @@ impl BattleSummary {
         self.mimic_selection = saved.mimic;
         self.is_player_transformed = saved.transformed;
         self.double_battle_flag = saved.double;
+        self.player_cur_hp = saved.player_cur_hp;
     }
 
     // ---- queries ------------------------------------------------------------------
@@ -1392,6 +1434,7 @@ impl BattleSummary {
         td.set_transformed(self.is_player_transformed);
         td.stat_stage_setup = final_stat_stage;
         td.collapsed_mons = collapsed;
+        td.player_cur_hp = self.player_cur_hp;
         Some(td)
     }
 
@@ -2115,6 +2158,7 @@ struct CommonArgs<'a> {
     is_double_battle: bool,
     is_wild_battle: bool,
     attacker_pinch: bool,
+    attacker_cur_hp: Option<i64>,
 }
 
 impl<'a> CommonArgs<'a> {
@@ -2136,6 +2180,7 @@ impl<'a> CommonArgs<'a> {
             attacker_is_enemy: false,
             is_wild_battle: self.is_wild_battle,
             attacker_pinch: self.attacker_pinch,
+            attacker_cur_hp: self.attacker_cur_hp,
         };
         calculate_damage(self.gen, &args)
     }

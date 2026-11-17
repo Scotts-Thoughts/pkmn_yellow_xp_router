@@ -99,7 +99,7 @@ fn add_all_trainers_makes_one_folder_in_object_order() {
     assert_eq!(f.name, "Mt. Moon");
     let kids: Vec<String> = f.children.iter().map(|c| ctrl.router.group(*c).unwrap().event_definition.trainer_def.as_ref().unwrap().trainer_name.clone()).collect();
     assert_eq!(kids, vec!["BugCatcher 4", "BugCatcher 5", "Youngster 3"], "unknown names are skipped, order kept, canonical names used");
-    assert_eq!(ctrl.get_single_selected_event_id(true), Some(last));
+    assert_eq!(ctrl.get_single_selected_event_id(true), Some(folder), "the folder is selected, not its last fight");
     // a second folder for the same map gets a distinct name
     ctrl.select_new_events(vec![anchor]);
     let again = ctrl.add_trainers_in_new_folder("Mt. Moon", &names).unwrap();
@@ -134,4 +134,21 @@ fn route_events_map_to_link_queries_that_resolve() {
     // and the map objects name trainers the route can add
     let brock = pack.objects.iter().find(|o| o.kind == ObjectKind::Trainer && o.trainer_names().iter().any(|n| n == "Brock 1")).expect("Brock's marker");
     assert_eq!(pack.map(brock.map).unwrap().const_name, "PEWTER_GYM");
+}
+
+/// "Add all trainers" selects the area's new folder, so the next add goes
+/// after it instead of inside it.
+#[test]
+fn add_area_selects_the_new_folder() {
+    let (_cfg, mut ctrl) = setup("yellow-pinsir-lv10brock.json");
+    let anchor = nth_trainer(&ctrl, 0);
+    ctrl.select_new_events(vec![anchor]);
+    ctrl.add_area("Mt. Moon", false, Some(anchor));
+    let folder = ctrl.get_single_selected_event_id(true).expect("something selected");
+    assert_eq!(ctrl.router.folder(folder).map(|f| f.name.clone()).as_deref(), Some("Mt. Moon"));
+    assert_eq!(ctrl.router.parent_of(folder), ctrl.router.parent_of(anchor), "right beside the anchor");
+    // the area's trainers are all fought now, so a second add makes nothing
+    // and leaves the selection alone
+    ctrl.add_area("Mt. Moon", false, Some(folder));
+    assert_eq!(ctrl.get_single_selected_event_id(true), Some(folder));
 }

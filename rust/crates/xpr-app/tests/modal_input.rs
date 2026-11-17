@@ -429,3 +429,79 @@ fn a_chevron_click_collapses_and_expands_a_folder() {
     h.frame(vec![]);
     assert!(expanded(&h, 0), "a second click expands it again");
 }
+
+/// Not a modal case, but this harness drives the real list: Space on an
+/// event, type "fight", Enter, then the trainer's name, Enter: the trainer
+/// field comes right after the type (location and class are later Tab stops),
+/// and Enter on it creates the fight.
+#[test]
+fn space_fight_enter_name_enter_adds_the_trainer() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    h.click(Harness::row_pos(1, 300.0));
+    let anchor = h.selected()[0];
+    h.press(Key::Space);
+    h.frame(vec![]);
+    assert!(h.list.has_inline_creator());
+    h.frame(vec![Event::Text("fight".into())]);
+    h.frame(vec![]);
+    h.press(Key::Enter);
+    h.frame(vec![]);
+    h.frame(vec![Event::Text("misty".into())]);
+    h.frame(vec![]);
+    h.press(Key::Enter);
+    h.frame(vec![]);
+    assert!(!h.list.has_inline_creator(), "Enter on the trainer creates the fight");
+    let siblings = h.siblings(anchor);
+    let at = siblings.iter().position(|c| *c == anchor).unwrap();
+    let group = h.ctrl.router.group(siblings[at + 1]).expect("an event right after the anchor");
+    let td = group.event_definition.trainer_def.as_ref().expect("a trainer fight");
+    assert_eq!(td.trainer_name, "Misty 1");
+}
+
+/// Not a modal case, but this harness drives the real list: Space on an
+/// event, type "elite 4 +", Enter adds the league and champion in one
+/// folder right after that event.
+#[test]
+fn space_elite_enter_adds_the_league_in_a_folder() {
+    let mut h = Harness::new("yellow-pinsir-lv10brock.json");
+    h.click(Harness::row_pos(1, 300.0));
+    let anchor = h.selected()[0];
+    h.press(Key::Space);
+    h.frame(vec![]);
+    assert!(h.list.has_inline_creator());
+    h.frame(vec![Event::Text("elite 4 +".into())]);
+    h.frame(vec![]);
+    for _ in 0..2 {
+        if !h.list.has_inline_creator() {
+            break;
+        }
+        h.press(Key::Enter);
+        h.frame(vec![]);
+    }
+    assert!(!h.list.has_inline_creator(), "the creator closes once the folder is in");
+    let siblings = h.siblings(anchor);
+    let at = siblings.iter().position(|c| *c == anchor).unwrap();
+    let folder = h.ctrl.router.folder(siblings[at + 1]).expect("a folder right after the event");
+    assert_eq!(folder.name, "Elite Four + Champion");
+    assert_eq!(folder.children.len(), 5);
+    let first_folder = siblings[at + 1];
+    assert_eq!(h.selected(), vec![first_folder], "the new folder is selected, not its last fight");
+
+    // again: the second folder goes after the first, not inside it
+    h.press(Key::Space);
+    h.frame(vec![]);
+    h.frame(vec![Event::Text("elite 4 +".into())]);
+    h.frame(vec![]);
+    for _ in 0..2 {
+        if !h.list.has_inline_creator() {
+            break;
+        }
+        h.press(Key::Enter);
+        h.frame(vec![]);
+    }
+    let siblings = h.siblings(first_folder);
+    let at = siblings.iter().position(|c| *c == first_folder).unwrap();
+    let second = h.ctrl.router.folder(siblings[at + 1]).expect("a sibling folder after the first");
+    assert_eq!(second.name, "Elite Four + Champion Trip:2");
+    assert_eq!(h.ctrl.router.folder(first_folder).unwrap().children.len(), 5, "nothing nested in the first");
+}

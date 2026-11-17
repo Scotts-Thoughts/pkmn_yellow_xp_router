@@ -41,6 +41,10 @@ pub struct DamageArgs<'a> {
     /// style option), so Overgrow / Blaze / Torrent / Swarm boost a move of
     /// their type. Eruption / Water Spout read it from their HP % instead.
     pub attacker_pinch: bool,
+    /// The attacker's current HP when the user set one (the player's HP chip
+    /// on the battle page). Eruption / Water Spout scale from it exactly and
+    /// the pinch abilities test it, in place of the HP % / pinch options.
+    pub attacker_cur_hp: Option<i64>,
 }
 
 impl<'a> DamageArgs<'a> {
@@ -62,6 +66,7 @@ impl<'a> DamageArgs<'a> {
             attacker_is_enemy: false,
             is_wild_battle: false,
             attacker_pinch: false,
+            attacker_cur_hp: None,
         }
     }
 }
@@ -75,6 +80,9 @@ pub fn pinch_boost_applies(args: &DamageArgs, move_type: &str) -> bool {
     if gc::pinch_ability_type(&args.attacking.ability) != Some(move_type) {
         return false;
     }
+    if let Some(hp) = args.attacker_cur_hp {
+        return hp <= xpr_core::floor_div(args.attacking.cur_stats.hp, 3);
+    }
     if args.mv.name == gc::ERUPTION_MOVE || args.mv.name == gc::WATER_SPOUT_MOVE {
         if let Some(pct) = damage::py_int(args.custom_move_data) {
             let max_hp = args.attacking.cur_stats.hp;
@@ -82,6 +90,31 @@ pub fn pinch_boost_applies(args: &DamageArgs, move_type: &str) -> bool {
         }
     }
     args.attacker_pinch
+}
+
+/// Eruption / Water Spout power at `cur_hp`: `power * curHP / maxHP`, at
+/// least 1 (`Cmd_...` in the gen 3 / 4 decomps).
+pub fn hp_scaled_power(base_power: i64, cur_hp: i64, max_hp: i64) -> i64 {
+    if max_hp <= 0 {
+        return base_power;
+    }
+    xpr_core::floor_div(base_power * cur_hp.clamp(0, max_hp), max_hp).max(1)
+}
+
+/// The Flail / Reversal option matching `cur_hp`. The games bucket by
+/// `48 * curHP / maxHP`: under 2, 5, 10, 17, 33 give 200 / 150 / 100 / 80 /
+/// 40, the rest 20.
+pub fn flail_option_for_hp(cur_hp: i64, max_hp: i64) -> &'static str {
+    use xpr_data::gen_consts as gc;
+    let p = if max_hp <= 0 { 48 } else { xpr_core::floor_div(48 * cur_hp.clamp(0, max_hp), max_hp) };
+    match p {
+        0..=1 => gc::FLAIL_MIN_HP,
+        2..=4 => gc::FLAIL_FIVE_PERCENT_HP,
+        5..=9 => gc::FLAIL_TEN_PERCENT_HP,
+        10..=16 => gc::FLAIL_QUARTER_HP,
+        17..=32 => gc::FLAIL_HALF_HP,
+        _ => gc::FLAIL_FULL_HP,
+    }
 }
 
 /// `CurrentGen.calculate_damage`

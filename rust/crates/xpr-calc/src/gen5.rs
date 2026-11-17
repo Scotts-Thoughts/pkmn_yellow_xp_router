@@ -403,7 +403,9 @@ fn calculate_damage_impl(gen: &GenData, a: &DamageArgs, single_hit: bool) -> Opt
             base_power_opt = Some(v);
         }
     } else if mv.name == gc::ERUPTION_MOVE || mv.name == gc::WATER_SPOUT_MOVE {
-        if let (Some(v), Some(bp)) = (py_int(custom), base_power_opt) {
+        if let (Some(hp), Some(bp)) = (a.attacker_cur_hp, base_power_opt) {
+            base_power_opt = Some(crate::hp_scaled_power(bp, hp, a.attacking.cur_stats.hp));
+        } else if let (Some(v), Some(bp)) = (py_int(custom), base_power_opt) {
             base_power_opt = Some(floor_div(bp * v, 100));
         }
     } else if mv.name == gc::CRUSH_GRIP_MOVE || mv.name == gc::WRING_OUT_MOVE {
@@ -800,6 +802,7 @@ fn calculate_damage_impl(gen: &GenData, a: &DamageArgs, single_hit: bool) -> Opt
                 attacker_is_enemy: false,
                 is_wild_battle: a.is_wild_battle,
                 attacker_pinch: a.attacker_pinch,
+                attacker_cur_hp: a.attacker_cur_hp,
             };
             calculate_damage_impl(gen, &sub, true)?
         } else {

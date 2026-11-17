@@ -335,6 +335,93 @@ fn a_blackout_after_the_solo_mon_is_replaced_is_recorded() {
     assert!(has_blackout(&log), "no blackout recorded: {:?}", describe(&log));
 }
 
+/// h-typhlosion-line-2-23925 (Leader Clair, Ace Trainer Gaven): the solo mon
+/// levelled up on the first enemy, then fainted, and the whole party after it.
+/// The game writes the new level back to the party while whiting out, which
+/// sends the recorder through its Rare Candy state; when it came back to the
+/// overworld the party was already healed, so a build without the faint watch
+/// called it "not a blackout" and kept the whole fight's exp.
+#[test]
+fn a_blackout_after_a_level_up_in_the_same_fight_is_recorded() {
+    let (mut sim, log) = start();
+    sim.start_battle();
+    sim.solo_faints_teammate_comes_out();
+    sim.batch(&[("battle.player.active_pokemon.stats.hp", json!(0)), ("battle.player.team.1.stats.hp", json!(0))]);
+    sim.tick(2);
+    sim.batch(&[("player.team.0.level", json!(37))]);
+    sim.batch(&[("player.team.0.stats.hp", json!(100)), ("player.team.1.stats.hp", json!(19))]);
+    sim.batch(&[("overworld.map_name", json!("Viridian City - Map 7"))]);
+    sim.tick(1); // out of the Rare Candy state, on the new map with a healed party
+    sim.batch(&[("battle.player.party_position", json!(255))]);
+    sim.tick(4);
+    settle(&log, has_blackout);
+    let log = log.lock().unwrap();
+    assert!(has_blackout(&log), "no blackout recorded: {:?}", describe(&log));
+}
+
+fn trainer_events(log: &Log) -> usize {
+    log.events.iter().filter(|(_, d)| d.trainer_def.is_some()).count()
+}
+
+impl Sim {
+    /// A Roar sends the Rattata out in place of the healthy solo mon: the mapper
+    /// sets the party position, then reads the game state as "No Pokemon" and
+    /// "Overworld" while the fight goes on.
+    fn solo_roared_out(&mut self) {
+        self.batch(&[
+            ("battle.player.active_pokemon.stats.hp", json!(19)),
+            ("battle.player.party_position", json!(1)),
+            ("battle.mode", Value::Null),
+            ("meta.state", json!("No Pokemon")),
+        ]);
+        self.batch(&[("meta.state", json!("Overworld"))]);
+        self.tick(3);
+        assert_eq!(self.controller.get_game_state(), Some(GameState::Battle), "the battle ended when the solo mon was roared out");
+    }
+}
+
+/// h-typhlosion-line-2-23925: Leader Blue's Arcanine roared Typhlosion out, it
+/// came back and won, and the route had Leader Blue twice.
+#[test]
+fn a_solo_mon_roared_out_and_back_is_one_battle() {
+    let (mut sim, log) = start();
+    sim.start_battle();
+    sim.solo_roared_out();
+    sim.batch(&[
+        ("battle.player.party_position", json!(0)),
+        ("battle.player.active_pokemon.stats.hp", json!(100)),
+        ("battle.mode", json!("Trainer")),
+        ("meta.state", json!("Battle")),
+    ]);
+    sim.tick(3);
+    assert_eq!(sim.controller.get_game_state(), Some(GameState::Battle));
+    // won with the solo mon out
+    sim.batch(&[("meta.state", json!("From Battle"))]);
+    sim.tick(2);
+    sim.batch(&[("meta.state", json!("Overworld")), ("battle.player.party_position", json!(255))]);
+    sim.tick(4);
+    settle(&log, |l| trainer_events(l) > 1);
+    assert_eq!(sim.controller.get_game_state(), Some(GameState::Overworld));
+    let log = log.lock().unwrap();
+    assert_eq!(trainer_events(&log), 1, "{:?}", describe(&log));
+    assert!(!has_blackout(&log), "a blackout was recorded: {:?}", describe(&log));
+}
+
+#[test]
+fn a_teammate_finishing_the_battle_with_the_solo_mon_out_ends_it() {
+    let (mut sim, log) = start();
+    sim.start_battle();
+    sim.solo_roared_out();
+    // the Rattata wins; the battle's data is cleared once it is over
+    sim.batch(&[("battle.player.party_position", json!(255))]);
+    sim.tick(4);
+    assert_eq!(sim.controller.get_game_state(), Some(GameState::Overworld));
+    settle(&log, |_| false);
+    let log = log.lock().unwrap();
+    assert_eq!(trainer_events(&log), 1, "{:?}", describe(&log));
+    assert!(!has_blackout(&log), "a blackout was recorded: {:?}", describe(&log));
+}
+
 #[test]
 fn a_teammate_winning_after_the_solo_faints_is_no_blackout() {
     let (mut sim, log) = start();

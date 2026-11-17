@@ -485,9 +485,16 @@ impl MainController {
     }
 
     pub fn add_area(&mut self, area_name: &str, include_rematches: bool, insert_after_id: Option<NodeId>) {
+        let folders_before = self.router.folder_lookup.len();
         let r = self.router.add_area(area_name, insert_after_id, consts::ROOT_FOLDER_NAME, include_rematches);
         if self.report(r, "add_area").is_some() {
             self.on_route_change();
+            // select the new folder, so the next add goes after it, not into it
+            if self.router.folder_lookup.len() > folders_before {
+                if let Some((_, &folder)) = self.router.folder_lookup.last() {
+                    self.select_new_events(vec![folder]);
+                }
+            }
         }
     }
 
@@ -814,17 +821,35 @@ impl MainController {
         if defs.is_empty() {
             return None;
         }
-        let folder = self.unique_folder_name(folder_base);
         let after = self.get_single_selected_event_id(true);
-        self.finalize_new_folder(&folder, None, after);
+        self.add_trainer_defs_in_new_folder_at(folder_base, defs, after, None)
+    }
+
+    /// The fights `defs` in a new folder named after `folder_base`, placed
+    /// after `insert_after`, else at the end of `dest_folder` (the route
+    /// when `None`). Returns the last fight but selects the folder, so the
+    /// next add lands after the folder instead of nesting in it; one undo
+    /// step.
+    fn add_trainer_defs_in_new_folder_at(&mut self, folder_base: &str, defs: Vec<EventDefinition>, insert_after: Option<NodeId>, dest_folder: Option<&str>) -> Option<NodeId> {
+        let folder = self.unique_folder_name(folder_base);
+        if insert_after.is_none() && dest_folder.is_some() {
+            let spec = InsertSpec { dest_folder_name: dest_folder.map(str::to_string), ..Default::default() };
+            let name = folder.clone();
+            if !self.undoable("finalize_new_folder", |r| r.add_event_object(None, Some(&name), spec, true, Some(true), Some(true)).map(|_| ())) {
+                return None;
+            }
+            self.on_route_change();
+        } else {
+            self.finalize_new_folder(&folder, None, insert_after);
+        }
         let mut last = None;
         for def in defs {
             // one undo step for the folder and its fights
             self.coalesce_next_undo_step();
             last = self.new_event(def, None, None, Some(&folder), false);
         }
-        if let Some(id) = last {
-            self.select_new_events(vec![id]);
+        if let Some(folder_id) = last.and_then(|id| self.router.parent_of(id)) {
+            self.select_new_events(vec![folder_id]);
         }
         last
     }
@@ -849,6 +874,19 @@ impl MainController {
     pub fn add_league_folder(&mut self, with_champion: bool) -> Option<NodeId> {
         let names = self.league_lineup(with_champion)?;
         self.add_trainers_in_new_folder(if with_champion { "Elite Four + Champion" } else { "Elite Four" }, &names)
+    }
+
+    /// `add_league_folder` at an explicit spot instead of the selection:
+    /// after `insert_after`, else at the end of `dest_folder` (the inline
+    /// event creator's insertion point).
+    pub fn add_league_folder_at(&mut self, with_champion: bool, insert_after: Option<NodeId>, dest_folder: Option<&str>) -> Option<NodeId> {
+        let names = self.league_lineup(with_champion)?;
+        let gen = self.gen()?;
+        let defs: Vec<EventDefinition> = names.iter().filter_map(|n| self.trainer_fight_def(&gen, n)).collect();
+        if defs.is_empty() {
+            return None;
+        }
+        self.add_trainer_defs_in_new_folder_at(if with_champion { "Elite Four + Champion" } else { "Elite Four" }, defs, insert_after, dest_folder)
     }
 
     /// Pre-Event State's "click a move to replace it": insert a Tutor move

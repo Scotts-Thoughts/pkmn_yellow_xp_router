@@ -600,6 +600,11 @@ pub struct TrainerEventDefinition {
     /// mons the solo mon steals the held item from with Thief / Covet. The
     /// stolen item lands in the solo mon's held slot, as in the games.
     pub thief_mons: Vec<i64>,
+    /// The solo mon's current HP for the damage calc (Eruption / Water
+    /// Spout, Flail / Reversal, the pinch abilities, the enemy's turns to
+    /// KO), set from the battle page. `None` is full HP. Calc only: the
+    /// route's HP is untouched.
+    pub player_cur_hp: Option<i64>,
 }
 
 impl TrainerEventDefinition {
@@ -627,6 +632,7 @@ impl TrainerEventDefinition {
             stat_stage_setup: Vec::new(),
             collapsed_mons: Vec::new(),
             thief_mons: Vec::new(),
+            player_cur_hp: None,
         }
     }
 
@@ -728,6 +734,12 @@ impl TrainerEventDefinition {
                 o.insert(consts::THIEF_MONS_KEY.to_string(), i64_list_value(&self.thief_mons));
             }
         }
+        // Rust-only key as well, written only when set
+        if let Some(hp) = self.player_cur_hp {
+            if let Value::Object(o) = &mut result {
+                o.insert(consts::PLAYER_CUR_HP_KEY.to_string(), Value::from(hp));
+            }
+        }
         result
     }
 
@@ -810,6 +822,7 @@ impl TrainerEventDefinition {
                 };
                 result.collapsed_mons = i64_list(get(raw, consts::COLLAPSED_MONS_KEY));
                 result.thief_mons = i64_list(get(raw, consts::THIEF_MONS_KEY));
+                result.player_cur_hp = get(raw, consts::PLAYER_CUR_HP_KEY).and_then(pyjson::value_as_i64).filter(|hp| *hp >= 0);
                 Ok(Some(result))
             }
             _ => Ok(None),
@@ -1381,8 +1394,14 @@ impl EventDefinition {
     }
 
     /// `get_pokemon_list(definition_order, include_definition_idx=True)`:
-    /// returns `(definition_idx, mon)` pairs exactly as the Python code
-    /// computes them (note the `mon_order[x] - 1` pairing quirk).
+    /// `(definition_idx, mon)` pairs in fight order, the index being the mon's
+    /// place in the trainer's definition (what `exp_split` and `thief_mons` are
+    /// indexed by).
+    ///
+    /// The Python code paired the x-th mon fought with `mon_order[x] - 1`, which
+    /// is only its definition index when the order is the definition order:
+    /// a recorded mon order put each exp split on another mon
+    /// (h-typhlosion-line-2-23925: Leader Blue's Arcanine split went to Gyarados).
     pub fn get_pokemon_list(&self, gen: &GenData, definition_order: bool) -> Result<Vec<(i64, EnemyPkmn)>, String> {
         if let Some(wild) = self.get_wild_pkmn(gen)? {
             let q = self.wild_pkmn_info.as_ref().map(|w| w.quantity).unwrap_or(1);
@@ -1439,11 +1458,7 @@ impl EventDefinition {
             }
             order_idx += 1;
         }
-        Ok(result
-            .into_iter()
-            .enumerate()
-            .map(|(x, mon)| (mon_order.get(x).copied().unwrap_or(1) - 1, mon))
-            .collect())
+        Ok(result.into_iter().map(|mon| (mon.definition_order, mon)).collect())
     }
 
     /// `get_pokemon_list()` without definition indices.
