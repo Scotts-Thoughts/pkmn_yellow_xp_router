@@ -86,6 +86,10 @@ pub struct Gen45Keys {
     pub battle_team_pid: Vec<String>,
     pub team_species: Vec<String>,
     pub team_level: Vec<String>,
+    /// every party slot's exp, and its moves (slot * 4 + move): what a mon
+    /// back from the Day Care is measured by (`solo_mon_rejoined`)
+    pub team_exp: Vec<String>,
+    pub team_moves: Vec<String>,
     pub team_hp: Vec<String>,
     pub team_iv_attack: Vec<String>,
     pub team_iv_defense: Vec<String>,
@@ -178,6 +182,8 @@ impl Gen45Keys {
             battle_team_pid: (0..6).map(|i| format!("battle.player.team.{}.internals.personality_value", i)).collect(),
             team_species: team("species"),
             team_level: team("level"),
+            team_exp: team("exp"),
+            team_moves: (0..6).flat_map(|i| (0..4).map(move |m| format!("player.team.{}.moves.{}.move", i, m))).collect(),
             team_hp: team("stats.hp"),
             team_iv_attack: team("ivs.attack"),
             team_iv_defense: team("ivs.defense"),
@@ -444,7 +450,7 @@ impl Gen45Keys {
         for list in self.team_ev.iter_mut() {
             fix_keys(store, list, &mut invalid);
         }
-        for list in [&mut self.party_hp_max, &mut self.party_moves, &mut self.party_pp] {
+        for list in [&mut self.party_hp_max, &mut self.party_moves, &mut self.party_pp, &mut self.team_exp, &mut self.team_moves] {
             for k in list.iter_mut() {
                 crate::controller::fix_optional_key(store, k);
             }
@@ -875,6 +881,11 @@ pub struct Gen45Machine {
     /// the species the solo mon evolved from, while `pending_evolution_level_check` is set
     pre_evolution_species: Option<String>,
     solo_mon_key: MonKey,
+    /// The solo mon's exp and level the last time it was seen in slot 1 (see
+    /// `on_idle`): once it has left the party the mapper no longer has them,
+    /// and they are what a Day Care stay is measured against.
+    last_solo_exp: i64,
+    last_solo_level: i64,
 
     cur_state: GameState,
     active: ActiveFlag,
@@ -934,6 +945,8 @@ impl Gen45Machine {
             pre_evolution_move_list: None,
             pre_evolution_species: None,
             solo_mon_key: mon_key_from(info.dvs.as_ref(), info.solo_species.clone()),
+            last_solo_exp: 0,
+            last_solo_level: 0,
             cur_state: GameState::Uninitialized,
             active: new_active_flag(),
             queue: EventQueue::new(),
@@ -1078,6 +1091,7 @@ impl Gen45Machine {
                     self.valid_solo_mon = true;
                     self.load_level_up_moves();
                     self.solo_mon_key = found_matches[0].clone();
+                    self.solo_mon_rejoined(store, &found_matches[0]);
                 } else if !found_evolutions.is_empty() {
                     if found_evolutions.len() > 1 {
                         let err_msg = format!("Found multiple new valid solo mons, just taking the first one from the list: {}", repr_team(&found_evolutions));
@@ -1096,7 +1110,13 @@ impl Gen45Machine {
             if !self.valid_solo_mon {
                 log::error!("skipping regeneration of move cache, as no valid solo mon is present");
             } else {
-                self.move_cache_update(store, false, None, false, false, false);
+                match (0..6).find(|i| self.mon_key(store, *i).same_key(&self.solo_mon_key)) {
+                    // back in the party behind another mon: slot 1's moves are
+                    // not its moves, and it has the ones it left with (or the
+                    // ones `solo_mon_rejoined` saw it come back from the Day Care with)
+                    Some(slot) if slot != 0 => log::info!("solo mon is in party slot {}, keeping its cached moves", slot + 1),
+                    _ => self.move_cache_update(store, false, None, false, false, false),
+                }
             }
         }
         // moves learned during an evolution that happened while already in the overworld
@@ -1105,6 +1125,56 @@ impl Gen45Machine {
         }
         log::info!("after team cache update, valid_solo_mon: {}", self.valid_solo_mon);
         self.cached_team = new_cache;
+    }
+
+    /// The solo mon has come back to the party. From the PC it comes back as it
+    /// left. From the Day Care it comes back with one exp per step on it, any
+    /// levels that bought, and the moves of those levels: the game adds them all
+    /// as it hands the mon over, deleting the first move and appending the new
+    /// one when all four slots are full, so the player never sees a prompt. HMs
+    /// are not protected, which is how a player gets rid of one without the
+    /// Move Deleter (pokeheartgold `Daycare_LearnLevelUpMoves`,
+    /// `DeleteBoxMonFirstMoveAndAppend`; pokeplatinum the same).
+    fn solo_mon_rejoined(&mut self, store: &PropertyStore, mon: &MonKey) {
+        let Some(slot) = (0..6).find(|i| self.mon_key(store, *i).same_key(mon)) else { return };
+        let Some(exp_key) = self.keys.team_exp.get(slot).filter(|k| !k.is_empty()) else { return };
+        let exp = store_i64(store, exp_key);
+        let exp_gained = exp - self.last_solo_exp;
+        if self.last_solo_exp <= 0 || exp_gained <= 0 {
+            return;
+        }
+        let level = store_i64(store, &self.keys.team_level[slot]);
+        log::info!("collected from the Day Care: exp {} to {}, level {} to {}", self.last_solo_exp, exp, self.last_solo_level, level);
+        self.queue_new_event(EventDefinition::with_day_care(exp_gained));
+        let levels = (self.last_solo_level + 1)..=level;
+        for new_level in levels.clone() {
+            self.solo_mon_levelup(new_level, None);
+        }
+        let move_keys: Vec<&String> = (0..4).filter_map(|i| self.keys.team_moves.get(slot * 4 + i)).collect();
+        if move_keys.len() == 4 && move_keys.iter().all(|k| !k.is_empty()) {
+            let new_moves: [Option<String>; 4] = std::array::from_fn(|i| self.conv.move_name_convert(store.str_of(move_keys[i]).as_deref()));
+            let old_moves: Vec<&String> = self.cached_moves.iter().flatten().collect();
+            let in_new: Vec<&String> = new_moves.iter().flatten().collect();
+            // both lists are in slot order, and the game always deletes the first
+            // move, so the moves pushed out go in the order the new ones came in
+            let mut deleted = old_moves.iter().filter(|m| !in_new.contains(m)).map(|m| (*m).clone());
+            let learned: Vec<String> = in_new.iter().filter(|m| !old_moves.contains(m)).map(|m| (*m).clone()).collect();
+            let species = self.solo_mon_key.species.clone().unwrap_or_default();
+            for name in learned {
+                let learned_at = levels.clone().find(|l| self.level_up_moves.get(&(species.clone(), *l)).map(|m| m.contains(&name)).unwrap_or(false));
+                if learned_at.is_none() {
+                    log::error!("{} came back from the Day Care with {}, which it does not learn between levels {} and {}", species, name, self.last_solo_level + 1, level);
+                }
+                let mut lm = LearnMoveEventDefinition::new(Some(&name), None, consts::MOVE_SOURCE_LEVELUP, LevelVal::Int(learned_at.unwrap_or(level)), Some(&species), false);
+                lm.destination_name = deleted.next();
+                self.queue_new_event(EventDefinition::with_learn_move(lm));
+            }
+            self.cached_moves = new_moves;
+        } else {
+            log::warn!("the mapper has no party moves: moves learned in the Day Care are not recorded");
+        }
+        self.last_solo_exp = exp;
+        self.last_solo_level = level;
     }
 
     fn update_all_cached_info(&mut self, store: &PropertyStore) {
@@ -3145,6 +3215,15 @@ impl GameRecorder for Gen45Machine {
             self.on_enter(result, store);
             self.cur_state = result;
             self.controller.set_game_state(result);
+        }
+    }
+
+    fn on_idle(&mut self, store: &PropertyStore) {
+        // here, not on the exp change: a whole batch is in, so slot 1's species,
+        // IVs and exp all belong to the same mon even part way through a deposit
+        if self.valid_solo_mon && self.mon_key(store, 0).same_key(&self.solo_mon_key) {
+            self.last_solo_exp = store_i64(store, &self.keys.mon_exppoints);
+            self.last_solo_level = store_i64(store, &self.keys.mon_level);
         }
     }
 
