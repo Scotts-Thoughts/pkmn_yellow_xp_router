@@ -101,8 +101,9 @@ def make_binary(archs: list[str], dst: str):
 
 def check_self_contained(path: str):
     out = subprocess.run(["otool", "-L", path], capture_output=True, text=True, check=True).stdout
-    # first line is the binary's own path; skip it
-    deps = [line.split()[0] for line in out.splitlines()[1:] if line.strip()]
+    # the dependencies are the indented lines: the others name the binary, once
+    # per architecture for a universal one ("<path> (architecture arm64):")
+    deps = [line.split()[0] for line in out.splitlines() if line[:1].isspace() and line.strip()]
     foreign = [d for d in deps if not d.startswith(SYSTEM_LIB_PREFIXES)]
     if foreign:
         raise SystemExit(f"{path} links outside system frameworks/libs: {foreign}")
