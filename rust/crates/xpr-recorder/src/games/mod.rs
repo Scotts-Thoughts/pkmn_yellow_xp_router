@@ -7,6 +7,7 @@ pub mod gen3;
 pub mod gen45;
 pub mod gen5;
 pub mod gen5_places;
+pub mod stage_setup;
 
 use std::sync::Arc;
 

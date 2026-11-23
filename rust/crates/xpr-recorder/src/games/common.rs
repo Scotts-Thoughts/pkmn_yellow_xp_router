@@ -46,13 +46,16 @@ pub fn full_mon_order(seen: &[i64], team_len: usize, predicted: &[i64]) -> Vec<i
 }
 
 /// The end-of-battle (ROAR) update: `update` carries the slots seen in its
-/// `mon_order`, and `opening`, the event it replaces, carries the prediction.
+/// `mon_order` (and its `stat_stage_setup` by party slot), and `opening`, the
+/// event it replaces, carries the prediction.
 pub fn finish_mon_order(gen: &GenData, update: &mut EventDefinition, opening: &EventDefinition) {
     let team_len = update.get_pokemon_list(gen, true).map(|list| list.len()).unwrap_or(0);
     let predicted = opening.trainer_def.as_ref().map(|t| t.mon_order.clone()).unwrap_or_default();
     if let Some(td) = update.trainer_def.as_mut() {
         td.mon_order = full_mon_order(&td.mon_order, team_len, &predicted);
     }
+    // the stat-stage setup came by party slot too
+    super::stage_setup::remap_stat_stage_setup(gen, update);
 }
 
 pub fn py_str(v: &Value) -> String {

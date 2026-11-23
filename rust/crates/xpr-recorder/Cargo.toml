@@ -12,3 +12,6 @@ indexmap = { workspace = true }
 log = { workspace = true }
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls", "system-proxy"] }
 tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
+
+[dev-dependencies]
+xpr-calc = { path = "../xpr-calc" }
