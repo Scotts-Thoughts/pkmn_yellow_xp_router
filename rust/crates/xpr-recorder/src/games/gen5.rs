@@ -409,6 +409,9 @@ pub struct Gen5Machine {
     /// and not in the move list yet: the game asks which move to forget after
     /// the level has already changed, so the choice can arrive in a later diff
     pending_levelup: Vec<(String, i64, String)>,
+    /// the solo mon as it was when it left the party (the Day Care or the PC):
+    /// what it is measured against when it comes back (`solo_rejoined`)
+    away_solo: Option<Mon>,
     /// `flags.new_game` is read from a save counter (see [`SAVE_COUNTER_ADDRESSES`]);
     /// without it a reset only rolls events back when the loaded save matches a
     /// state the recorder knows
@@ -467,6 +470,7 @@ impl Gen5Machine {
                 .collect(),
             save_pending: false,
             pending_levelup: Vec::new(),
+            away_solo: None,
             saves_detectable: false,
             warned_saves: false,
             saved: None,
@@ -768,8 +772,13 @@ impl Gen5Machine {
         };
         if let (Some(o), Some(n)) = (&old_solo, &new_solo) {
             self.solo_changes(o, n, new, &mut gained, &mut lost);
-        } else if old_solo.is_some() && new_solo.is_none() {
+        } else if let (Some(o), None) = (&old_solo, &new_solo) {
             log::warn!("[gen5] the solo mon left the party");
+            self.away_solo = Some(o.clone());
+        } else if let (None, Some(n)) = (&old_solo, &new_solo) {
+            if let Some(away) = self.away_solo.take() {
+                self.solo_rejoined(&away, n);
+            }
         }
 
         // what is left is bought, sold, found or used
@@ -805,6 +814,45 @@ impl Gen5Machine {
                 self.queue_event(EventDefinition::with_heal(&area));
             }
             self.blackout_heal_pending = false;
+        }
+    }
+
+    /// The solo mon came back to the party. From the PC it comes back as it
+    /// left. From the Day Care it comes back with one exp per step on it, any
+    /// levels that bought, and the moves of those levels: the game adds them all
+    /// as it hands the mon over, deleting the first move and appending the new
+    /// one when all four slots are full, HMs included, so the player never sees
+    /// a prompt (as in gen 4: pokeheartgold `Daycare_LearnLevelUpMoves`).
+    fn solo_rejoined(&mut self, away: &Mon, back: &Mon) {
+        let exp_gained = back.exp - away.exp;
+        if exp_gained <= 0 {
+            log::info!("[gen5] the solo mon is back as it left");
+            return;
+        }
+        log::info!("[gen5] collected from the Day Care: exp {} to {}, level {} to {}", away.exp, back.exp, away.level, back.level);
+        self.queue_event(EventDefinition::with_day_care(exp_gained));
+        let species = back.species.clone();
+        self.load_level_up_moves(&species);
+        let before: Vec<&String> = away.moves.iter().flatten().collect();
+        let after: Vec<&String> = back.moves.iter().flatten().collect();
+        // both lists are in slot order, and the game always deletes the first
+        // move, so the moves pushed out go in the order the new ones came in
+        let mut deleted = before.iter().filter(|m| !after.contains(m)).map(|m| (*m).clone());
+        for level in (away.level + 1)..=back.level {
+            for move_name in self.level_up_moves.get(&(species.clone(), level)).cloned().unwrap_or_default() {
+                if before.contains(&&move_name) {
+                    continue;
+                }
+                let mut lm = LearnMoveEventDefinition::new(Some(&move_name), None, consts::MOVE_SOURCE_LEVELUP, LevelVal::Int(level), Some(&species), false);
+                if after.contains(&&move_name) {
+                    lm.destination_name = deleted.next();
+                    log::info!("level {} move {} learned in the Day Care over {:?}", level, move_name, lm.destination_name);
+                } else {
+                    // learned and pushed out again by a later level of the same stay
+                    log::info!("level {} move {} gone again by the end of the Day Care stay", level, move_name);
+                }
+                self.queue_event(EventDefinition::with_learn_move(lm));
+            }
         }
     }
 

@@ -73,8 +73,9 @@ impl RecorderHost for FakeHost {
     fn get_defeated_trainers(&self) -> Vec<String> {
         Vec::new()
     }
-    fn get_move_idx(&self, _move_name: &str) -> Option<i64> {
-        Some(1)
+    fn get_move_idx(&self, move_name: &str) -> Option<i64> {
+        // the Day Care test's HM is in the first slot; any other move is in the second
+        Some(if move_name == "Strength" { 0 } else { 1 })
     }
     fn update_levelup_move(&mut self, def: LearnMoveEventDefinition) {
         self.log.lock().unwrap().levelups.push(def);
@@ -969,4 +970,89 @@ fn battle_end_with_enemies_standing_does_not_stop_the_tracking() {
     let trainer = fought(&log, "Leader Burgh").trainer_def.unwrap();
     // slot 0 first, slot 2 second, slot 1 third
     assert_eq!(trainer.mon_order, vec![1, 3, 2]);
+}
+
+/// A Day Care stay: Tepig goes in at level 8 with Strength first and comes back
+/// at 9 with Odor Sleuth in its place. The game teaches it without a prompt,
+/// deleting the first move, HMs included, and the mon comes back in the last
+/// party slot, behind the mon that kept the party going.
+#[test]
+fn a_day_care_stay_records_its_exp_and_the_hm_it_pushed_out() {
+    let (log, mut sim, _controller) = setup(SAVE_FLAG_ADDRESS);
+    // Strength over Tackle, then Rollout into the empty slot
+    sim.batch(&[("player.team.0.moves.0.move", json!("Strength")), ("player.team.0.moves.3.move", json!("Rollout"))]);
+    sim.settle();
+    sim.settle();
+    let before = log.lock().unwrap().events.len();
+
+    // into the Day Care: a Patrat takes over slot 1
+    sim.batch(&[
+        ("player.team.0.species", json!("Patrat")),
+        ("player.team.0.level", json!(4)),
+        ("player.team.0.exp", json!(64)),
+        ("player.team.0.internals.personality_value", json!(12345)),
+        ("player.team.0.moves.0.move", json!("Tackle")),
+        ("player.team.0.moves.1.move", json!("Leer")),
+        ("player.team.0.moves.2.move", Value::Null),
+        ("player.team.0.moves.3.move", Value::Null),
+        ("player.team.0.ivs.hp", json!(5)),
+        ("player.team.0.ivs.attack", json!(5)),
+        ("player.team.0.ivs.defense", json!(5)),
+        ("player.team.0.ivs.speed", json!(5)),
+        ("player.team.0.ivs.special_attack", json!(5)),
+        ("player.team.0.ivs.special_defense", json!(5)),
+    ]);
+    sim.settle();
+    sim.settle();
+    {
+        let l = log.lock().unwrap();
+        assert!(l.events[before..].iter().all(|(_, d)| d.day_care.is_none() && d.learn_move.is_none()), "leaving records no moves: {:?}", l.events[before..].iter().map(|(_, d)| format!("{:?}", d)).collect::<Vec<_>>());
+    }
+
+    // back: slot 2, level 9, with Odor Sleuth appended and Strength gone
+    let mut back: Vec<(String, Value)> = vec![
+        ("player.team_count".into(), json!(2)),
+        ("player.team.1.species".into(), json!("Tepig")),
+        ("player.team.1.level".into(), json!(9)),
+        ("player.team.1.exp".into(), json!(500)),
+        ("player.team.1.friendship".into(), json!(70)),
+        ("player.team.1.internals.personality_value".into(), json!(SOLO_PID)),
+        ("player.team.1.flags.skip_checksum".into(), json!(0)),
+        ("player.team.1.stats.hp".into(), json!(33)),
+        ("player.team.1.stats.hp_max".into(), json!(33)),
+        ("player.team.1.moves.0.move".into(), json!("Tail Whip")),
+        ("player.team.1.moves.1.move".into(), json!("Ember")),
+        ("player.team.1.moves.2.move".into(), json!("Rollout")),
+        ("player.team.1.moves.3.move".into(), json!("Odor Sleuth")),
+    ];
+    for stat in ["hp", "attack", "defense", "speed", "special_attack", "special_defense"] {
+        back.push((format!("player.team.1.ivs.{}", stat), json!(31)));
+    }
+    let back_refs: Vec<(&str, Value)> = back.iter().map(|(p, v)| (p.as_str(), v.clone())).collect();
+    sim.batch(&back_refs);
+    sim.settle();
+    sim.settle();
+    wait_for(&log, "the Day Care stay", |l| l.events.iter().any(|(_, d)| d.day_care.is_some()) && l.levelups.iter().any(|lm| lm.move_to_learn.as_deref() == Some("Odor Sleuth")));
+    let l = log.lock().unwrap();
+    let day_care: Vec<i64> = l.events.iter().filter_map(|(_, d)| d.day_care.map(|d| d.exp_gained)).collect();
+    assert_eq!(day_care, vec![100]);
+    let odor_sleuth = l.levelups.iter().rev().find(|lm| lm.move_to_learn.as_deref() == Some("Odor Sleuth")).unwrap();
+    assert_eq!(odor_sleuth.destination, Some(0), "Odor Sleuth goes over Strength: {:?}", l.levelups);
+    assert_eq!(odor_sleuth.level.display(), "9");
+}
+
+/// A mon back from the PC comes back as it left: nothing to record.
+#[test]
+fn a_mon_back_from_the_pc_records_no_day_care_exp() {
+    let (log, mut sim, _controller) = setup(SAVE_FLAG_ADDRESS);
+    sim.batch(&[("player.team.0.internals.personality_value", json!(12345)), ("player.team.0.species", json!("Patrat")), ("player.team.0.ivs.hp", json!(5))]);
+    sim.settle();
+    sim.settle();
+    sim.batch(&[("player.team.0.internals.personality_value", json!(SOLO_PID)), ("player.team.0.species", json!("Tepig")), ("player.team.0.ivs.hp", json!(31))]);
+    sim.settle();
+    sim.settle();
+    std::thread::sleep(Duration::from_millis(300));
+    let l = log.lock().unwrap();
+    assert!(l.events.iter().all(|(_, d)| d.day_care.is_none()), "{:?}", l.events.iter().map(|(_, d)| format!("{:?}", d)).collect::<Vec<_>>());
+    assert!(l.levelups.is_empty(), "{:?}", l.levelups);
 }
