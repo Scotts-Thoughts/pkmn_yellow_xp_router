@@ -15,6 +15,7 @@ use xpr_data::GenData;
 use xpr_engine::{EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
 
 use super::common::*;
+use super::stage_setup::{party_slot, StageSetupTracker};
 use crate::controller::{dedupe, fix_key, fix_keys, fix_optional_key, fix_optional_keys, is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
 use crate::gamehook::{GameHookProperty, PropertyStore};
 use crate::host::StartInfo;
@@ -615,6 +616,8 @@ pub struct Gen2Machine {
     move_delete: MoveDeleteData,
     vitamin: VitaminData,
     overworld: OverworldData,
+    /// the solo mon's stat-stage setup in the current battle
+    stage_setup: StageSetupTracker,
 }
 
 fn mon_key_from(dvs: Option<&xpr_data::model::StatBlock>, species: Option<String>) -> MonKey {
@@ -661,6 +664,7 @@ impl Gen2Machine {
             move_delete: MoveDeleteData::default(),
             vitamin: VitaminData::default(),
             overworld: OverworldData::default(),
+            stage_setup: StageSetupTracker::default(),
         }
     }
 
@@ -1157,6 +1161,7 @@ impl Gen2Machine {
                 b.friendship_data.clear();
                 b.battle_started = false;
                 b.initial_money = money;
+                self.stage_setup.reset();
                 log::info!("Entered battle. With trainer initially? {}", is_trainer);
             }
             GameState::InventoryChange => {
@@ -1221,6 +1226,8 @@ impl Gen2Machine {
                         td.exp_split = final_exp_split;
                         // the slots seen: `finish_mon_order` makes the real order of them
                         td.mon_order = self.battle.enemy_mon_order.clone();
+                        // by party slot until then too
+                        td.stat_stage_setup = self.stage_setup.finish(&self.gen, &self.cached_moves);
                         if self.has_return() {
                             td.custom_move_data = self.return_custom_data(&self.battle.friendship_data);
                         }
@@ -1919,6 +1926,7 @@ impl GameRecorder for Gen2Machine {
     fn on_mapper_loaded(&mut self, store: &PropertyStore) -> (Vec<String>, Vec<String>) {
         self.keys = Gen2Keys::configure_for_mapper(store.game_name());
         let invalid = self.keys.fix_case(store);
+        self.stage_setup.configure(store);
         (self.keys.all_keys_to_register(), invalid)
     }
 
@@ -1941,6 +1949,11 @@ impl GameRecorder for Gen2Machine {
         if self.valid_solo_mon && self.mon_key(store, 0).same_key(&self.solo_mon_key) {
             self.last_solo_exp = store_i64(store, &self.keys.mon_exppoints);
             self.last_solo_level = store_i64(store, &self.keys.mon_level);
+        }
+        if self.cur_state == GameState::Battle && self.battle.is_trainer_battle {
+            let slot = party_slot(store.get_value(Some(&self.keys.battle_enemy_mon_party_pos)));
+            let solo_active = store.get_value(Some(&self.keys.battle_player_mon_party_pos)).as_i64() == Some(0);
+            self.stage_setup.observe(&self.gen, store, slot, solo_active, &self.cached_moves);
         }
     }
 

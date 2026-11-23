@@ -54,6 +54,7 @@ use xpr_data::GenData;
 use xpr_engine::{EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
 
 use super::common::*;
+use super::stage_setup::{StageKeys, StageSetupTracker};
 use super::gen45::{process_one, reset_flag, roar_flag, trainer_loss_flag, Flavor, Gen45Converter, RETURN_MOVE_NAME};
 use crate::controller::{is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
 use crate::gamehook::{value_as_i64, GameHookProperty, PropertyStore};
@@ -394,6 +395,10 @@ pub struct Gen5Machine {
     last_change: Instant,
     invalid_since: Option<Instant>,
     battle: Option<BattleTrack>,
+    /// the solo mon's stat-stage setup in the current battle, and the (solo,
+    /// enemy) party slots whose battle structs it reads
+    stage_setup: StageSetupTracker,
+    stage_slots: Option<(usize, usize)>,
     area: Option<String>,
     level_up_moves: HashMap<(String, i64), Vec<String>>,
     /// a blackout just happened: the heal that follows it is part of it
@@ -457,6 +462,8 @@ impl Gen5Machine {
             last_change: crate::clock::now(),
             invalid_since: None,
             battle: None,
+            stage_setup: StageSetupTracker::default(),
+            stage_slots: None,
             area: None,
             level_up_moves: HashMap::new(),
             blackout_heal_pending: false,
@@ -951,8 +958,35 @@ impl Gen5Machine {
             b.exp_read = b.exp_settled;
         }
         self.battle = Some(b);
+        self.stage_setup.reset();
+        self.stage_slots = None;
         self.set_phase(Phase::Battle);
         self.update_battle(store);
+        self.observe_stages(store);
+    }
+
+    /// Follow the solo mon's stat-stage setup; after every batch in a trainer
+    /// battle. The stages are in the battle struct of each mon's party slot.
+    fn observe_stages(&mut self, store: &PropertyStore) {
+        let Some(b) = self.battle.as_ref() else { return };
+        if b.is_trainer != Some(true) || b.over {
+            return;
+        }
+        let Some(solo) = self.solo_pid.and_then(|p| b.pre.by_pid(p)) else { return };
+        let (solo_slot, moves) = (solo.slot, solo.moves.clone());
+        let opp_count = Self::i64_of(store, &self.keys.opp_count).clamp(0, 6);
+        let opp_pos = store.i64_of(&self.keys.opp_pos).filter(|p| (0..opp_count).contains(p)).map(|p| p as usize);
+        let solo_active = store.i64_of(&self.keys.player_pos) == Some(solo_slot as i64);
+        // two trainers' mons interleave in the event: their slots are not its order
+        let slot = opp_pos.filter(|_| b.trainer_b == 0);
+        if let Some(e) = opp_pos {
+            if self.stage_slots != Some((solo_slot, e)) {
+                self.stage_slots = Some((solo_slot, e));
+                let keys = StageKeys::with_prefixes(store, &format!("battle.player.pkmn_ram.pokemon_{}_ram", solo_slot), &format!("battle.opponent.pkmn_ram.pokemon_{}_ram", e));
+                self.stage_setup.set_keys(keys);
+            }
+        }
+        self.stage_setup.observe(&self.gen, store, slot, solo_active, &moves);
     }
 
     /// Follow the battle structs; called after every batch while in battle.
@@ -1255,6 +1289,12 @@ impl Gen5Machine {
                 None => opp_slots.iter().map(|s| *s as i64).collect(),
             };
             td.thief_mons = thief_mons;
+            // by party slot until `finish_mon_order`
+            let solo_moves = o.as_ref().map(|m| m.moves.clone()).unwrap_or_default();
+            let setup = self.stage_setup.finish(&self.gen, &solo_moves);
+            if b.trainer_b == 0 {
+                td.stat_stage_setup = setup;
+            }
             if let Some(o) = &o {
                 if o.moves.iter().flatten().any(|m| m == RETURN_MOVE_NAME) {
                     td.custom_move_data = (0..known.max(1))
@@ -1492,6 +1532,7 @@ impl Gen5Machine {
                     return;
                 }
                 self.update_battle(store);
+                self.observe_stages(store);
                 let over = self.battle.as_ref().map(|b| b.over).unwrap_or(true);
                 // the party holds the outcome once the battle word is cleared
                 if over && !in_battle && now.duration_since(self.last_change) >= SETTLE {
@@ -1654,6 +1695,7 @@ fn take_n(map: &mut IndexMap<String, i64>, name: &str, n: i64) -> bool {
 impl GameRecorder for Gen5Machine {
     fn on_mapper_loaded(&mut self, store: &PropertyStore) -> (Vec<String>, Vec<String>) {
         self.keys = Gen5Keys::configure(store);
+        self.stage_setup.configure(store);
         self.settle_paths = self.keys.settle_paths();
         let save_address = store.get(&self.keys.save_flag).and_then(|p| value_as_i64(&p.address));
         let detectable = save_address.is_some_and(|a| SAVE_COUNTER_ADDRESSES.contains(&a) || PARTY_BLOCK_COUNTERS.contains(&a));

@@ -12,6 +12,7 @@ use xpr_data::GenData;
 use xpr_engine::{swaps_between, BagSwap, EventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
 
 use super::common::*;
+use super::stage_setup::StageSetupTracker;
 use crate::controller::{fix_key, fix_keys, fix_optional_keys, dedupe, is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
 use crate::gamehook::{GameHookProperty, PropertyStore};
 use crate::host::StartInfo;
@@ -482,6 +483,8 @@ pub struct Gen1Machine {
     tm: TmData,
     vitamin: VitaminData,
     overworld: OverworldData,
+    /// the solo mon's stat-stage setup in the current battle
+    stage_setup: StageSetupTracker,
 }
 
 impl Gen1Machine {
@@ -520,6 +523,7 @@ impl Gen1Machine {
             tm: TmData::default(),
             vitamin: VitaminData::default(),
             overworld: OverworldData::default(),
+            stage_setup: StageSetupTracker::default(),
         };
         m.solo_mon_key = mon_key_from(info.dvs.as_ref(), info.solo_species.clone());
         m
@@ -912,6 +916,7 @@ impl Gen1Machine {
                 b.loss_detected = false;
                 b.evolution_detected = false;
                 b.initial_money = store_i64(store, &self.keys.player_money);
+                self.stage_setup.reset();
             }
             GameState::InventoryChange => {
                 self.inventory.seconds_delay = BASE_DELAY;
@@ -987,6 +992,9 @@ impl Gen1Machine {
                     } else if !self.battle.trainer_name.is_empty() {
                         let mut td = TrainerEventDefinition::new(&self.battle.trainer_name);
                         td.pay_day_amount = Some(store_i64(store, &self.keys.player_money) - self.battle.initial_money);
+                        // gen 1 trainers send their mons out in party order: the
+                        // slots are the matchups, as the event keeps them
+                        td.stat_stage_setup = self.stage_setup.finish(&self.gen, &self.cached_moves);
                         let mut ev = EventDefinition::with_trainer(td);
                         ev.notes = pay_day_flag();
                         self.queue_new_event(ev);
@@ -1479,6 +1487,7 @@ impl GameRecorder for Gen1Machine {
     fn on_mapper_loaded(&mut self, store: &PropertyStore) -> (Vec<String>, Vec<String>) {
         self.keys = Gen1Keys::configure_for_mapper(store.game_name());
         let invalid = self.keys.fix_case(store);
+        self.stage_setup.configure(store);
         (self.keys.all_keys_to_register(), invalid)
     }
 
@@ -1524,6 +1533,15 @@ impl GameRecorder for Gen1Machine {
             if self.cur_state != GameState::Resetting {
                 self.queue_new_event(EventDefinition::with_heal_value(&store.value(&self.keys.overworld_map)));
             }
+        }
+    }
+
+    fn on_idle(&mut self, store: &PropertyStore) {
+        if self.cur_state == GameState::Battle && self.battle.is_trainer_battle {
+            // the enemy mons come out in party order, one per mon beaten
+            let slot = Some(self.battle.defeated_trainer_mons.len());
+            let solo_active = store.get_value(Some(&self.keys.battle_player_mon_species)) == store.get_value(Some(&self.keys.mon_species));
+            self.stage_setup.observe(&self.gen, store, slot, solo_active, &self.cached_moves);
         }
     }
 

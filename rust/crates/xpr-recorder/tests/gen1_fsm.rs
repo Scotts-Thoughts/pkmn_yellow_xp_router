@@ -139,6 +139,11 @@ fn mapper_with_bag(bag: &[(&str, i64)]) -> Value {
         json!({"path": "event_flags.in_purified_zone", "value": false}),
         json!({"path": "event_flags.battled_rival_in_oaks_lab", "value": false}),
     ];
+    for side in ["player", "opponent"] {
+        for stat in ["attack", "defense", "speed", "special", "accuracy", "evasion"] {
+            props.push(json!({"path": format!("battle.{}.active_pokemon.modifiers.{}", side, stat), "value": 0}));
+        }
+    }
     for i in 0..6 {
         let species = if i == 0 { json!("Pikachu") } else { Value::Null };
         props.push(json!({"path": format!("player.team.{}.species", i), "value": species}));
@@ -483,6 +488,33 @@ fn back_to_back_fights_whose_gap_was_missed_are_both_recorded() {
     sim.set("battle.mode", Value::Null);
     let got = collect_events(&events, 2);
     assert_eq!(trainer_names(&got), vec!["Lass 1".to_string(), "Lass 2".to_string()], "{:?}", labels(&events));
+    sim.machine.shutdown();
+}
+
+#[test]
+fn the_solo_mons_growls_reach_the_trainer_event_and_the_enemys_dont() {
+    let (mut sim, controller, events) = overworld_sim(&[("POTION", 1)]);
+    sim.set("battle.opponent.trainer", json!("LASS"));
+    sim.set("battle.opponent.id", json!(1));
+    sim.set("battle.mode", json!("Trainer"));
+    sim.set("battle.player.active_pokemon.species", json!("Pikachu"));
+    sim.tick(2);
+    sim.machine.on_idle(&sim.store);
+    // past the first enemy's send-out
+    std::thread::sleep(Duration::from_millis(3200));
+    sim.machine.on_idle(&sim.store);
+    // the enemy's Growl, then two of Pikachu's
+    for (path, stage) in [("battle.player.active_pokemon.modifiers.attack", -1), ("battle.opponent.active_pokemon.modifiers.attack", -1), ("battle.opponent.active_pokemon.modifiers.attack", -2)] {
+        sim.store.set_value(path, json!(stage)).unwrap();
+        sim.machine.on_idle(&sim.store);
+    }
+    sim.set("battle.mode", Value::Null);
+    assert_eq!(controller.get_game_state(), Some(xpr_recorder::GameState::Overworld));
+    let got = collect_events(&events, 1);
+    let td = got[0].trainer_def.as_ref().expect("the trainer event");
+    assert_eq!(td.trainer_name, "Lass 1");
+    let setup: Vec<Vec<(String, String)>> = td.stat_stage_setup.iter().map(|c| c.player.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).collect();
+    assert_eq!(setup, vec![vec![("Growl".to_string(), "2".to_string())]], "{:?}", labels(&events));
     sim.machine.shutdown();
 }
 
