@@ -14,6 +14,7 @@ use xpr_core::io_utils;
 use xpr_core::pyjson;
 
 use crate::db::{ItemDB, MinBattlesDB, MoveDB, PkmnDB, TrainerDB};
+use crate::gen_consts;
 use crate::gen_data::{GenData, TypeChart};
 use crate::model::{BaseItem, EnemyPkmn, Gen, Move, MoveEffect, Nature, PokemonSpecies, StatBlock, Trainer, TrainerTimingStats};
 
@@ -283,7 +284,7 @@ fn load_pkmn_db(gen: Gen, raw: &Value) -> Result<Vec<PokemonSpecies>, String> {
                     req_i64(cur, consts::EV_YIELD_SPD_KEY)?,
                     false,
                 ),
-                abilities: str_list(req(cur, consts::ABILITY_LIST_KEY)?),
+                abilities: str_list(req(cur, consts::ABILITY_LIST_KEY)?).into_iter().map(gen_consts::canonical_ability_name).collect(),
                 // kg (optional; used by Low Kick)
                 weight: pyjson::get(cur, consts::WEIGHT_KEY).and_then(|v| match v {
                     Value::Null => None,
@@ -323,7 +324,7 @@ fn load_pkmn_db(gen: Gen, raw: &Value) -> Result<Vec<PokemonSpecies>, String> {
                         req_i64(ev, consts::SPEED)?,
                         false,
                     ),
-                    abilities: str_list(req(cur, consts::ABILITY_LIST_KEY)?),
+                    abilities: str_list(req(cur, consts::ABILITY_LIST_KEY)?).into_iter().map(gen_consts::canonical_ability_name).collect(),
                     weight: match req(cur, consts::WEIGHT_KEY)? {
                         Value::Null => None,
                         other => pyjson::value_as_f64(other),
@@ -524,7 +525,7 @@ fn create_trainer(gen: Gen, t: &Value, pkmn_db: &PkmnDB, extract_trainer_id: boo
                     exp_split: 1,
                     mon_order: 1,
                     definition_order: 1,
-                    ability: req_str(cur, consts::ABILITY_KEY)?,
+                    ability: gen_consts::canonical_ability_name(req_str(cur, consts::ABILITY_KEY)?),
                     nature: Nature::from_index(nature_idx).ok_or_else(|| format!("{} is not a valid Nature", nature_idx))?,
                 }
             }
@@ -579,7 +580,7 @@ fn create_trainer(gen: Gen, t: &Value, pkmn_db: &PkmnDB, extract_trainer_id: boo
                     exp_split: 1,
                     mon_order: 1,
                     definition_order: 1,
-                    ability: req_str(cur, consts::ABILITY_KEY)?,
+                    ability: gen_consts::canonical_ability_name(req_str(cur, consts::ABILITY_KEY)?),
                     nature: Nature::from_index(nature_idx).ok_or_else(|| format!("{} is not a valid Nature", nature_idx))?,
                 }
             }
