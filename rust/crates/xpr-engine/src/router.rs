@@ -37,6 +37,9 @@ pub struct Router {
     pub level_up_move_defs: IndexMap<LevelUpKey, LearnMoveEventDefinition>,
     pub defeated_trainers: IndexSet<String>,
     pub test_moves: Vec<String>,
+    /// The run's move stats (wild battles, reset attempts). The trainer
+    /// battles' own numbers live on their events; see [`Router::move_stats_total`].
+    pub move_stats: Option<crate::move_stats::RunMoveStats>,
     pub(crate) next_id: NodeId,
     /// Set while the computed states are not a valid prefix for an
     /// incremental recalculation (before the first full pass, or after a
@@ -58,6 +61,7 @@ impl Router {
             level_up_move_defs: IndexMap::new(),
             defeated_trainers: IndexSet::new(),
             test_moves: vec![String::new(); 4],
+            move_stats: None,
             next_id: 0,
             needs_full_recalc: true,
         };
@@ -121,6 +125,69 @@ impl Router {
         self.reset_events();
         self.level_up_move_defs = IndexMap::new();
         self.defeated_trainers = IndexSet::new();
+        self.move_stats = None;
+    }
+
+    /// Every trainer battle's move stats, in route order.
+    pub fn trainer_move_stats(&self) -> Vec<&crate::move_stats::BattleMoveStats> {
+        let mut out = Vec::new();
+        self.collect_move_stats(self.root_id, &mut out);
+        out
+    }
+
+    fn collect_move_stats<'a>(&'a self, folder_id: NodeId, out: &mut Vec<&'a crate::move_stats::BattleMoveStats>) {
+        let Some(f) = self.folder(folder_id) else { return };
+        for c in &f.children {
+            match self.nodes.get(c) {
+                Some(Node::Folder(_)) => self.collect_move_stats(*c, out),
+                Some(Node::Group(g)) => {
+                    if let Some(ms) = g.event_definition.trainer_def.as_ref().and_then(|t| t.move_stats.as_ref()) {
+                        out.push(ms);
+                    }
+                }
+                None => {}
+            }
+        }
+    }
+
+    /// The run total: every trainer battle still in the route plus the wild
+    /// battles. Reset attempts are not in it (they are not part of the run as
+    /// viewers saw it).
+    pub fn move_stats_total(&self) -> crate::move_stats::SidePair {
+        let mut total = crate::move_stats::SidePair::default();
+        for b in self.trainer_move_stats() {
+            total.add_signed(&b.stats, 1);
+        }
+        if let Some(run) = &self.move_stats {
+            total.add_signed(&run.wild, 1);
+        }
+        total
+    }
+
+    /// Whether the route has move stats anywhere (old routes have none).
+    pub fn has_move_stats(&self) -> bool {
+        self.move_stats.is_some() || !self.trainer_move_stats().is_empty()
+    }
+
+    /// The top-level `move_stats` object as saved, `None` for a route without any.
+    pub fn move_stats_json(&self) -> Option<Value> {
+        if !self.has_move_stats() {
+            return None;
+        }
+        let run = self.move_stats.clone().unwrap_or_default();
+        Some(run.to_json(&self.move_stats_total()))
+    }
+
+    /// Drop every trainer event's move stats (a base route's events are a plan
+    /// for a new run, not a record of it).
+    pub fn clear_event_move_stats(&mut self) {
+        for node in self.nodes.values_mut() {
+            if let Node::Group(g) = node {
+                if let Some(t) = g.event_definition.trainer_def.as_mut() {
+                    t.move_stats = None;
+                }
+            }
+        }
     }
 
     /// `_change_version`
@@ -837,6 +904,13 @@ impl Router {
         if new_event_def.split_time.is_null() {
             new_event_def.split_time = old_def.split_time.clone();
         }
+        // move stats are a record of the battle, not part of the plan: an edit
+        // (or the recorder's end-of-battle update) keeps them
+        if let (Some(new_td), Some(old_td)) = (new_event_def.trainer_def.as_mut(), old_def.trainer_def.as_ref()) {
+            if new_td.move_stats.is_none() && new_td.trainer_name == old_td.trainer_name {
+                new_td.move_stats = old_td.move_stats.clone();
+            }
+        }
         match kind {
             ObjKind::Folder => {
                 if new_event_def.get_event_type() != consts::TASK_NOTES_ONLY {
@@ -969,6 +1043,14 @@ impl Router {
             ),
             (consts::EVENTS, Value::Array(vec![self.serialize_folder(self.root_id)])),
         ]))
+        .map(|mut v| {
+            // Rust-only key, written only for routes recorded with move stats,
+            // so every older route saves byte-identical
+            if let (Some(ms), Value::Object(o)) = (self.move_stats_json(), &mut v) {
+                o.insert(crate::move_stats::MOVE_STATS_KEY.to_string(), ms);
+            }
+            v
+        })
     }
 
     /// The bytes `save` writes (`serialize()` + `test_moves`, `indent=4`,
@@ -1005,6 +1087,7 @@ impl Router {
     ) -> Result<(), String> {
         self.change_version(pkmn_version)?;
         self.reset_events();
+        self.move_stats = None;
         self.set_solo_pkmn(solo_mon, None, custom_dvs, custom_ability_idx, custom_nature)?;
         if let Some(p) = base_route_path {
             self.load(p, true)?;
@@ -1027,6 +1110,7 @@ impl Router {
     pub fn load_value(&mut self, result: &Value, load_events_only: bool) -> Result<(), String> {
         self.reset_events();
         if !load_events_only {
+            self.move_stats = get(result, crate::move_stats::MOVE_STATS_KEY).and_then(crate::move_stats::RunMoveStats::from_json);
             let version = get(result, consts::PKMN_VERSION_KEY)
                 .and_then(|v| v.as_str())
                 .unwrap_or(consts::YELLOW_VERSION)
@@ -1101,6 +1185,9 @@ impl Router {
                 let root = self.root_id;
                 self.load_events_recursive(root, first)?;
             }
+        }
+        if load_events_only {
+            self.clear_event_move_stats();
         }
         self.recalc()
     }

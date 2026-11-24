@@ -14,10 +14,11 @@ use serde_json::Value;
 use xpr_core::consts;
 use xpr_data::send_out_order::{self, SendOutMon, SendOutMove, SendOutPlayer};
 use xpr_data::GenData;
-use xpr_engine::{EventDefinition, NodeId, SoloPokemon, TrainerEventDefinition};
+use xpr_engine::{BattleMoveStats, EventDefinition, NodeId, RunMoveStats, SidePair, SoloPokemon, TrainerEventDefinition};
 
 use crate::gamehook::{GameHookClient, GameHookProperty, PropertyStore, SessionEvents};
 use crate::host::{HostHandle, PrevEvent, StartInfo};
+use crate::move_stats::{MoveDetector, MoveOutcome, MoveStatsCollector, MoveStatsHandle};
 use crate::shuckie::supershuckie;
 
 /// The FSM state of every game machine (`StateType`).
@@ -126,6 +127,10 @@ pub struct RecorderController {
     wake: Arc<dyn Fn() + Send + Sync>,
     /// What the last prediction read, for [`Self::repredict_send_out`]
     last_send_out: Mutex<Option<SendOutInputs>>,
+    /// move stats for this session (read by the app's local server)
+    move_stats: MoveStatsHandle,
+    /// the route's move stats when recording starts (see [`Self::prepare_move_stats`])
+    move_stats_start: Mutex<Option<(Option<RunMoveStats>, SidePair)>>,
 }
 
 impl RecorderController {
@@ -141,7 +146,103 @@ impl RecorderController {
             machine_active: Mutex::new(None),
             wake,
             last_send_out: Mutex::new(None),
+            move_stats: MoveStatsCollector::new_handle(),
+            move_stats_start: Mutex::new(None),
         })
+    }
+
+    /// The move stats collector (the app's local server reads it).
+    pub fn move_stats(&self) -> MoveStatsHandle {
+        self.move_stats.clone()
+    }
+
+    /// Called on the UI thread before recording starts: the route's run object
+    /// (if it has one) and its current total, so a route recorded over several
+    /// sessions keeps adding to the same run.
+    pub fn prepare_move_stats(&self, run: Option<RunMoveStats>, total: SidePair) {
+        *self.move_stats_start.lock().unwrap() = Some((run, total));
+    }
+
+    fn record_move(&self, o: &MoveOutcome) {
+        log::info!(
+            "[MOVE STATS] {:?} {} hit={} p={:?} crit={}/{} effect={}/{}{}",
+            o.side,
+            o.move_name,
+            !o.missed,
+            o.hit_chance,
+            o.crits,
+            o.crit_rolls,
+            o.effect_applied,
+            o.effect_rolled,
+            if o.effect_blocked { " (blocked)" } else { "" }
+        );
+        self.move_stats.lock().unwrap().record(o);
+    }
+
+    /// Send the run object to the route when it changed.
+    fn push_move_stats(&self) {
+        let run = self.move_stats.lock().unwrap().take_dirty_run();
+        if let Some(run) = run {
+            self.host.post(move |h| h.set_run_move_stats(run));
+        }
+    }
+
+    /// Store finished trainer battles' numbers on their events.
+    fn attach_move_stats(&self) {
+        let ready = self.move_stats.lock().unwrap().take_attachable();
+        if ready.is_empty() {
+            self.push_move_stats();
+            return;
+        }
+        let mut waiting = Vec::new();
+        for stats in ready {
+            let name = stats.trainer.clone().unwrap_or_default();
+            let mut event = self.host.call(|h| h.get_previous_event(None));
+            let mut search = 0;
+            let found = loop {
+                let Some(e) = &event else { break None };
+                if let Some(td) = &e.definition.trainer_def {
+                    if td.trainer_name == name && td.move_stats.as_ref().map(|m| m.battle_id == stats.battle_id).unwrap_or(true) {
+                        break event.clone();
+                    }
+                }
+                search += 1;
+                if search > 40 {
+                    break None;
+                }
+                let id = e.group_id;
+                event = self.host.call(move |h| h.get_previous_event(Some(id)));
+            };
+            match found {
+                Some(e) => {
+                    let mut def = e.definition.clone();
+                    if let Some(td) = def.trainer_def.as_mut() {
+                        log::info!("[MOVE STATS] storing battle {} on trainer event {}", stats.battle_id, td.trainer_name);
+                        td.move_stats = Some(stats);
+                    }
+                    let id = e.group_id;
+                    self.host.call(move |h| h.update_existing_event(id, def));
+                }
+                None => waiting.push(stats),
+            }
+        }
+        if !waiting.is_empty() {
+            self.move_stats.lock().unwrap().return_unattached(waiting);
+        }
+        self.push_move_stats();
+    }
+
+    /// A game recorder queued an event (FSM thread): a trainer battle opening,
+    /// or the flag for losing one.
+    pub fn note_queued_event(&self, event: &EventDefinition, loss_flag: &str) {
+        if event.trainer_def.is_none() {
+            return;
+        }
+        if event.notes.is_empty() {
+            self.move_stats.lock().unwrap().mark_trainer();
+        } else if event.notes == loss_flag {
+            self.move_stats.lock().unwrap().mark_lost();
+        }
     }
 
     pub fn host(&self) -> &HostHandle {
@@ -213,6 +314,7 @@ impl RecorderController {
             if let Some(c) = client {
                 c.disconnect();
             }
+            self.move_stats.lock().unwrap().stop();
             // `disconnect()` → `machine.shutdown()` in Python: the machine stops now,
             // not when the connection thread gets around to it
             if let Some(flag) = self.machine_active.lock().unwrap().take() {
@@ -227,11 +329,15 @@ impl RecorderController {
     pub fn create_session(self: &Arc<Self>, info: &StartInfo) -> Option<Session> {
         let (expected_names, game) = crate::games::create_recorder(info, self.clone())?;
         *self.machine_active.lock().unwrap() = Some(game.active_flag());
-        Some(Session { controller: self.clone(), expected_names, game })
+        let (run, total) = self.move_stats_start.lock().unwrap().take().unwrap_or_default();
+        self.move_stats.lock().unwrap().start(info.gen.clone(), run, total, &info.version, info.solo_species.as_deref().unwrap_or(""));
+        let detector = MoveDetector::for_gen(info.gen.clone());
+        Some(Session { controller: self.clone(), expected_names, game, detector, ms_in_battle: false })
     }
 
     /// Offline: stop the machine `create_session` started.
     pub fn stop_offline_session(&self) {
+        self.move_stats.lock().unwrap().stop();
         if let Some(flag) = self.machine_active.lock().unwrap().take() {
             deactivate(&flag);
         }
@@ -290,15 +396,21 @@ impl RecorderController {
         }
         let mut to_delete: Vec<NodeId> = Vec::new();
         let mut test_obj = self.host.call(|h| h.get_previous_event(None));
+        let mut removed_stats: Vec<BattleMoveStats> = Vec::new();
         while let Some(obj) = &test_obj {
             if obj.definition.save.is_some() {
                 break;
+            }
+            if let Some(ms) = obj.definition.trainer_def.as_ref().and_then(|t| t.move_stats.clone()) {
+                removed_stats.push(ms);
             }
             to_delete.push(obj.group_id);
             let id = obj.group_id;
             test_obj = self.host.call(move |h| h.get_previous_event(Some(id)));
         }
         log::info!("Cleaning up {} events for reset", to_delete.len());
+        self.move_stats.lock().unwrap().on_reset(removed_stats);
+        self.push_move_stats();
         let ids = to_delete.clone();
         self.host.call(move |h| {
             h.delete_events(&ids);
@@ -396,6 +508,14 @@ impl RecorderController {
                     log::error!("{} When removing trainer event {}, it was not the last event... odd", consts::RECORDING_ERROR_FRAGMENT, trainer_name);
                 }
                 log::info!("[BLACKOUT DEBUG] Deleting trainer event with group_id: {}", obj.group_id);
+                {
+                    let mut ms = self.move_stats.lock().unwrap();
+                    if let Some(stats) = obj.definition.trainer_def.as_ref().and_then(|t| t.move_stats.clone()) {
+                        ms.event_removed(stats, "lost");
+                    }
+                    ms.lost_battle(trainer_name);
+                }
+                self.push_move_stats();
                 let id = obj.group_id;
                 self.host.call(move |h| h.delete_events(&[id]));
             }
@@ -476,6 +596,9 @@ impl RecorderController {
                 let folder = active_folder.clone();
                 self.host.call(move |h| h.new_event(EventDefinition::notes_only(&msg), &folder));
                 return;
+            }
+            if event_def.notes.is_empty() {
+                self.move_stats.lock().unwrap().set_trainer_name(&td.trainer_name);
             }
             // the event a battle opens with. The queue is in order, so the route
             // has everything up to this battle in it and its solo mon is the one
@@ -563,8 +686,13 @@ impl RecorderController {
             }
         }
 
+        let is_save = event_def.save.is_some();
         let folder = active_folder;
         self.host.call(move |h| h.new_event(event_def, &folder));
+        if is_save {
+            self.move_stats.lock().unwrap().on_save();
+        }
+        self.attach_move_stats();
     }
 }
 
@@ -654,6 +782,9 @@ pub struct Session {
     controller: Arc<RecorderController>,
     expected_names: Vec<String>,
     game: Box<dyn GameRecorder>,
+    /// move stats (`None` for generations without them yet)
+    detector: Option<MoveDetector>,
+    ms_in_battle: bool,
 }
 
 impl Session {
@@ -665,6 +796,32 @@ impl Session {
     /// Whether the machine is running (it stops itself, e.g. after the final trainer).
     pub fn is_active(&self) -> bool {
         self.game.is_active()
+    }
+}
+
+impl Session {
+    /// Move stats: follow the battle state and feed the detector.
+    fn track_moves(&mut self, store: &PropertyStore, new: &GameHookProperty, old: &GameHookProperty) {
+        let Some(d) = self.detector.as_mut() else { return };
+        let state = self.controller.get_game_state();
+        let in_battle = state == Some(GameState::Battle);
+        if self.ms_in_battle {
+            for o in d.on_change(store, new, old) {
+                self.controller.record_move(&o);
+            }
+        }
+        if in_battle && !self.ms_in_battle {
+            d.begin();
+            self.controller.move_stats.lock().unwrap().begin_battle();
+            self.ms_in_battle = true;
+        } else if !in_battle && self.ms_in_battle {
+            for o in d.end(store) {
+                self.controller.record_move(&o);
+            }
+            self.controller.move_stats.lock().unwrap().end_battle(state == Some(GameState::Resetting));
+            self.ms_in_battle = false;
+            self.controller.push_move_stats();
+        }
     }
 }
 
@@ -728,6 +885,13 @@ impl SessionEvents for Session {
                 log::warn!("Skipping registration of unmapped path: {}", key);
             }
         }
+        if let Some(d) = self.detector.as_mut() {
+            for key in d.on_mapper_loaded(store) {
+                if !result.contains(&key) {
+                    result.push(key);
+                }
+            }
+        }
         if !self.game.is_active() {
             self.game.startup(store);
         }
@@ -741,6 +905,7 @@ impl SessionEvents for Session {
 
     fn on_property_changed(&mut self, store: &PropertyStore, new: &GameHookProperty, old: &GameHookProperty) {
         self.game.handle_event(store, new, old);
+        self.track_moves(store, new, old);
     }
 
     fn on_idle(&mut self, store: &PropertyStore) {

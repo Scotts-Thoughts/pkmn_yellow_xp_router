@@ -999,6 +999,7 @@ impl Gen45Machine {
     }
 
     fn queue_new_event(&self, event: EventDefinition) {
+        self.controller.note_queued_event(&event, &trainer_loss_flag());
         self.queue.push(event);
     }
 

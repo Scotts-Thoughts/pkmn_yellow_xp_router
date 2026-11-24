@@ -6,6 +6,7 @@ pub mod controller;
 pub mod gamehook;
 pub mod games;
 pub mod host;
+pub mod move_stats;
 pub mod offline;
 pub mod shuckie;
 pub mod starter;

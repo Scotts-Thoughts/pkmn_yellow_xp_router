@@ -475,6 +475,14 @@ impl MainController {
         }
     }
 
+    /// The recorder's move-stats run object (wild totals, reset attempts).
+    /// It is a record, not part of the plan: nothing is recalculated.
+    pub fn set_run_move_stats(&mut self, run: xpr_engine::RunMoveStats) {
+        self.router.move_stats = Some(run);
+        self.unsaved_changes = true;
+        self.route_revision += 1;
+    }
+
     pub fn update_levelup_move(&mut self, new_def: LearnMoveEventDefinition) {
         self.undo_before();
         let r = self.router.replace_levelup_move_event(new_def);

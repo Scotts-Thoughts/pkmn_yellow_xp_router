@@ -758,6 +758,10 @@ pub struct MoveEffect {
     pub target: Option<String>,
     pub chance: Option<i64>,
     pub status: Option<String>,
+    /// `"flinch": true` entries (Bite, Headbutt, the fangs...)
+    pub flinch: bool,
+    /// `chance` without truncation: gen 1 lists some as fractions (33.2 = 85/256)
+    pub chance_exact: Option<f64>,
 }
 
 impl MoveEffect {
@@ -768,6 +772,8 @@ impl MoveEffect {
             target: xpr_core::pyjson::get_str(v, consts::TARGET_KEY).map(|s| s.to_string()),
             chance: xpr_core::pyjson::get_i64(v, "chance"),
             status: xpr_core::pyjson::get_str(v, "status").map(|s| s.to_string()),
+            flinch: xpr_core::pyjson::get(v, "flinch").map(xpr_core::pyjson::truthy).unwrap_or(false),
+            chance_exact: xpr_core::pyjson::get(v, "chance").and_then(|c| c.as_f64()),
         }
     }
 

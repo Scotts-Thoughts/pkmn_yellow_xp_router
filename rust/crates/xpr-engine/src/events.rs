@@ -605,6 +605,9 @@ pub struct TrainerEventDefinition {
     /// KO), set from the battle page. `None` is full HP. Calc only: the
     /// route's HP is untouched.
     pub player_cur_hp: Option<i64>,
+    /// What happened when this battle was fought (written by the recorder).
+    /// A record, not part of the plan: recalculation never reads it.
+    pub move_stats: Option<crate::move_stats::BattleMoveStats>,
 }
 
 impl TrainerEventDefinition {
@@ -633,6 +636,7 @@ impl TrainerEventDefinition {
             collapsed_mons: Vec::new(),
             thief_mons: Vec::new(),
             player_cur_hp: None,
+            move_stats: None,
         }
     }
 
@@ -740,6 +744,12 @@ impl TrainerEventDefinition {
                 o.insert(consts::PLAYER_CUR_HP_KEY.to_string(), Value::from(hp));
             }
         }
+        // Rust-only key, written only when the recorder measured the battle
+        if let Some(ms) = &self.move_stats {
+            if let Value::Object(o) = &mut result {
+                o.insert(crate::move_stats::MOVE_STATS_KEY.to_string(), ms.to_json());
+            }
+        }
         result
     }
 
@@ -823,6 +833,7 @@ impl TrainerEventDefinition {
                 result.collapsed_mons = i64_list(get(raw, consts::COLLAPSED_MONS_KEY));
                 result.thief_mons = i64_list(get(raw, consts::THIEF_MONS_KEY));
                 result.player_cur_hp = get(raw, consts::PLAYER_CUR_HP_KEY).and_then(pyjson::value_as_i64).filter(|hp| *hp >= 0);
+                result.move_stats = get(raw, crate::move_stats::MOVE_STATS_KEY).and_then(crate::move_stats::BattleMoveStats::from_json);
                 Ok(Some(result))
             }
             _ => Ok(None),

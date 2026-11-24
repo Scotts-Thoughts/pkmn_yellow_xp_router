@@ -125,6 +125,10 @@ macro_rules! recorder_host {
                 self.ctrl_mut().update_existing_event(id, def);
             }
 
+            fn set_run_move_stats(&mut self, run: xpr_engine::RunMoveStats) {
+                self.ctrl_mut().set_run_move_stats(run);
+            }
+
             fn get_dvs(&self) -> Option<StatBlock> {
                 self.ctrl().get_dvs()
             }
@@ -206,6 +210,8 @@ pub struct Recorder {
     /// status label text shown while recording
     pub client_status: String,
     pub reconnect_enabled: bool,
+    /// the local move-stats server, while recording
+    pub move_stats_server: Option<crate::move_stats_server::MoveStatsServer>,
 }
 
 impl Recorder {
@@ -214,7 +220,7 @@ impl Recorder {
         let wake: Arc<dyn Fn() + Send + Sync> = Arc::new(move || wake_ctx.request_repaint());
         let (handle, queue) = host_channel(wake.clone());
         let controller = RecorderController::new(handle.clone(), wake);
-        Recorder { controller, queue, handle, client_status: String::new(), reconnect_enabled: false }
+        Recorder { controller, queue, handle, client_status: String::new(), reconnect_enabled: false, move_stats_server: None }
     }
 
     /// `on_recording_mode_changed`: start or stop the GameHook session.
@@ -236,13 +242,22 @@ impl Recorder {
                 }),
                 _ => None,
             };
+            self.controller.prepare_move_stats(ctrl.router.move_stats.clone(), ctrl.router.move_stats_total());
             self.controller.on_recording_mode_changed(true, start);
             if !self.controller.has_client() {
                 self.client_status = "No recorder has been created yet for the current version".to_string();
                 self.reconnect_enabled = false;
+            } else if self.move_stats_server.is_none() {
+                match crate::move_stats_server::MoveStatsServer::start(cfg.get_move_stats_port(), self.controller.move_stats()) {
+                    Ok(server) => self.move_stats_server = Some(server),
+                    Err(e) => log::warn!("{}", e),
+                }
             }
         } else {
             self.controller.on_recording_mode_changed(false, None);
+            if let Some(mut server) = self.move_stats_server.take() {
+                server.stop();
+            }
         }
     }
 

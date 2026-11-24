@@ -3,6 +3,7 @@
 
 pub mod compare;
 pub mod events;
+pub mod move_stats;
 pub mod recalc;
 pub mod router;
 pub mod state;
@@ -17,6 +18,7 @@ pub use events::{
     LocationEventDefinition, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition,
     WildPkmnEventDefinition,
 };
+pub use move_stats::{BattleMoveStats, MoveCounts, RunMoveStats, SidePair, SideStats};
 pub use router::{InsertSpec, Router};
 pub use state::{BagItem, Inventory, RouteState, SoloPokemon};
 pub use tree::{EventFolder, EventGroup, EventItem, Node, NodeId, ObjKind};

@@ -152,6 +152,9 @@ pub fn watched_paths(info: &crate::host::StartInfo, store: &PropertyStore) -> Ve
         let (watch, _invalid) = game.on_mapper_loaded(store);
         paths.extend(watch);
     }
+    if let Some(mut d) = crate::move_stats::MoveDetector::for_gen(info.gen.clone()) {
+        paths.extend(d.on_mapper_loaded(store));
+    }
     paths.retain(|p| store.contains(p));
     paths.sort();
     paths.dedup();

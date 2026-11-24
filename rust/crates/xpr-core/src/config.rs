@@ -487,6 +487,8 @@ pub struct Config {
     shortcut_overrides: IndexMap<String, Value>,
     final_trainers_per_game: IndexMap<String, Vec<String>>,
     recording_auto_stop_enabled: bool,
+    /// the local move-stats server's port (`GET /move-stats`, `GET /status`)
+    move_stats_port: u16,
 
     // not persisted
     custom_image_path: String,
@@ -556,6 +558,7 @@ impl Config {
             }
         }
         let recording_auto_stop_enabled = g("recording_auto_stop_enabled").map(|v| pyjson::truthy(&v)).unwrap_or(true);
+        let move_stats_port = g("move_stats_port").and_then(|v| v.as_u64()).filter(|p| (1024..=65535).contains(p)).map(|p| p as u16).unwrap_or(DEFAULT_MOVE_STATS_PORT);
 
         let cfg = Config {
             config_file: config_file.to_path_buf(),
@@ -621,6 +624,7 @@ impl Config {
             shortcut_overrides,
             final_trainers_per_game,
             recording_auto_stop_enabled,
+            move_stats_port,
             custom_image_path: String::new(),
         };
         if colors_outdated && raw_present {
@@ -707,6 +711,9 @@ impl Config {
         }
         if !self.recording_auto_stop_enabled {
             pairs.push(("recording_auto_stop_enabled".into(), Value::Bool(false)));
+        }
+        if self.move_stats_port != DEFAULT_MOVE_STATS_PORT {
+            pairs.push(("move_stats_port".into(), Value::from(self.move_stats_port)));
         }
         let mut map = serde_json::Map::new();
         for (k, v) in pairs {
@@ -1134,4 +1141,10 @@ impl Config {
 
     pub fn get_recording_auto_stop_enabled(&self) -> bool { self.recording_auto_stop_enabled }
     pub fn set_recording_auto_stop_enabled(&mut self, v: bool) { self.recording_auto_stop_enabled = v; self.save(); }
+
+    pub fn get_move_stats_port(&self) -> u16 { self.move_stats_port }
+    pub fn set_move_stats_port(&mut self, v: u16) { self.move_stats_port = v; self.save(); }
 }
+
+/// 30158 is Super Shuckie, 30159 the overlay's control server, 30160 the clock page.
+pub const DEFAULT_MOVE_STATS_PORT: u16 = 30161;
