@@ -10,6 +10,12 @@ It assumes that a single pokemon has been injected to Pokemon Yellow as your sta
 **NOTE:** This is a solo project done in my free time, so there are definitely some rough edges. I have manually verified the accuracy with several routes myself, but I cannot guarantee 100% accuracy. If you notice any discrepancies, let me know!
 I recommend playing through the route once after mapping it out with this tool (or even playing it alongside the tool as you map it out) to guarantee its accuracy.
 
+## Move stats in route files
+
+Routes recorded with move stats (Rust router, late 2026 and later) keep a `move_stats` object on each trainer battle and at the top of the file.
+Older routes load and save exactly as before. **An older router (an older Rust build, the Python app or an old iOS build) loads a new route fine but drops `move_stats` if it saves the file again.** The automatic backup keeps the previous file.
+Details: `docs/rust_port/recording/move_stats.md`.
+
 ## Project status
 
 I have the last major update of this project. If you find any bugs, I will try to fix them, but this project will receive no major updates moving forward.

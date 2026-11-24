@@ -166,6 +166,7 @@ pub struct XprApp {
     index_rx: Option<Receiver<(RouteIndex, bool)>>,
     run_summary: Option<RunSummary>,
     setup_summary_open: bool,
+    move_stats_open: bool,
     compare: CompareView,
     /// The compare page's on-screen width, for exports.
     compare_width: Option<f32>,
@@ -284,6 +285,7 @@ impl XprApp {
             index_rx: Some(rx),
             run_summary: None,
             setup_summary_open: false,
+            move_stats_open: false,
             compare: CompareView::new(),
             compare_width: None,
             smoke_compare_expand: None,
@@ -2173,6 +2175,10 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
                 if widgets::menu_item(ui, &theme, "Final Trainers...", &label("final_trainers"), true) {
                     self.open_final_trainers_dialog();
                 }
+                widgets::menu_separator(ui, &theme);
+                if widgets::menu_item(ui, &theme, "Move Stats...", "", true) {
+                    self.move_stats_open = true;
+                }
             });
             ui.menu_button("Battle Summary", |ui| {
                 ui.set_min_width(280.0);
@@ -3132,6 +3138,30 @@ impl XprApp {
             }
             if export {
                 self.request_shot(ShotKind::SetupSummary);
+            }
+        }
+        if self.move_stats_open {
+            let mut close = false;
+            let theme2 = theme.clone();
+            let ctrl = &self.ctrl;
+            ctx.show_viewport_immediate(
+                egui::ViewportId::from_hash_of("move_stats"),
+                egui::ViewportBuilder::default().with_title("Move Stats").with_inner_size([760.0, 560.0]),
+                |root, _class| {
+                    let ctx = &root.ctx().clone();
+                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(15))).show(root, |ui| {
+                        crate::move_stats_view::ui(ui, &theme2, ctrl);
+                    });
+                    if main_modal {
+                        crate::dialogs::block_secondary_window(ctx, &theme2);
+                    }
+                    if ctx.input(|i| i.viewport().close_requested()) {
+                        close = true;
+                    }
+                },
+            );
+            if close {
+                self.move_stats_open = false;
             }
         }
         if self.run_summary.as_ref().map(|r| !r.docked).unwrap_or(false) {

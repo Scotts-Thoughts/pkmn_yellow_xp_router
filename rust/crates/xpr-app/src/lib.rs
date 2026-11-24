@@ -16,6 +16,8 @@ pub mod event_details;
 pub mod filter_bar;
 pub mod inline_creator;
 pub mod map;
+pub mod move_stats_server;
+pub mod move_stats_view;
 pub mod pages;
 pub mod pp_ledger;
 pub mod quick_add;

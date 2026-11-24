@@ -7,6 +7,7 @@ edition.workspace = true
 xpr-core = { path = "../xpr-core" }
 xpr-data = { path = "../xpr-data" }
 xpr-engine = { path = "../xpr-engine" }
+xpr-calc = { path = "../xpr-calc" }
 serde_json = { workspace = true }
 indexmap = { workspace = true }
 log = { workspace = true }

@@ -4643,6 +4643,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "tungstenite",
+ "xpr-calc",
  "xpr-core",
  "xpr-data",
  "xpr-engine",
