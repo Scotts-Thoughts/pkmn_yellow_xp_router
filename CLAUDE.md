@@ -56,6 +56,13 @@ crates, `dex_data/` and `tools/dex_data/` are gone; Solodex is a separate app
 (`A:\Dropbox\stp-projects\programs\solodex`). To bring the page back, restore
 it from commit `7d63714` and follow `docs/rust_port/design/dex/PORTING.md`.
 
+## Debugging recorded routes
+
+When a recorded route is wrong, reproduce it from Scott's Super Shuckie replay
+with the headless tools instead of asking him for files. `AGENTS.md` has the
+steps: find the replay, run `replay_to_route`, trace the mapper/RAM, fix, and
+re-import to prove it.
+
 ## Game decompilation repos (reference)
 
 Local clones of the Pokémon decomp projects. Consult these whenever we need to
