@@ -251,6 +251,7 @@ impl Session {
             "enemy_setup" => self.bc.update_enemy_setup_moves(cfg, &self.ctrl, strs(p, "moves")),
             "transform" => self.bc.update_player_transform(cfg, &self.ctrl, b(p, "enabled")),
             "weather" => self.bc.update_weather(cfg, &self.ctrl, s(p, "value"), None),
+            "field_weather" => self.bc.update_field_weather(cfg, &self.ctrl, s(p, "value")),
             "refresh" => self.bc.full_refresh(cfg, &self.ctrl),
             other => return Err(format!("unknown battle op {}", other)),
         }
@@ -384,6 +385,9 @@ impl Session {
             "has_held_items": gen.get_generation() >= 2,
             "weather": s.get_weather(),
             "weather_options": gen.get_valid_weather(),
+            "has_area_weather": gen.has_area_weather(),
+            "field_weather": s.get_field_weather(),
+            "area_weather": s.area_weather_default,
             "player_setup": s.player_setup_move_list,
             "enemy_setup": s.enemy_setup_move_list,
             "setup_options": gen.get_stat_modifer_moves(),

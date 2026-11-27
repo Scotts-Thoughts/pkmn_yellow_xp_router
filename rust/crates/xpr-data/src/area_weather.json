@@ -1,0 +1,286 @@
+{
+  "groups": [
+    {
+      "games": [
+        "Ruby",
+        "Sapphire"
+      ],
+      "locations": {
+        "Route119": "Rain"
+      },
+      "trainers": {
+        "Picnicker Heidi": "Sandstorm",
+        "Camper Drew": "Sandstorm",
+        "Camper Cliff": "Sandstorm",
+        "Picnicker Becky": "Sandstorm",
+        "Ruin Maniac Dusty": "Sandstorm",
+        "Ruin Maniac Dusty Rematch 1": "Sandstorm",
+        "Ruin Maniac Dusty Rematch 2": "Sandstorm",
+        "Ruin Maniac Dusty Rematch 3": "Sandstorm",
+        "Ruin Maniac Dusty Rematch 4": "Sandstorm",
+        "Bird Keeper Colin": "Rain",
+        "Ninja Boy Tsunao": "Rain",
+        "Parasol Lady Angelica": "Rain",
+        "Cool Trainer Jennifer": "Rain",
+        "Pokemon Ranger Jenna": "Rain",
+        "Pokemon Ranger Carlos": "Rain",
+        "Ruin Maniac Chip": "Rain",
+        "Team Magma Grunt 16": "None",
+        "Team Magma Grunt 17": "None",
+        "Team Magma Grunt 18": "None",
+        "Team Magma Grunt 25": "None",
+        "Magma Admin Courtney": "None",
+        "Team Aqua Grunt 16": "None",
+        "Team Aqua Grunt 17": "None",
+        "Team Aqua Grunt 18": "None",
+        "Team Aqua Grunt 25": "None",
+        "Aqua Admin Shelly": "None"
+      }
+    },
+    {
+      "games": [
+        "Emerald"
+      ],
+      "locations": {
+        "Route119": "Rain"
+      },
+      "trainers": {
+        "Picnicker Heidi": "Sandstorm",
+        "Camper Drew": "Sandstorm",
+        "Camper Beau": "Sandstorm",
+        "Picnicker Becky": "Sandstorm",
+        "Ruin Maniac Bryan": "Sandstorm",
+        "Picnicker Celia": "Sandstorm",
+        "Camper Branden": "Sandstorm",
+        "Ruin Maniac Dusty": "Sandstorm",
+        "Ruin Maniac Dusty Rematch 1": "Sandstorm",
+        "Ruin Maniac Dusty Rematch 2": "Sandstorm",
+        "Ruin Maniac Dusty Rematch 3": "Sandstorm",
+        "Ruin Maniac Dusty Rematch 4": "Sandstorm",
+        "Bird Keeper Colin": "Rain",
+        "Ninja Boy Riley": "Rain",
+        "Battle Girl Callie": "Rain",
+        "Parasol Lady Angelica": "Rain",
+        "Cooltrainer Leonel": "Rain",
+        "Cooltrainer Jennifer": "Rain",
+        "Pkmn Ranger Jenna": "Rain",
+        "Pkmn Ranger Lorenzo": "Rain",
+        "Ruin Maniac Chip": "Rain",
+        "Team Aqua Grunt 11": "None",
+        "Team Aqua Grunt 12": "None",
+        "Team Aqua Grunt 13": "None",
+        "Team Aqua Grunt 19": "None",
+        "Team Aqua Grunt 26": "None",
+        "Aqua Admin Shelly": "None"
+      }
+    },
+    {
+      "games": [
+        "FireRed",
+        "LeafGreen"
+      ],
+      "locations": {},
+      "trainers": {}
+    },
+    {
+      "games": [
+        "Diamond",
+        "Pearl"
+      ],
+      "locations": {
+        "Route 215": "Rain",
+        "Route 216": "Hail",
+        "Route 217": "Hail",
+        "Route 228": "Sandstorm"
+      },
+      "trainers": {
+        "Ace Trainer Ernest": "Fog",
+        "Ace Trainer Alyssa": "Fog",
+        "Veteran Brian": "Fog",
+        "Black Belt Adam": "Fog",
+        "Ninja Boy Joel": "Fog",
+        "Ninja Boy Nathan": "Fog",
+        "Ninja Boy Davido": "Fog",
+        "Dragon Tamer Patrick": "Fog",
+        "Bird Keeper Brianna": "Fog",
+        "Double Team Zac & Jen": "Fog",
+        "Bird Keeper Brianna Rematch 2": "Fog",
+        "Bird Keeper Brianna Rematch 3": "Fog",
+        "Dragon Tamer Patrick Rematch 2": "Fog",
+        "Dragon Tamer Patrick Rematch 3": "Fog",
+        "Veteran Brian Rematch 2": "Fog",
+        "Veteran Brian Rematch 3": "Fog",
+        "Fisherman Juan": "Rain",
+        "Fisherman Cameron": "Rain",
+        "Fisherman Travis": "Rain",
+        "Pokemon Ranger Taylor": "Rain",
+        "Pokemon Ranger Jeffrey": "Rain",
+        "Pokemon Ranger Allison": "Rain",
+        "Scientist Stefano": "Rain",
+        "Parasol Lady Alexa": "Rain",
+        "Parasol Lady Sabrina": "Rain",
+        "Policeman Danny": "Rain",
+        "Collector Dominique": "Rain",
+        "Scientist Shaun": "Rain",
+        "Parasol Lady Alexa Rematch 2": "Rain",
+        "Parasol Lady Alexa Rematch 3": "Rain",
+        "Parasol Lady Alexa Rematch 4": "Rain",
+        "Policeman Danny Rematch 2": "Rain",
+        "Policeman Danny Rematch 3": "Rain",
+        "Policeman Danny Rematch 4": "Rain",
+        "Pokemon Ranger Taylor Rematch 2": "Rain",
+        "Pokemon Ranger Taylor Rematch 3": "Rain",
+        "Pokemon Ranger Taylor Rematch 4": "Rain",
+        "Pokemon Ranger Allison Rematch 2": "Rain",
+        "Pokemon Ranger Allison Rematch 3": "Rain",
+        "Pokemon Ranger Allison Rematch 4": "Rain",
+        "Scientist Shaun Rematch 2": "Rain",
+        "Scientist Shaun Rematch 3": "Rain",
+        "Scientist Shaun Rematch 4": "Rain",
+        "Bird Keeper Autumn": "Fog",
+        "Dragon Tamer Joe": "Fog",
+        "Ace Trainer Micah": "Fog",
+        "Ace Trainer Arthur": "Fog",
+        "Ace Trainer Brandi": "Fog",
+        "Ace Trainer Clarice": "Fog",
+        "Psychic Landon": "Fog",
+        "Psychic Deandre": "Fog",
+        "Psychic Desiree": "Fog",
+        "Psychic Kendra": "Fog",
+        "Black Belt Eddie": "Fog",
+        "Black Belt Willie": "Fog",
+        "Veteran Terrell": "Fog",
+        "Veteran Brenden": "Fog"
+      }
+    },
+    {
+      "games": [
+        "Platinum"
+      ],
+      "locations": {
+        "Route 215": "Rain",
+        "Route 216": "Hail",
+        "Route 217": "Hail",
+        "Route 228": "Sandstorm"
+      },
+      "trainers": {
+        "Ace Trainer Ernest": "Fog",
+        "Ace Trainer Alyssa": "Fog",
+        "Veteran Brian": "Fog",
+        "Black Belt Adam": "Fog",
+        "Ninja Boy Joel": "Fog",
+        "Ninja Boy Nathan": "Fog",
+        "Ninja Boy Davido": "Fog",
+        "Dragon Tamer Patrick": "Fog",
+        "Bird Keeper Brianna": "Fog",
+        "Double Team Zac & Jen": "Fog",
+        "Bird Keeper Brianna Rematch 2": "Fog",
+        "Bird Keeper Brianna Rematch 3": "Fog",
+        "Dragon Tamer Patrick Rematch 2": "Fog",
+        "Dragon Tamer Patrick Rematch 3": "Fog",
+        "Veteran Brian Rematch 2": "Fog",
+        "Veteran Brian Rematch 3": "Fog",
+        "Fisherman Juan": "Rain",
+        "Fisherman Josh": "Rain",
+        "Fisherman Travis": "Rain",
+        "Pokemon Ranger Taylor": "Rain",
+        "Pokemon Ranger Jeffrey": "Rain",
+        "Pokemon Ranger Allison": "Rain",
+        "Scientist Stefano": "Rain",
+        "Parasol Lady Alexa": "Rain",
+        "Parasol Lady Sabrina": "Rain",
+        "Policeman Danny": "Rain",
+        "Collector Dean": "Rain",
+        "Scientist Shaun": "Rain",
+        "Parasol Lady Alexa Rematch 2": "Rain",
+        "Parasol Lady Alexa Rematch 3": "Rain",
+        "Parasol Lady Alexa Rematch 4": "Rain",
+        "Policeman Danny Rematch 2": "Rain",
+        "Policeman Danny Rematch 3": "Rain",
+        "Policeman Danny Rematch 4": "Rain",
+        "Pokemon Ranger Taylor Rematch 2": "Rain",
+        "Pokemon Ranger Taylor Rematch 3": "Rain",
+        "Pokemon Ranger Taylor Rematch 4": "Rain",
+        "Pokemon Ranger Allison Rematch 2": "Rain",
+        "Pokemon Ranger Allison Rematch 3": "Rain",
+        "Pokemon Ranger Allison Rematch 4": "Rain",
+        "Scientist Shaun Rematch 2": "Rain",
+        "Scientist Shaun Rematch 3": "Rain",
+        "Scientist Shaun Rematch 4": "Rain",
+        "Bird Keeper Autumn": "Fog",
+        "Dragon Tamer Joe": "Fog",
+        "Ace Trainer Micah": "Fog",
+        "Ace Trainer Arthur": "Fog",
+        "Ace Trainer Brandi": "Fog",
+        "Ace Trainer Clarice": "Fog",
+        "Psychic Landon": "Fog",
+        "Psychic Deandre": "Fog",
+        "Psychic Desiree": "Fog",
+        "Psychic Kendra": "Fog",
+        "Black Belt Eddie": "Fog",
+        "Black Belt Willie": "Fog",
+        "Veteran Terrell": "Fog",
+        "Veteran Brenden": "Fog",
+        "Pokemon Trainer Marley": "Fog",
+        "Roughneck Kirby": "Fog",
+        "Pokefan Leonard": "Fog",
+        "Pokefan Rebekah": "Fog",
+        "Belle & Pa Beth & Bob": "Fog",
+        "Young Couple Mike & Nat": "Fog"
+      }
+    },
+    {
+      "games": [
+        "HeartGold",
+        "SoulSilver"
+      ],
+      "locations": {
+        "Route 33": "Rain",
+        "Lake of Rage": "Rain",
+        "Mt. Silver Cave": "Hail"
+      },
+      "trainers": {}
+    },
+    {
+      "games": [
+        "Black",
+        "White"
+      ],
+      "locations": {
+        "Route 4": "Sandstorm",
+        "Desert Resort": "Sandstorm"
+      },
+      "trainers": {}
+    },
+    {
+      "games": [
+        "Black 2",
+        "White 2"
+      ],
+      "locations": {
+        "Desert Resort": "Sandstorm"
+      },
+      "trainers": {}
+    },
+    {
+      "games": [
+        "White 2"
+      ],
+      "locations": {},
+      "trainers": {
+        "Lady Lina": "Sandstorm",
+        "Fisherman Hubert": "Sandstorm",
+        "Fisherman Andrew": "Sandstorm",
+        "Backpacker Clifford": "Sandstorm",
+        "Rich Boy Keenan": "Sandstorm",
+        "Backpacker Roland": "Sandstorm",
+        "Backpacker Rachel": "Sandstorm",
+        "Pokéfan Norbert": "Sandstorm",
+        "Pokéfan Sachiko": "Sandstorm",
+        "Twins Tara & Val": "Sandstorm",
+        "Pokemon Breeder Irene": "Sandstorm",
+        "Pokemon Trainer Colress (358)": "Sandstorm"
+      }
+    }
+  ]
+}

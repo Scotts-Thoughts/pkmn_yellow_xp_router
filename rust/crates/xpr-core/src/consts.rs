@@ -150,6 +150,7 @@ pub const COLLAPSED_MONS_KEY: &str = "collapsed_mons";
 /// (Thief / Covet) during a trainer fight.
 pub const THIEF_MONS_KEY: &str = "thief_mons";
 pub const PLAYER_CUR_HP_KEY: &str = "player_cur_hp";
+pub const FIELD_WEATHER_KEY: &str = "field_weather";
 pub const PLAYER_KEY: &str = "player";
 pub const ENEMY_KEY: &str = "enemy";
 pub const EVOLVED_SPECIES: &str = "evolved_species";

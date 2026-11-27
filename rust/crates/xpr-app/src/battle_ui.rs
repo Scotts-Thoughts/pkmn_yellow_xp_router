@@ -90,6 +90,8 @@ pub struct BattleSummaryUi {
     player_setup: SetupMovesState,
     enemy_setup: SetupMovesState,
     weather: OptionMenu,
+    /// The controls bar's persistent area weather.
+    field_weather: OptionMenu,
     legacy_candy: String,
     legacy_candy_deadline: Option<Instant>,
     transform: bool,
@@ -141,6 +143,7 @@ impl BattleSummaryUi {
             player_setup: SetupMovesState::default(),
             enemy_setup: SetupMovesState::default(),
             weather: OptionMenu::new(vec![consts::WEATHER_NONE.to_string()], None),
+            field_weather: OptionMenu::new(vec![consts::WEATHER_NONE.to_string()], None),
             legacy_candy: "0".to_string(),
             legacy_candy_deadline: None,
             transform: false,
@@ -158,6 +161,7 @@ impl BattleSummaryUi {
     pub fn configure_for_version(&mut self, ctrl: &MainController) {
         if let Some(gen) = ctrl.gen() {
             self.weather.new_values(gen.get_valid_weather().iter().map(|s| s.to_string()).collect(), None);
+            self.field_weather.new_values(gen.get_valid_weather().iter().map(|s| s.to_string()).collect(), None);
             let setup = gen.get_stat_modifer_moves();
             self.player_setup.selector.new_values(setup.clone(), None);
             self.enemy_setup.selector.new_values(setup, None);
@@ -259,6 +263,7 @@ impl BattleSummaryUi {
         }
         self.held_item_text = bc.get_player_held_item();
         self.weather.set(bc.summary.get_weather());
+        self.field_weather.set(bc.summary.get_field_weather());
         self.player_setup.move_list = bc.summary.player_setup_move_list.clone();
         self.enemy_setup.move_list = bc.summary.enemy_setup_move_list.clone();
         for idx in 0..6 {
@@ -392,6 +397,22 @@ impl BattleSummaryUi {
                         self.held_item_text = bc.get_player_held_item();
                     }
                     self.held_item_apply_in_flight = false;
+                }
+                // persistent area weather (only games that have any)
+                if ctrl.gen().is_some_and(|g| g.has_area_weather()) {
+                    let default = bc.summary.area_weather_default.as_str();
+                    let tip = if default == consts::WEATHER_NONE {
+                        "Weather that lasts the whole battle in this area".to_string()
+                    } else {
+                        format!("Weather that lasts the whole battle in this area (this area's default: {})", default)
+                    };
+                    widgets::label(ui, theme, "Weather:").on_hover_text(tip.as_str());
+                    let field_id = ui.scope_id().with("field_weather");
+                    let changed = ui.scope(|ui| self.field_weather.ui(ui, theme, field_id, Some(120.0), can_candies)).inner;
+                    if changed {
+                        let w = self.field_weather.get().to_string();
+                        bc.update_field_weather(cfg, ctrl, &w);
+                    }
                 }
                 let chip = |ui: &mut Ui, text: String, tip: &str| {
                     let galley = ui.fonts_mut(|f| f.layout_no_wrap(text, theme.body(), Color32::PLACEHOLDER));

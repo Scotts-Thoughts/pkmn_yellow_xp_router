@@ -156,6 +156,14 @@ impl BattleController {
         self.after_full();
     }
 
+    /// The persistent area weather (the controls bar's weather dropdown).
+    pub fn update_field_weather(&mut self, cfg: &Config, ctrl: &MainController, new_weather: &str) {
+        let Some(gen) = ctrl.gen() else { return };
+        let sc = BattleController::summary_config(cfg, ctrl);
+        self.summary.update_field_weather(&gen, &sc, new_weather);
+        self.after_full();
+    }
+
     pub fn update_enemy_setup_moves(&mut self, cfg: &Config, ctrl: &MainController, moves: Vec<String>) {
         let Some(gen) = ctrl.gen() else { return };
         let sc = BattleController::summary_config(cfg, ctrl);

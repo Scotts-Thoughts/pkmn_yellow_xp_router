@@ -605,6 +605,11 @@ pub struct TrainerEventDefinition {
     /// KO), set from the battle page. `None` is full HP. Calc only: the
     /// route's HP is untouched.
     pub player_cur_hp: Option<i64>,
+    /// The persistent area weather picked on the battle page (Mt. Silver's
+    /// hail, ...). `None` follows the area's default from
+    /// `xpr_data::area_weather`; `Some("None")` turns a default off. Calc
+    /// only, under any weather a move sets with `weather`.
+    pub field_weather: Option<String>,
     /// What happened when this battle was fought (written by the recorder).
     /// A record, not part of the plan: recalculation never reads it.
     pub move_stats: Option<crate::move_stats::BattleMoveStats>,
@@ -636,6 +641,7 @@ impl TrainerEventDefinition {
             collapsed_mons: Vec::new(),
             thief_mons: Vec::new(),
             player_cur_hp: None,
+            field_weather: None,
             move_stats: None,
         }
     }
@@ -744,6 +750,12 @@ impl TrainerEventDefinition {
                 o.insert(consts::PLAYER_CUR_HP_KEY.to_string(), Value::from(hp));
             }
         }
+        // Rust-only key as well, written only when it differs from the area default
+        if let Some(w) = &self.field_weather {
+            if let Value::Object(o) = &mut result {
+                o.insert(consts::FIELD_WEATHER_KEY.to_string(), Value::String(w.clone()));
+            }
+        }
         // Rust-only key, written only when the recorder measured the battle
         if let Some(ms) = &self.move_stats {
             if let Value::Object(o) = &mut result {
@@ -833,6 +845,7 @@ impl TrainerEventDefinition {
                 result.collapsed_mons = i64_list(get(raw, consts::COLLAPSED_MONS_KEY));
                 result.thief_mons = i64_list(get(raw, consts::THIEF_MONS_KEY));
                 result.player_cur_hp = get(raw, consts::PLAYER_CUR_HP_KEY).and_then(pyjson::value_as_i64).filter(|hp| *hp >= 0);
+                result.field_weather = get(raw, consts::FIELD_WEATHER_KEY).and_then(Value::as_str).map(str::to_string);
                 result.move_stats = get(raw, crate::move_stats::MOVE_STATS_KEY).and_then(crate::move_stats::BattleMoveStats::from_json);
                 Ok(Some(result))
             }

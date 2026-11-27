@@ -494,6 +494,22 @@ impl GenData {
         gen_consts::natural_gift(self.gen, held_item).map(|(p, t)| (t.to_string(), p))
     }
 
+    /// The persistent area weather a fight with `trainer_name` starts in
+    /// (see [`crate::area_weather`]); `"None"` when the area has none or
+    /// this generation can't have it.
+    pub fn get_area_weather(&self, trainer_name: &str) -> &'static str {
+        let Some(trainer) = self.trainer_db().get_trainer(trainer_name) else { return consts::WEATHER_NONE };
+        crate::area_weather::area_weather(self.effective_version(), &trainer.location, trainer_name)
+            .filter(|w| self.get_valid_weather().contains(w))
+            .unwrap_or(consts::WEATHER_NONE)
+    }
+
+    /// Whether this game has areas with persistent weather (the battle
+    /// page's weather dropdown shows only then).
+    pub fn has_area_weather(&self) -> bool {
+        crate::area_weather::has_area_weather(self.effective_version())
+    }
+
     pub fn get_valid_weather(&self) -> Vec<&'static str> {
         match self.gen {
             Gen::One => vec![consts::WEATHER_NONE],

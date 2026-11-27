@@ -1,0 +1,847 @@
+diff --git a/README.md b/README.md
+index a3e59324..2d0f363b 100644
+--- a/README.md
++++ b/README.md
+@@ -10,6 +10,12 @@ It assumes that a single pokemon has been injected to Pokemon Yellow as your sta
+ **NOTE:** This is a solo project done in my free time, so there are definitely some rough edges. I have manually verified the accuracy with several routes myself, but I cannot guarantee 100% accuracy. If you notice any discrepancies, let me know!
+ I recommend playing through the route once after mapping it out with this tool (or even playing it alongside the tool as you map it out) to guarantee its accuracy.
+ 
++## Move stats in route files
++
++Routes recorded with move stats (Rust router, late 2026 and later) keep a `move_stats` object on each trainer battle and at the top of the file.
++Older routes load and save exactly as before. **An older router (an older Rust build, the Python app or an old iOS build) loads a new route fine but drops `move_stats` if it saves the file again.** The automatic backup keeps the previous file.
++Details: `docs/rust_port/recording/move_stats.md`.
++
+ ## Project status
+ 
+ I have the last major update of this project. If you find any bugs, I will try to fix them, but this project will receive no major updates moving forward.
+diff --git a/rust/Cargo.lock b/rust/Cargo.lock
+index 57747cbe..ef2eefd1 100644
+--- a/rust/Cargo.lock
++++ b/rust/Cargo.lock
+@@ -4643,6 +4643,7 @@ dependencies = [
+  "reqwest",
+  "serde_json",
+  "tungstenite",
++ "xpr-calc",
+  "xpr-core",
+  "xpr-data",
+  "xpr-engine",
+diff --git a/rust/crates/xpr-app/src/app.rs b/rust/crates/xpr-app/src/app.rs
+index fc69a2d6..4fbaaafc 100644
+--- a/rust/crates/xpr-app/src/app.rs
++++ b/rust/crates/xpr-app/src/app.rs
+@@ -166,6 +166,7 @@ pub struct XprApp {
+     index_rx: Option<Receiver<(RouteIndex, bool)>>,
+     run_summary: Option<RunSummary>,
+     setup_summary_open: bool,
++    move_stats_open: bool,
+     compare: CompareView,
+     /// The compare page's on-screen width, for exports.
+     compare_width: Option<f32>,
+@@ -284,6 +285,7 @@ impl XprApp {
+             index_rx: Some(rx),
+             run_summary: None,
+             setup_summary_open: false,
++            move_stats_open: false,
+             compare: CompareView::new(),
+             compare_width: None,
+             smoke_compare_expand: None,
+@@ -2173,6 +2175,10 @@ Saved as {}", report.summary_text(), path.display()), MsgButtons::Ok, MsgTag::In
+                 if widgets::menu_item(ui, &theme, "Final Trainers...", &label("final_trainers"), true) {
+                     self.open_final_trainers_dialog();
+                 }
++                widgets::menu_separator(ui, &theme);
++                if widgets::menu_item(ui, &theme, "Move Stats...", "", true) {
++                    self.move_stats_open = true;
++                }
+             });
+             ui.menu_button("Battle Summary", |ui| {
+                 ui.set_min_width(280.0);
+@@ -3134,6 +3140,30 @@ impl XprApp {
+                 self.request_shot(ShotKind::SetupSummary);
+             }
+         }
++        if self.move_stats_open {
++            let mut close = false;
++            let theme2 = theme.clone();
++            let ctrl = &self.ctrl;
++            ctx.show_viewport_immediate(
++                egui::ViewportId::from_hash_of("move_stats"),
++                egui::ViewportBuilder::default().with_title("Move Stats").with_inner_size([760.0, 560.0]),
++                |root, _class| {
++                    let ctx = &root.ctx().clone();
++                    egui::CentralPanel::default().frame(egui::Frame::new().fill(theme2.bg).inner_margin(egui::Margin::same(15))).show(root, |ui| {
++                        crate::move_stats_view::ui(ui, &theme2, ctrl);
++                    });
++                    if main_modal {
++                        crate::dialogs::block_secondary_window(ctx, &theme2);
++                    }
++                    if ctx.input(|i| i.viewport().close_requested()) {
++                        close = true;
++                    }
++                },
++            );
++            if close {
++                self.move_stats_open = false;
++            }
++        }
+         if self.run_summary.as_ref().map(|r| !r.docked).unwrap_or(false) {
+             let mut toggled = false;
+             let mut closed = false;
+diff --git a/rust/crates/xpr-app/src/controller.rs b/rust/crates/xpr-app/src/controller.rs
+index a562162e..8f9f6a16 100644
+--- a/rust/crates/xpr-app/src/controller.rs
++++ b/rust/crates/xpr-app/src/controller.rs
+@@ -475,6 +475,14 @@ impl MainController {
+         }
+     }
+ 
++    /// The recorder's move-stats run object (wild totals, reset attempts).
++    /// It is a record, not part of the plan: nothing is recalculated.
++    pub fn set_run_move_stats(&mut self, run: xpr_engine::RunMoveStats) {
++        self.router.move_stats = Some(run);
++        self.unsaved_changes = true;
++        self.route_revision += 1;
++    }
++
+     pub fn update_levelup_move(&mut self, new_def: LearnMoveEventDefinition) {
+         self.undo_before();
+         let r = self.router.replace_levelup_move_event(new_def);
+diff --git a/rust/crates/xpr-app/src/lib.rs b/rust/crates/xpr-app/src/lib.rs
+index 38ee351f..c52c71fb 100644
+--- a/rust/crates/xpr-app/src/lib.rs
++++ b/rust/crates/xpr-app/src/lib.rs
+@@ -16,6 +16,8 @@ pub mod event_details;
+ pub mod filter_bar;
+ pub mod inline_creator;
+ pub mod map;
++pub mod move_stats_server;
++pub mod move_stats_view;
+ pub mod pages;
+ pub mod pp_ledger;
+ pub mod quick_add;
+diff --git a/rust/crates/xpr-app/src/recorder_glue.rs b/rust/crates/xpr-app/src/recorder_glue.rs
+index 282c3147..de8bb54a 100644
+--- a/rust/crates/xpr-app/src/recorder_glue.rs
++++ b/rust/crates/xpr-app/src/recorder_glue.rs
+@@ -125,6 +125,10 @@ macro_rules! recorder_host {
+                 self.ctrl_mut().update_existing_event(id, def);
+             }
+ 
++            fn set_run_move_stats(&mut self, run: xpr_engine::RunMoveStats) {
++                self.ctrl_mut().set_run_move_stats(run);
++            }
++
+             fn get_dvs(&self) -> Option<StatBlock> {
+                 self.ctrl().get_dvs()
+             }
+@@ -206,6 +210,8 @@ pub struct Recorder {
+     /// status label text shown while recording
+     pub client_status: String,
+     pub reconnect_enabled: bool,
++    /// the local move-stats server, while recording
++    pub move_stats_server: Option<crate::move_stats_server::MoveStatsServer>,
+ }
+ 
+ impl Recorder {
+@@ -214,7 +220,7 @@ impl Recorder {
+         let wake: Arc<dyn Fn() + Send + Sync> = Arc::new(move || wake_ctx.request_repaint());
+         let (handle, queue) = host_channel(wake.clone());
+         let controller = RecorderController::new(handle.clone(), wake);
+-        Recorder { controller, queue, handle, client_status: String::new(), reconnect_enabled: false }
++        Recorder { controller, queue, handle, client_status: String::new(), reconnect_enabled: false, move_stats_server: None }
+     }
+ 
+     /// `on_recording_mode_changed`: start or stop the GameHook session.
+@@ -236,13 +242,22 @@ impl Recorder {
+                 }),
+                 _ => None,
+             };
++            self.controller.prepare_move_stats(ctrl.router.move_stats.clone(), ctrl.router.move_stats_total());
+             self.controller.on_recording_mode_changed(true, start);
+             if !self.controller.has_client() {
+                 self.client_status = "No recorder has been created yet for the current version".to_string();
+                 self.reconnect_enabled = false;
++            } else if self.move_stats_server.is_none() {
++                match crate::move_stats_server::MoveStatsServer::start(cfg.get_move_stats_port(), self.controller.move_stats()) {
++                    Ok(server) => self.move_stats_server = Some(server),
++                    Err(e) => log::warn!("{}", e),
++                }
+             }
+         } else {
+             self.controller.on_recording_mode_changed(false, None);
++            if let Some(mut server) = self.move_stats_server.take() {
++                server.stop();
++            }
+         }
+     }
+ 
+diff --git a/rust/crates/xpr-core/src/config.rs b/rust/crates/xpr-core/src/config.rs
+index 8995c1ac..b7647692 100644
+--- a/rust/crates/xpr-core/src/config.rs
++++ b/rust/crates/xpr-core/src/config.rs
+@@ -487,6 +487,8 @@ pub struct Config {
+     shortcut_overrides: IndexMap<String, Value>,
+     final_trainers_per_game: IndexMap<String, Vec<String>>,
+     recording_auto_stop_enabled: bool,
++    /// the local move-stats server's port (`GET /move-stats`, `GET /status`)
++    move_stats_port: u16,
+ 
+     // not persisted
+     custom_image_path: String,
+@@ -556,6 +558,7 @@ impl Config {
+             }
+         }
+         let recording_auto_stop_enabled = g("recording_auto_stop_enabled").map(|v| pyjson::truthy(&v)).unwrap_or(true);
++        let move_stats_port = g("move_stats_port").and_then(|v| v.as_u64()).filter(|p| (1024..=65535).contains(p)).map(|p| p as u16).unwrap_or(DEFAULT_MOVE_STATS_PORT);
+ 
+         let cfg = Config {
+             config_file: config_file.to_path_buf(),
+@@ -621,6 +624,7 @@ impl Config {
+             shortcut_overrides,
+             final_trainers_per_game,
+             recording_auto_stop_enabled,
++            move_stats_port,
+             custom_image_path: String::new(),
+         };
+         if colors_outdated && raw_present {
+@@ -708,6 +712,9 @@ impl Config {
+         if !self.recording_auto_stop_enabled {
+             pairs.push(("recording_auto_stop_enabled".into(), Value::Bool(false)));
+         }
++        if self.move_stats_port != DEFAULT_MOVE_STATS_PORT {
++            pairs.push(("move_stats_port".into(), Value::from(self.move_stats_port)));
++        }
+         let mut map = serde_json::Map::new();
+         for (k, v) in pairs {
+             map.insert(k, v);
+@@ -1134,4 +1141,10 @@ impl Config {
+ 
+     pub fn get_recording_auto_stop_enabled(&self) -> bool { self.recording_auto_stop_enabled }
+     pub fn set_recording_auto_stop_enabled(&mut self, v: bool) { self.recording_auto_stop_enabled = v; self.save(); }
++
++    pub fn get_move_stats_port(&self) -> u16 { self.move_stats_port }
++    pub fn set_move_stats_port(&mut self, v: u16) { self.move_stats_port = v; self.save(); }
+ }
++
++/// 30158 is Super Shuckie, 30159 the overlay's control server, 30160 the clock page.
++pub const DEFAULT_MOVE_STATS_PORT: u16 = 30161;
+diff --git a/rust/crates/xpr-data/src/model.rs b/rust/crates/xpr-data/src/model.rs
+index ef87aecd..d14fe432 100644
+--- a/rust/crates/xpr-data/src/model.rs
++++ b/rust/crates/xpr-data/src/model.rs
+@@ -758,6 +758,10 @@ pub struct MoveEffect {
+     pub target: Option<String>,
+     pub chance: Option<i64>,
+     pub status: Option<String>,
++    /// `"flinch": true` entries (Bite, Headbutt, the fangs...)
++    pub flinch: bool,
++    /// `chance` without truncation: gen 1 lists some as fractions (33.2 = 85/256)
++    pub chance_exact: Option<f64>,
+ }
+ 
+ impl MoveEffect {
+@@ -768,6 +772,8 @@ impl MoveEffect {
+             target: xpr_core::pyjson::get_str(v, consts::TARGET_KEY).map(|s| s.to_string()),
+             chance: xpr_core::pyjson::get_i64(v, "chance"),
+             status: xpr_core::pyjson::get_str(v, "status").map(|s| s.to_string()),
++            flinch: xpr_core::pyjson::get(v, "flinch").map(xpr_core::pyjson::truthy).unwrap_or(false),
++            chance_exact: xpr_core::pyjson::get(v, "chance").and_then(|c| c.as_f64()),
+         }
+     }
+ 
+diff --git a/rust/crates/xpr-engine/src/events.rs b/rust/crates/xpr-engine/src/events.rs
+index 95a1c16e..98f7f8f1 100644
+--- a/rust/crates/xpr-engine/src/events.rs
++++ b/rust/crates/xpr-engine/src/events.rs
+@@ -605,6 +605,9 @@ pub struct TrainerEventDefinition {
+     /// KO), set from the battle page. `None` is full HP. Calc only: the
+     /// route's HP is untouched.
+     pub player_cur_hp: Option<i64>,
++    /// What happened when this battle was fought (written by the recorder).
++    /// A record, not part of the plan: recalculation never reads it.
++    pub move_stats: Option<crate::move_stats::BattleMoveStats>,
+ }
+ 
+ impl TrainerEventDefinition {
+@@ -633,6 +636,7 @@ impl TrainerEventDefinition {
+             collapsed_mons: Vec::new(),
+             thief_mons: Vec::new(),
+             player_cur_hp: None,
++            move_stats: None,
+         }
+     }
+ 
+@@ -740,6 +744,12 @@ impl TrainerEventDefinition {
+                 o.insert(consts::PLAYER_CUR_HP_KEY.to_string(), Value::from(hp));
+             }
+         }
++        // Rust-only key, written only when the recorder measured the battle
++        if let Some(ms) = &self.move_stats {
++            if let Value::Object(o) = &mut result {
++                o.insert(crate::move_stats::MOVE_STATS_KEY.to_string(), ms.to_json());
++            }
++        }
+         result
+     }
+ 
+@@ -823,6 +833,7 @@ impl TrainerEventDefinition {
+                 result.collapsed_mons = i64_list(get(raw, consts::COLLAPSED_MONS_KEY));
+                 result.thief_mons = i64_list(get(raw, consts::THIEF_MONS_KEY));
+                 result.player_cur_hp = get(raw, consts::PLAYER_CUR_HP_KEY).and_then(pyjson::value_as_i64).filter(|hp| *hp >= 0);
++                result.move_stats = get(raw, crate::move_stats::MOVE_STATS_KEY).and_then(crate::move_stats::BattleMoveStats::from_json);
+                 Ok(Some(result))
+             }
+             _ => Ok(None),
+diff --git a/rust/crates/xpr-engine/src/lib.rs b/rust/crates/xpr-engine/src/lib.rs
+index e27d680a..9fd6c408 100644
+--- a/rust/crates/xpr-engine/src/lib.rs
++++ b/rust/crates/xpr-engine/src/lib.rs
+@@ -3,6 +3,7 @@
+ 
+ pub mod compare;
+ pub mod events;
++pub mod move_stats;
+ pub mod recalc;
+ pub mod router;
+ pub mod state;
+@@ -17,6 +18,7 @@ pub use events::{
+     LocationEventDefinition, RareCandyEventDefinition, TrainerEventDefinition, VitaminEventDefinition,
+     WildPkmnEventDefinition,
+ };
++pub use move_stats::{BattleMoveStats, MoveCounts, RunMoveStats, SidePair, SideStats};
+ pub use router::{InsertSpec, Router};
+ pub use state::{BagItem, Inventory, RouteState, SoloPokemon};
+ pub use tree::{EventFolder, EventGroup, EventItem, Node, NodeId, ObjKind};
+diff --git a/rust/crates/xpr-engine/src/router.rs b/rust/crates/xpr-engine/src/router.rs
+index 05131055..48c06a0d 100644
+--- a/rust/crates/xpr-engine/src/router.rs
++++ b/rust/crates/xpr-engine/src/router.rs
+@@ -37,6 +37,9 @@ pub struct Router {
+     pub level_up_move_defs: IndexMap<LevelUpKey, LearnMoveEventDefinition>,
+     pub defeated_trainers: IndexSet<String>,
+     pub test_moves: Vec<String>,
++    /// The run's move stats (wild battles, reset attempts). The trainer
++    /// battles' own numbers live on their events; see [`Router::move_stats_total`].
++    pub move_stats: Option<crate::move_stats::RunMoveStats>,
+     pub(crate) next_id: NodeId,
+     /// Set while the computed states are not a valid prefix for an
+     /// incremental recalculation (before the first full pass, or after a
+@@ -58,6 +61,7 @@ impl Router {
+             level_up_move_defs: IndexMap::new(),
+             defeated_trainers: IndexSet::new(),
+             test_moves: vec![String::new(); 4],
++            move_stats: None,
+             next_id: 0,
+             needs_full_recalc: true,
+         };
+@@ -121,6 +125,69 @@ impl Router {
+         self.reset_events();
+         self.level_up_move_defs = IndexMap::new();
+         self.defeated_trainers = IndexSet::new();
++        self.move_stats = None;
++    }
++
++    /// Every trainer battle's move stats, in route order.
++    pub fn trainer_move_stats(&self) -> Vec<&crate::move_stats::BattleMoveStats> {
++        let mut out = Vec::new();
++        self.collect_move_stats(self.root_id, &mut out);
++        out
++    }
++
++    fn collect_move_stats<'a>(&'a self, folder_id: NodeId, out: &mut Vec<&'a crate::move_stats::BattleMoveStats>) {
++        let Some(f) = self.folder(folder_id) else { return };
++        for c in &f.children {
++            match self.nodes.get(c) {
++                Some(Node::Folder(_)) => self.collect_move_stats(*c, out),
++                Some(Node::Group(g)) => {
++                    if let Some(ms) = g.event_definition.trainer_def.as_ref().and_then(|t| t.move_stats.as_ref()) {
++                        out.push(ms);
++                    }
++                }
++                None => {}
++            }
++        }
++    }
++
++    /// The run total: every trainer battle still in the route plus the wild
++    /// battles. Reset attempts are not in it (they are not part of the run as
++    /// viewers saw it).
++    pub fn move_stats_total(&self) -> crate::move_stats::SidePair {
++        let mut total = crate::move_stats::SidePair::default();
++        for b in self.trainer_move_stats() {
++            total.add_signed(&b.stats, 1);
++        }
++        if let Some(run) = &self.move_stats {
++            total.add_signed(&run.wild, 1);
++        }
++        total
++    }
++
++    /// Whether the route has move stats anywhere (old routes have none).
++    pub fn has_move_stats(&self) -> bool {
++        self.move_stats.is_some() || !self.trainer_move_stats().is_empty()
++    }
++
++    /// The top-level `move_stats` object as saved, `None` for a route without any.
++    pub fn move_stats_json(&self) -> Option<Value> {
++        if !self.has_move_stats() {
++            return None;
++        }
++        let run = self.move_stats.clone().unwrap_or_default();
++        Some(run.to_json(&self.move_stats_total()))
++    }
++
++    /// Drop every trainer event's move stats (a base route's events are a plan
++    /// for a new run, not a record of it).
++    pub fn clear_event_move_stats(&mut self) {
++        for node in self.nodes.values_mut() {
++            if let Node::Group(g) = node {
++                if let Some(t) = g.event_definition.trainer_def.as_mut() {
++                    t.move_stats = None;
++                }
++            }
++        }
+     }
+ 
+     /// `_change_version`
+@@ -837,6 +904,13 @@ impl Router {
+         if new_event_def.split_time.is_null() {
+             new_event_def.split_time = old_def.split_time.clone();
+         }
++        // move stats are a record of the battle, not part of the plan: an edit
++        // (or the recorder's end-of-battle update) keeps them
++        if let (Some(new_td), Some(old_td)) = (new_event_def.trainer_def.as_mut(), old_def.trainer_def.as_ref()) {
++            if new_td.move_stats.is_none() && new_td.trainer_name == old_td.trainer_name {
++                new_td.move_stats = old_td.move_stats.clone();
++            }
++        }
+         match kind {
+             ObjKind::Folder => {
+                 if new_event_def.get_event_type() != consts::TASK_NOTES_ONLY {
+@@ -969,6 +1043,14 @@ impl Router {
+             ),
+             (consts::EVENTS, Value::Array(vec![self.serialize_folder(self.root_id)])),
+         ]))
++        .map(|mut v| {
++            // Rust-only key, written only for routes recorded with move stats,
++            // so every older route saves byte-identical
++            if let (Some(ms), Value::Object(o)) = (self.move_stats_json(), &mut v) {
++                o.insert(crate::move_stats::MOVE_STATS_KEY.to_string(), ms);
++            }
++            v
++        })
+     }
+ 
+     /// The bytes `save` writes (`serialize()` + `test_moves`, `indent=4`,
+@@ -1005,6 +1087,7 @@ impl Router {
+     ) -> Result<(), String> {
+         self.change_version(pkmn_version)?;
+         self.reset_events();
++        self.move_stats = None;
+         self.set_solo_pkmn(solo_mon, None, custom_dvs, custom_ability_idx, custom_nature)?;
+         if let Some(p) = base_route_path {
+             self.load(p, true)?;
+@@ -1027,6 +1110,7 @@ impl Router {
+     pub fn load_value(&mut self, result: &Value, load_events_only: bool) -> Result<(), String> {
+         self.reset_events();
+         if !load_events_only {
++            self.move_stats = get(result, crate::move_stats::MOVE_STATS_KEY).and_then(crate::move_stats::RunMoveStats::from_json);
+             let version = get(result, consts::PKMN_VERSION_KEY)
+                 .and_then(|v| v.as_str())
+                 .unwrap_or(consts::YELLOW_VERSION)
+@@ -1102,6 +1186,9 @@ impl Router {
+                 self.load_events_recursive(root, first)?;
+             }
+         }
++        if load_events_only {
++            self.clear_event_move_stats();
++        }
+         self.recalc()
+     }
+ 
+diff --git a/rust/crates/xpr-recorder/Cargo.toml b/rust/crates/xpr-recorder/Cargo.toml
+index 3a1c5e57..09024d46 100644
+--- a/rust/crates/xpr-recorder/Cargo.toml
++++ b/rust/crates/xpr-recorder/Cargo.toml
+@@ -7,6 +7,7 @@ edition.workspace = true
+ xpr-core = { path = "../xpr-core" }
+ xpr-data = { path = "../xpr-data" }
+ xpr-engine = { path = "../xpr-engine" }
++xpr-calc = { path = "../xpr-calc" }
+ serde_json = { workspace = true }
+ indexmap = { workspace = true }
+ log = { workspace = true }
+diff --git a/rust/crates/xpr-recorder/src/controller.rs b/rust/crates/xpr-recorder/src/controller.rs
+index 1672f31e..5711fc9c 100644
+--- a/rust/crates/xpr-recorder/src/controller.rs
++++ b/rust/crates/xpr-recorder/src/controller.rs
+@@ -14,10 +14,11 @@ use serde_json::Value;
+ use xpr_core::consts;
+ use xpr_data::send_out_order::{self, SendOutMon, SendOutMove, SendOutPlayer};
+ use xpr_data::GenData;
+-use xpr_engine::{EventDefinition, NodeId, SoloPokemon, TrainerEventDefinition};
++use xpr_engine::{BattleMoveStats, EventDefinition, NodeId, RunMoveStats, SidePair, SoloPokemon, TrainerEventDefinition};
+ 
+ use crate::gamehook::{GameHookClient, GameHookProperty, PropertyStore, SessionEvents};
+ use crate::host::{HostHandle, PrevEvent, StartInfo};
++use crate::move_stats::{MoveDetector, MoveOutcome, MoveStatsCollector, MoveStatsHandle};
+ use crate::shuckie::supershuckie;
+ 
+ /// The FSM state of every game machine (`StateType`).
+@@ -126,6 +127,10 @@ pub struct RecorderController {
+     wake: Arc<dyn Fn() + Send + Sync>,
+     /// What the last prediction read, for [`Self::repredict_send_out`]
+     last_send_out: Mutex<Option<SendOutInputs>>,
++    /// move stats for this session (read by the app's local server)
++    move_stats: MoveStatsHandle,
++    /// the route's move stats when recording starts (see [`Self::prepare_move_stats`])
++    move_stats_start: Mutex<Option<(Option<RunMoveStats>, SidePair)>>,
+ }
+ 
+ impl RecorderController {
+@@ -141,9 +146,105 @@ impl RecorderController {
+             machine_active: Mutex::new(None),
+             wake,
+             last_send_out: Mutex::new(None),
++            move_stats: MoveStatsCollector::new_handle(),
++            move_stats_start: Mutex::new(None),
+         })
+     }
+ 
++    /// The move stats collector (the app's local server reads it).
++    pub fn move_stats(&self) -> MoveStatsHandle {
++        self.move_stats.clone()
++    }
++
++    /// Called on the UI thread before recording starts: the route's run object
++    /// (if it has one) and its current total, so a route recorded over several
++    /// sessions keeps adding to the same run.
++    pub fn prepare_move_stats(&self, run: Option<RunMoveStats>, total: SidePair) {
++        *self.move_stats_start.lock().unwrap() = Some((run, total));
++    }
++
++    fn record_move(&self, o: &MoveOutcome) {
++        log::info!(
++            "[MOVE STATS] {:?} {} hit={} p={:?} crit={}/{} effect={}/{}{}",
++            o.side,
++            o.move_name,
++            !o.missed,
++            o.hit_chance,
++            o.crits,
++            o.crit_rolls,
++            o.effect_applied,
++            o.effect_rolled,
++            if o.effect_blocked { " (blocked)" } else { "" }
++        );
++        self.move_stats.lock().unwrap().record(o);
++    }
++
++    /// Send the run object to the route when it changed.
++    fn push_move_stats(&self) {
++        let run = self.move_stats.lock().unwrap().take_dirty_run();
++        if let Some(run) = run {
++            self.host.post(move |h| h.set_run_move_stats(run));
++        }
++    }
++
++    /// Store finished trainer battles' numbers on their events.
++    fn attach_move_stats(&self) {
++        let ready = self.move_stats.lock().unwrap().take_attachable();
++        if ready.is_empty() {
++            self.push_move_stats();
++            return;
++        }
++        let mut waiting = Vec::new();
++        for stats in ready {
++            let name = stats.trainer.clone().unwrap_or_default();
++            let mut event = self.host.call(|h| h.get_previous_event(None));
++            let mut search = 0;
++            let found = loop {
++                let Some(e) = &event else { break None };
++                if let Some(td) = &e.definition.trainer_def {
++                    if td.trainer_name == name && td.move_stats.as_ref().map(|m| m.battle_id == stats.battle_id).unwrap_or(true) {
++                        break event.clone();
++                    }
++                }
++                search += 1;
++                if search > 40 {
++                    break None;
++                }
++                let id = e.group_id;
++                event = self.host.call(move |h| h.get_previous_event(Some(id)));
++            };
++            match found {
++                Some(e) => {
++                    let mut def = e.definition.clone();
++                    if let Some(td) = def.trainer_def.as_mut() {
++                        log::info!("[MOVE STATS] storing battle {} on trainer event {}", stats.battle_id, td.trainer_name);
++                        td.move_stats = Some(stats);
++                    }
++                    let id = e.group_id;
++                    self.host.call(move |h| h.update_existing_event(id, def));
++                }
++                None => waiting.push(stats),
++            }
++        }
++        if !waiting.is_empty() {
++            self.move_stats.lock().unwrap().return_unattached(waiting);
++        }
++        self.push_move_stats();
++    }
++
++    /// A game recorder queued an event (FSM thread): a trainer battle opening,
++    /// or the flag for losing one.
++    pub fn note_queued_event(&self, event: &EventDefinition, loss_flag: &str) {
++        if event.trainer_def.is_none() {
++            return;
++        }
++        if event.notes.is_empty() {
++            self.move_stats.lock().unwrap().mark_trainer();
++        } else if event.notes == loss_flag {
++            self.move_stats.lock().unwrap().mark_lost();
++        }
++    }
++
+     pub fn host(&self) -> &HostHandle {
+         &self.host
+     }
+@@ -213,6 +314,7 @@ impl RecorderController {
+             if let Some(c) = client {
+                 c.disconnect();
+             }
++            self.move_stats.lock().unwrap().stop();
+             // `disconnect()` → `machine.shutdown()` in Python: the machine stops now,
+             // not when the connection thread gets around to it
+             if let Some(flag) = self.machine_active.lock().unwrap().take() {
+@@ -227,11 +329,15 @@ impl RecorderController {
+     pub fn create_session(self: &Arc<Self>, info: &StartInfo) -> Option<Session> {
+         let (expected_names, game) = crate::games::create_recorder(info, self.clone())?;
+         *self.machine_active.lock().unwrap() = Some(game.active_flag());
+-        Some(Session { controller: self.clone(), expected_names, game })
++        let (run, total) = self.move_stats_start.lock().unwrap().take().unwrap_or_default();
++        self.move_stats.lock().unwrap().start(info.gen.clone(), run, total, &info.version, info.solo_species.as_deref().unwrap_or(""));
++        let detector = MoveDetector::for_gen(info.gen.clone());
++        Some(Session { controller: self.clone(), expected_names, game, detector, ms_in_battle: false })
+     }
+ 
+     /// Offline: stop the machine `create_session` started.
+     pub fn stop_offline_session(&self) {
++        self.move_stats.lock().unwrap().stop();
+         if let Some(flag) = self.machine_active.lock().unwrap().take() {
+             deactivate(&flag);
+         }
+@@ -290,15 +396,21 @@ impl RecorderController {
+         }
+         let mut to_delete: Vec<NodeId> = Vec::new();
+         let mut test_obj = self.host.call(|h| h.get_previous_event(None));
++        let mut removed_stats: Vec<BattleMoveStats> = Vec::new();
+         while let Some(obj) = &test_obj {
+             if obj.definition.save.is_some() {
+                 break;
+             }
++            if let Some(ms) = obj.definition.trainer_def.as_ref().and_then(|t| t.move_stats.clone()) {
++                removed_stats.push(ms);
++            }
+             to_delete.push(obj.group_id);
+             let id = obj.group_id;
+             test_obj = self.host.call(move |h| h.get_previous_event(Some(id)));
+         }
+         log::info!("Cleaning up {} events for reset", to_delete.len());
++        self.move_stats.lock().unwrap().on_reset(removed_stats);
++        self.push_move_stats();
+         let ids = to_delete.clone();
+         self.host.call(move |h| {
+             h.delete_events(&ids);
+@@ -396,6 +508,14 @@ impl RecorderController {
+                     log::error!("{} When removing trainer event {}, it was not the last event... odd", consts::RECORDING_ERROR_FRAGMENT, trainer_name);
+                 }
+                 log::info!("[BLACKOUT DEBUG] Deleting trainer event with group_id: {}", obj.group_id);
++                {
++                    let mut ms = self.move_stats.lock().unwrap();
++                    if let Some(stats) = obj.definition.trainer_def.as_ref().and_then(|t| t.move_stats.clone()) {
++                        ms.event_removed(stats, "lost");
++                    }
++                    ms.lost_battle(trainer_name);
++                }
++                self.push_move_stats();
+                 let id = obj.group_id;
+                 self.host.call(move |h| h.delete_events(&[id]));
+             }
+@@ -477,6 +597,9 @@ impl RecorderController {
+                 self.host.call(move |h| h.new_event(EventDefinition::notes_only(&msg), &folder));
+                 return;
+             }
++            if event_def.notes.is_empty() {
++                self.move_stats.lock().unwrap().set_trainer_name(&td.trainer_name);
++            }
+             // the event a battle opens with. The queue is in order, so the route
+             // has everything up to this battle in it and its solo mon is the one
+             // walking in. The end-of-battle update overwrites this with the order
+@@ -563,8 +686,13 @@ impl RecorderController {
+             }
+         }
+ 
++        let is_save = event_def.save.is_some();
+         let folder = active_folder;
+         self.host.call(move |h| h.new_event(event_def, &folder));
++        if is_save {
++            self.move_stats.lock().unwrap().on_save();
++        }
++        self.attach_move_stats();
+     }
+ }
+ 
+@@ -654,6 +782,9 @@ pub struct Session {
+     controller: Arc<RecorderController>,
+     expected_names: Vec<String>,
+     game: Box<dyn GameRecorder>,
++    /// move stats (`None` for generations without them yet)
++    detector: Option<MoveDetector>,
++    ms_in_battle: bool,
+ }
+ 
+ impl Session {
+@@ -668,6 +799,32 @@ impl Session {
+     }
+ }
+ 
++impl Session {
++    /// Move stats: follow the battle state and feed the detector.
++    fn track_moves(&mut self, store: &PropertyStore, new: &GameHookProperty, old: &GameHookProperty) {
++        let Some(d) = self.detector.as_mut() else { return };
++        let state = self.controller.get_game_state();
++        let in_battle = state == Some(GameState::Battle);
++        if self.ms_in_battle {
++            for o in d.on_change(store, new, old) {
++                self.controller.record_move(&o);
++            }
++        }
++        if in_battle && !self.ms_in_battle {
++            d.begin();
++            self.controller.move_stats.lock().unwrap().begin_battle();
++            self.ms_in_battle = true;
++        } else if !in_battle && self.ms_in_battle {
++            for o in d.end(store) {
++                self.controller.record_move(&o);
++            }
++            self.controller.move_stats.lock().unwrap().end_battle(state == Some(GameState::Resetting));
++            self.ms_in_battle = false;
++            self.controller.push_move_stats();
++        }
++    }
++}
++
+ impl SessionEvents for Session {
+     fn on_connected(&mut self) {
+         self.controller.set_ready(false);
+@@ -728,6 +885,13 @@ impl SessionEvents for Session {
+                 log::warn!("Skipping registration of unmapped path: {}", key);
+             }
+         }
++        if let Some(d) = self.detector.as_mut() {
++            for key in d.on_mapper_loaded(store) {
++                if !result.contains(&key) {
++                    result.push(key);
++                }
++            }
++        }
+         if !self.game.is_active() {
+             self.game.startup(store);
+         }
+@@ -741,6 +905,7 @@ impl SessionEvents for Session {
+ 
+     fn on_property_changed(&mut self, store: &PropertyStore, new: &GameHookProperty, old: &GameHookProperty) {
+         self.game.handle_event(store, new, old);
++        self.track_moves(store, new, old);
+     }
+ 
+     fn on_idle(&mut self, store: &PropertyStore) {
+diff --git a/rust/crates/xpr-recorder/src/games/gen1.rs b/rust/crates/xpr-recorder/src/games/gen1.rs
+index 2a82e0a2..d351565b 100644
+--- a/rust/crates/xpr-recorder/src/games/gen1.rs
++++ b/rust/crates/xpr-recorder/src/games/gen1.rs
+@@ -561,6 +561,7 @@ impl Gen1Machine {
+     }
+ 
+     fn queue_new_event(&self, event: EventDefinition) {
++        self.controller.note_queued_event(&event, &trainer_loss_flag());
+         self.queue.push(event);
+     }
+ 
+diff --git a/rust/crates/xpr-recorder/src/games/gen2.rs b/rust/crates/xpr-recorder/src/games/gen2.rs
+index 720af6bf..157aa583 100644
+--- a/rust/crates/xpr-recorder/src/games/gen2.rs
++++ b/rust/crates/xpr-recorder/src/games/gen2.rs
+@@ -683,6 +683,7 @@ impl Gen2Machine {
+     }
+ 
+     fn queue_new_event(&self, event: EventDefinition) {
++        self.controller.note_queued_event(&event, &trainer_loss_flag());
+         self.queue.push(event);
+     }
+ 
+diff --git a/rust/crates/xpr-recorder/src/games/gen3.rs b/rust/crates/xpr-recorder/src/games/gen3.rs
+index 9ede33b4..cdaf8a0e 100644
+--- a/rust/crates/xpr-recorder/src/games/gen3.rs
++++ b/rust/crates/xpr-recorder/src/games/gen3.rs
+@@ -633,6 +633,7 @@ impl Gen3Machine {
+     }
+ 
+     fn queue_new_event(&self, event: EventDefinition) {
++        self.controller.note_queued_event(&event, &trainer_loss_flag());
+         self.queue.push(event);
+     }
+ 
+diff --git a/rust/crates/xpr-recorder/src/games/gen45.rs b/rust/crates/xpr-recorder/src/games/gen45.rs
+index 713d2167..b205fea4 100644
+--- a/rust/crates/xpr-recorder/src/games/gen45.rs
++++ b/rust/crates/xpr-recorder/src/games/gen45.rs
+@@ -999,6 +999,7 @@ impl Gen45Machine {
+     }
+ 
+     fn queue_new_event(&self, event: EventDefinition) {
++        self.controller.note_queued_event(&event, &trainer_loss_flag());
+         self.queue.push(event);
+     }
+ 
+diff --git a/rust/crates/xpr-recorder/src/host.rs b/rust/crates/xpr-recorder/src/host.rs
+index b4ac3ee7..3fb98b03 100644
+--- a/rust/crates/xpr-recorder/src/host.rs
++++ b/rust/crates/xpr-recorder/src/host.rs
+@@ -78,6 +78,8 @@ pub trait RecorderHost {
+     fn is_debug_mode(&self) -> bool;
+     /// the GameHook base URL (default `http://localhost:8085`)
+     fn gamehook_url(&self) -> String;
++    /// The route's move-stats run object changed (wild totals, reset attempts).
++    fn set_run_move_stats(&mut self, _run: xpr_engine::RunMoveStats) {}
+     /// The host itself, for a driver that owns it (`replay_to_route`).
+     fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
+         None
+diff --git a/rust/crates/xpr-recorder/src/lib.rs b/rust/crates/xpr-recorder/src/lib.rs
+index 241f9092..0942d9d0 100644
+--- a/rust/crates/xpr-recorder/src/lib.rs
++++ b/rust/crates/xpr-recorder/src/lib.rs
+@@ -6,6 +6,7 @@ pub mod controller;
+ pub mod gamehook;
+ pub mod games;
+ pub mod host;
++pub mod move_stats;
+ pub mod offline;
+ pub mod shuckie;
+ pub mod starter;
+diff --git a/rust/crates/xpr-recorder/src/offline.rs b/rust/crates/xpr-recorder/src/offline.rs
+index e3f861d5..838c7f7e 100644
+--- a/rust/crates/xpr-recorder/src/offline.rs
++++ b/rust/crates/xpr-recorder/src/offline.rs
+@@ -152,6 +152,9 @@ pub fn watched_paths(info: &crate::host::StartInfo, store: &PropertyStore) -> Ve
+         let (watch, _invalid) = game.on_mapper_loaded(store);
+         paths.extend(watch);
+     }
++    if let Some(mut d) = crate::move_stats::MoveDetector::for_gen(info.gen.clone()) {
++        paths.extend(d.on_mapper_loaded(store));
++    }
+     paths.retain(|p| store.contains(p));
+     paths.sort();
+     paths.dedup();

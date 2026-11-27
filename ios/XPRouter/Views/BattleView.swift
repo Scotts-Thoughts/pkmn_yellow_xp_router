@@ -87,6 +87,12 @@ struct BattleView: View {
                 }
                 .task { heldItems = (await model.run("battle.held_items", quiet: true))?.strings ?? [] }
             }
+            if view.has_area_weather.bool {
+                // persistent area weather (Mt. Silver's hail, ...)
+                Picker("Area weather", selection: Binding(get: { view.field_weather.str }, set: { v in Task { await act(["op": "field_weather", "value": .string(v)]) } })) {
+                    ForEach(view.weather_options.strings, id: \.self) { Text($0).tag($0) }
+                }
+            }
         }
         .padding(14)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))

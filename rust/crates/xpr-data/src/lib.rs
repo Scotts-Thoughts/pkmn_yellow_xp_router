@@ -1,6 +1,7 @@
 //! Game data: typed schemas, loaders for the five generation formats,
 //! lookup databases, per-gen stat arithmetic and the version registry.
 
+pub mod area_weather;
 pub mod backport;
 pub mod badges;
 pub mod db;

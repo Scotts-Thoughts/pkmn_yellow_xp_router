@@ -249,6 +249,18 @@ pub const LEVITATE: &str = "Levitate";
 pub const DAMP: &str = "Damp";
 pub const VOLT_ABSORB: &str = "Volt Absorb";
 pub const LIGHTNING_ROD: &str = "Lightning Rod";
+
+/// Older games' data spells a few abilities without their space (the Gen 4
+/// in-game names, also used by the Gen 5 trainer files), while every
+/// ability check uses the modern spelling. Loaders run names through this
+/// so e.g. a HeartGold Yanma's "Compoundeyes" still gets its accuracy boost.
+pub fn canonical_ability_name(name: String) -> String {
+    match name.as_str() {
+        "Compoundeyes" => COMPOUND_EYES.to_string(),
+        "Lightningrod" => LIGHTNING_ROD.to_string(),
+        _ => name,
+    }
+}
 pub const WATER_ABSORB: &str = "Water Absorb";
 pub const FLASH_FIRE: &str = "Flash Fire";
 pub const WONDER_GUARD: &str = "Wonder Guard";

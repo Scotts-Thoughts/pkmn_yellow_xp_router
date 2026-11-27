@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+## Reported problems: reproduce them from the replay
+
+When Scott reports something the Router (or another tool) got wrong in a run,
+find the run's Super Shuckie replay and test it headlessly yourself before
+asking him for anything: `tools/replay_to_route` for the route, or the overlay's
+`tools/markers/memlog.cjs` for a memory log. Recipe:
+`A:\Dropbox\stp-projects\project_context\docs\workflows\debugging-from-replays.md`.
+The router-specific commands (finding the replay, `replay_to_route`,
+`XPR_REPLAY_TRACE`, `shuckie-feeder` RAM reads) are in `AGENTS.md`.
+
 ## Python version is deprecated
 
 The Python version of this program (the `gui`/`controllers` tkinter app and

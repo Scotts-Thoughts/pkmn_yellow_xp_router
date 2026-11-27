@@ -18,6 +18,7 @@ use xpr_data::GenData;
 use xpr_engine::{EventDefinition, HoldItemEventDefinition, InventoryEventDefinition, LearnMoveEventDefinition, LevelVal, TrainerEventDefinition, VitaminEventDefinition, WildPkmnEventDefinition};
 
 use super::common::*;
+use super::stage_setup::{party_slot, StageSetupTracker};
 use super::gen2::convert_move_name_gen2plus;
 use crate::controller::{dedupe, fix_key, fix_keys, fix_opt_key, is_set, new_active_flag, ActiveFlag, EventQueue, GameRecorder, GameState, RecorderController};
 use crate::gamehook::{GameHookProperty, PropertyStore};
@@ -902,6 +903,8 @@ pub struct Gen45Machine {
     move_delete: MoveDeleteData,
     vitamin: VitaminData,
     overworld: OverworldData,
+    /// the solo mon's stat-stage setup in the current battle
+    stage_setup: StageSetupTracker,
 }
 
 fn mon_key_from(dvs: Option<&xpr_data::model::StatBlock>, species: Option<String>) -> MonKey {
@@ -960,6 +963,7 @@ impl Gen45Machine {
             move_delete: MoveDeleteData::default(),
             vitamin: VitaminData::default(),
             overworld: OverworldData::default(),
+            stage_setup: StageSetupTracker::default(),
         }
     }
 
@@ -1994,6 +1998,7 @@ impl Gen45Machine {
                 b.is_double_battle = false;
                 b.multi_battle = false;
                 b.ally_id = ally_id;
+                self.stage_setup.reset();
                 log::info!("ally id: {}", py_str(&b.ally_id));
                 b.initial_money = money;
                 // the held item as the battle starts (not as the delayed
@@ -2174,6 +2179,8 @@ impl Gen45Machine {
                         td.second_trainer_name = self.battle.second_trainer_name.clone();
                         td.exp_split = final_exp_split;
                         td.mon_order = final_mon_order;
+                        // by party slot until `finish_mon_order` too
+                        td.stat_stage_setup = self.stage_setup.finish(&self.gen, &self.cached_moves);
                         td.thief_mons = self.battle.thief_mons.clone();
                         if self.has_return() {
                             td.custom_move_data = Self::return_custom_data(&self.battle.friendship_data);
@@ -3188,6 +3195,7 @@ impl GameRecorder for Gen45Machine {
     fn on_mapper_loaded(&mut self, store: &PropertyStore) -> (Vec<String>, Vec<String>) {
         self.keys = Gen45Keys::configure(self.flavor);
         let invalid = self.keys.fix_case(store);
+        self.stage_setup.configure(store);
         (self.keys.all_keys_to_register(), invalid)
     }
 
@@ -3225,6 +3233,12 @@ impl GameRecorder for Gen45Machine {
         if self.valid_solo_mon && self.mon_key(store, 0).same_key(&self.solo_mon_key) {
             self.last_solo_exp = store_i64(store, &self.keys.mon_exppoints);
             self.last_solo_level = store_i64(store, &self.keys.mon_level);
+        }
+        if self.cur_state == GameState::Battle && self.is_trainer() {
+            // the slot in the event's party order (two trainers' mons interleave)
+            let slot = self.first_enemy_mon_pos(store, None).and_then(|p| party_slot(p.into()));
+            let solo_active = store.get_value(Some(&self.keys.battle_player_mon_party_pos)).as_i64() == Some(0);
+            self.stage_setup.observe(&self.gen, store, slot, solo_active, &self.cached_moves);
         }
     }
 

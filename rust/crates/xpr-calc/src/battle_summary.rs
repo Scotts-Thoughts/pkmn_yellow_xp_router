@@ -169,6 +169,7 @@ pub struct TransientState {
     custom_data: Vec<CustomMoveData>,
     weather: Option<String>,
     weather_source_mon_idx: Option<i64>,
+    field_weather: String,
     player_screens: IndexMap<String, i64>,
     enemy_screens: IndexMap<String, i64>,
     player_intimidate: Option<BTreeSet<i64>>,
@@ -205,6 +206,12 @@ pub struct BattleSummary {
     pub cached_definition_order: Vec<i64>,
     pub weather: Option<String>,
     pub weather_source_mon_idx: Option<i64>,
+    /// The persistent area weather (Mt. Silver's hail, ...): in effect
+    /// wherever `weather` (a weather move, or the legacy whole-battle pick)
+    /// is not. See `TrainerEventDefinition::field_weather`.
+    pub field_weather: String,
+    /// The area's default `field_weather` for this trainer.
+    pub area_weather_default: String,
     pub player_screens: IndexMap<String, i64>,
     pub enemy_screens: IndexMap<String, i64>,
     pub player_intimidate: Option<BTreeSet<i64>>,
@@ -262,6 +269,8 @@ impl Default for BattleSummary {
             cached_definition_order: Vec::new(),
             weather: Some(consts::WEATHER_NONE.to_string()),
             weather_source_mon_idx: None,
+            field_weather: consts::WEATHER_NONE.to_string(),
+            area_weather_default: consts::WEATHER_NONE.to_string(),
             player_screens: IndexMap::new(),
             enemy_screens: IndexMap::new(),
             player_intimidate: None,
@@ -324,6 +333,8 @@ impl BattleSummary {
         self.second_trainer_name_raw = Value::String(String::new());
         self.weather = Some(consts::WEATHER_NONE.to_string());
         self.weather_source_mon_idx = None;
+        self.field_weather = consts::WEATHER_NONE.to_string();
+        self.area_weather_default = consts::WEATHER_NONE.to_string();
         self.player_screens.clear();
         self.enemy_screens.clear();
         self.player_intimidate = None;
@@ -403,6 +414,8 @@ impl BattleSummary {
         self.second_trainer_name_raw = td.second_trainer_name.clone();
         self.weather = td.weather.clone();
         self.weather_source_mon_idx = td.weather_source_mon_idx;
+        self.area_weather_default = gen.get_area_weather(&td.trainer_name).to_string();
+        self.field_weather = td.field_weather.clone().unwrap_or_else(|| self.area_weather_default.clone());
         self.player_screens = td.player_screens.clone();
         self.enemy_screens = td.enemy_screens.clone();
         self.double_battle_flag = trainer_obj.double_battle || second_trainer_obj.is_some();
@@ -499,6 +512,8 @@ impl BattleSummary {
         self.second_trainer_name_raw = Value::String(String::new());
         self.weather = Some(consts::WEATHER_NONE.to_string());
         self.weather_source_mon_idx = None;
+        self.field_weather = consts::WEATHER_NONE.to_string();
+        self.area_weather_default = consts::WEATHER_NONE.to_string();
         self.player_screens.clear();
         self.enemy_screens.clear();
         self.player_intimidate = None;
@@ -526,6 +541,10 @@ impl BattleSummary {
             let player = cur_state.solo_pkmn.get_pkmn_obj(&cur_state.badges, None);
             self.push_state_matchup(gen, cur_enemy, &enemy_mons[0], player, is_wild);
             cur_state = cur_state.defeat_pkmn(gen, cur_enemy, None, 1, 0)?.0;
+        }
+        if let Some(t) = trainer_name.filter(|_| !is_wild) {
+            self.area_weather_default = gen.get_area_weather(t).to_string();
+            self.field_weather = self.area_weather_default.clone();
         }
         self.double_battle_flag = trainer_name
             .and_then(|t| gen.trainer_db().get_trainer(t))
@@ -570,6 +589,8 @@ impl BattleSummary {
         self.second_trainer_name_raw = Value::String(String::new());
         self.weather = Some(consts::WEATHER_NONE.to_string());
         self.weather_source_mon_idx = None;
+        self.field_weather = consts::WEATHER_NONE.to_string();
+        self.area_weather_default = consts::WEATHER_NONE.to_string();
         self.player_screens.clear();
         self.enemy_screens.clear();
         self.player_intimidate = None;
@@ -775,12 +796,14 @@ impl BattleSummary {
     }
 
     /// `_get_weather_for_mon_idx`
+    /// A weather move (or the legacy whole-battle pick) overrides the area
+    /// weather from its matchup on; before it, the area weather holds.
     pub fn get_weather_for_mon_idx(&self, mon_idx: i64) -> &str {
-        let Some(w) = &self.weather else { return consts::WEATHER_NONE };
+        let field = self.field_weather.as_str();
+        let Some(w) = self.weather.as_deref().filter(|w| *w != consts::WEATHER_NONE) else { return field };
         match self.weather_source_mon_idx {
-            None => w,
-            Some(src) if mon_idx < src => consts::WEATHER_NONE,
-            Some(_) => w,
+            Some(src) if mon_idx < src => field,
+            _ => w,
         }
     }
 
@@ -1251,6 +1274,16 @@ impl BattleSummary {
         self.full_refresh(Some(gen), cfg);
     }
 
+    /// Sets the persistent area weather (the battle page's weather dropdown).
+    pub fn update_field_weather(&mut self, gen: &GenData, cfg: &SummaryConfig, new_weather: &str) {
+        self.field_weather = new_weather.to_string();
+        self.full_refresh(Some(gen), cfg);
+    }
+
+    pub fn get_field_weather(&self) -> &str {
+        &self.field_weather
+    }
+
     pub fn update_enemy_setup_moves(&mut self, gen: &GenData, cfg: &SummaryConfig, moves: Vec<String>) {
         self.enemy_setup_move_list = moves;
         self.full_refresh(Some(gen), cfg);
@@ -1292,6 +1325,7 @@ impl BattleSummary {
             custom_data: self.custom_move_data.clone(),
             weather: self.weather.clone(),
             weather_source_mon_idx: self.weather_source_mon_idx,
+            field_weather: self.field_weather.clone(),
             player_screens: self.player_screens.clone(),
             enemy_screens: self.enemy_screens.clone(),
             player_intimidate: self.player_intimidate.clone(),
@@ -1313,6 +1347,7 @@ impl BattleSummary {
         self.custom_move_data = saved.custom_data;
         self.weather = saved.weather;
         self.weather_source_mon_idx = saved.weather_source_mon_idx;
+        self.field_weather = saved.field_weather;
         self.player_screens = saved.player_screens;
         self.enemy_screens = saved.enemy_screens;
         self.player_intimidate = saved.player_intimidate;
@@ -1427,6 +1462,7 @@ impl BattleSummary {
         td.custom_move_data = final_custom;
         td.weather = self.weather.clone();
         td.weather_source_mon_idx = self.weather_source_mon_idx;
+        td.field_weather = (self.field_weather != self.area_weather_default).then(|| self.field_weather.clone());
         td.player_screens = self.player_screens.clone();
         td.enemy_screens = self.enemy_screens.clone();
         td.player_intimidate = self.intimidate_to_def_order(self.player_intimidate.as_ref());

@@ -53,7 +53,7 @@ Eligible = referenced by some object or script in the game data (pokemap trainer
 - **Twins**: Twins Dara & Dia [385], Twins Jo & Zoe [416], Twins Mickey [531]
 - **Youngster**: Youngster Mickey [511]
 
-## Anchors inherited from a namesake (141)
+## Anchors inherited from a namesake (143)
 
 - Hiker Anthony Rematch 2 <- Hiker Anthony
 - Picnicker Gina Rematch 2 <- Picnicker Gina
@@ -75,6 +75,8 @@ Eligible = referenced by some object or script in the game data (pokemap trainer
 - Picnicker Gina Rematch 3 <- Picnicker Gina
 - Picnicker Erin Rematch 2 <- Picnicker Erin
 - Bug Catcher Arnie Rematch 2 <- Bug Catcher Arnie
+- Twins Amy & Mimi Rematch 2 <- Twins Amy & Mimi
+- Twins Meg & Peg Rematch 2 <- Twins Meg & Peg
 - School Kid Jack Rematch 2 <- School Kid Jack
 - School Kid Jack Rematch 3 <- School Kid Jack
 - School Kid Alan Rematch 2 <- School Kid Alan
@@ -196,12 +198,6 @@ Eligible = referenced by some object or script in the game data (pokemap trainer
 - Gentleman Alfred Rematch 2 <- Gentleman Alfred
 - Gentleman Alfred Rematch 3 <- Gentleman Alfred
 - Gentleman Alfred Rematch 4 <- Gentleman Alfred
-
-## Anchored to their place only (trainer_location; no object or script on the map battles them) (0)
-
-
-## Trainer locations that name no map (0)
-
 
 ## Linked trainer ids pokemap has no party for (party guard skipped) (0)
 
